@@ -9,13 +9,15 @@ agentic engineering team. Agent-specific rules live in the sibling files.
 
 ## Identifiers & systems
 
-- **Jira:** `https://thekeval.atlassian.net`, project **Agentic Team**, key **`DRIVE`**,
+- **Jira:** `https://thekeval.atlassian.net`, project **DrivePerf**, key **`DRIVE`**,
   agile **board id 2**. Ticket keys look like `DRIVE-12`.
 - **Jira statuses (only these four):** `To Do` (transition id 11) → `In Progress` (21) →
   `In Review` (31) → `Done` (41). Transitions are any-to-any.
 - **Design flag:** the Jira label **`design-needed`** marks tickets requiring design work.
-- **Pilot product repo:** `theKeval/DriveStats` (GitHub) — Android app, Kotlin, Jetpack
+- **Pilot product repo:** `theKeval/DrivePerf` (GitHub) — Android app, Kotlin, Jetpack
   Compose. Default branch: `main`.
+- **Product identity:** **DrivePerf**, domain **`driveperf.com`**, Android package
+  **`com.driveperf`** (subpackages `com.driveperf.*`).
 - **Slack:** workspace `AgenticWorkflow`, channel **#agentic-team**. Bot handles:
   **@product_manager** (PM), **@developer** (dev), **@senior_developer** (reviewer),
   **@designer**.

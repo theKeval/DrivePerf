@@ -2,7 +2,7 @@
 applyTo: "app/**"
 ---
 
-# Android / Kotlin / Jetpack Compose rules (DriveStats)
+# Android / Kotlin / Jetpack Compose rules (DrivePerf)
 
 - **Kotlin idioms:** prefer `val`, data classes, sealed interfaces for state, extension
   functions over utility classes; no `!!` — handle nullability explicitly.
