@@ -6,9 +6,24 @@
 | **Version** | PRD v1.0, draft for the Gate 2 review |
 | **Jira** | DRIVE-13 |
 | **Author** | Agent A4 (product management) · 6 November 2026 |
-| **Status** | Draft. Becomes the source for the Jira backlog (A5) once approved at Gate 2. |
+| **Status** | **Approved at Gate 2 on 6 Nov 2026** with the decisions below. It is the source for the Jira backlog (A5). |
 | **Binding inputs** | [Gate 1 decisions](gate-1-decisions.md) and the [decisions log](decisions.md). This PRD does not change any of them. Where I think one needs another look, it is listed in §9 (Open questions). |
 | **Other inputs** | [A1 market refresh](../research/2026-11/A1-market-refresh.md) (incl. §8a Mileon) · [A2 strategy and positioning](A2-strategy-positioning.md) · [A3 platform feasibility](../research/2026-11/A3-platform-feasibility.md) · [kickoff plan](../planning/DrivePerf-v1-kickoff-plan.md) §2–3 · [Sep 2026 research pack](../research/2026-09/README.md) |
+
+---
+
+## Gate 2 decisions (6 Nov 2026), which override anything below
+
+| Topic | Decision |
+|---|---|
+| **Timeline (OQ-17)** | **Full scope is kept, and the target launch is January 2027, or earlier if ready.** The build is AI-agent driven, so phases are compressed: prototypes in mid–late Nov 2026, Spike 1 and foundations in late Nov, feature build in Dec, a short Founding Drivers beta in early Jan, launch in Jan 2027. The P1 slip order in §7.3 still applies if needed. The launch event is called **"Launch"** (the "Season Opener" name and spring timing are replaced). |
+| **Replay older than 30 days (OQ-06)** | **Pro**, as written in F-RPL-01 ("locked, not lost" preview). |
+| **Trends on Free (OQ-07)** | As written: Free gets the weekly view with a 4-week line; month, year, per-car and per-route trends are Pro. |
+| **Pro Preview (OQ-08)** | **14 days** for everyone. Beta and internal testers get **free or extended Pro** through promotional entitlements (RevenueCat) for as long as testing needs. |
+| **iOS "Show live drive" control (OQ-24)** | Kept, designed never to invite use while moving (aimed at passengers and pre-departure), as proposed. |
+| **Language (OQ-01)** | **English only** for v1 and the foreseeable future. No FR-CA localisation is planned. |
+| **Trademark check (OQ-19)** | An AI-assisted preliminary search of USPTO and CIPO for "DrivePerf" and "Smooth is a skill." is scheduled as the **last task, after development**. It is not legal clearance. |
+| **Jira backlog** | Created directly from this PRD without a separate tree review. Changes are handled during development. |
 
 ---
 
@@ -30,9 +45,9 @@
 
 **Not in v1.** Insurance, OBD/hardware, track or lap timing, 0–60, friends, feeds, leaderboards, live location sharing, CarPlay/Android Auto, Apple Watch, push-to-start Live Activities, a web dashboard, ML detectors, crash detection, phone-distraction scoring, and any energy or fuel *measurement* claim.
 
-**Order of work.** Gate 2 (this PRD + Jira) → screen-by-screen prototypes for every screen in §4 (Gate 3) → **Spike 1: iOS capture test app benchmarked against Mileon** → monorepo scaffold → shared core → app shells → backend → website → feature build → Founding Drivers beta → **spring 2027 "Season Opener" launch**.
+**Order of work.** Gate 2 (this PRD + Jira) → screen-by-screen prototypes for every screen in §4 (Gate 3) → **Spike 1: iOS capture test app benchmarked against Mileon** → monorepo scaffold → shared core → app shells → backend → website → feature build → short Founding Drivers beta → **launch in January 2027 (or earlier)**.
 
-**Top risks.** (1) iOS auto-capture (force-quit, reboot, Low Power Mode, the lost first few hundred metres). (2) Android OEM battery killers. (3) Store review of background location (three Play declarations, Apple 2.5.4). (4) Scope: 96 P0 features against a 6–10 week build phase. (5) Quebec French-language obligations (open legal question).
+**Top risks.** (1) iOS auto-capture (force-quit, reboot, Low Power Mode, the lost first few hundred metres). (2) Android OEM battery killers. (3) Store review of background location (three Play declarations, Apple 2.5.4). (4) Scope: 96 P0 features against a 6–10 week build phase. (5) The compressed January 2027 timeline.
 
 ---
 
@@ -87,7 +102,7 @@ Personas are defined in [A2 §1](A2-strategy-positioning.md#1-personas). This PR
 | Fuel, kWh or money *measurement* ("you saved 12%") | A phone measures behaviour, not energy (Sep research; A2 I1 copy rule) | Only with vehicle data (OBD) |
 | Teen or parent monitoring | v1 is 18+ (A2 I2 guardrails) | Separate product |
 | Weekly plan, lifetime plan, ads, ad or attribution SDKs, data sale | Gate 1 #4; privacy label target | Lifetime revisited at 6 months (A2 §5.2) |
-| French (Quebec) localisation | Open legal question (Gate 1 #15) | §9 OQ-01 |
+| French (Quebec) or other localisation | English only (Gate 2) | Not planned |
 
 ---
 
@@ -159,7 +174,7 @@ Report weekly retention (W1, W4) alongside day-N retention: driving apps follow 
 | Q20 | Event detection accuracy (hard braking, acceleration, cornering) | Precision ≥ 85%, recall ≥ 75% vs labelled field-test events | Same | — | Provisional — set by A12, measured by A19 |
 | Q21 | Background relaunch to first DB write (iOS) | ≤ 2 s (A3 Spike 5) | — | — | Provisional |
 
-**Release gates.** v1.0 ships only when Q1, Q2, Q4, Q9, Q11, Q14, Q15 and Q17 meet target on the beta cohort for two consecutive weeks.
+**Release gates.** v1.0 ships only when Q1, Q2, Q4, Q9, Q11, Q14, Q15 and Q17 meet target on the beta cohort for at least one week.
 
 ---
 
@@ -2270,7 +2285,7 @@ Rules: no ad, attribution or data-broker SDKs; no locations in Crashlytics logs 
 | Law 25: confidentiality incidents | Incident register and notification process (CAI and affected people where there is a risk of serious injury). |
 | Law 25: portability, deletion | F-PRV-02 (structured, commonly used format), F-PRV-04/05. |
 | Law 25: cookies | Website sets no cookies by default (F-WEB-01). |
-| Charter of the French language (Quebec) | **Open legal question** (Gate 1 #15, §9 OQ-01). |
+| Charter of the French language (Quebec) | English only (Gate 2). Counsel may still advise before any Quebec-targeted marketing. |
 | **CASL** (Canada's Anti-Spam Legislation) | Waitlist and launch emails only with express, unticked opt-in; consent records kept; sender identification and unsubscribe in every message, honoured within 10 business days (F-WEB-02, F-WEB-07). |
 
 ### 6.6 United States: state privacy laws and other rules
@@ -2308,13 +2323,14 @@ As of 6 Nov 2026, trackers count roughly 20 state comprehensive privacy laws in 
 
 | Phase | What | Gate | Target dates (indicative) |
 |---|---|---|---|
-| 2 | PRD (this document) → Jira epics, stories and design tasks (A5) | **Gate 2** | 6–13 Nov 2026 |
-| 3 | Design system (A6) → screen-by-screen prototypes for every row of §4: iOS (A7), Android (A8), web (A9) | **Gate 3**: every UI story has "ready" design artifacts | mid-Nov – early Dec 2026 |
-| 4 | Architecture docs (A10 ADRs, A11 data model, A12 pipeline and scoring), overlapping Phase 3 | **Gate 4** | Nov – Dec 2026 |
-| 5 | Foundations (first development tickets, §7.2) | — | Dec 2026 – Jan 2027 |
-| 6 | Feature build from Jira, field test (A19), **Founding Drivers beta** (200–300 testers, TestFlight + Play closed testing) | v1.0 release gates (§2.4) | Jan – Apr 2027 |
+| 2 | PRD (this document) → Jira epics, stories and design tasks (A5) | **Gate 2** ✅ | 6 Nov 2026 |
+| 3 | Design system (A6) → screen-by-screen prototypes for every row of §4: iOS (A7), Android (A8), web (A9) | **Gate 3**: every UI story has "ready" design artifacts | mid – late Nov 2026 |
+| 4 | Architecture docs (A10 ADRs, A11 data model, A12 pipeline and scoring), overlapping Phase 3 | **Gate 4** | Nov 2026 |
+| 5 | Foundations (first development tickets, §7.2) | — | late Nov – early Dec 2026 |
+| 6 | Feature build from Jira, field test (A19), **Founding Drivers beta** (200–300 testers, TestFlight + Play closed testing) | v1.0 release gates (§2.4) | Dec 2026 – early Jan 2027 |
 | 7 | Launch readiness (A20): store listings, privacy labels, declarations, review notes | — | 1 week before launch |
-| Launch | **"Season Opener"**, both stores, same day (a Tuesday), CA + US, English | — | spring 2027 (late Apr – May) |
+| Launch | Both stores, same day (a Tuesday), CA + US, English | — | **January 2027 (or earlier)** |
+| After launch | Trademark preliminary search (AI-assisted, USPTO + CIPO) for "DrivePerf" and "Smooth is a skill." | — | Last task |
 
 The website and waitlist go live as soon as the web ticket is done (Phase 5) so the positioning A/B test has ≥ 4 weeks before store copy is locked.
 
@@ -2329,10 +2345,10 @@ The website and waitlist go live as soon as the web ticket is done (Phase 5) so 
 | 5 | **Backend** (A17): Firebase Auth, Firestore rules, App Check, Hosting config, waitlist collection; Blaze-scope code prepared (Storage, Functions) | Emulator tests green; Spark scope deployed |
 | 6 | **Website** (A18): Astro site from the A9 prototype, waitlist live, legal drafts, app-link files | Lighthouse ≥ 95; waitlist writes verified; preview channels per PR |
 
-### 7.3 v1.0 (MVP) — spring 2027
+### 7.3 v1.0 (MVP) — January 2027
 
 - **Contents:** all P0 features (96) and the P1 features the product owner keeps in scope (26 candidates).
-- **Release gates:** §2.4 (Q1, Q2, Q4, Q9, Q11, Q14, Q15, Q17 on the beta for two consecutive weeks); Play policy approval of the three declarations; Apple review notes and demo video ready; counsel sign-off on the privacy policy, terms and OQ-01/OQ-18.
+- **Release gates:** §2.4 (Q1, Q2, Q4, Q9, Q11, Q14, Q15, Q17 on the beta cohort for at least one week, given the compressed January timeline); Play policy approval of the three declarations; Apple review notes and demo video ready; counsel sign-off on the privacy policy, terms and OQ-01/OQ-18.
 - **P1 slip order if the build runs late** (the first listed slips first): F-CAP-13, F-RPL-09, F-SHR-03, F-SET-06, F-DQ-06, F-ONB-10, F-SHR-04, F-NTF-04, F-PRV-07, F-SET-04, F-SCO-10, F-SCO-09, F-GAR-03, F-RTE-06, F-ACC-05, F-NTF-06, F-WEB-05, F-WEB-06, F-SHR-05, F-DQ-07, F-ANA-04, F-ANA-05, F-CAP-15, F-CAP-17, F-ONB-09. (F-NTF-05 Annual Wrapped is planned for v1.2.)
 
 ### 7.4 v1.1 — early summer 2027 (≈ 6–8 weeks after launch)
@@ -2341,7 +2357,6 @@ The website and waitlist go live as soon as the web ticket is done (Phase 5) so 
 - P2: Bluetooth car assignment (F-GAR-04), merge/split trips (F-HIS-06), replay layers (F-RPL-10), press kit (F-WEB-08).
 - Club codes for car clubs (A2 §4.2 runner-up), anonymous aggregate "club recap" only — nothing that ranks members.
 - Wrapped Pro extra chapters and card styles.
-- FR-CA localisation if OQ-01 requires it (or earlier, before any Quebec-targeted marketing).
 - Tuning from beta and launch data: detector thresholds, transit heuristics, Pro Preview variant A/B (RevenueCat Experiments).
 
 ### 7.5 v1.2 — autumn 2027 (must land before 1 Dec 2027)
@@ -2408,14 +2423,14 @@ Gate 1 decisions are not changed here. Where I think one is under strain, it is 
 
 | ID | Question | Why it matters / my proposal | Owner | Due phase |
 |---|---|---|---|---|
-| OQ-01 | **Quebec French.** What do the Charter of the French language rules require for the app, the store listings, the website and marketing aimed at Quebec? | Gate 1 #15 flags it. Options: FR-CA at launch, or launch in English with no Quebec-targeted marketing until FR-CA ships. Affects Phase 6 scope. | PO + counsel | Decision by end of Phase 5; confirmed before Phase 7 |
+| OQ-01 | ✅ *Resolved at Gate 2, see the top of this PRD.* **Quebec French.** What do the Charter of the French language rules require for the app, the store listings, the website and marketing aimed at Quebec? | Gate 1 #15 flags it. Options: FR-CA at launch, or launch in English with no Quebec-targeted marketing until FR-CA ships. Affects Phase 6 scope. | PO + counsel | Decision by end of Phase 5; confirmed before Phase 7 |
 | OQ-02 | **Usage-statistics default.** Opt-in (nothing pre-selected) vs opt-out, under Law 25 privacy-by-default and US sensitive-data rules — and how WDD, activation and retention are measured if many users decline. | I specified an explicit choice with nothing pre-selected (F-ONB-08). WDD would then be measured on the opted-in cohort, with beta testers consenting to full telemetry. **Tension with Gate 1 #11** measurability. | Counsel + A10 (ADR-007) + PO | Phase 4 |
 | OQ-03 | iOS behaviour after force-quit, reboot and in Low Power Mode on iOS 26.x/27.x | Sources conflict (A3 §1.5). May change the honest capture copy (Gate 1 #10). | A13a (Spike 1) | Phase 5 |
 | OQ-04 | Do the provisional capture targets (Q1–Q13) hold? | Spike 1 on iOS; A19 field test on both platforms. Changes recorded in `decisions.md`. | A13a, A19 → PO | Phase 5 (iOS), Phase 6 (both) |
 | OQ-05 | Is promoting an automatic trip as an Android Live Update acceptable under Play's "user-initiated" expectation? | Proposal: promote only after confirmation, never re-promote; fall back to a standard notification. Check in the closed-testing policy review. | A16 + A20 | Phase 6 |
-| OQ-06 | **Replay for trips older than 30 days on Free.** I applied Gate 1 #6's "30-day Analysis" to Trip Replay too (Mileon's free tier is also 30 days). Should basic Replay stay free forever, with only Analysis gated? | Replay is P0 and a baseline expectation; gating it may feel like "lost" data. Interpretation, not a change. | PO | Gate 2 |
-| OQ-07 | **"Trends" in Free.** Gate 1 #6 puts trends in Pro; A2 gives Free a weekly trend. I gave Free the weekly view with a 4-week line and Pro month/year/car/route. Confirm. | Interpretation of a binding decision. | PO | Gate 2 |
-| OQ-08 | Pro Preview for low-usage users (< 3 trips in 14 days): end on day 15 anyway, or extend (e.g. until 5 trips or +14 days)? | Gate 1 #5 says 14 days; an extension would be a change, so it needs a PO decision or a beta A/B test. | PO + A2 | Gate 2 (or beta experiment) |
+| OQ-06 | ✅ *Resolved at Gate 2, see the top of this PRD.* **Replay for trips older than 30 days on Free.** I applied Gate 1 #6's "30-day Analysis" to Trip Replay too (Mileon's free tier is also 30 days). Should basic Replay stay free forever, with only Analysis gated? | Replay is P0 and a baseline expectation; gating it may feel like "lost" data. Interpretation, not a change. | PO | Gate 2 |
+| OQ-07 | ✅ *Resolved at Gate 2, see the top of this PRD.* **"Trends" in Free.** Gate 1 #6 puts trends in Pro; A2 gives Free a weekly trend. I gave Free the weekly view with a 4-week line and Pro month/year/car/route. Confirm. | Interpretation of a binding decision. | PO | Gate 2 |
+| OQ-08 | ✅ *Resolved at Gate 2, see the top of this PRD.* Pro Preview for low-usage users (< 3 trips in 14 days): end on day 15 anyway, or extend (e.g. until 5 trips or +14 days)? | Gate 1 #5 says 14 days; an extension would be a change, so it needs a PO decision or a beta A/B test. | PO + A2 | Gate 2 (or beta experiment) |
 | OQ-09 | Cloud data retention after Pro lapses | Proposal: keep 90 days with warnings at 30, 7 and 1 day, then delete cloud copies (local data untouched). | PO + A11 | Phase 4 |
 | OQ-10 | How to limit the founding price to waitlist and beta members (Apple offer codes; Play developer-determined offers or promo codes) | Mechanism affects store setup and the waitlist email flow. | A20 + A17 | Phase 5 |
 | OQ-11 | Store age ratings, and whether state app-store age-assurance laws (e.g. Texas, Utah) require us to read store age signals; is self-attestation enough for an 18+ product? | Compliance for the 18+ rule. | Counsel + A20 | Phase 6 |
@@ -2424,14 +2439,14 @@ Gate 1 decisions are not changed here. Where I think one is under strain, it is 
 | OQ-14 | Email provider for waitlist confirmation and launch emails (needs Blaze + an extension, or a third-party service) | CASL compliance; Spark cannot send email. | PO + A18 | Phase 5 |
 | OQ-15 | Android map provider and static map snapshots for the map share card (Google Maps SDK vs MapLibre + tiles; cost; terms) | Replay is P0; cost and licence for images users share. | A10 (ADR-005) | Phase 4 |
 | OQ-16 | When to upgrade Firebase to Blaze | Needed for backup, deletion cascade, Ride-along validation and email. Proposal: at the start of Phase 6 with a US$5 budget alert. | PO | End of Phase 5 |
-| OQ-17 | **Scope vs timeline.** 96 P0 features against a 6–10 week feature build. Accept a longer build (launch late May rather than April), or move items — some of which are binding Pro features (cloud backup, trends, export)? | Not a contradiction of Gate 1, but the binding Free/Pro split fixes much of the scope. A5's estimates will make this concrete. | PO | Gate 2 |
+| OQ-17 | ✅ *Resolved at Gate 2, see the top of this PRD.* **Scope vs timeline.** 96 P0 features against a 6–10 week feature build. Accept a longer build (launch late May rather than April), or move items — some of which are binding Pro features (cloud backup, trends, export)? | Not a contradiction of Gate 1, but the binding Free/Pro split fixes much of the scope. A5's estimates will make this concrete. | PO | Gate 2 |
 | OQ-18 | Counsel review of the Replay speed readout and max-speed pin (Gate 1 #16) and of share cards, given negligent-design precedent | Decision 16 stands; the question is whether the speed-neutral rule (§3.5) is a sufficient mitigation. | Counsel | Phase 6 (before beta) |
-| OQ-19 | Trademark clearance for "DrivePerf" and "Smooth is a skill." | A2 flagged it before brand identity work. | PO | Phase 3 (before A6) |
+| OQ-19 | ✅ *Resolved at Gate 2, see the top of this PRD.* Trademark clearance for "DrivePerf" and "Smooth is a skill." | A2 flagged it before brand identity work. | PO | Phase 3 (before A6) |
 | OQ-20 | Transit (bus/train) detection approach and an acceptable Q7 target | Phones can't reliably tell transit from driving; A12 heuristic + one-tap correction. | A12 + A19 | Phase 4 / Phase 6 |
 | OQ-21 | Minimum OS versions (proposed iOS 26+, Android 10+) | Market reach vs test cost and Liquid Glass. | A10 | Phase 4 |
 | OQ-22 | Should "Was it needed?" apply to all event types (as specified) or braking only, and how many exclusions may a record-setting run have? | Fairness vs gaming one's own records. | A12 + A2 | Phase 4 |
 | OQ-23 | Raw sensor data retention and stored size per hour | Storage growth (≈ 1.5 GB/yr raw for 1 h/day) vs "locked, not lost" Pro analysis of old trips. | A11 | Phase 4 |
-| OQ-24 | **iOS live surface for automatic trips.** Gate 1 #9 specifies a notification plus a one-tap control/widget that starts a Live Activity. I implemented the control as "Show live drive", which attaches a Live Activity to a running auto trip. Is offering a tap during an auto trip compatible with Gate 1 #12 (no interaction while moving), or should the control only start trips before departure? | Mild tension between #9 and #12. Proposal: keep it, with copy and design that never prompt use while moving; passengers benefit. | A6 + PO | Phase 3 |
+| OQ-24 | ✅ *Resolved at Gate 2, see the top of this PRD.* **iOS live surface for automatic trips.** Gate 1 #9 specifies a notification plus a one-tap control/widget that starts a Live Activity. I implemented the control as "Show live drive", which attaches a Live Activity to a running auto trip. Is offering a tap during an auto trip compatible with Gate 1 #12 (no interaction while moving), or should the control only start trips before departure? | Mild tension between #9 and #12. Proposal: keep it, with copy and design that never prompt use while moving; passengers benefit. | A6 + PO | Phase 3 |
 | OQ-25 | Criteria for the push-to-start evaluation (latency, cost, network dependency, privacy) | Planned for v1.2 as a decision. | A10 | v1.2 |
 | OQ-26 | Apple and Google rules for referral rewards (Ride-along) | No referral-specific Apple rule was confirmed (A2 §4.2). | A20 | Phase 7 |
 

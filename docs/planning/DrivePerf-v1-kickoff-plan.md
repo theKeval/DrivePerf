@@ -5,6 +5,7 @@
 > **Decisions on 6 Nov 2026** (see also `docs/product/decisions.md`)
 > - **Order is strict:** PRD → Jira tickets → prototypes approved → development. Architecture docs (Phase 4) may be written alongside prototyping, but no application code is written before Gate 3.
 > - **Hosting and backend:** a new Firebase project **"DrivePerf"** on the free **Spark** plan. Firebase Hosting serves the website. Namecheap remains only the domain registrar, and the custom domain is connected to Firebase Hosting later.
+> - **Timeline (Gate 2):** full v1 scope, launch in **January 2027 or earlier**, with compressed AI-driven phases. English only.
 > - **Accounts:** a Google Play Console account exists. The Apple Developer account is bought later. Until then, iOS work runs on the simulator; TestFlight, device builds with background capabilities, and Sign in with Apple wait for it.
 **Product:** DrivePerf · **Domain:** driveperf.com · **Jira:** [DRIVE](https://thekeval.atlassian.net/jira/software/projects/DRIVE/summary) · **Repo:** [theKeval/DrivePerf](https://github.com/theKeval/DrivePerf)
 
@@ -96,12 +97,13 @@ Each **phase gate** needs your approval before the next phase starts. Prompts in
 |---|---|---|---|
 | **0. Housekeeping** ✅ done 6 Nov (DRIVE-11) | — | Rebrand committed, legacy tagged, monorepo layout, `docs/` folders | 1 day |
 | **1. Discovery** ✅ done 6 Nov (DRIVE-12, Gate 1 approved) | A1 ∥ A2 ∥ A3 | Market refresh incl. iOS, personas/positioning/pricing, iOS+Android feasibility | 3–5 days |
-| **2. PRD & backlog** | A4 → A5 | `docs/product/PRD-v1.md`, Jira epics, stories and design tasks | 2–3 days |
+| **2. PRD & backlog** ✅ PRD approved 6 Nov (DRIVE-13, Gate 2) | A4 → A5 | `docs/product/PRD-v1.md`, Jira epics, stories and design tasks | 2–3 days |
 | **3. Design & prototypes** | A6 → (A7 ∥ A8 ∥ A9) | Design system + motion language; **screen-by-screen** iOS, Android and web HTML prototypes, with each screen's artifacts in `docs/design/<JIRA-KEY>/` and linked from its Jira story | 1–2 weeks |
 | **4. Architecture** (documents only; can overlap phase 3) | A10 ∥ A11 ∥ A12 | ADRs, data model + migration plan, sensor/scoring algorithm spec | 1 week |
 | **5. Foundations build** | **A13a iOS capture test app (Spike 1) first**, then A13 → (A14 ∥ A15 ∥ A16 ∥ A17 ∥ A18) | Capture benchmark vs Mileon; monorepo + CI, shared core, app shells, Firebase, live landing page | 3–4 weeks |
 | **6. Feature build → field test → beta** | @PM/@dev workflow from Jira tickets + A19 field-test protocol | TestFlight + Play internal testing, calibration data | 6–10 weeks |
 | **7. Launch readiness** | A20 | Store listings, privacy policy, data-safety forms, ASO | 1 week |
+| **8. After development (last)** | A21 | AI-assisted trademark preliminary search for "DrivePerf" and "Smooth is a skill." (USPTO, CIPO) | 1 day |
 
 ### Phase 0 — housekeeping ✅ done 6 Nov 2026 ([DRIVE-11](https://thekeval.atlassian.net/browse/DRIVE-11))
 1. The pending rebrand was committed and merged ([PR #11](https://github.com/theKeval/DrivePerf/pull/11)).
@@ -298,9 +300,8 @@ Rules:
 - Create design Tasks (label design-needed) under an Epic "v1 · Prototypes": one per screen
   group for iOS, Android and web. Each design Task "blocks" the stories it covers.
 - Link dependencies with "blocks" links.
-- Before creating anything, print the full proposed tree (epics → stories) and STOP for human
-  approval. After approval, create the tickets and write docs/product/jira-map.md (PRD section →
-  Jira keys).
+- Create the tickets directly (Gate 2 decision: no separate tree review; changes are handled
+  during development), then write docs/product/jira-map.md (PRD feature/screen → Jira keys).
 ```
 
 ---
@@ -673,3 +674,17 @@ docs/launch/.
 3. ✅ Phase 1 and Gate 1 are done. Next: **A4 PRD → A5 Jira (Gate 2) → A6 design system → A7/A8/A9 screen-by-screen prototypes attached to the tickets (Gate 3) → A13a iOS capture test app → build**.
 4. Create the Firebase project **"DrivePerf"** (Spark) in the Firebase console before Phase 5. Prototypes don't need it.
 5. Buy the **Apple Developer** account ($99/yr) before iOS device testing and TestFlight in Phase 6. The Play Console account is already in place.
+
+---
+
+### A21 — Trademark preliminary search · *Research model* · Phase 8 (last, after development)
+
+```
+Run a preliminary (not legal) trademark knock-out search for "DrivePerf" (the app name) and
+"Smooth is a skill." (the tagline) in the USPTO (Trademark Search) and CIPO (Canadian Trademarks
+Database) registers, in classes 9 (downloadable software), 42 (SaaS) and 35 if relevant. Also check
+the App Store and Google Play for identical or confusingly similar app names, and common-law use
+(web, social handles). Report exact and similar marks with status, owner, classes and dates, a risk
+rating, and whether to engage a trademark lawyer before filing. Output
+docs/launch/trademark-preliminary-search.md. State clearly that this is not legal advice.
+```
