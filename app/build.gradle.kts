@@ -7,11 +7,11 @@ plugins {
 }
 
 android {
-    namespace = "com.drivestats"
+    namespace = "com.driveperf"
     compileSdk = 34
 
     defaultConfig {
-        applicationId = "com.drivestats"
+        applicationId = "com.driveperf"
         minSdk = 26
         targetSdk = 34
         versionCode = 1
@@ -114,6 +114,7 @@ dependencies {
 
     // Unit tests
     testImplementation(libs.junit)
+    testImplementation(libs.kotlin.test)
     testImplementation(libs.mockk)
     testImplementation(libs.turbine)
     testImplementation(libs.truth)

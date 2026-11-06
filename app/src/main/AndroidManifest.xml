@@ -29,20 +29,20 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <application
-        android:name=".DriveStatsApp"
+        android:name=".DrivePerfApp"
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
-        android:theme="@style/Theme.DriveStats"
+        android:theme="@style/Theme.DrivePerf"
         android:hardwareAccelerated="true">
 
         <activity
             android:name=".MainActivity"
             android:exported="true"
             android:label="@string/app_name"
-            android:theme="@style/Theme.DriveStats"
+            android:theme="@style/Theme.DrivePerf"
             android:windowSoftInputMode="adjustResize">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -62,7 +62,7 @@
             android:exported="false"
             android:permission="com.google.android.gms.permission.ACTIVITY_RECOGNITION">
             <intent-filter>
-                <action android:name="com.drivestats.ACTION_ACTIVITY_TRANSITION" />
+                <action android:name="com.driveperf.ACTION_ACTIVITY_TRANSITION" />
             </intent-filter>
         </receiver>
 

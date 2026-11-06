@@ -1,8 +1,8 @@
 <resources>
-    <string name="app_name">DriveStats</string>
+    <string name="app_name">DrivePerf</string>
     <string name="notification_channel_trip_tracking">Trip Tracking</string>
     <string name="notification_recording_title">Recording trip</string>
-    <string name="notification_recording_text">DriveStats is tracking your drive</string>
+    <string name="notification_recording_text">DrivePerf is tracking your drive</string>
     <string name="notification_stop_action">Stop</string>
 
     <!-- About -->
@@ -10,11 +10,11 @@
     <string name="about_version">Version %1$s (Build %2$d)</string>
     <string name="back">Back</string>
     <string name="about_icon_description">About</string>
-    <string name="about_logo_content_description">DriveStats logo</string>
+    <string name="about_logo_content_description">DrivePerf logo</string>
     <string name="about_description">Track every drive. See your speed, distance, routes, and fuel efficiency trends over time — all recorded automatically, right on your device.</string>
     <string name="about_view_source">View source on GitHub</string>
-    <string name="about_github_url">https://github.com/theKeval/DriveStats</string>
-    <string name="about_footer">© 2026 DriveStats · Built for drivers, by drivers.</string>
+    <string name="about_github_url">https://github.com/theKeval/DrivePerf</string>
+    <string name="about_footer">© 2026 DrivePerf · driveperf.com</string>
     <string name="settings_icon_description">Settings</string>
     <string name="insights_icon_description">Insights</string>
     <string name="settings_distance_unit_title">Units</string>
@@ -36,7 +36,7 @@
     <string name="stats_glossary_body">Total distance and total driving time are calculated from valid completed trips. Average speed is total distance divided by total driving time. Personal records exclude trips with invalid durations.</string>
     <string name="stats_glossary_dismiss">Got it</string>
     <string name="stats_no_trips_title">No trips recorded yet</string>
-    <string name="stats_no_trips_body">Start a drive and DriveStats will build your all-time totals, weekly trend, and personal records automatically.</string>
+    <string name="stats_no_trips_body">Start a drive and DrivePerf will build your all-time totals, weekly trend, and personal records automatically.</string>
     <string name="stats_start_trip">Start a Trip</string>
     <string name="stats_partial_data_banner">Some recent trips are still syncing — totals may update shortly.</string>
     <string name="stats_overview">Overview</string>
@@ -58,7 +58,7 @@
     <string name="permission_location_title">Precise location</string>
     <string name="permission_location_rationale">Required to track your route and detect speeding.</string>
     <string name="permission_activity_title">Physical activity</string>
-    <string name="permission_activity_rationale">Lets DriveStats detect when you enter a vehicle.</string>
+    <string name="permission_activity_rationale">Lets DrivePerf detect when you enter a vehicle.</string>
     <string name="permission_notifications_title">Notifications</string>
     <string name="permission_notifications_rationale">Shows a notification while recording so you always know when tracking is active.</string>
 </resources>

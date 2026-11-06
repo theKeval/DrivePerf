@@ -1,10 +1,39 @@
-# DriveStats
+# DrivePerf
 
 A local-first, explainable driving analytics app that scores safety, smoothness, efficiency, and trip quality from start point to end point using only the phone's sensors and location stack.
 
+## Product identity
+
+- **Product:** DrivePerf
+- **Domain:** [driveperf.com](https://driveperf.com) (registered project domain; website deployment is separate).
+- **Repository:** [theKeval/DrivePerf](https://github.com/theKeval/DrivePerf).
+- **Android namespace and release application ID:** `com.driveperf`.
+- **Debug application ID:** `com.driveperf.debug`.
+- **Packages:** `com.driveperf` and its subpackages.
+
+DrivePerf is being researched for two audiences: driving enthusiasts who want detailed
+performance metrics, and everyday or new drivers who want understandable feedback and
+coaching. Early versions will focus on driving analytics without insurance integrations
+or insurance discount claims. The current implementation remains an early prototype;
+research will define the next specifications.
+
+### Android identity migration
+
+The new application ID installs as a separate Android app with its own private storage.
+Existing installations under the previous ID do not upgrade in place, and their trips,
+preferences, permissions, and backups do not transfer automatically. The new Room
+database is `driveperf.db`; the schema remains at version 1 and DataStore continues to
+use `settings.preferences_pb` in the new app's sandbox. No cross-app data migration has
+been implemented. Preserve any existing installation with data that needs to be retained
+until an explicit export/import approach is designed.
+
+The manifest's provider authority continues to derive from `${applicationId}`. This
+project currently declares no website App Links, custom URL scheme, or domain backend;
+registering the domain alone does not configure those integrations.
+
 ## Architecture
 
-DriveStats follows Google's recommended Android architecture with unidirectional data flow:
+DrivePerf follows Google's recommended Android architecture with unidirectional data flow:
 
 ```
 UI Layer (Compose + ViewModel)
@@ -19,8 +48,8 @@ Platform (FusedLocationProvider, ActivityRecognition, SensorManager)
 ### Module structure
 
 ```
-app/src/main/java/com/drivestats/
-├── DriveStatsApp.kt              – Hilt application class + WorkManager init
+app/src/main/java/com/driveperf/
+├── DrivePerfApp.kt              – Hilt application class + WorkManager init
 ├── MainActivity.kt               – Single activity, Compose entry point
 ├── di/
 │   ├── AppModule.kt              – Repository bindings
@@ -50,7 +79,7 @@ app/src/main/java/com/drivestats/
 │   ├── TripTrackingService.kt    – Foreground service: fused location + IMU + event detection
 │   └── ActivityTransitionReceiver.kt – Activity Recognition → trip start/stop
 ├── navigation/
-│   └── DriveStatsNavigation.kt   – NavHost with all routes
+│   └── DrivePerfNavigation.kt   – NavHost with all routes
 └── ui/theme/                     – Material 3 colour, typography, theme
 ```
 

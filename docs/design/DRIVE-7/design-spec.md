@@ -11,7 +11,7 @@
 │                                │
 │                                │
 │          ◎  (logo, 200x200)   │  Hero block, centered, top margin 96px
-│          DriveStats           │  Headline
+│          DrivePerf           │  Headline
 │          v2.4.1 (Build 218)   │  Label chip
 │                                │
 │  Track every drive. See your  │  Body copy, centered, max width 760px
@@ -22,8 +22,8 @@
 │                                │
 │  ⎔  View source on GitHub   › │  Link row card, 96px tall
 │                                │
-│  © 2026 DriveStats · Built    │  Footer caption, centered
-│  for drivers, by drivers.     │
+│  © 2026 DrivePerf             │  Footer caption, centered
+│  driveperf.com                │
 └───────────────────────────────┘
 ```
 
@@ -53,14 +53,14 @@
 | secondary (accent, sparing) | `#FF7A45` |
 | error | `#FFB4AB` |
 
-Dark-first per DriveStats convention; contrast on-surface vs surface = 13.6:1 (AA/AAA pass).
+Dark-first per DrivePerf convention; contrast on-surface vs surface = 13.6:1 (AA/AAA pass).
 
 ## 3. Typography (M3 type scale, Roboto/system-ui stack)
 
 | Style | Size / Line height | Weight | Usage |
 |---|---|---|---|
 | Title Large | 28sp/36 | 500 | Top app bar "About" |
-| Headline Small | 32sp/40 | 600 | "DriveStats" app name |
+| Headline Small | 32sp/40 | 600 | "DrivePerf" app name |
 | Label Large | 16sp/22 | 500 | Version chip text |
 | Body Large | 18sp/28 | 400 | Description paragraph |
 | Body Medium | 15sp/22 | 500 | Link row label |

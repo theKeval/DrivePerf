@@ -3,10 +3,10 @@
 # in /path/to/android-sdk/tools/proguard/proguard-android.txt
 
 # Keep Room entities
--keep class com.drivestats.data.local.entity.** { *; }
+-keep class com.driveperf.data.local.entity.** { *; }
 
 # Keep data models
--keep class com.drivestats.domain.model.** { *; }
+-keep class com.driveperf.domain.model.** { *; }
 
 # Hilt
 -keep class dagger.hilt.** { *; }
