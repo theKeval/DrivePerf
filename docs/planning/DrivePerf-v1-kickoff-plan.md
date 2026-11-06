@@ -97,7 +97,7 @@ Each **phase gate** needs your approval before the next phase starts. Prompts in
 |---|---|---|---|
 | **0. Housekeeping** ✅ done 6 Nov (DRIVE-11) | — | Rebrand committed, legacy tagged, monorepo layout, `docs/` folders | 1 day |
 | **1. Discovery** ✅ done 6 Nov (DRIVE-12, Gate 1 approved) | A1 ∥ A2 ∥ A3 | Market refresh incl. iOS, personas/positioning/pricing, iOS+Android feasibility | 3–5 days |
-| **2. PRD & backlog** ✅ PRD approved 6 Nov (DRIVE-13, Gate 2) | A4 → A5 | `docs/product/PRD-v1.md`, Jira epics, stories and design tasks | 2–3 days |
+| **2. PRD & backlog** ✅ done 6 Nov (DRIVE-13, Gate 2; 192 Jira issues, see docs/product/jira-map.md) | A4 → A5 | `docs/product/PRD-v1.md`, Jira epics, stories and design tasks | 2–3 days |
 | **3. Design & prototypes** | A6 → (A7 ∥ A8 ∥ A9) | Design system + motion language; **screen-by-screen** iOS, Android and web HTML prototypes, with each screen's artifacts in `docs/design/<JIRA-KEY>/` and linked from its Jira story | 1–2 weeks |
 | **4. Architecture** (documents only; can overlap phase 3) | A10 ∥ A11 ∥ A12 | ADRs, data model + migration plan, sensor/scoring algorithm spec | 1 week |
 | **5. Foundations build** | **A13a iOS capture test app (Spike 1) first**, then A13 → (A14 ∥ A15 ∥ A16 ∥ A17 ∥ A18) | Capture benchmark vs Mileon; monorepo + CI, shared core, app shells, Firebase, live landing page | 3–4 weeks |
