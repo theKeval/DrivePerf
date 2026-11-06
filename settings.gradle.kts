@@ -19,5 +19,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "DriveStats"
+rootProject.name = "DrivePerf"
 include(":app")

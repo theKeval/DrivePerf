@@ -2,7 +2,7 @@
 
 **Platform:** Android (Kotlin + Jetpack Compose) · **Design language:** Material 3
 **Deliverable:** Phone, portrait, **1080×2400** (xxhdpi, density 3.0 → 360×800dp)
-**Theme:** Dark-first (DriveStats convention). Light theme tokens included below; both
+**Theme:** Dark-first (DrivePerf convention). Light theme tokens included below; both
 must meet WCAG AA contrast.
 
 ## Files
