@@ -1,136 +1,34 @@
 # DrivePerf
 
-A local-first, explainable driving analytics app that scores safety, smoothness, efficiency, and trip quality from start point to end point using only the phone's sensors and location stack.
+**Every drive, decoded.** DrivePerf is a phone-based driving analytics app for iOS and Android. It is built for everyday driving enthusiasts and for drivers who want smoother, more efficient driving.
 
-## Product identity
+[driveperf.com](https://driveperf.com) · [Jira DRIVE](https://thekeval.atlassian.net/jira/software/projects/DRIVE/summary) · Android package `com.driveperf`
 
-- **Product:** DrivePerf
-- **Domain:** [driveperf.com](https://driveperf.com) (registered project domain; website deployment is separate).
-- **Repository:** [theKeval/DrivePerf](https://github.com/theKeval/DrivePerf).
-- **Android namespace and release application ID:** `com.driveperf`.
-- **Debug application ID:** `com.driveperf.debug`.
-- **Packages:** `com.driveperf` and its subpackages.
+## Status
 
-DrivePerf is being researched for two audiences: driving enthusiasts who want detailed
-performance metrics, and everyday or new drivers who want understandable feedback and
-coaching. Early versions will focus on driving analytics without insurance integrations
-or insurance discount claims. The current implementation remains an early prototype;
-research will define the next specifications.
+The project is in **v1 preparation**. The cross-platform v1 is being specified from scratch, in this order:
 
-### Android identity migration
+1. **Product requirements**: research, then the PRD in `docs/product/`
+2. **Jira backlog**: epics and stories in DRIVE, created from the approved PRD
+3. **Prototypes**: HTML/CSS/JS prototypes for iOS (Liquid Glass), Android (Material 3 Expressive) and web, in `prototypes/`
+4. **Development**: starts only after the prototypes are approved
 
-The new application ID installs as a separate Android app with its own private storage.
-Existing installations under the previous ID do not upgrade in place, and their trips,
-preferences, permissions, and backups do not transfer automatically. The new Room
-database is `driveperf.db`; the schema remains at version 1 and DataStore continues to
-use `settings.preferences_pb` in the new app's sandbox. No cross-app data migration has
-been implemented. Preserve any existing installation with data that needs to be retained
-until an explicit export/import approach is designed.
+See the [v1 kickoff plan](docs/planning/DrivePerf-v1-kickoff-plan.md) for the phases, gates and agent prompts.
 
-The manifest's provider authority continues to derive from `${applicationId}`. This
-project currently declares no website App Links, custom URL scheme, or domain backend;
-registering the domain alone does not configure those integrations.
+## Repository layout
 
-## Architecture
-
-DrivePerf follows Google's recommended Android architecture with unidirectional data flow:
-
-```
-UI Layer (Compose + ViewModel)
-    ↕ UI State (StateFlow)
-Domain Layer (Scoring calculators, domain models)
-    ↕ Repository interface
-Data Layer (Room database, DAOs, Mappers)
-    ↕ Android Platform APIs
-Platform (FusedLocationProvider, ActivityRecognition, SensorManager)
-```
-
-### Module structure
-
-```
-app/src/main/java/com/driveperf/
-├── DrivePerfApp.kt              – Hilt application class + WorkManager init
-├── MainActivity.kt               – Single activity, Compose entry point
-├── di/
-│   ├── AppModule.kt              – Repository bindings
-│   └── DatabaseModule.kt         – Room database and DAO providers
-├── data/
-│   ├── local/
-│   │   ├── AppDatabase.kt        – Room database definition
-│   │   ├── dao/                  – TripSession, LocationPoint, MotionWindow, DrivingEvent, TripScore DAOs
-│   │   └── entity/               – Room @Entity data classes
-│   └── repository/
-│       ├── TripRepository.kt     – Interface
-│       └── TripRepositoryImpl.kt – Room-backed implementation with domain mappers
-├── domain/
-│   ├── model/                    – TripSession, DrivingEvent, TripScore, EventType, TripState
-│   └── scoring/
-│       ├── SafetyScoreCalculator.kt
-│       ├── SmoothnessScoreCalculator.kt
-│       ├── EfficiencyScoreCalculator.kt
-│       └── TripQualityScoreCalculator.kt
-├── feature/
-│   ├── onboarding/               – 3-page onboarding flow
-│   ├── permissions/              – Per-permission educational UI
-│   ├── trips/                    – Trip list + trip detail (score breakdown, events, delete/passenger)
-│   ├── insights/                 – 30-day trend view and coaching tips
-│   └── settings/                 – Auto-detect toggle, cloud sync toggle, privacy info
-├── service/
-│   ├── TripTrackingService.kt    – Foreground service: fused location + IMU + event detection
-│   └── ActivityTransitionReceiver.kt – Activity Recognition → trip start/stop
-├── navigation/
-│   └── DrivePerfNavigation.kt   – NavHost with all routes
-└── ui/theme/                     – Material 3 colour, typography, theme
-```
-
-## Scoring model
-
-All scores are in the range [0, 100] where 100 is best.
-
-| Score | What it measures |
+| Path | Purpose |
 |---|---|
-| **Safety** | Speeding, hard braking, harsh acceleration, aggressive cornering, phone distraction. Night driving and long trips act as context multipliers. |
-| **Smoothness** | Jerk, abrupt acceleration/deceleration, aggressive cornering harshness, excessive stop-start patterns. |
-| **Efficiency** | Behavioural proxy: idling time, overspeed duration, repeated harsh acceleration/braking, stop-start cycles. |
-| **Trip Quality** | Weighted aggregate (Safety 40 %, Smoothness 30 %, Efficiency 30 %) with signal-confidence adjustment. Displayed as 0–5 ★ in 0.5-star steps. |
+| `docs/planning/` | Kickoff plan, phase gates, agent prompts |
+| `docs/research/` | Market, competitor and platform research (`2026-09` Android pass, `2026-11` v1 refresh) |
+| `docs/product/` | PRD, strategy, decisions log, Jira map |
+| `docs/design/` | Design system, motion language, per-ticket design artifacts (`docs/design/<JIRA-KEY>/`) |
+| `docs/architecture/` | Architecture overview, ADRs, data model, pipeline and scoring spec |
+| `prototypes/` | Clickable HTML/CSS/JS prototypes: `ios/`, `android/`, `web/` |
+| `legacy/android-prototype/` | The frozen Android-only prototype (Kotlin/Compose). For reference only; it is not the v1 codebase. Also tagged `android-prototype-v0`. |
 
-## Tech stack
+Application code (`shared/`, `apps/ios/`, `apps/android/`, `backend/`, `web/`) is added during the development phase, after the prototypes are approved.
 
-| Component | Library |
-|---|---|
-| UI | Jetpack Compose + Material 3 |
-| Navigation | Navigation Compose |
-| DI | Hilt |
-| Local DB | Room |
-| Background work | WorkManager |
-| Trip detection | Activity Recognition Transition API |
-| Location | Fused Location Provider |
-| Motion sensors | Android SensorManager (accelerometer + gyroscope) |
-| Preferences | DataStore Preferences |
-| Permissions UI | Accompanist Permissions |
+## Conventions
 
-## Setup
-
-1. Clone the repository.
-2. Open in Android Studio Hedgehog or later.
-3. Sync Gradle.
-4. Run on a device or emulator with Google Play Services (required for Activity Recognition and Fused Location).
-
-> **Note:** Background location (`ACCESS_BACKGROUND_LOCATION`) is requested separately after the user grants foreground location, in compliance with Google Play policy. Auto-detection (the feature that depends on background location) can be disabled in Settings.
-
-## Privacy design
-
-- **Trip-only collection by default.** Location and motion data are only recorded while a trip is active.
-- **Local-first.** All data is stored on-device in Room. Cloud sync is an opt-in setting (backend not yet implemented).
-- **Transparent recording.** A persistent foreground notification is shown whenever a trip is being recorded.
-- **User control.** Users can delete any trip, mark any trip as passenger, and toggle auto-detection off at any time.
-
-## Roadmap
-
-- [ ] Discovery & calibration spike (collect labeled drives, tune thresholds)
-- [x] MVP trip lifecycle (this PR)
-- [ ] ML-based event detectors (hard braking transformer model)
-- [ ] Map display on trip detail screen
-- [ ] Cloud sync backend + WorkManager upload worker
-- [ ] OBD integration for real efficiency metrics
-- [ ] Play Store privacy declaration + beta hardening
+Every branch, commit, issue and PR carries a Jira key (`DRIVE-<n>`). See [AGENTS.md](AGENTS.md).
