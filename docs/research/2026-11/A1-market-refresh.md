@@ -182,6 +182,27 @@ Legend: ✓ = claimed in listing or release notes · ◐ = partial or ambiguous 
 
 ---
 
+## 8a. Addendum: Mileon (added 6 Nov 2026 at the product owner's request)
+
+The product owner uses **Mileon** on iPhone daily and reports, first hand, that background trip detection is excellent. Once permissions are granted, trips start recording as soon as the car moves, and walking or running are not mistaken for drives. This is a **user field report (n = 1)**, not a measurement. It is still the strongest real-world evidence we have that iOS auto-capture can feel instant.
+
+| Field | Mileon: Car & Mileage Tracker (App ID 6799522506) · Alexandre Koguashvili |
+|---|---|
+| Platform | iPhone only, iOS 18.6+; no Android build mentioned. Released v1.0 on 25 Sep 2026 and iterating quickly (v1.7 by early Nov 2026). Listing read on the Georgia storefront; **US/CA availability unverified**. |
+| Price | Free; Pro US$9.99/mo, US$49.99/yr, US$119.99 lifetime. Free tier: automatic tracking, Friends and Services for one car, plus the last 30 days of drives. Referral: both sides get a month of Pro (up to 3 friends). |
+| Rating | 5.0★ from 2 ratings in the store. The site's "4.9 · 10K+ drivers" claim is **unverified** and conflicts with the store count. |
+| Capture (vendor claims) | Automatic tracking with no need to open the app or press Start. Uses background location plus Motion & Fitness "to help determine when you are driving" and reduce accidental recordings. Manual mode available; "very short trips may not be saved". Live drive on the Lock Screen and Dynamic Island. The privacy policy lists **parking location** among processed data, which is consistent with the parked-location region technique in A3 §1.4. |
+| Replay and map | Replay of any drive with stops, elevation, speed and "20+ driving details". Average and maximum speed are processed. A lifetime "every road you've driven" heatmap. Event pins for hard braking, acceleration or cornering are **not** mentioned. |
+| Other | "Smoothness, speed and habits" per drive (no numeric score described). Driver Type labels (Night Owl, City Hopper…). Monthly Recap made to share. Animated trip card for IG Stories. Garage with service reminders and cost logging. Widgets. Friends, live drives, meet-ups with ETA, leaderboards and badges. |
+| Privacy | Cloud storage (Supabase), Mapbox maps, Open-Meteo weather, Meta ad measurement with ATT. The label declares **Data Used to Track You** (identifiers, usage data). No local-only option is stated. |
+
+**What DrivePerf should take from Mileon**
+- **The capture bar is "starts as soon as I drive, never for a walk".** A3's parked-location region, motion-activity confirmation and start backfill must aim for this feel. Spike 1 should benchmark DrivePerf against Mileon on the same iPhone and drives.
+- **An in-app replay is expected.** A map replay with a moving marker, current speed, max speed reached, stops and elevation. DrivePerf goes further: **pins on the map for hard braking, hard acceleration and hard cornering**, each one tappable to show its evidence (speed and G trace around the event) and linked to the coaching tip.
+- **Where Mileon leaves room:** iPhone only, no explained smoothness score, no event pins, ad-tracking label, cloud by default, and speed leaderboards. These are DrivePerf's parity, coaching and privacy advantages.
+
+Sources: [Mileon home](https://mileon.app/), [Mileon support](https://mileon.app/support/), [Mileon privacy (30 Sep 2026)](https://mileon.app/privacy/), [App Store listing](https://apps.apple.com/ge/app/mileon-drive-tracker/id6799522506), all accessed 2026-11-06.
+
 ## 9. Implications for the v1 PRD and decisions for the product owner
 
 **PRD implications**

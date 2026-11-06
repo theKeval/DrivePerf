@@ -95,11 +95,11 @@ Each **phase gate** needs your approval before the next phase starts. Prompts in
 | Phase | Agents | Output | Rough duration |
 |---|---|---|---|
 | **0. Housekeeping** ✅ done 6 Nov (DRIVE-11) | — | Rebrand committed, legacy tagged, monorepo layout, `docs/` folders | 1 day |
-| **1. Discovery** | A1 ∥ A2 ∥ A3 | Market refresh incl. iOS, personas/positioning/pricing, iOS+Android feasibility | 3–5 days |
-| **2. PRD & backlog** | A4 → A5 | `docs/product/PRD-v1.md`, Jira epics and stories | 2–3 days |
-| **3. Design & prototypes** | A6 → (A7 ∥ A8 ∥ A9) | Design system + motion language; iOS, Android and web HTML prototypes | 1–2 weeks |
+| **1. Discovery** ✅ done 6 Nov (DRIVE-12, Gate 1 approved) | A1 ∥ A2 ∥ A3 | Market refresh incl. iOS, personas/positioning/pricing, iOS+Android feasibility | 3–5 days |
+| **2. PRD & backlog** | A4 → A5 | `docs/product/PRD-v1.md`, Jira epics, stories and design tasks | 2–3 days |
+| **3. Design & prototypes** | A6 → (A7 ∥ A8 ∥ A9) | Design system + motion language; **screen-by-screen** iOS, Android and web HTML prototypes, with each screen's artifacts in `docs/design/<JIRA-KEY>/` and linked from its Jira story | 1–2 weeks |
 | **4. Architecture** (documents only; can overlap phase 3) | A10 ∥ A11 ∥ A12 | ADRs, data model + migration plan, sensor/scoring algorithm spec | 1 week |
-| **5. Foundations build** | A13 → (A14 ∥ A15 ∥ A16 ∥ A17 ∥ A18) | Monorepo + CI, shared core, app shells, Firebase, live landing page | 3–4 weeks |
+| **5. Foundations build** | **A13a iOS capture test app (Spike 1) first**, then A13 → (A14 ∥ A15 ∥ A16 ∥ A17 ∥ A18) | Capture benchmark vs Mileon; monorepo + CI, shared core, app shells, Firebase, live landing page | 3–4 weeks |
 | **6. Feature build → field test → beta** | @PM/@dev workflow from Jira tickets + A19 field-test protocol | TestFlight + Play internal testing, calibration data | 6–10 weeks |
 | **7. Launch readiness** | A20 | Store listings, privacy policy, data-safety forms, ASO | 1 week |
 
@@ -234,8 +234,20 @@ You are a senior product manager. Write the Product Requirements Document for Dr
 
 Inputs (read all): docs/research/2026-09/*, docs/research/2026-11/A1-market-refresh.md,
 docs/product/A2-strategy-positioning.md, docs/research/2026-11/A3-platform-feasibility.md,
-docs/planning/DrivePerf-v1-kickoff-plan.md, and any Gate-1 decisions recorded in
-docs/product/decisions.md.
+docs/planning/DrivePerf-v1-kickoff-plan.md, docs/product/gate-1-decisions.md and
+docs/product/decisions.md. The Gate 1 decisions are BINDING: hero user, Smoothness baseline
+model, pricing, Free/Pro split, safety rules, trip replay as P0 (decision 16), and
+prototype-first delivery (decision 17).
+
+Must-haves to include:
+- Trip Replay (P0): animated map replay, scrubbable timeline, current speed, max speed, stops,
+  elevation, and tappable pins for hard braking, acceleration and cornering, each opening its
+  evidence and coaching tip.
+- Capture requirements written as measurable targets (start latency in metres from parking,
+  missed-trip %, false-trip %, battery %/h with the screen off). The iOS capture test app
+  (Spike 1, benchmarked against Mileon) will confirm or adjust them.
+- For every user-facing feature, the list of screens it needs (screen IDs such as
+  IOS/AND-DRV-01). These become the Jira design tasks and the prototype screen list.
 
 PRD structure:
 1. Problem, vision, positioning, target users (personas by reference), non-goals.
@@ -246,7 +258,7 @@ PRD structure:
    analytics events, edge cases (no GPS, tunnel, phone moved, passenger, low battery,
    permission revoked), privacy notes, Free vs Pro.
    Epics to cover at minimum: Onboarding & Permissions; Trip Capture (manual/auto/live
-   activity); Data Quality & Calibration; Drive Story; Analysis Workspace; Scores & Coaching;
+   activity); Data Quality & Calibration; Drive Story; Trip Replay & Analysis Workspace; Scores & Coaching;
    History & Stats; Routes & Personal Bests; Garage; Sharing; Account & Cloud Backup;
    Privacy Centre, Export & Deletion; Subscription & Paywall; Notifications & Recaps;
    Settings; Web landing & waitlist; Analytics & Crash reporting.
@@ -276,9 +288,15 @@ Rules:
   description (user story + context + PRD section link), acceptance criteria as a checklist,
   labels (`ios`, `android`, `shared`, `backend`, `web`, `design-needed` where UI work exists),
   priority mapped from P0/P1/P2, and fixVersion `v1.0` / `v1.1`.
-- Create foundation Tasks for Phase 5 (monorepo, CI, KMP core, iOS shell, Android shell,
-  Firebase project, landing page) under an Epic "v1 · Platform foundations".
-- Create design Tasks (label design-needed) for each prototype screen group.
+- Create foundation Tasks for Phase 5 under an Epic "v1 · Platform foundations". The FIRST
+  one is "iOS capture test app (Spike 1): background auto-detect benchmark vs Mileon on a real
+  iPhone". Then: monorepo, CI, KMP core, iOS shell, Android shell, Firebase project, landing page.
+- For every story with UI, add the label design-needed, list its screen IDs from the PRD, and
+  add a "Design" section to the description that points to docs/design/<THIS-KEY>/
+  (mockup.html, mockup.png, design-spec.md, assets/). The section is marked "pending
+  prototype" until A7/A8 fill it in.
+- Create design Tasks (label design-needed) under an Epic "v1 · Prototypes": one per screen
+  group for iOS, Android and web. Each design Task "blocks" the stories it covers.
 - Link dependencies with "blocks" links.
 - Before creating anything, print the full proposed tree (epics → stories) and STOP for human
   approval. After approval, create the tickets and write docs/product/jira-map.md (PRD section →
@@ -344,15 +362,22 @@ Requirements:
   2. Home/Drives: "ready to record" state with data-quality status; manual Start.
   3. Live Activity + Dynamic Island mock while recording, and the locked in-drive screen.
   4. Drive Story: animated route draw-on, G-meter replay, smoothness ring reveal, one highlight, one tip.
-  5. Analysis: map + synced scrubbable timeline (speed, long-G, lat-G), G-G circle, event detail sheet.
+  5. Trip Replay: animated map replay with a moving marker, play/pause/speed controls and a scrubber;
+     live speed readout, max speed, stops, elevation; pins for hard braking, acceleration and
+     cornering that open an evidence sheet (speed + G trace around the event, coaching tip).
+     Analysis: synced timeline (speed, long-G, lat-G), G-G circle.
   6. Routes & personal bests; Stats dashboard; Garage; Share card builder; Paywall; Privacy Centre; Settings.
   7. Empty, loading, partial-data and permission-denied states.
 - 60fps animations, prefers-reduced-motion respected, haptic moments annotated.
 - A small "annotations" overlay toggle explaining interaction and motion specs for developers.
 
-Output: prototypes/ios/ (open index.html directly). Add prototypes/ios/README.md listing every
-screen and the PRD story it covers. Take screenshots of key screens into
-prototypes/ios/screens/.
+Output: prototypes/ios/ (open index.html directly; deep-link each screen via #screen-id).
+Cover EVERY iOS screen ID in the PRD and docs/product/jira-map.md, including all states.
+Add prototypes/ios/README.md mapping screen ID → Jira key. For each Jira story with UI, write
+docs/design/<KEY>/ios/: mockup.html (standalone screen or a link into the prototype),
+mockup.png (1206×2622 screenshot), design-spec.md (exact tokens, spacing, type, motion and
+interaction notes) and assets/ (SVGs). Then comment on the Jira story with the links and
+update its Design section from "pending prototype" to "ready".
 ```
 
 ### A8 — Android prototype (HTML/CSS/JS, Material 3 Expressive) · *Top creative model + strong front-end coder* · Phase 3 ∥
@@ -373,11 +398,15 @@ Requirements:
   Use Roboto Flex / Google Sans-like stack.
 - Same flows as the iOS prototype (onboarding, permissions incl. Android's separate
   background-location step, ready state, Live Update notification + ongoing notification while
-  recording, Drive Story, Analysis, Routes, Stats, Garage, Share, Paywall, Privacy, Settings, states).
+  recording, Drive Story, Trip Replay with event pins, Analysis, Routes, Stats, Garage, Share,
+  Paywall, Privacy, Settings, states).
 - Predictive back gesture animation mock; edge-to-edge layout.
 - Same annotations overlay concept.
 
-Output: prototypes/android/ with README.md (screen → PRD story) and screens/ screenshots.
+Output: prototypes/android/ (deep-link each screen via #screen-id), covering EVERY Android
+screen ID with all states, and a README.md mapping screen ID → Jira key. For each Jira story
+with UI, write docs/design/<KEY>/android/ with the same files as iOS (mockup.png at 1080×2400),
+comment on the Jira story with the links, and set its Design section to "ready".
 ```
 
 ### A9 — Web prototype + landing page content · *Creative model* · Phase 3 ∥
@@ -402,7 +431,7 @@ Output: prototypes/web/ + README.md. Copy must avoid insurance claims and speed 
 ```
 
 ---
-**🚦 Gate 3 (you):** pick the final visual direction. Optionally run 5–8 user tests on the prototypes (see the research plan in `02-next-phase-research-plan.md` §4).
+**🚦 Gate 3 (you):** approve the prototypes. **Development starts only when every UI story in Jira has a "ready" Design section** with iOS and Android artifacts in `docs/design/<KEY>/`. Optionally run 5–8 user tests on the prototypes (see the research plan in `02-next-phase-research-plan.md` §4).
 
 ---
 
@@ -496,7 +525,29 @@ Include pseudocode and a fixture format the shared module's tests will use.
 
 ---
 
-### A13 — Monorepo scaffold & CI · *Sonnet 5.5 (Claude Code)* · Phase 5 (first)
+### A13a — iOS capture test app (Spike 1) · *Opus 5.5 (Claude Code)* · Phase 5 (very first)
+
+```
+Jira: <Spike 1 key>. Build a throwaway SwiftUI test app in spikes/ios-capture/ (it is not
+product code, but keep it in the repo for the record) that proves iOS background auto-trip
+capture per docs/research/2026-11/A3-platform-feasibility.md §1.3–1.6:
+- "Always" location; significant-location-change + a CLMonitor parked-location region (100–150 m)
+  re-armed at every trip end; Visits; CLLocationUpdate.liveUpdates with CLBackgroundActivitySession;
+  CMMotionActivityManager automotive confirmation (reject walking, running, cycling);
+  CMSensorRecorder + parking-point backfill for the trip start; 50 Hz CMDeviceMotion while awake;
+  an auto-detect-paused watchdog notification; a manual start through a Control Center control /
+  LiveActivityIntent with a Live Activity.
+- A debug screen listing trips with: wake trigger, distance from the parking spot to the first
+  recorded point, start latency (s), samples per second, gaps, and the battery delta.
+- An export of each trip as JSON/GPX for later shared-core fixtures.
+Run it on a real iPhone with a free Personal Team. Test side by side with Mileon for ≥10
+drives, plus walks and runs, and also after force-quit, after a reboot and in Low Power Mode.
+Write docs/research/2026-11/spike-1-ios-capture-results.md comparing DrivePerf vs Mileon
+(start latency, missed trips, false trips, battery). Recommend whether the PRD capture targets
+hold.
+```
+
+### A13 — Monorepo scaffold & CI · *Sonnet 5.5 (Claude Code)* · Phase 5
 
 ```
 Jira: <foundation ticket key>. Implement the monorepo described in docs/architecture/adr/ADR-002
@@ -619,6 +670,6 @@ docs/launch/.
 ## 6. Immediate next steps for you
 1. ✅ Phase 0 is done.
 2. **Approve or redirect the wedge** in §2: enthusiast hero + Smoothness hero metric.
-3. Start **A1, A2 and A3 in parallel** (Phase 1), then go through Gate 1 → A4 PRD → A5 Jira → Gate 2 → prototypes → Gate 3.
+3. ✅ Phase 1 and Gate 1 are done. Next: **A4 PRD → A5 Jira (Gate 2) → A6 design system → A7/A8/A9 screen-by-screen prototypes attached to the tickets (Gate 3) → A13a iOS capture test app → build**.
 4. Create the Firebase project **"DrivePerf"** (Spark) in the Firebase console before Phase 5. Prototypes don't need it.
 5. Buy the **Apple Developer** account ($99/yr) before iOS device testing and TestFlight in Phase 6. The Play Console account is already in place.

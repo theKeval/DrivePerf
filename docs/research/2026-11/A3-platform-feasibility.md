@@ -147,6 +147,19 @@ None of this blocks DrivePerf: continuous trip recording is not a one-time reque
 | **Location downgraded to While Using** | Always is required for wakes [A8][A10] | Auto mode is impossible. Manual mode works through `CLBackgroundActivitySession` [A2] | Health-check banner |
 | **System memory termination during a trip** | Core Location relaunches the app and resumes queued updates if the APIs are restarted on launch [A1][A9] | Short gap | Write to disk continuously. Mark a gap in the trip rather than interpolating it, as the September doc recommends |
 
+### 1.6 Field example: Mileon (added at the product owner's request)
+
+The product owner uses **Mileon** (iPhone, released Sep 2026) daily. Their first-hand report is that trips are detected **as soon as the vehicle moves**, and that walking or running is not mistaken for a drive. See [A1 §8a](A1-market-refresh.md#8a-addendum-mileon-added-6-nov-2026-at-the-product-owners-request). Mileon's privacy policy says it uses background location and Motion & Fitness to determine when you are driving, and it lists **parking location** among the data it processes.
+
+This does not contradict §1.4, but it shifts the expectation: a well-built iOS app can make the start of a trip *feel* instant. The likely combination, which is our recommended design and not a verified description of Mileon's code, is:
+
+1. **A parked-location region.** At the end of every trip, register a `CLMonitor` circular condition (about 100–150 m) around the parking spot. Leaving it wakes the app much earlier than SLC's ~500 m in typical urban cell and Wi-Fi density.
+2. **Immediate automotive confirmation.** On wake, start `CLLocationUpdate.liveUpdates` and check the `CMMotionActivityManager` history. Accept the trip only when automotive confidence and speed consistently match a vehicle, which filters out walking, running and cycling. Keep the candidate as provisional until confirmed.
+3. **Backfill the start.** The trip's start point is the known parking location. Draw the first segment from it to the first fix, and fill the motion channels from `CMSensorRecorder` history. Mark that segment **estimated** (provenance label).
+4. **An honest live surface.** Mileon advertises a live drive on the Lock Screen and in the Dynamic Island. Because it uses a cloud backend (Supabase), it may rely on push-to-start. This is **unverified**. It does not change §3's finding that a *local* background start of a Live Activity is not allowed.
+
+**Spike 1 benchmark:** run DrivePerf's capture spike and Mileon side by side on the same iPhone over the same 10+ drives. Record each app's start latency (distance from the parking spot to the first recorded point), missed trips and false trips. Mileon's behaviour is the bar to match.
+
 ---
 
 ## 2. iOS sensors in the background

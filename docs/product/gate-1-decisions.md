@@ -1,6 +1,6 @@
 # Gate 1 — decisions for approval
 
-**Status:** awaiting Keval's approval · **Prepared:** 6 Nov 2026 · **Jira:** DRIVE-12
+**Status:** ✅ **approved by Keval on 6 Nov 2026**, with decision 14 changed and decisions 16–17 added (see the bottom of this file). · **Jira:** DRIVE-12
 
 These decisions consolidate the Phase 1 outputs: [A1 market refresh](../research/2026-11/A1-market-refresh.md), [A2 strategy](A2-strategy-positioning.md) and [A3 feasibility](../research/2026-11/A3-platform-feasibility.md). Duplicates across the three are merged. Once you approve them (or change any), they move to `decisions.md` and become binding inputs for the PRD (A4).
 
@@ -30,3 +30,11 @@ These decisions consolidate the Phase 1 outputs: [A1 market refresh](../research
 | 13 | **Accounts and plans timing** | Apple Developer account: buy it before Sign in with Apple, push, App Attest and TestFlight work. The free Personal Team is enough for an iOS capture spike on a real iPhone. Blaze: upgrade when cloud backup is built. | — |
 | 14 | **Feasibility spike before Gate 3?** | **Allow one throwaway spike**: iOS background auto-capture on a real iPhone, 1–2 days, not product code. It is the biggest risk to the PRD's core promise. | Wait until after the prototypes are approved |
 | 15 | **Launch window and market** | **Spring 2027 "Season Opener"**, Canada + US, English. Get legal advice on French-language requirements for Quebec before the CA launch. | Soft launch Feb 2027 |
+
+## Changes made at approval (6 Nov 2026)
+
+| # | Decision as approved |
+|---|---|
+| 14 (changed) | **No spike before the PRD, tickets and prototypes.** The iOS background-capture test app ("Spike 1") becomes the **first ticket of the development phase**. It runs on a real iPhone (a free Personal Team is enough) and is benchmarked side by side against **Mileon**, the product owner's reference for instant, reliable auto-detection. The PRD's capture requirements are written so that Spike 1 can confirm or adjust them. |
+| 16 (new) | **Trip replay is P0.** An animated map replay with a moving marker and a scrubbable timeline. It shows current speed, **max speed reached**, stops and elevation, plus **map pins for hard braking, hard acceleration and hard cornering**. Each pin is tappable and opens its evidence (the speed and G trace around the event) and the related coaching tip. Speed appears *neutrally* in personal replay and analysis, but never on share cards, records, leaderboards or achievements (rule 12 still applies). Reference: Mileon's replay ([A1 §8a](../research/2026-11/A1-market-refresh.md)). |
+| 17 (new) | **Prototype-first delivery.** After the Jira tickets exist, full **screen-by-screen HTML/CSS/JS prototypes** are built for iOS (Liquid Glass) and Android (Material 3 Expressive), plus the informational web site. Every screen maps to a Jira story. Its artifacts go in `docs/design/<JIRA-KEY>/` (`mockup.html`, `mockup.png`, `design-spec.md`, `assets/`) and are linked from the ticket. Development starts only when every UI story has its design artifacts. |
