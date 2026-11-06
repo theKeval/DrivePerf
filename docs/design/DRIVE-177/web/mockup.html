@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DRIVE-177 · web contact sheet</title>
+<link rel="icon" href="../../../../prototypes/web/assets/brand/favicon.svg">
+<style>
+  :root { color-scheme: dark; --bg:#05070A; --s:#10151C; --l:#96A0B429; --t:#F2F4F7; --t2:#A3AAB6; --a:#5BE7C4; }
+  * { box-sizing: border-box; } body { margin: 0; background: var(--bg); color: var(--t); font: 15px/1.5 -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif; }
+  .top { padding: 40px 48px 24px; border-bottom: 1px solid var(--l); display: flex; gap: 20px; align-items: flex-end; justify-content: space-between; flex-wrap: wrap; }
+  .top h1 { margin: 0; font: 700 34px/1.1 -apple-system, "SF Pro Display", system-ui, sans-serif; letter-spacing: -0.02em; } .top p { margin: 6px 0 0; color: var(--t2); }
+  .top .k { color: var(--a); font-weight: 650; } a { color: var(--a); }
+  .scr { padding: 32px 48px 8px; } .scr > header { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; border-bottom: 1px solid var(--l); padding-bottom: 10px; }
+  .scr h2 { margin: 0; font: 650 22px/1.2 -apple-system, "SF Pro Display", system-ui, sans-serif; } .scr h2 span { color: var(--a); font-family: ui-monospace, Menlo, monospace; font-size: 17px; margin-right: 8px; }
+  .state { padding: 22px 0 8px; } .state h3 { margin: 0 0 12px; font-size: 15px; font-weight: 650; display: flex; gap: 12px; align-items: baseline; } .state h3 code { font-size: 12px; color: var(--t2); }
+  .pair { display: grid; grid-template-columns: 720px 195px 250px 130px; gap: 20px; align-items: start; }
+  figure { margin: 0; } figcaption { color: var(--t2); font-size: 12px; margin-top: 6px; }
+  .clip { position: relative; overflow: hidden; border-radius: 12px; border: 1px solid var(--l); background: #000; }
+  .desk .clip { width: 720px; height: 450px; } .desk iframe { width: 1440px; height: 900px; transform: scale(.5); transform-origin: 0 0; border: 0; pointer-events: none; }
+  .mob .clip { width: 195px; height: 422px; border-radius: 22px; } .mob iframe { width: 390px; height: 844px; transform: scale(.5); transform-origin: 0 0; border: 0; pointer-events: none; }
+  .full img { width: 100%; height: auto; max-height: 900px; object-fit: cover; object-position: top; display: block; border-radius: 10px; border: 1px solid var(--l); }
+  .full.m img { max-height: 900px; }
+  .foot { padding: 32px 48px 48px; color: var(--t2); font-size: 13px; }
+</style></head>
+<body>
+  <div class="top"><div><p class="k">DRIVE-177 · driveperf.com prototype (A9)</p><h1>F-WEB-04 · Account deletion request page</h1><p>Live iframes render the prototype at 1440 and 390 px (first viewport). Full-page captures are in <code>screens/</code>. States follow PRD §4; switch them with <code>#S-WEB-ID/state</code>.</p></div>
+  <p><a href="design-spec.md">design-spec.md</a> · <a href="../../../../prototypes/web/README.md">prototype README</a></p></div>
+  
+    <section class="scr">
+      <header><h2><span>S-WEB-07</span> Account deletion request</h2><a href="../../../../prototypes/web/pages/delete-account.html#S-WEB-07/form">Open live page →</a></header>
+      
+      <div class="state">
+        <h3>form <a href="../../../../prototypes/web/pages/delete-account.html#S-WEB-07/form"><code>#S-WEB-07/form</code></a></h3>
+        <div class="pair">
+          <figure class="desk"><div class="clip"><iframe src="../../../../prototypes/web/pages/delete-account.html?shot=1#S-WEB-07/form" title="S-WEB-07 form at 1440 px" loading="eager" tabindex="-1"></iframe></div><figcaption>Desktop 1440 · first viewport</figcaption></figure>
+          <figure class="mob"><div class="clip"><iframe src="../../../../prototypes/web/pages/delete-account.html?shot=1#S-WEB-07/form" title="S-WEB-07 form at 390 px" loading="eager" tabindex="-1"></iframe></div><figcaption>Mobile 390</figcaption></figure>
+          <figure class="full"><a href="../../screens/web/S-WEB-07--1440.webp"><img src="../../screens/web/S-WEB-07--1440.webp" alt="S-WEB-07 form, full page at 1440 px"></a><figcaption>Full page 1440</figcaption></figure>
+          <figure class="full m"><a href="../../screens/web/S-WEB-07--390.webp"><img src="../../screens/web/S-WEB-07--390.webp" alt="S-WEB-07 form, full page at 390 px"></a><figcaption>Full page 390</figcaption></figure>
+        </div>
+      </div>
+      <div class="state">
+        <h3>formErr <a href="../../../../prototypes/web/pages/delete-account.html#S-WEB-07/formErr"><code>#S-WEB-07/formErr</code></a></h3>
+        <div class="pair">
+          <figure class="desk"><div class="clip"><iframe src="../../../../prototypes/web/pages/delete-account.html?shot=1#S-WEB-07/formErr" title="S-WEB-07 formErr at 1440 px" loading="eager" tabindex="-1"></iframe></div><figcaption>Desktop 1440 · first viewport</figcaption></figure>
+          <figure class="mob"><div class="clip"><iframe src="../../../../prototypes/web/pages/delete-account.html?shot=1#S-WEB-07/formErr" title="S-WEB-07 formErr at 390 px" loading="eager" tabindex="-1"></iframe></div><figcaption>Mobile 390</figcaption></figure>
+          <figure class="full"><a href="../../screens/web/S-WEB-07-formErr--1440.webp"><img src="../../screens/web/S-WEB-07-formErr--1440.webp" alt="S-WEB-07 formErr, full page at 1440 px"></a><figcaption>Full page 1440</figcaption></figure>
+          <figure class="full m"><a href="../../screens/web/S-WEB-07-formErr--390.webp"><img src="../../screens/web/S-WEB-07-formErr--390.webp" alt="S-WEB-07 formErr, full page at 390 px"></a><figcaption>Full page 390</figcaption></figure>
+        </div>
+      </div>
+      <div class="state">
+        <h3>emailSent <a href="../../../../prototypes/web/pages/delete-account.html#S-WEB-07/emailSent"><code>#S-WEB-07/emailSent</code></a></h3>
+        <div class="pair">
+          <figure class="desk"><div class="clip"><iframe src="../../../../prototypes/web/pages/delete-account.html?shot=1#S-WEB-07/emailSent" title="S-WEB-07 emailSent at 1440 px" loading="eager" tabindex="-1"></iframe></div><figcaption>Desktop 1440 · first viewport</figcaption></figure>
+          <figure class="mob"><div class="clip"><iframe src="../../../../prototypes/web/pages/delete-account.html?shot=1#S-WEB-07/emailSent" title="S-WEB-07 emailSent at 390 px" loading="eager" tabindex="-1"></iframe></div><figcaption>Mobile 390</figcaption></figure>
+          <figure class="full"><a href="../../screens/web/S-WEB-07-emailSent--1440.webp"><img src="../../screens/web/S-WEB-07-emailSent--1440.webp" alt="S-WEB-07 emailSent, full page at 1440 px"></a><figcaption>Full page 1440</figcaption></figure>
+          <figure class="full m"><a href="../../screens/web/S-WEB-07-emailSent--390.webp"><img src="../../screens/web/S-WEB-07-emailSent--390.webp" alt="S-WEB-07 emailSent, full page at 390 px"></a><figcaption>Full page 390</figcaption></figure>
+        </div>
+      </div>
+      <div class="state">
+        <h3>verified <a href="../../../../prototypes/web/pages/delete-account.html#S-WEB-07/verified"><code>#S-WEB-07/verified</code></a></h3>
+        <div class="pair">
+          <figure class="desk"><div class="clip"><iframe src="../../../../prototypes/web/pages/delete-account.html?shot=1#S-WEB-07/verified" title="S-WEB-07 verified at 1440 px" loading="eager" tabindex="-1"></iframe></div><figcaption>Desktop 1440 · first viewport</figcaption></figure>
+          <figure class="mob"><div class="clip"><iframe src="../../../../prototypes/web/pages/delete-account.html?shot=1#S-WEB-07/verified" title="S-WEB-07 verified at 390 px" loading="eager" tabindex="-1"></iframe></div><figcaption>Mobile 390</figcaption></figure>
+          <figure class="full"><a href="../../screens/web/S-WEB-07-verified--1440.webp"><img src="../../screens/web/S-WEB-07-verified--1440.webp" alt="S-WEB-07 verified, full page at 1440 px"></a><figcaption>Full page 1440</figcaption></figure>
+          <figure class="full m"><a href="../../screens/web/S-WEB-07-verified--390.webp"><img src="../../screens/web/S-WEB-07-verified--390.webp" alt="S-WEB-07 verified, full page at 390 px"></a><figcaption>Full page 390</figcaption></figure>
+        </div>
+      </div>
+    </section>
+  <p class="foot">Generated by prototypes/web/tools/export-web.mjs · Route and map geometry © OpenStreetMap contributors.</p>
+</body></html>

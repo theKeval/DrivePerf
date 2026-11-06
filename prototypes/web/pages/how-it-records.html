@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="en-CA" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>How DrivePerf records · DrivePerf</title>
+<meta name="description" content="Manual and automatic trips, the estimated start, battery with the screen off, and the honest limits of recording on iPhone and Android.">
+<meta name="theme-color" content="#05070A">
+<link rel="canonical" href="https://driveperf.com/how-it-records">
+<link rel="icon" href="../assets/brand/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../css/site.css">
+</head>
+<body data-screen="S-WEB-06">
+<a class="skip-link" href="#main">Skip to content</a>
+<div data-partial="header" data-solid></div>
+<main id="main">
+  <header class="page-hero" data-component="DocHero">
+    <div class="wrap">
+      <nav class="crumbs" aria-label="Breadcrumb"><a href="../index.html">Home</a><span aria-hidden="true">/</span><a href="support.html">Support</a><span aria-hidden="true">/</span><span>How DrivePerf records</span></nav>
+      <p class="eyebrow">The honest capture promise</p>
+      <h1 class="h1">How DrivePerf records.</h1>
+      <p class="lede">Auto-detects most drives. The first few hundred metres may be estimated. <span data-pl-text data-ios="Force-quitting" data-android="Force-stopping the app">Force-quitting</span> pauses auto-detect. Here's what that means, and how to get the most reliable recording on your phone.</p>
+    </div>
+  </header>
+
+  <section class="section section--tight" aria-labelledby="modes">
+    <div class="wrap">
+      <h2 class="h2" id="modes" style="margin-bottom:32px">Two ways to record.</h2>
+      <div class="grid-2">
+        <article class="card" data-reveal>
+          <span class="icon-tile" data-icon="sparkle"></span>
+          <h3 class="h3">Automatic trips</h3>
+          <p class="muted">Off until you turn them on. DrivePerf notices you're driving, records the route and ends the drive a few minutes after you park. Your Story is waiting when you stop.</p>
+          <p class="small muted" style="margin:0">Needs <span data-pl-text data-ios="Always location and Motion &amp; Fitness" data-android="“Allow all the time” location and Physical activity">Always location and Motion &amp; Fitness</span>. Used only to record your drives.</p>
+        </article>
+        <article class="card" data-reveal style="--d:80ms">
+          <span class="icon-tile" data-icon="play"></span>
+          <h3 class="h3">Manual trips</h3>
+          <p class="muted">Tap Start before you pull away, from the app, <span data-pl-text data-ios="the Control Center control or a widget" data-android="the Quick Settings tile or a widget">the Control Center control or a widget</span>. Stop it when you park, or it ends on its own after 15 minutes parked.</p>
+          <p class="small muted" style="margin:0">Needs location only while in use. Every feature, Pro included, works in manual mode.</p>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <section class="section section--alt" aria-labelledby="drive">
+    <div class="wrap split" style="align-items:start">
+      <div>
+        <h2 class="h2" id="drive">What happens on a drive.</h2>
+        <p class="lede" style="margin-top:20px">Nothing for you to do while moving. While a drive is in progress the app shows a calm, black recording screen: no score, no speed, no alerts.</p>
+      </div>
+      <ol class="steps">
+        <li><div><b>You park</b><span>DrivePerf remembers roughly where, so it can notice when you leave. GPS goes off.</span></div></li>
+        <li><div><b>You pull away</b><span>Your phone wakes DrivePerf when it senses you're moving. It confirms you're driving, not walking or cycling, before recording.</span></div></li>
+        <li><div><b>It records</b><span>Route, speed and motion sensors, about once a second. <span data-pl-text data-ios="A notification tells you a drive is being recorded; for manual drives a Live Activity shows it on the Lock Screen." data-android="An ongoing notification shows that a drive is being recorded, as Android requires.">A notification tells you a drive is being recorded; for manual drives a Live Activity shows it on the Lock Screen.</span></span></div></li>
+        <li><div><b>You park again</b><span>After a few minutes stationary the drive ends. Traffic lights and jams don't end it.</span></div></li>
+        <li><div><b>Drive decoded</b><span>Scoring, events and your Story are worked out on your phone in seconds. One notification, held until you're parked.</span></div></li>
+      </ol>
+    </div>
+  </section>
+
+  <section class="section" aria-labelledby="estimated">
+    <div class="wrap split">
+      <div class="panel" data-reveal>
+        <div class="panel__map" style="aspect-ratio:16/9">
+          <svg viewBox="0 0 640 360" role="img" aria-label="Diagram: a drive begins at the parking spot. The first 0.4 kilometres are drawn dashed and labelled estimated, then the recorded route continues as a solid line.">
+            <rect width="640" height="360" fill="var(--map-land)"/>
+            <path d="M40 300 C 120 300, 150 250, 210 230 S 330 200, 380 150 S 520 70, 610 60" fill="none" stroke="var(--map-road)" stroke-width="16" stroke-linecap="round"/>
+            <path d="M70 296 C 120 296, 150 252, 210 230" fill="none" stroke="#5BE7C4" stroke-opacity=".6" stroke-width="5" stroke-dasharray="8 8" stroke-linecap="round"/>
+            <path d="M210 230 S 330 200, 380 150 S 520 70, 600 61" fill="none" stroke="#5BE7C4" stroke-width="5" stroke-linecap="round"/>
+            <rect x="52" y="278" width="36" height="36" rx="9" fill="var(--surface-3)" stroke="var(--text-2)" stroke-width="2"/><text x="70" y="303" text-anchor="middle" font-size="18" font-weight="700" fill="var(--text)">P</text>
+            <circle cx="210" cy="230" r="8" fill="#fff"/>
+            <g font-size="15" fill="var(--text)"><text x="52" y="340" font-weight="650">≈ 0.4 km estimated</text><text x="222" y="262" fill="var(--text-2)">First GPS fix</text><text x="440" y="128" fill="var(--text-2)">Recorded</text></g>
+          </svg>
+        </div>
+        <div class="panel__body"><p class="small muted" style="margin:0">Dashed means estimated, everywhere in DrivePerf: on maps, in charts and in your export. No event pins are shown on an estimated stretch.</p></div>
+      </div>
+      <div>
+        <h2 class="h2" id="estimated">The estimated start.</h2>
+        <p class="lede" style="margin-top:20px">Phones take a moment to wake an app when you start moving, so the first few hundred metres of an automatic drive may be missed. We don't pretend otherwise.</p>
+        <p class="muted">DrivePerf starts the drive where you parked and fills the gap from your phone's motion history. That stretch is drawn dashed, labelled "estimated", and its distance is counted but marked. Start a manual drive before you pull away and there's no estimated start at all.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="section section--alt" aria-labelledby="limits">
+    <div class="wrap">
+      <div class="section__head">
+        <h2 class="h2" id="limits">Honest limits, by platform.</h2>
+        <p class="lede">What iPhone and Android allow, and how DrivePerf works with it.</p>
+      </div>
+      <div class="tabs" role="tablist" aria-label="Platform">
+        <button role="tab" id="tab-ios" aria-controls="panel-ios" data-pl="ios" aria-selected="true">iPhone</button>
+        <button role="tab" id="tab-android" aria-controls="panel-android" data-pl="android" aria-selected="false" tabindex="-1">Android</button>
+      </div>
+      <div role="tabpanel" id="panel-ios" aria-labelledby="tab-ios" data-pl="ios">
+        <div class="split" style="align-items:start">
+          <div class="prose limit-table"><div class="table-scroll"><table>
+            <thead><tr><th scope="col">Situation</th><th scope="col">What happens</th></tr></thead>
+            <tbody>
+              <tr><td>Start of an automatic drive</td><td>The first ~300–1,000 m may be estimated while iOS wakes DrivePerf.</td></tr>
+              <tr><td>You force-quit the app</td><td>Auto-detect pauses until you open DrivePerf again.</td></tr>
+              <tr><td>Phone restarts</td><td>Auto-detect resumes after you unlock. The first drive starts at the first GPS fix, without an estimated start.</td></tr>
+              <tr><td>Low Power Mode</td><td>iOS may delay detection. The Health Check warns you.</td></tr>
+              <tr><td>Location set to "While Using"</td><td>Automatic trips stop; manual trips still work. DrivePerf tells you, with a two-tap fix.</td></tr>
+              <tr><td>Lock Screen Live Activity</td><td>Shown for manual drives. For automatic drives iOS doesn't allow it to start on its own, so you get a quiet notification instead.</td></tr>
+            </tbody>
+          </table></div></div>
+          <div><h3 class="h3" style="margin-bottom:16px">Reliability checklist</h3><ul class="never-list">
+            <li><span data-icon="check"></span><div><b>Location: Always, Precise on</b><span>Settings → DrivePerf → Location.</span></div></li>
+            <li><span data-icon="check"></span><div><b>Motion &amp; Fitness on</b><span>Settings → Privacy &amp; Security → Motion &amp; Fitness.</span></div></li>
+            <li><span data-icon="check"></span><div><b>Background App Refresh on</b><span>Settings → General → Background App Refresh.</span></div></li>
+            <li><span data-icon="check"></span><div><b>Leave it in the background</b><span>No need to open it before a drive. Just don't swipe it away.</span></div></li>
+          </ul></div>
+        </div>
+      </div>
+      <div role="tabpanel" id="panel-android" aria-labelledby="tab-android" data-pl="android" hidden>
+        <div class="split" style="align-items:start">
+          <div class="prose limit-table"><div class="table-scroll"><table>
+            <thead><tr><th scope="col">Situation</th><th scope="col">What happens</th></tr></thead>
+            <tbody>
+              <tr><td>Start of an automatic drive</td><td>The first stretch, usually a couple of hundred metres, may be estimated from GPS while Android starts recording.</td></tr>
+              <tr><td>You force-stop the app</td><td>Auto-detect pauses until you open DrivePerf again.</td></tr>
+              <tr><td>Phone maker's battery saver</td><td>Some brands put apps to sleep. The Health Check shows how to exempt DrivePerf on your phone.</td></tr>
+              <tr><td>Battery Saver on</td><td>Detection may be slower. The Health Check warns you.</td></tr>
+              <tr><td>Location set to "Only while using"</td><td>Automatic trips stop; manual trips still work. DrivePerf tells you how to fix it.</td></tr>
+              <tr><td>During a drive</td><td>An ongoing notification shows recording is on, as Android requires.</td></tr>
+            </tbody>
+          </table></div></div>
+          <div><h3 class="h3" style="margin-bottom:16px">Reliability checklist</h3><ul class="never-list">
+            <li><span data-icon="check"></span><div><b>Location: Allow all the time, Precise on</b><span>Settings → Apps → DrivePerf → Permissions → Location.</span></div></li>
+            <li><span data-icon="check"></span><div><b>Physical activity allowed</b><span>Settings → Apps → DrivePerf → Permissions.</span></div></li>
+            <li><span data-icon="check"></span><div><b>Battery: Unrestricted</b><span>Settings → Apps → DrivePerf → Battery. On some phones also remove it from "sleeping apps".</span></div></li>
+            <li><span data-icon="check"></span><div><b>Leave it in the background</b><span>No need to open it before a drive. Just don't force-stop it.</span></div></li>
+          </ul></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section section--tight" aria-labelledby="battery">
+    <div class="wrap">
+      <div class="promise" data-reveal>
+        <p class="eyebrow">Battery</p>
+        <h2 class="h2" id="battery" style="max-width:16em">About <span class="num accent">2–4%</span> an hour of driving, with the screen off.</h2>
+        <div class="promise__facts">
+          <div class="fact"><b>An estimate, for now</b><span>Our target until the beta measures it on real phones. We'll publish the numbers.</span></div>
+          <div class="fact"><b>Nothing between drives</b><span>No GPS while you're parked: just low-power motion signals.</span></div>
+          <div class="fact"><b>Backs off when it's hot</b><span>If your phone gets hot or low on battery, DrivePerf records less often to protect it.</span></div>
+        </div>
+      </div>
+      <p style="margin-top:32px" class="muted">Something not right? The <b>Health Check</b> in Settings tests everything above with a one-tap fix, and <a href="support.html#capture">Support</a> has more answers.</p>
+    </div>
+  </section>
+</main>
+<div data-partial="footer"></div>
+<script src="../js/site.js"></script>
+<script src="../js/pages.js"></script>
+</body>
+</html>

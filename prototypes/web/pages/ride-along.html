@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en-CA" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>A Ride-along pass for you · DrivePerf</title>
+<meta name="description" content="A friend sent you a Ride-along pass: 30 days of DrivePerf Pro, no card. Get the app and the pass is applied on first open.">
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#05070A">
+<link rel="icon" href="../assets/brand/favicon.svg" type="image/svg+xml">
+<meta property="og:title" content="A Ride-along pass for you">
+<meta property="og:description" content="30 days of DrivePerf Pro, no card. Smooth is a skill.">
+<link rel="stylesheet" href="../css/site.css">
+</head>
+<body data-screen="S-WEB-08">
+<a class="skip-link" href="#main">Skip to content</a>
+<div data-partial="header" data-solid></div>
+<main id="main">
+  <section class="hero" style="min-height:0;padding-bottom:96px" aria-labelledby="ra-title" data-component="RideAlongLanding">
+    <div class="wrap hero__grid">
+      <div class="hero__copy">
+        <!-- Valid pass: mobile without the app, and desktop -->
+        <div class="state-view" data-ra-view="mobile desktop">
+          <p class="eyebrow">Ride-along pass</p>
+          <h1 class="h1" id="ra-title"><span data-from>Priya</span> sent you 30 days of Pro.</h1>
+          <p class="lede" style="margin:20px 0 32px">DrivePerf records your drives automatically and turns each one into a short Story and a Smoothness score you can improve. Your pass doubles the usual 14-day Pro Preview. No card.</p>
+        </div>
+        <div class="state-view" data-ra-view="mobile">
+          <div class="badges" style="margin-bottom:16px">
+            <span class="store-badge" role="img" aria-label="Coming to the App Store"><span data-icon="store"></span><span><small>Coming to the</small><b>App Store</b></span></span>
+            <span class="store-badge" role="img" aria-label="Coming to Google Play"><span data-icon="phone"></span><span><small>Coming to</small><b>Google Play</b></span></span>
+          </div>
+          <p class="small muted" style="max-width:32em">Install DrivePerf from this phone and your pass is applied the first time you open the app. Already have it? <a href="#S-WEB-08/mobile">Open in DrivePerf</a>.</p>
+        </div>
+        <div class="state-view" data-ra-view="desktop">
+          <div class="qr-wrap" style="max-width:560px">
+            <div class="qr" id="qr"></div>
+            <div><h2 class="h4" style="margin-bottom:6px">Open it on your phone</h2><p class="small muted" style="margin:0 0 14px">Point your phone's camera at the code. DrivePerf is an iPhone and Android app, so the pass goes with you.</p><p class="tiny" style="margin:0">Or open <b style="color:var(--text)">driveperf.com/r/7KQ2-M9XD</b> on your phone.</p></div>
+          </div>
+        </div>
+        <!-- Invalid / expired pass -->
+        <div class="state-view" data-ra-view="invalid">
+          <p class="eyebrow">Ride-along pass</p>
+          <h1 class="h1">This pass has already been used.</h1>
+          <p class="lede" style="margin:20px 0 32px">Ride-along passes work once and expire after <span class="placeholder">[60 days]</span>. You can still try everything in DrivePerf Pro free for 14 days, no card.</p>
+          <div class="btn-row"><a class="btn btn--lg" href="../index.html#waitlist">Join the waitlist</a><a class="btn btn--lg btn--ghost" href="../index.html">What is DrivePerf?</a></div>
+        </div>
+      </div>
+
+      <div class="state-view" data-ra-view="mobile desktop">
+        <div class="pass" aria-label="Ride-along pass from Priya: 30 days of DrivePerf Pro" role="img">
+          <div class="pass__top"><span class="brand" style="pointer-events:none"><span data-loop="30"></span><span class="brand__word" style="font-size:17px">DrivePerf</span></span><span class="chip chip--accent">Pro</span></div>
+          <div class="pass__days"><span class="num">30</span><span class="h3">days of Pro</span></div>
+          <p class="muted small" style="margin:0">Replay every drive, unlimited routes, ghost comparison, trends and cloud backup.</p>
+          <div class="pass__from"><span class="avatar" data-initial>P</span><div><b style="display:block">From <span data-from>Priya</span></b><span class="small muted">Ride-along pass</span></div></div>
+        </div>
+        <p class="tiny" style="margin-top:20px;max-width:440px"><span data-from>Priya</span> only sees "Your friend is set up". Nothing about your drives, ever.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="section section--tight section--alt" aria-labelledby="ra-what">
+    <div class="wrap">
+      <h2 class="h3" id="ra-what" style="margin-bottom:24px">What you get with DrivePerf</h2>
+      <div class="grid-3">
+        <div class="card card--flat"><span class="icon-tile" data-icon="car"></span><h3 class="h4">Records automatically</h3><p class="muted small">From the phone alone. No hardware, nothing to do while you drive.</p></div>
+        <div class="card card--flat"><span class="icon-tile" data-icon="ring"></span><h3 class="h4">Smoothness, against you</h3><p class="muted small">Every drive compared with your own usual. No leaderboards.</p></div>
+        <div class="card card--flat"><span class="icon-tile" data-icon="shield"></span><h3 class="h4">Private by design</h3><p class="muted small">No account needed. Never sold or shared with insurers.</p></div>
+      </div>
+    </div>
+  </section>
+</main>
+<div data-partial="footer"></div>
+<script src="../../shared/tokens.js"></script>
+<script src="../../shared/data.js"></script>
+<script src="../../shared/motion.js"></script>
+<script src="../js/site.js"></script>
+<script src="../js/pages.js"></script>
+</body>
+</html>

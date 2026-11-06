@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en-CA" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Support and FAQ · DrivePerf</title>
+<meta name="description" content="Answers about DrivePerf: automatic capture, battery with the screen off, force-quitting, passenger trips, your data, Pro and cancelling.">
+<meta name="theme-color" content="#05070A">
+<link rel="canonical" href="https://driveperf.com/support">
+<link rel="icon" href="../assets/brand/favicon.svg" type="image/svg+xml">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"Will DrivePerf drain my battery?","acceptedAnswer":{"@type":"Answer","text":"We estimate about 2–4% battery per hour of driving with the screen off."}},{"@type":"Question","name":"Is DrivePerf an insurance app?","acceptedAnswer":{"@type":"Answer","text":"No. Your data is never sold and never shared with insurers."}}]}</script>
+<link rel="stylesheet" href="../css/site.css">
+</head>
+<body data-screen="S-WEB-05">
+<a class="skip-link" href="#main">Skip to content</a>
+<div data-partial="header" data-solid></div>
+<main id="main">
+  <header class="page-hero" data-component="DocHero">
+    <div class="wrap">
+      <nav class="crumbs" aria-label="Breadcrumb"><a href="../index.html">Home</a><span aria-hidden="true">/</span><span>Support</span></nav>
+      <h1 class="h1">Support and FAQ</h1>
+      <p class="lede">Plain answers about recording, battery, your data and Pro. Can't find it? Email <a href="mailto:support@driveperf.com">support@driveperf.com</a>.</p>
+      <div class="field" style="max-width:560px;margin-top:28px">
+        <label for="faq-search">Search the answers</label>
+        <input class="input" id="faq-search" type="search" placeholder="Try “battery” or “cancel”" autocomplete="off">
+        <p class="field-hint" id="faq-count" aria-live="polite"></p>
+      </div>
+    </div>
+  </header>
+
+  <div class="wrap doc">
+    <nav class="toc" aria-label="Topics" data-component="Toc">
+      <h2>Topics</h2>
+      <ol>
+        <li><a href="#capture">Recording and capture</a></li>
+        <li><a href="#battery">Battery</a></li>
+        <li><a href="#passenger">Passenger trips</a></li>
+        <li><a href="#scores">Scores and tips</a></li>
+        <li><a href="#data">Your data and privacy</a></li>
+        <li><a href="#pro">Pro and the Pro Preview</a></li>
+        <li><a href="#cancel">Cancelling and refunds</a></li>
+        <li><a href="#contact">Contact us</a></li>
+      </ol>
+    </nav>
+    <div>
+      <p id="faq-empty" class="lede" hidden>No answers match that. Email <a href="mailto:support@driveperf.com">support@driveperf.com</a> and we'll help.</p>
+
+      <section class="faq-group" aria-labelledby="capture"><h2 class="h3" id="capture">Recording and capture</h2><div class="faq">
+        <details open><summary>How does automatic recording work?</summary><div class="answer"><p>Turn on automatic trips and DrivePerf notices when you start driving, records the drive and ends it a few minutes after you park. Between drives it waits for low-power signals from your phone instead of keeping GPS on. <a href="how-it-records.html">How DrivePerf records</a> explains it step by step for iPhone and Android.</p></div></details>
+        <details><summary>Why is the start of some drives dashed and marked "estimated"?</summary><div class="answer"><p>Phones take a moment to wake up an app when you start driving, so the first few hundred metres of an automatic drive may be missing. DrivePerf fills that stretch from where you parked and your phone's motion history, draws it dashed and labels it "estimated". It never shows event pins there.</p></div></details>
+        <details><summary>What happens if I force-quit (or force-stop) the app?</summary><div class="answer"><p>Force-quitting on iPhone, or force-stopping on Android, pauses automatic detection until you open DrivePerf again. You don't need to keep the app open; just leave it in the background. The Health Check in Settings shows you if anything needs fixing.</p></div></details>
+        <details><summary>DrivePerf missed a drive. What can I do?</summary><div class="answer"><p>Open the Health Check in Settings: it checks location, motion access, Low Power Mode or battery settings, and notifications, with a one-tap fix for each. On some Android phones the maker's battery saver puts apps to sleep; the Health Check helps you exempt DrivePerf. If a drive is still missed, the app may ask "Did you drive around 5 pm?" so we can tune detection.</p></div></details>
+        <details><summary>Can I record drives manually instead?</summary><div class="answer"><p>Yes. Start a drive with one tap before you set off: from the app, the Control Center control or widget on iPhone, or the Quick Settings tile or widget on Android. Every feature, including Pro, works in manual mode.</p></div></details>
+      </div></section>
+
+      <section class="faq-group" aria-labelledby="battery"><h2 class="h3" id="battery">Battery</h2><div class="faq">
+        <details><summary>How much battery does it use?</summary><div class="answer"><p>About 2–4% of battery per hour of driving with the screen off. That's our estimate; we'll publish measured numbers from the beta. If the screen is on for navigation or music, your phone will use more for that, not for DrivePerf. When your phone gets hot or low, DrivePerf records less often to protect it.</p></div></details>
+        <details><summary>Does it drain my battery when I'm not driving?</summary><div class="answer"><p>Barely. Between drives DrivePerf doesn't run GPS. It relies on your phone's motion signals and a small geofence around where you parked.</p></div></details>
+      </div></section>
+
+      <section class="faq-group" aria-labelledby="passenger"><h2 class="h3" id="passenger">Passenger trips</h2><div class="faq">
+        <details><summary>I was a passenger. Will that count against my score?</summary><div class="answer"><p>No. Tap "I was a passenger" on the Story and the trip is removed from your scores, records and recaps. If you know before you leave, a passenger can start the drive as a passenger trip. Bus and train rides are usually recognised; when we're not sure, the Story asks.</p></div></details>
+      </div></section>
+
+      <section class="faq-group" aria-labelledby="scores"><h2 class="h3" id="scores">Scores and tips</h2><div class="faq">
+        <details><summary>What is Smoothness?</summary><div class="answer"><p>A score from 0 to 100 for how gently you braked, accelerated and turned, compared with your own usual on the same route or the same kind of road. Your first three drives set your baseline. A full, gentle stop scores as well as not stopping, so rolling stops are never rewarded.</p></div></details>
+        <details><summary>Someone cut me off and I had to brake hard. Is that fair?</summary><div class="answer"><p>Tap the stop and answer "Yes, it was needed". It's left out of your score straight away, with no further questions.</p></div></details>
+        <details><summary>Will DrivePerf show me my score while I drive?</summary><div class="answer"><p>No, never. While a drive is in progress the app shows only a calm recording screen. No score, no speed, no alerts. Your Story is ready once you're parked.</p></div></details>
+      </div></section>
+
+      <section class="faq-group" aria-labelledby="data"><h2 class="h3" id="data">Your data and privacy</h2><div class="faq">
+        <details><summary>Do I need an account?</summary><div class="answer"><p>No. Everything in Free and the Pro Preview works without one, and your trips stay on your phone. Sign in only if you want Pro cloud backup or to use a second device.</p></div></details>
+        <details><summary>Is this an insurance app?</summary><div class="answer"><p>No. DrivePerf has no insurance features, and your data is never sold and never shared with insurers.</p></div></details>
+        <details><summary>How do I download or delete my data?</summary><div class="answer"><p>Open Profile, then Privacy Centre. "Download all my data" creates a ZIP in an open format, free on every plan. You can delete a trip, a date range, everything, or your whole account. No app any more? Use the <a href="delete-account.html">account deletion page</a>.</p></div></details>
+        <details><summary>What do share cards show?</summary><div class="answer"><p>By default, the shape of a route with the start and end trimmed, its Smoothness, your car and the part of day. Never a map unless you choose it each time, never where you start or stop, never speed.</p></div></details>
+      </div></section>
+
+      <section class="faq-group" aria-labelledby="pro"><h2 class="h3" id="pro">Pro and the Pro Preview</h2><div class="faq">
+        <details><summary>What do I get for free?</summary><div class="answer"><p>Recording, every Drive Story, Smoothness and tips, trip summaries forever, Replay and Analysis for the last 30 days, the weekly recap, Drive Wrapped, sharing, 2 routes, 1 car and a full data download. See <a href="../index.html#pricing">Free vs Pro</a>.</p></div></details>
+        <details><summary>How does the Pro Preview work?</summary><div class="answer"><p>Every new driver gets 14 days of Pro with no card. On day 15 you'll see "Your first two weeks, decoded" and choose: keep Pro, or continue with Free. Nothing is ever charged without you choosing a plan.</p></div></details>
+        <details><summary>How much is Pro?</summary><div class="answer"><p>US$6.99 a month or US$39.99 a year in the US; CA$8.99 a month or CA$49.99 a year in Canada. Founding Drivers get their first year for US$29.99 or CA$39.99.</p></div></details>
+        <details><summary>What happens to my trips if Pro ends?</summary><div class="answer"><p>They stay on your phone. Replay and Analysis older than 30 days are locked, not lost: subscribe again and they're back. Cloud backup stops.</p></div></details>
+      </div></section>
+
+      <section class="faq-group" aria-labelledby="cancel"><h2 class="h3" id="cancel">Cancelling and refunds</h2><div class="faq">
+        <details><summary>How do I cancel?</summary><div class="answer"><p>On iPhone: Settings, your name, Subscriptions, DrivePerf. On Android: Google Play, Profile, Payments and subscriptions, Subscriptions. Pro stays on until the end of the period you paid for.</p></div></details>
+        <details><summary>Can I get a refund?</summary><div class="answer"><p>Refunds are handled by Apple or Google. Request one from your App Store or Google Play purchase history.</p></div></details>
+      </div></section>
+
+      <section id="contact" class="cta-band" style="text-align:left;justify-items:start;padding:32px 24px" aria-labelledby="contact-title">
+        <h2 class="h3" id="contact-title">Still stuck?</h2>
+        <p class="muted" style="margin:0">Email us and a person will reply within a few business days. Include your phone model and app version from Settings, never your password.</p>
+        <div class="btn-row"><a class="btn" href="mailto:support@driveperf.com">support@driveperf.com</a><a class="btn btn--ghost" href="mailto:privacy@driveperf.com">Privacy questions</a></div>
+      </section>
+    </div>
+  </div>
+</main>
+<div data-partial="footer"></div>
+<script src="../js/site.js"></script>
+<script src="../js/pages.js"></script>
+</body>
+</html>

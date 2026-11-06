@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en-CA" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Delete your DrivePerf account · DrivePerf</title>
+<meta name="description" content="Request deletion of your DrivePerf account and cloud data, with or without the app. What is deleted, what is kept and why, and how long it takes.">
+<meta name="theme-color" content="#05070A">
+<link rel="canonical" href="https://driveperf.com/delete-account">
+<link rel="icon" href="../assets/brand/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../css/site.css">
+</head>
+<body data-screen="S-WEB-07">
+<a class="skip-link" href="#main">Skip to content</a>
+<div data-partial="header" data-solid></div>
+<main id="main">
+  <header class="page-hero" data-component="DocHero">
+    <div class="wrap">
+      <nav class="crumbs" aria-label="Breadcrumb"><a href="../index.html">Home</a><span aria-hidden="true">/</span><a href="support.html">Support</a><span aria-hidden="true">/</span><span>Delete your account</span></nav>
+      <h1 class="h1">Delete your DrivePerf account.</h1>
+      <p class="lede">DrivePerf, made by <span class="placeholder">[developer legal name]</span>, deletes your account and everything in cloud backup on request, whether or not you still have the app.</p>
+    </div>
+  </header>
+
+  <div class="wrap" style="padding:56px var(--gutter) 96px">
+    <div class="split" style="align-items:start;gap:48px">
+      <div>
+        <!-- Form (Def) and validation error -->
+        <div class="state-view" data-del-view="form formErr" data-component="DeletionRequestForm">
+          <h2 class="h3" style="margin-bottom:8px">Request deletion</h2>
+          <p class="muted">Enter the email on your DrivePerf account. We'll send a link to confirm it's you, so nobody else can delete your account.</p>
+          <form class="waitlist" id="del-form" novalidate style="box-shadow:none;max-width:none">
+            <div class="field" id="f-del-email">
+              <label for="del-email">Account email</label>
+              <input class="input" id="del-email" type="email" autocomplete="email" inputmode="email" placeholder="you@example.com" aria-describedby="del-email-err del-email-hint">
+              <p class="field-error" id="del-email-err"></p>
+              <p class="field-hint" id="del-email-hint">Signed in with Apple and hid your email? Use the relay address ending in privaterelay.appleid.com.</p>
+            </div>
+            <button class="btn btn--lg" id="del-submit" type="submit">Send confirmation link</button>
+            <p class="tiny" style="margin:0">If you have an active Pro subscription, cancel it in your App Store or Google Play account too. Deleting your account doesn't cancel it.</p>
+          </form>
+        </div>
+
+        <!-- Email sent (neutral: no account enumeration) -->
+        <div class="state-view" data-del-view="emailSent" role="status">
+          <div class="status__icon" style="width:72px;height:72px;margin-bottom:24px;border-radius:20px;background:var(--accent-container);color:var(--on-accent-container);display:grid;place-items:center"><span data-icon="mail" style="--is:34px"></span></div>
+          <h2 class="h2" style="margin-bottom:16px">Check your email.</h2>
+          <p class="lede">If there's a DrivePerf account for <b id="sent-to"></b>, we've sent a link to confirm the deletion. It expires in 24 hours.</p>
+          <p class="muted">Nothing arrived after a few minutes? Check spam, or <a href="#S-WEB-07/form">try another address</a>. You can also delete your account in the app.</p>
+        </div>
+
+        <!-- Verified / done -->
+        <div class="state-view" data-del-view="verified" role="status">
+          <div class="status__icon" style="width:72px;height:72px;margin-bottom:24px;border-radius:20px;background:var(--accent-container);color:var(--on-accent-container);display:grid;place-items:center"><span data-icon="check" style="--is:34px"></span></div>
+          <h2 class="h2" style="margin-bottom:16px">Deletion confirmed.</h2>
+          <p class="lede">We're deleting your account and cloud data now. It's usually done within 7 days and always within 30. We'll email you when it's complete.</p>
+          <ul class="next-steps" style="margin:28px 0">
+            <li><span class="ico" data-icon="phone"></span><div><b>Trips on your phone</b><span>Not touched by this. Delete them in the app (Privacy Centre → Delete all trips) or by removing the app.</span></div></li>
+            <li><span class="ico" data-icon="lock"></span><div><b>Subscription</b><span>If you subscribed, cancel it in your App Store or Google Play account so you're not charged again.</span></div></li>
+          </ul>
+          <a class="btn btn--ghost" href="../index.html">Back to driveperf.com</a>
+        </div>
+
+        <section style="margin-top:56px" aria-labelledby="in-app">
+          <h2 class="h3" id="in-app" style="margin-bottom:16px">Or delete it in the app</h2>
+          <ol class="steps">
+            <li><div><b>Open Profile</b><span>Tap your avatar at the top of any tab.</span></div></li>
+            <li><div><b>Privacy Centre → Delete account</b><span>Sign in again to confirm it's you, and review what will be deleted.</span></div></li>
+            <li><div><b>Choose what happens on this phone</b><span>Keep your local trips, or delete them too.</span></div></li>
+          </ol>
+          <p class="small muted" style="margin-top:16px">Never signed in? Then there's no account: everything is on your phone. Delete it in Privacy Centre → Delete all trips, or remove the app.</p>
+        </section>
+      </div>
+
+      <aside aria-labelledby="what-del">
+        <div class="card" style="padding:28px">
+          <h2 class="h3" id="what-del" style="margin-bottom:16px">What is deleted</h2>
+          <ul class="never-list">
+            <li><span data-icon="trash"></span><div><b>Your account</b><span>Sign-in, email, name and account ID.</span></div></li>
+            <li><span data-icon="trash"></span><div><b>Everything in cloud backup</b><span>Trips with their routes, sensor data, scores, routes, cars and settings.</span></div></li>
+            <li><span data-icon="trash"></span><div><b>Ride-along pass records</b><span>Passes you sent or redeemed.</span></div></li>
+            <li><span data-icon="trash"></span><div><b>Subscription link and diagnostics</b><span>Your customer record at RevenueCat, and crash data tied to your installation where the provider allows.</span></div></li>
+          </ul>
+          <h2 class="h3" style="margin:28px 0 16px">What is kept, and why</h2>
+          <ul class="never-list">
+            <li><span data-icon="info"></span><div><b>Purchase records at Apple or Google</b><span>They keep their own records of what you bought. We can't delete them; contact them directly.</span></div></li>
+            <li><span data-icon="info"></span><div><b>A record of your request</b><span>The date and outcome of the deletion, without your trip data, for <span class="placeholder">[12 months]</span>, so we can show we honoured it.</span></div></li>
+            <li><span data-icon="info"></span><div><b>Anonymous totals</b><span>Counts such as "drives decoded this week" that can't identify you.</span></div></li>
+          </ul>
+          <p class="small muted" style="margin:20px 0 0">Questions: <a href="mailto:privacy@driveperf.com">privacy@driveperf.com</a>. More in the <a href="privacy.html#rights">privacy policy</a>.</p>
+        </div>
+      </aside>
+    </div>
+  </div>
+</main>
+<div data-partial="footer"></div>
+<script src="../js/site.js"></script>
+<script src="../js/pages.js"></script>
+</body>
+</html>

@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="240" height="240" viewBox="0 0 240 240"><title>DrivePerf logo concept C: The Trace</title><defs><linearGradient id="tg" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#A3AAB6"/><stop offset="0.45" stop-color="#5BE7C4"/><stop offset="1" stop-color="#C6F8EA"/></linearGradient></defs>
+  <rect width="240" height="240" rx="48" fill="#080B10"/>
+  <path d="M48.0 196.0 L79.0 190.0 L50.0 184.0 L77.1 178.0 L51.8 172.0 L75.3 166.0 L53.6 160.0 L73.5 154.0 L55.3 148.0 L71.9 142.0 L56.9 136.0 L70.4 130.0 L58.3 124.0 L69.0 118.0 L59.7 112.0 L67.7 106.0 L60.9 100.0 L66.5 94.0 L62.0 88.0 L65.5 82.0 L62.9 76.0 L64.7 70.0 L63.6 64.0 L64.1 58.0 L64.0 52.0 L64 52 L112 52 C162 52 190 84 190 124 C190 164 162 196 112 196 L96 196" fill="none" stroke="url(#tg)" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="84" cy="196" r="10" fill="#FFFFFF"/>
+</svg>
