@@ -16,8 +16,8 @@ agentic engineering team. Agent-specific rules live in the sibling files.
 - **Design flag:** the Jira label **`design-needed`** marks tickets requiring design work.
 - **Pilot product repo:** `theKeval/DrivePerf` (GitHub) — Android app, Kotlin, Jetpack
   Compose. Default branch: `main`.
-- **Product identity:** **DrivePerf**, domain **`driveperf.com`**, Android package
-  **`com.driveperf`** (subpackages `com.driveperf.*`).
+- **Product identity:** **DrivePerf**, domain **`driveperf.com`**, app ID
+  **`com.driveperf.app`** on both stores (dev builds `com.driveperf.app.dev`); Kotlin packages `com.driveperf.*`.
 - **Slack:** workspace `AgenticWorkflow`, channel **#agentic-team**. Bot handles:
   **@product_manager** (PM), **@developer** (dev), **@senior_developer** (reviewer),
   **@designer**.
@@ -65,9 +65,11 @@ The issue/PR title carries a Jira key like `DRIVE-12`. You MUST:
 1. **Read the whole issue first** — description, acceptance criteria, attached designs.
    Implement exactly what's asked; nothing more. If the issue is ambiguous or infeasible,
    comment on the issue explaining what's unclear instead of guessing wildly.
-2. **Check for design artifacts at `docs/design/<JIRA-KEY>/` in the repo** (also linked
+2. **Check for design artifacts at `docs/design/<JIRA-KEY>/<ios|android|web>/` in the repo** (also linked
    from the issue's Design section when one exists). If present, they are the source of
-   truth for UI work: `mockup.png` = the exact target UI; `design-spec.md` = exact color
+   truth for UI work: `design-spec.md` lists every screen and state, with links to the exact target UI
+   images in `docs/design/screens/<platform>/`, and the interactive prototype (`prototypes/<platform>/index.html#<SCREEN-ID>/<state>`)
+   shows behaviour and motion; `mockup.webp` = a contact sheet of the story; `design-spec.md` = exact color
    tokens, spacing, and type scale — use these values verbatim, do not approximate;
    `assets/*.svg` = real assets — copy them into the app's resources and use them, do not
    recreate icons; `mockup.html` = reference implementation to consult for layout/CSS

@@ -2,7 +2,7 @@
 
 **Every drive, decoded.** DrivePerf is a phone-based driving analytics app for iOS and Android. It is built for everyday driving enthusiasts and for drivers who want smoother, more efficient driving.
 
-[driveperf.com](https://driveperf.com) · [Jira DRIVE](https://thekeval.atlassian.net/jira/software/projects/DRIVE/summary) · Android package `com.driveperf`
+[driveperf.com](https://driveperf.com) · [Jira DRIVE](https://thekeval.atlassian.net/jira/software/projects/DRIVE/summary) · App ID `com.driveperf.app`
 
 ## Status
 

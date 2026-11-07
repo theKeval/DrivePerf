@@ -1,0 +1,629 @@
+<!doctype html>
+<html lang="en-CA" data-platform="ios" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DrivePerf Design System</title>
+<!-- Single page; it renders from the real shared files so it can't drift from them. -->
+<link rel="stylesheet" href="../../../prototypes/shared/tokens.css">
+<script src="../../../prototypes/shared/tokens.js"></script>
+<script src="../../../prototypes/shared/data.js"></script>
+<script src="../../../prototypes/shared/icons.js"></script>
+<script src="../../../prototypes/shared/motion.js"></script>
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body { background: #05070A; color: #E4E7EC; font: 400 15px/1.45 -apple-system, BlinkMacSystemFont, "Google Sans Flex", system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+  .page { width: 1440px; margin: 0 auto; padding: 48px 30px 64px; }
+  .hero { display: grid; grid-template-columns: 1fr 520px; gap: 40px; align-items: center; padding: 28px 36px; border-radius: 36px; background: radial-gradient(120% 140% at 0% 0%, #17344C 0%, #0A1420 45%, #05070A 100%); border: 1px solid #ffffff12; }
+  .hero h1 { font: 650 64px/1 "Google Sans Flex", -apple-system, system-ui; font-stretch: 112%; letter-spacing: -0.5px; margin: 14px 0 10px; }
+  .hero p { color: #A3AAB6; font-size: 18px; margin: 0; max-width: 680px; }
+  .hero .tag { display: inline-flex; gap: 10px; align-items: center; color: #5BE7C4; font-weight: 600; letter-spacing: .4px; font-size: 13px; text-transform: uppercase; }
+  .hero-art { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+  .hero-art img { width: 100%; border-radius: 26px; display: block; }
+  .hero-art figure { margin: 0; } .hero-art figcaption { color: #7A8392; font-size: 12px; margin-top: 6px; text-align: center; }
+  h2.sec { font: 650 13px/1 system-ui; letter-spacing: 1.6px; text-transform: uppercase; color: #5BE7C4; margin: 56px 0 6px; }
+  .sec-sub { color: #A3AAB6; margin: 0 0 18px; font-size: 15px; }
+  .sec-title { font: 650 30px/1.15 "Google Sans Flex", -apple-system, system-ui; font-stretch: 108%; margin: 0 0 6px; color: #F2F4F7; }
+  .row { display: grid; grid-template-columns: repeat(4, 330px); gap: 20px; }
+  .colhead { display: flex; align-items: center; gap: 8px; font: 600 13px/1 system-ui; color: #C9CED6; margin-bottom: 10px; }
+  .colhead .pill { font: 600 11px/1 system-ui; padding: 5px 8px; border-radius: 99px; background: #ffffff12; color: #A3AAB6; letter-spacing: .3px; }
+  /* ---------- token boards ---------- */
+  .board { display: grid; grid-template-columns: 1.25fr 1fr; gap: 20px; }
+  .card0 { background: #0C1016; border: 1px solid #ffffff10; border-radius: 24px; padding: 22px; }
+  .sw-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px; }
+  .sw { border-radius: 14px; overflow: hidden; border: 1px solid #ffffff10; font-size: 11px; }
+  .sw .c { height: 54px; } .sw .t { padding: 7px 8px; background: #10151C; color: #C9CED6; line-height: 1.3; } .sw .t b { display: block; color: #F2F4F7; font-size: 12px; }
+  .data-row { display: grid; grid-template-columns: 150px 1fr 1fr; gap: 10px; align-items: center; padding: 7px 0; border-bottom: 1px solid #ffffff0c; font-size: 13px; }
+  .data-row:last-child { border: 0; }
+  .data-row .lbl { color: #C9CED6; }
+  .data-row .s { display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-radius: 10px; }
+  .data-row .s.dk { background: #131822; color: #A3AAB6; } .data-row .s.lt { background: #FFFFFF; color: #5A6271; }
+  .data-row code { font: 500 11px/1 ui-monospace, Menlo, monospace; }
+  .type-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  .type-col h4 { margin: 0 0 10px; font: 600 12px/1 system-ui; color: #7A8392; letter-spacing: 1px; text-transform: uppercase; }
+  .ts { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 4px 0; color: #F2F4F7; border-bottom: 1px dashed #ffffff0d; }
+  .ts small { color: #7A8392; font: 500 11px/1 ui-monospace, Menlo, monospace; white-space: nowrap; }
+  .num-demo { display: flex; gap: 16px; align-items: flex-end; margin-top: 16px; }
+  .num-demo div { color: #F2F4F7; } .num-demo small { display: block; color: #7A8392; font: 500 11px/1.4 ui-monospace, monospace; margin-top: 4px; }
+  .springs { display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px; margin-top: 8px; }
+  .spr { background: #10151C; border-radius: 14px; padding: 10px; font-size: 11px; color: #A3AAB6; } .spr b { color: #F2F4F7; display: block; font-size: 12px; margin-bottom: 2px; }
+  .spr svg { width: 100%; height: 64px; display: block; margin-top: 6px; }
+
+  /* ---------- phone frames ---------- */
+  .phone { position: relative; width: 330px; height: 716px; overflow: hidden; background: var(--dp-bg-grouped); color: var(--dp-text); font: var(--dp-font-body); letter-spacing: var(--dp-track-body); isolation: isolate; }
+  [data-platform="ios"].phone { border-radius: 48px; box-shadow: 0 0 0 7px #1b1f26, 0 0 0 8px #3a414d, 0 30px 60px -20px #000; }
+  [data-platform="android"].phone { border-radius: 36px; box-shadow: 0 0 0 7px #16191e, 0 0 0 8px #2f343c, 0 30px 60px -20px #000; }
+  [data-theme="light"].phone { box-shadow: 0 0 0 7px #d9dde3, 0 0 0 8px #b9bfc8, 0 30px 60px -24px #0008; }
+  .sb { position: absolute; inset: 0 0 auto 0; height: 46px; display: flex; align-items: center; justify-content: space-between; padding: 0 28px 0 34px; font: 600 14px/1 var(--dp-family-text); z-index: 30; color: var(--dp-text); }
+  [data-platform="android"] .sb { height: 34px; padding: 0 20px; font: 500 13px/1 var(--dp-family-text); }
+  .sb .island { position: absolute; left: 50%; top: 11px; width: 104px; height: 30px; margin-left: -52px; background: #000; border-radius: 20px; }
+  [data-platform="android"] .sb .island { width: 12px; height: 12px; top: 11px; margin-left: -6px; border-radius: 50%; }
+  .sb .ic { display: flex; gap: 5px; align-items: center; }
+  .sb .bat { width: 22px; height: 11px; border-radius: 3.5px; border: 1.3px solid currentColor; opacity: .9; position: relative; } .sb .bat:after { content: ""; position: absolute; inset: 1.5px 5px 1.5px 1.5px; background: currentColor; border-radius: 1.5px; }
+  .gbar { position: absolute; left: 50%; bottom: 8px; width: 120px; height: 4px; margin-left: -60px; border-radius: 4px; background: var(--dp-text); opacity: .55; z-index: 40; }
+  [data-platform="ios"] .gbar { width: 130px; height: 5px; bottom: 7px; margin-left: -65px; }
+  .scroll { position: absolute; inset: 0; padding-top: 52px; overflow: hidden; }
+  [data-platform="android"] .scroll { padding-top: 38px; }
+
+  .glass { background: var(--dp-glass-fill); -webkit-backdrop-filter: var(--dp-glass-blur); backdrop-filter: var(--dp-glass-blur); border: 0.5px solid var(--dp-glass-stroke); box-shadow: var(--dp-elev-glass-current); }
+  [data-platform="android"] .glass { background: var(--md-sys-color-surface-container-high); border: 0; box-shadow: var(--dp-elev-3); }
+  .num { font-family: var(--dp-family-numeric); font-variant-numeric: tabular-nums lining-nums; font-feature-settings: var(--dp-num-features); font-stretch: var(--dp-num-stretch); font-variation-settings: var(--dp-num-variation); }
+  .u { font-size: .52em; font-weight: 500; color: var(--dp-text-2); margin-left: 2px; font-stretch: 100%; font-variation-settings: normal; letter-spacing: 0; }
+  .t2 { color: var(--dp-text-2); } .t3 { color: var(--dp-text-3); }
+  .pad { padding: 0 var(--dp-screen-margin); }
+
+  /* headers */
+  .lt-head { display: flex; align-items: flex-end; justify-content: space-between; padding: 6px var(--dp-screen-margin) 10px; }
+  .lt-head h1 { margin: 0; font: var(--dp-font-screen-title); letter-spacing: var(--dp-track-screen-title); }
+  .avatar { width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; font: 600 15px/1 var(--dp-family-text); color: var(--dp-text); position: relative; }
+  [data-platform="android"] .avatar { width: 40px; height: 40px; border-radius: 0; background: var(--md-sys-color-secondary-container); color: var(--md-sys-color-on-secondary-container); clip-path: url(#cookie12); }
+  .avatar .dot { position: absolute; top: -1px; right: -1px; width: 10px; height: 10px; border-radius: 50%; background: var(--dp-warning); border: 2px solid var(--dp-bg-grouped); }
+  .prev-badge { font: 700 10px/1 var(--dp-family-text); letter-spacing: .6px; padding: 6px 9px; border-radius: 99px; color: var(--dp-accent-text); }
+  [data-platform="android"] .prev-badge { background: var(--md-sys-color-primary-container); color: var(--md-sys-color-on-primary-container); border-radius: 8px; }
+  .detail-head { display: flex; align-items: center; gap: 10px; padding: 4px 12px 8px; }
+  .icon-btn { width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; color: var(--dp-text); flex: none; }
+  [data-platform="android"] .icon-btn { background: transparent; box-shadow: none; }
+  .detail-head .tt { flex: 1; min-width: 0; } .detail-head .tt b { display: block; font: var(--dp-font-card-title); } .detail-head .tt span { font: var(--dp-font-meta); color: var(--dp-text-2); }
+  [data-platform="android"] .detail-head { padding: 4px 4px 6px; }
+  [data-platform="android"] .detail-head .tt b { font: 400 22px/28px var(--dp-family-display); }
+
+  /* cards */
+  .card { background: var(--dp-surface); border-radius: var(--dp-radius-card); }
+  [data-theme="light"][data-platform="ios"] .card { box-shadow: var(--dp-elev-1); }
+  [data-platform="android"] .card { background: var(--md-sys-color-surface-container); }
+  .section-label { font: var(--dp-font-caption); color: var(--dp-text-2); text-transform: uppercase; letter-spacing: .6px; padding: 14px var(--dp-screen-margin) 8px; }
+  [data-platform="android"] .section-label { text-transform: none; letter-spacing: .1px; font: 500 14px/20px var(--dp-family-text); color: var(--md-sys-color-primary); }
+
+  /* story card on home */
+  .story-card { margin: 0 var(--dp-screen-margin); padding: 16px; display: grid; grid-template-columns: 1fr 104px; gap: 8px; align-items: center; border-radius: var(--dp-radius-card-hero); background: radial-gradient(130% 120% at 100% 0%, color-mix(in srgb, var(--dp-car-carmine) 16%, transparent) 0%, transparent 60%), var(--dp-surface); }
+  [data-platform="android"] .story-card { background: radial-gradient(130% 120% at 100% 0%, color-mix(in srgb, var(--dp-car-carmine) 16%, transparent) 0%, transparent 60%), var(--md-sys-color-surface-container-high); }
+  .story-card .k { font: var(--dp-font-caption); color: var(--dp-accent-text); font-weight: 600; letter-spacing: .3px; }
+  .story-card .h { font: var(--dp-font-card-title); margin: 4px 0 2px; } .story-card .m { font: var(--dp-font-meta); color: var(--dp-text-2); }
+  .btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 40px; padding: 0 16px; border-radius: 99px; font: var(--dp-font-button); letter-spacing: var(--dp-track-button); border: 0; white-space: nowrap; }
+  .btn.pri { background: var(--dp-accent); color: var(--dp-on-accent); }
+  .btn.sec { background: var(--dp-fill-strong); color: var(--dp-text); }
+  [data-platform="android"] .btn.sec { background: var(--md-sys-color-secondary-container); color: var(--md-sys-color-on-secondary-container); }
+  .btn.ter { background: transparent; color: var(--dp-accent-text); padding: 0 8px; }
+  .btn.sm { height: 32px; padding: 0 12px; font-size: 14px; }
+  [data-platform="ios"] .btn.pri.glassy { box-shadow: inset 0 1px 0 #ffffff80, 0 6px 16px -6px var(--dp-accent); }
+
+  /* trip card */
+  .trip { display: grid; grid-template-columns: 48px minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 11px 14px; }
+  .trip + .trip { border-top: 0.5px solid var(--dp-separator); }
+  [data-platform="android"] .trip + .trip { border-top: 0; }
+  .trip .g { width: 48px; height: 48px; border-radius: 12px; background: var(--dp-surface-2); display: grid; place-items: center; }
+  [data-platform="android"] .trip .g { background: var(--md-sys-color-surface-container-highest); border-radius: 12px; }
+  .trip .ti { font: var(--dp-font-card-title); font-size: 15px; line-height: 20px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .trip .me { font: var(--dp-font-meta); color: var(--dp-text-2); white-space: nowrap; }
+  .trip .tst { font: 500 13px/16px var(--dp-family-text); font-variant-numeric: tabular-nums; color: var(--dp-text-2); margin-top: 2px; display: flex; gap: 6px; align-items: center; white-space: nowrap; overflow: hidden; }
+  .trip .tst > * { flex: none; }
+  .score-badge { position: relative; width: 46px; height: 46px; display: grid; place-items: center; }
+  .score-badge .n { position: relative; font: 650 17px/1 var(--dp-family-numeric); font-stretch: var(--dp-num-stretch); font-variation-settings: var(--dp-num-variation); font-variant-numeric: tabular-nums; }
+  .score-badge svg { position: absolute; inset: 0; }
+  .score-badge .d { position: absolute; bottom: -7px; left: 50%; transform: translateX(-50%); font: 700 10px/1 var(--dp-family-numeric); font-stretch: var(--dp-num-stretch); white-space: nowrap; padding: 2px 5px; border-radius: 99px; background: var(--dp-bg-grouped); }
+  .muted { opacity: .55; }
+  .chip { display: inline-flex; align-items: center; gap: 5px; height: 26px; padding: 0 10px; border-radius: 99px; font: 600 12px/1 var(--dp-family-text); background: var(--dp-fill); color: var(--dp-text); white-space: nowrap; }
+  [data-platform="android"] .chip { border-radius: 8px; height: 28px; font-weight: 500; }
+  .chip.up { background: color-mix(in srgb, var(--dp-accent) 18%, transparent); color: var(--dp-accent-text); }
+  .chip.rec { background: color-mix(in srgb, var(--dp-record) 18%, transparent); color: var(--dp-record); }
+  .chip.dn { color: var(--dp-text-2); }
+  .chip.q { background: transparent; border: 1px solid var(--dp-separator); color: var(--dp-text-2); font-weight: 500; }
+  .car-dot { width: 8px; height: 8px; border-radius: 50%; }
+
+  /* shell */
+  .tabbar { position: absolute; z-index: 25; }
+  [data-platform="ios"] .tabbar { left: 14px; right: 14px; bottom: 18px; height: 58px; border-radius: 99px; display: grid; grid-template-columns: repeat(4, 1fr); padding: 4px; }
+  [data-platform="ios"] .tab { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; font: 600 10px/1 var(--dp-family-text); color: var(--dp-text); border-radius: 99px; }
+  [data-platform="ios"] .tab.on { color: var(--dp-accent-text); background: var(--dp-fill-strong); }
+  [data-platform="android"] .tabbar { left: 0; right: 0; bottom: 0; height: 84px; padding: 10px 6px 24px; display: grid; grid-template-columns: repeat(4, 1fr); background: var(--md-sys-color-surface-container); }
+  [data-platform="android"] .tab { display: flex; flex-direction: column; align-items: center; gap: 4px; font: 500 12px/16px var(--dp-family-text); color: var(--md-sys-color-on-surface-variant); }
+  [data-platform="android"] .tab i { width: 56px; height: 30px; border-radius: 99px; display: grid; place-items: center; }
+  [data-platform="android"] .tab.on { color: var(--md-sys-color-on-surface); font-weight: 700; } [data-platform="android"] .tab.on i { background: var(--md-sys-color-secondary-container); color: var(--md-sys-color-on-secondary-container); }
+  .accessory { position: absolute; z-index: 25; display: flex; align-items: center; gap: 10px; }
+  [data-platform="ios"] .accessory { left: 14px; right: 14px; bottom: 84px; height: 46px; border-radius: 99px; padding: 0 5px 0 14px; }
+  [data-platform="android"] .accessory { left: 16px; right: 16px; bottom: 96px; height: 60px; border-radius: 99px; padding: 0 6px 0 18px; background: var(--md-sys-color-primary-container) !important; color: var(--md-sys-color-on-primary-container); box-shadow: var(--dp-elev-3); }
+  .accessory .tx { flex: 1; font: 600 13px/16px var(--dp-family-text); } .accessory .tx small { display: block; font: 500 11px/14px var(--dp-family-text); opacity: .75; }
+  .accessory .go { height: 36px; padding: 0 14px; border-radius: 99px; background: var(--dp-accent); color: var(--dp-on-accent); font: 650 14px/1 var(--dp-family-text); display: flex; align-items: center; gap: 6px; }
+  [data-platform="android"] .accessory .go { height: 48px; width: 96px; justify-content: center; border-radius: 16px; background: var(--md-sys-color-primary); color: var(--md-sys-color-on-primary); }
+  .live-dot { position: relative; width: 10px; height: 10px; border-radius: 50%; background: var(--dp-live); flex: none; }
+  .live-dot:after { content: ""; position: absolute; inset: -5px; border-radius: 50%; border: 2px solid var(--dp-live); opacity: .35; }
+  .fadebot { position: absolute; left: 0; right: 0; bottom: 0; height: 180px; z-index: 20; background: linear-gradient(transparent, var(--dp-bg-grouped) 70%); pointer-events: none; }
+
+  /* ring */
+  .ring-wrap { display: grid; justify-items: center; gap: 8px; }
+
+  /* stat tiles */
+  .tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .tile { background: var(--dp-surface-2); border-radius: var(--dp-radius-md); padding: 10px 10px 9px; min-height: 64px; position: relative; }
+  [data-platform="android"] .tile { background: var(--md-sys-color-surface-container-high); border-radius: 12px; }
+  .tile .l { font: 500 11px/14px var(--dp-family-text); color: var(--dp-text-2); }
+  .tile .v { font: 600 21px/26px var(--dp-family-numeric); font-stretch: var(--dp-num-stretch); font-variation-settings: var(--dp-num-variation); font-variant-numeric: tabular-nums; margin-top: 3px; letter-spacing: -.2px; }
+  .tile .p { position: absolute; top: 9px; right: 9px; color: var(--dp-text-3); }
+
+  /* map */
+  .map { position: relative; overflow: hidden; }
+  .map svg { display: block; }
+  .readouts { position: absolute; left: 12px; right: 12px; top: 8px; height: 52px; border-radius: 99px; display: grid; grid-template-columns: repeat(3, 1fr); align-items: center; z-index: 5; }
+  [data-platform="android"] .readouts { border-radius: 20px; }
+  .readouts div { text-align: center; } .readouts div + div { border-left: 0.5px solid var(--dp-separator); }
+  .readouts b { display: block; font: 600 18px/20px var(--dp-family-numeric); font-stretch: var(--dp-num-stretch); font-variation-settings: var(--dp-num-variation); font-variant-numeric: tabular-nums; }
+  .readouts span { font: 500 10px/12px var(--dp-family-text); color: var(--dp-text-2); }
+  .playbar { position: absolute; left: 10px; right: 10px; z-index: 6; padding: 10px 12px 10px 10px; display: grid; grid-template-columns: 44px 1fr; gap: 10px; align-items: center; border-radius: 30px; }
+  [data-platform="android"] .playbar { border-radius: 28px; background: var(--md-sys-color-surface-container-high); }
+  .playbtn { width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; background: var(--dp-accent); color: var(--dp-on-accent); }
+  [data-platform="android"] .playbtn { border-radius: 14px; width: 48px; height: 48px; background: var(--md-sys-color-primary-container); color: var(--md-sys-color-on-primary-container); }
+  .seg { display: flex; gap: 2px; padding: 2px; border-radius: 99px; background: var(--dp-fill); font: 600 11px/1 var(--dp-family-text); }
+  .seg span { flex: 1; text-align: center; padding: 6px 0; border-radius: 99px; color: var(--dp-text-2); }
+  .seg span.on { background: var(--dp-surface-3); color: var(--dp-text); box-shadow: 0 1px 3px #0003; }
+  [data-platform="android"] .seg { background: transparent; gap: 3px; padding: 0; }
+  [data-platform="android"] .seg span { background: var(--md-sys-color-surface-container-highest); border-radius: 6px; color: var(--md-sys-color-on-surface-variant); }
+  [data-platform="android"] .seg span:first-child { border-radius: 99px 6px 6px 99px; } [data-platform="android"] .seg span:last-child { border-radius: 6px 99px 99px 6px; }
+  [data-platform="android"] .seg span.on { background: var(--md-sys-color-primary); color: var(--md-sys-color-on-primary); border-radius: 99px; box-shadow: none; }
+
+  /* sheet */
+  .sheet { position: absolute; left: 6px; right: 6px; bottom: 6px; z-index: 28; border-radius: 34px 34px 40px 40px; padding: 8px 16px 18px; }
+  [data-platform="ios"] .sheet { background: var(--dp-glass-fill-strong); -webkit-backdrop-filter: var(--dp-glass-prominent-blur); backdrop-filter: var(--dp-glass-prominent-blur); border: .5px solid var(--dp-glass-stroke); box-shadow: 0 -10px 40px #0006; }
+  [data-platform="android"] .sheet { left: 0; right: 0; bottom: 0; border-radius: 28px 28px 0 0; background: var(--md-sys-color-surface-container-low); padding-bottom: 28px; box-shadow: var(--dp-elev-2); }
+  .grab { width: 36px; height: 5px; border-radius: 3px; background: var(--dp-text-3); opacity: .6; margin: 0 auto 10px; }
+  [data-platform="android"] .grab { width: 32px; height: 4px; background: var(--md-sys-color-on-surface-variant); opacity: .4; margin: 6px auto 14px; }
+  .sheet h3 { margin: 0; font: var(--dp-font-sheet-title); font-size: 20px; line-height: 25px; display: flex; gap: 8px; align-items: center; }
+  .facts { display: grid; grid-template-columns: 1fr 0.9fr 1.15fr 1.3fr; gap: 6px; margin: 10px 0; }
+  .facts > div { min-width: 0; overflow: hidden; }
+  [data-platform="android"] .facts b { font-size: 12px; letter-spacing: -.2px; }
+  .facts div { background: var(--dp-fill); border-radius: 12px; padding: 7px 8px; }
+  [data-platform="android"] .facts div { background: var(--md-sys-color-surface-container-highest); }
+  .facts b { display: block; white-space: nowrap; font: 600 13px/18px var(--dp-family-numeric); font-stretch: var(--dp-num-stretch); font-variation-settings: var(--dp-num-variation); font-variant-numeric: tabular-nums; }
+  .facts span { font: 500 10px/12px var(--dp-family-text); color: var(--dp-text-2); }
+  .tipbox { border-radius: 16px; padding: 10px 12px; background: color-mix(in srgb, var(--dp-accent) 10%, var(--dp-surface)); font: 400 13px/18px var(--dp-family-text); }
+  .tipbox b { display: block; font: 600 11px/14px var(--dp-family-text); color: var(--dp-accent-text); margin-bottom: 2px; letter-spacing: .2px; }
+
+  /* analysis */
+  .lane-lbl { font: 600 10px/1 var(--dp-family-text); color: var(--dp-text-2); display: flex; align-items: center; gap: 6px; }
+  .legend { display: flex; flex-wrap: wrap; gap: 10px; font: 500 11px/1 var(--dp-family-text); color: var(--dp-text-2); padding: 6px var(--dp-screen-margin); }
+  .legend i { display: inline-block; width: 18px; height: 0; vertical-align: middle; margin-right: 4px; }
+
+  /* route */
+  .route-hero { margin: 0 var(--dp-screen-margin); padding: 14px; border-radius: var(--dp-radius-card-hero); background: radial-gradient(90% 90% at 70% 30%, #5BE7C41a, transparent 70%), var(--dp-surface); }
+  [data-theme="light"] .route-hero { background: radial-gradient(90% 90% at 70% 30%, #07977714, transparent 70%), var(--dp-surface); }
+  [data-platform="android"] .route-hero { background: radial-gradient(90% 90% at 70% 30%, #5BE7C41a, transparent 70%), var(--md-sys-color-surface-container); }
+  .dotstrip { position: relative; height: 22px; margin: 10px 2px 2px; }
+  .dotstrip:before { content: ""; position: absolute; left: 0; right: 0; top: 9px; height: 4px; border-radius: 2px; background: var(--dp-fill); }
+  .dotstrip i { position: absolute; top: 6px; width: 10px; height: 10px; border-radius: 50%; background: var(--dp-text-3); margin-left: -5px; }
+  .dotstrip i.rec { background: var(--dp-record); width: 14px; height: 14px; top: 4px; margin-left: -7px; box-shadow: 0 0 0 3px color-mix(in srgb, var(--dp-record) 25%, transparent); }
+  .dotstrip i.last { background: transparent; border: 2px solid var(--dp-accent); }
+  .share { width: 132px; height: 234px; border-radius: 18px; overflow: hidden; position: relative; flex: none; background: radial-gradient(120% 70% at 80% 0%, #E5484D33, transparent 60%), linear-gradient(180deg, #0A1420, #05070A); color: #F2F4F7; box-shadow: 0 10px 30px -10px #000c; }
+  .lock-panel { position: relative; border-radius: 20px; overflow: hidden; }
+  .lock-over { position: absolute; inset: 0; display: grid; place-items: center; text-align: center; padding: 12px; background: color-mix(in srgb, var(--dp-bg-grouped) 35%, transparent); }
+  .lock-over b { font: var(--dp-font-card-title); font-size: 14px; display: block; margin: 6px 0 8px; }
+
+  /* component sheet (non-phone) */
+  .comp > * { min-width: 0; }
+  .comp { min-width: 0; overflow: hidden; border-radius: 26px; padding: 16px; background: var(--dp-bg-grouped); color: var(--dp-text); font: var(--dp-font-body); display: grid; gap: 14px; }
+  [data-platform="android"].comp { background: var(--md-sys-color-surface); }
+  .comp h5 { margin: 0 0 6px; font: 600 11px/1 var(--dp-family-text); letter-spacing: .8px; text-transform: uppercase; color: var(--dp-text-3); }
+  .plans { display: grid; gap: 8px; }
+  .plan { border-radius: 18px; padding: 12px 14px; border: 1.5px solid var(--dp-separator); display: flex; justify-content: space-between; align-items: center; background: var(--dp-surface); }
+  .plan.on { border-color: var(--dp-accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--dp-accent) 25%, transparent); }
+  [data-platform="android"] .plan { background: var(--md-sys-color-surface-container); border: 0; border-radius: 16px; }
+  [data-platform="android"] .plan.on { background: var(--md-sys-color-primary-container); color: var(--md-sys-color-on-primary-container); box-shadow: none; border-radius: 28px; }
+  .plan b { font: var(--dp-font-card-title); font-size: 15px; } .plan small { display: block; font: var(--dp-font-meta); color: var(--dp-text-2); }
+  .plan .pr { text-align: right; font: 650 16px/1.2 var(--dp-family-numeric); font-stretch: var(--dp-num-stretch); font-variation-settings: var(--dp-num-variation); }
+  .found { font: 700 10px/1 var(--dp-family-text); color: var(--dp-record); letter-spacing: .4px; }
+  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .two .btn { width: 100%; height: 44px; }
+  .hrow { display: grid; grid-template-columns: 22px 1fr auto; gap: 10px; align-items: center; padding: 9px 12px; background: var(--dp-surface); }
+  [data-platform="android"] .hrow { background: var(--md-sys-color-surface-container); }
+  .hrow:first-child { border-radius: 16px 16px 4px 4px; } .hrow:last-child { border-radius: 4px 4px 16px 16px; } .hrow + .hrow { margin-top: 2px; }
+  .hrow b { font: 500 14px/18px var(--dp-family-text); display: block; } .hrow span { font: var(--dp-font-meta); color: var(--dp-text-2); }
+  .states { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .stt { border-radius: 16px; padding: 12px; background: var(--dp-surface); min-height: 112px; font: var(--dp-font-meta); color: var(--dp-text-2); }
+  [data-platform="android"] .stt { background: var(--md-sys-color-surface-container); }
+  .stt b { display: block; color: var(--dp-text); font: 600 13px/17px var(--dp-family-text); margin: 6px 0 2px; }
+  .skel { height: 10px; border-radius: 6px; background: var(--dp-fill-strong); margin-top: 7px; }
+  .primer { border-radius: 20px; padding: 16px; background: var(--dp-surface); text-align: center; }
+  [data-platform="android"] .primer { background: var(--md-sys-color-surface-container); text-align: left; }
+  .primer b { display: block; font: var(--dp-font-card-title); font-size: 17px; margin: 8px 0 4px; } .primer p { margin: 0 0 10px; font: var(--dp-font-meta); color: var(--dp-text-2); }
+  .primer ul { list-style: none; padding: 0; margin: 0 0 12px; text-align: left; font: var(--dp-font-meta); } .primer li { display: flex; gap: 6px; align-items: center; padding: 2px 0; }
+  .lockscreen { border-radius: 22px; padding: 12px 14px; background: #1c2430cc; color: #F2F4F7; -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px); }
+  .island { border-radius: 26px; background: #000; color: #F2F4F7; height: 36px; display: flex; align-items: center; justify-content: space-between; padding: 0 14px 0 10px; margin: 0 auto; width: 200px; }
+  .island.exp { height: auto; width: 100%; border-radius: 30px; padding: 12px 16px; display: block; }
+  .notif { border-radius: 22px; padding: 12px 14px; background: var(--md-sys-color-surface-container-high); }
+  [data-theme="light"] .lockscreen { background: #ffffffcc; color: #0B0E13; }
+  .wallpaper { border-radius: 20px; padding: 10px; background: linear-gradient(160deg, #3d5a78, #1b2433); }
+  [data-theme="light"] .wallpaper { background: linear-gradient(160deg, #b7c9dc, #e8edf3); }
+  .qs { display: inline-flex; align-items: center; gap: 10px; height: 64px; padding: 0 18px 0 14px; border-radius: 99px; background: var(--md-sys-color-primary); color: var(--md-sys-color-on-primary); font: 500 14px/18px var(--dp-family-text); }
+  .qs small { display: block; opacity: .8; font-size: 12px; }
+  .indrive { border-radius: 26px; background: #000; color: #F2F4F7; padding: 18px 16px 14px; }
+  .indrive .big { font: 600 44px/48px var(--dp-family-numeric); font-stretch: var(--dp-num-stretch); font-variation-settings: var(--dp-num-variation); font-variant-numeric: tabular-nums; }
+  .indrive .bt { height: 64px; border-radius: 22px; display: grid; place-items: center; font: 650 17px/1 var(--dp-family-text); margin-top: 8px; }
+  .footer { margin-top: 48px; color: #7A8392; font-size: 13px; display: flex; justify-content: space-between; border-top: 1px solid #ffffff10; padding-top: 18px; }
+  .footer code { color: #A3AAB6; }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute"><defs>
+  <clipPath id="cookie12" clipPathUnits="objectBoundingBox"><path id="cookie12p"/></clipPath>
+</defs></svg>
+<div class="page" id="page"></div>
+<script>
+(function () {
+  const D = window.DP_DATA, I = window.DP_ICONS, U = D.util;
+  const $ = (h) => h;
+  const hero = U.trip('t20261105-0742'), gapTrip = U.trip('t20261020-0740'), exTrip = U.trip('t20261027-1728');
+  const route = U.route('r_commute');
+  const PLAT = [['ios', 'dark'], ['ios', 'light'], ['android', 'dark'], ['android', 'light']];
+  const NAME = { ios: 'iOS 26 · Liquid Glass', android: 'Android 16 · M3 Expressive' };
+
+  // ---------- helpers ----------
+  function cookie(n, R, cx, cy, amp = 0.075) {
+    let d = '';
+    for (let i = 0; i <= 180; i++) { const a = (i / 180) * Math.PI * 2; const r = R * (1 - amp + amp * Math.cos(n * a)); d += `${i ? 'L' : 'M'}${(cx + r * Math.cos(a - Math.PI / 2)).toFixed(2)} ${(cy + r * Math.sin(a - Math.PI / 2)).toFixed(2)}`; }
+    return d + 'Z';
+  }
+  document.getElementById('cookie12p').setAttribute('d', cookie(12, 0.5, 0.5, 0.5, 0.06).replace(/(\d+\.\d+)/g, (m) => (+m).toFixed(3)));
+  const sb = (p) => `<div class="sb"><span>${p === 'ios' ? '9:41' : '7:30'}</span><span class="island"></span><span class="ic">${p === 'ios' ? '<svg width="17" height="11" viewBox="0 0 17 11"><g fill="currentColor"><rect x="0" y="7" width="3" height="4" rx="1"/><rect x="4.5" y="5" width="3" height="6" rx="1"/><rect x="9" y="2.5" width="3" height="8.5" rx="1"/><rect x="13.5" y="0" width="3" height="11" rx="1"/></g></svg>' : '<svg width="15" height="12" viewBox="0 0 15 12"><path d="M7.5 12L0 3a11 11 0 0 1 15 0z" fill="currentColor"/></svg>'}<span class="bat"></span></span></div>`;
+  function ring(score, size, { base, rec, stroke, label, num = 'hero' } = {}) {
+    if (label === undefined) label = size >= 140;
+    const r = (size - stroke) / 2 - 2, c = size / 2, C = 2 * Math.PI * r, f = score / 100;
+    const id = 'rg' + Math.random().toString(36).slice(2, 7);
+    const notch = (v, col, w = 2.5, len = stroke + 6) => { const a = (v / 100) * 2 * Math.PI - Math.PI / 2; const x1 = c + (r - len / 2) * Math.cos(a), y1 = c + (r - len / 2) * Math.sin(a), x2 = c + (r + len / 2) * Math.cos(a), y2 = c + (r + len / 2) * Math.sin(a); return `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${col}" stroke-width="${w}" stroke-linecap="round"/>`; };
+    const fs = num === 'hero' ? size * 0.34 : size * 0.33;
+    return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" role="img" aria-label="Smoothness ${score}">
+      <defs><linearGradient id="${id}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="var(--dp-ref-glide-400)"/><stop offset=".6" stop-color="var(--dp-accent)"/><stop offset="1" stop-color="var(--dp-ref-glide-100)"/></linearGradient></defs>
+      <circle cx="${c}" cy="${c}" r="${r}" fill="none" stroke="var(--dp-fill-strong)" stroke-width="${stroke}"/>
+      <circle cx="${c}" cy="${c}" r="${r}" fill="none" stroke="url(#${id})" stroke-width="${stroke}" stroke-linecap="round" stroke-dasharray="${C * f} ${C}" transform="rotate(-90 ${c} ${c})"/>
+      ${base != null ? notch(base, 'var(--dp-text-2)') : ''}${rec != null ? notch(rec, 'var(--dp-record)', 4) : ''}
+      <text x="${c}" y="${c + fs * 0.34 - (label ? size * 0.04 : 0)}" text-anchor="middle" fill="var(--dp-text)" style="font: 650 ${fs}px var(--dp-family-numeric); font-stretch: var(--dp-num-stretch); font-variation-settings: var(--dp-num-variation); font-variant-numeric: tabular-nums; letter-spacing:-1px">${score}</text>
+      ${label ? `<text x="${c}" y="${c + fs * 0.34 + size * 0.1}" text-anchor="middle" fill="var(--dp-text-2)" style="font: 600 ${Math.max(10, size * 0.07)}px var(--dp-family-text); letter-spacing:.4px">SMOOTHNESS</text>` : ''}
+    </svg>`;
+  }
+  const qBadge = (b, detail) => `<span class="chip q">${I.quality(b, { size: 14 })}${b}${detail ? ` <span class="t3" style="font-weight:500">· ${detail}</span>` : ''}</span>`;
+  const glyphSvg = (pts, s, col = 'var(--dp-data-route)', w = 2.4) => `<svg width="${s}" height="${s}" viewBox="0 0 ${s} ${s}"><path d="${U.glyphPath(pts, s, s, s * 0.14)}" fill="none" stroke="${col}" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+  const signedTxt = (d) => U.signed(d);
+  function scoreBadge(t, p) {
+    if (!t.smoothness) return `<span class="chip">${t.type === 'passenger' ? I.svg('passenger', { size: 14 }) + 'Passenger' : 'Not scored'}</span>`;
+    const s = t.smoothness, rec = s.record && s.record.isNew && s.record.previous;
+    const shape = p === 'android' ? `<svg width="46" height="46" viewBox="0 0 46 46"><path d="${cookie(9, 23, 23, 23)}" fill="var(--md-sys-color-primary-container)" opacity=".55"/></svg>` : `<svg width="46" height="46" viewBox="0 0 46 46"><circle cx="23" cy="23" r="21" fill="none" stroke="var(--dp-fill-strong)" stroke-width="3"/><circle cx="23" cy="23" r="21" fill="none" stroke="var(--dp-accent)" stroke-width="3" stroke-linecap="round" stroke-dasharray="${(s.score / 100) * 132} 132" transform="rotate(-90 23 23)"/></svg>`;
+    const d = s.delta != null ? `<span class="d" style="color:${s.delta > 0 ? 'var(--dp-positive)' : 'var(--dp-change-down)'}">${s.delta > 0 ? '▲' : s.delta < 0 ? '▼' : '●'}${Math.abs(s.delta)}</span>` : '';
+    return `<div class="score-badge">${shape}<span class="n">${s.score}</span>${rec ? `<span style="position:absolute;top:-5px;right:-3px;color:var(--dp-record);background:var(--dp-surface);border-radius:50%;display:grid;padding:1px">${I.svg('rosette', { size: 14 })}</span>` : ''}${d}</div>`;
+  }
+  function tripRow(t, p) {
+    const v = U.vehicle(t.vehicleId);
+    return `<div class="trip ${t.type === 'passenger' ? 'muted' : ''}"><div class="g">${glyphSvg(t.glyph, 40)}</div>
+      <div style="min-width:0"><div class="ti">${t.label}</div><div class="me">${t.partOfDay} · ${U.fmtDate(t.start)}</div>
+      <div class="tst">${t.distanceKm} km · ${Math.round(t.durationS / 60)} min ${I.quality(t.quality.badge, { size: 12 })}${D.vehicles.length > 1 ? `<span class="car-dot" style="background:var(--dp-car-${v.colour})" title="${v.nickname}"></span>` : ''}</div></div>
+      ${scoreBadge(t, p)}</div>`;
+  }
+  function tabbar(p, on = 0) {
+    const tabs = [['drives', 'Drives'], ['routes', 'Routes'], ['insights', 'Insights'], ['garage', 'Garage']];
+    return `<div class="tabbar ${p === 'ios' ? 'glass' : ''}">${tabs.map(([ic, l], i) => `<div class="tab ${i === on ? 'on' : ''}"><i>${I.svg(ic, { size: p === 'ios' ? 22 : 24 })}</i>${l}</div>`).join('')}</div>`;
+  }
+  const accessory = (p) => `<div class="accessory ${p === 'ios' ? 'glass' : ''}"><span class="live-dot" style="background:var(--dp-accent)"></span><div class="tx">Auto-detect on · ready<small>Last check-in 2 min ago</small></div><span class="go">${I.svg('record', { size: 16 })}Start</span></div>`;
+
+  // ---------- map ----------
+  function mapSvg(trip, w, h, { pins = true, marker = null, others = true, est = true } = {}) {
+    const pr = U.trackPath(trip, w, h, 26);
+    let ctx = '';
+    if (others) {
+      for (const t of D.trips) {
+        if (t.id === trip.id) continue;
+        let d = '', pen = false;
+        for (const r of t.track.rows) { if (r[1] == null) { pen = false; continue; } const [x, y] = pr.project(r[1], r[2]); if (x < -60 || x > w + 60 || y < -60 || y > h + 60) { pen = false; continue; } d += `${pen ? 'L' : 'M'}${x.toFixed(1)} ${y.toFixed(1)}`; pen = true; }
+        if (d) ctx += `<path d="${d}" fill="none" stroke="var(--dp-data-map-road)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>`;
+      }
+    }
+    const grid = Array.from({ length: 12 }, (_, i) => `<path d="M${i * 34} 0V${h}M0 ${i * 34}H${w}" stroke="var(--dp-data-grid)" stroke-width="1"/>`).join('');
+    // estimated start + gaps drawn separately
+    const rows = trip.track.rows;
+    let estD = '', mainD = '', pen = false, gapLines = '';
+    let lastGood = null;
+    rows.forEach((r, i) => {
+      if (r[1] == null) { pen = false; return; }
+      const [x, y] = pr.project(r[1], r[2]);
+      if (r[7] === 1) { estD += `${estD ? 'L' : 'M'}${x.toFixed(1)} ${y.toFixed(1)}`; }
+      if (r[7] !== 1 || (rows[i + 1] && rows[i + 1][7] !== 1)) {
+        if (!pen && lastGood && rows[i - 1] && rows[i - 1][1] == null) gapLines += `<path d="M${lastGood[0]} ${lastGood[1]}L${x} ${y}" stroke="var(--dp-data-gap-stroke)" stroke-width="2" stroke-dasharray="1 6" stroke-linecap="round"/>`;
+        mainD += `${pen ? 'L' : 'M'}${x.toFixed(1)} ${y.toFixed(1)}`; pen = true;
+      }
+      lastGood = [x.toFixed(1), y.toFixed(1)];
+    });
+    let pinsSvg = '';
+    if (pins) {
+      for (const s of trip.stops.slice(0, 5)) { const [x, y] = pr.project(s.lat, s.lng); pinsSvg += `<g transform="translate(${x - 9} ${y - 7})">${I.stopPin({ size: 14 })}</g>`; }
+      if (trip.maxAt && trip.maxAt.lat) { const [x, y] = pr.project(trip.maxAt.lat, trip.maxAt.lng); pinsSvg += `<g transform="translate(${x - 9} ${y - 18})">${I.maxPin({ size: 18 })}</g>`; }
+      trip.events.forEach((e, i) => { const [x, y] = pr.project(e.lat, e.lng); pinsSvg += `<g transform="translate(${x - 13} ${y - 13})">${I.pin(e.type, { size: 26, needed: e.needed, selected: pins === 'select' && i === 1 })}</g>`; });
+    }
+    let mk = '';
+    if (marker != null) { const s = U.sampleAt(trip, marker); const [x, y] = pr.project(s.lat, s.lng); mk = `<circle cx="${x}" cy="${y}" r="16" fill="var(--dp-accent)" opacity=".18"/><circle cx="${x}" cy="${y}" r="8" fill="var(--dp-data-marker)" stroke="var(--dp-accent)" stroke-width="3"/>`; }
+    return `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}"><rect width="${w}" height="${h}" fill="var(--dp-data-map-land)"/>${grid}${ctx}
+      <path d="${mainD}" fill="none" stroke="var(--dp-data-route-casing)" stroke-width="7" stroke-linecap="round" stroke-linejoin="round" opacity=".7"/>
+      <path d="${mainD}" fill="none" stroke="var(--dp-data-route)" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round"/>
+      ${est && estD ? `<path d="${estD}" fill="none" stroke="var(--dp-data-route)" stroke-width="3.6" stroke-dasharray="4 4" opacity=".6" stroke-linecap="round"/>` : ''}${gapLines}${pinsSvg}${mk}</svg>`;
+  }
+
+  // ---------- charts ----------
+  function lanePath(rows, idx, x0, w, y0, h, lo, hi, t0, t1, T = null) {
+    const TT = T || rows[rows.length - 1][0];
+    let d = '', pen = false;
+    rows = rows.map((r, i, a) => { if (idx === 3 || r[idx] == null) return r; const n = [a[i - 1], r, a[i + 1]].filter((q) => q && q[idx] != null); const c = r.slice(); c[idx] = n.reduce((s, q) => s + q[idx], 0) / n.length; if (Math.abs(r[idx]) > 0.28) c[idx] = r[idx]; return c; });
+    for (const r of rows) { if (r[0] < t0 || r[0] > t1) continue; if (r[idx] == null) { pen = false; continue; } const x = x0 + (r[0] / TT) * w; const y = y0 + h - ((Math.max(lo, Math.min(hi, r[idx])) - lo) / (hi - lo)) * h; d += `${pen ? 'L' : 'M'}${x.toFixed(1)} ${y.toFixed(1)}`; pen = true; }
+    return d;
+  }
+  function timeline(trip, w, { cursor = 0.42 } = {}) {
+    const rows = trip.track.rows, T = trip.durationS, x0 = 0;
+    const lanes = [{ k: 'Speed', idx: 3, lo: 0, hi: 120, h: 36, col: 'var(--dp-data-speed)', dash: '', unit: 'km/h' },
+      { k: 'Longitudinal G', idx: 4, lo: -0.6, hi: 0.6, h: 52, col: 'var(--dp-data-long-g)', dash: '', zero: true },
+      { k: 'Lateral G', idx: 5, lo: -0.6, hi: 0.6, h: 52, col: 'var(--dp-data-lat-g)', dash: '6 3', zero: true }];
+    let y = 0, out = '', labels = '';
+    const tx = (t) => x0 + (t / T) * w;
+    const q = trip.quality.spans;
+    const H = lanes.reduce((a, l) => a + l.h + 18, 0) + 26;
+    for (const sp of q.excluded) out += `<rect x="${tx(sp[0])}" y="0" width="${tx(sp[1]) - tx(sp[0])}" height="${H - 26}" fill="url(#hatch)"/>`;
+    for (const sp of q.gap) out += `<rect x="${tx(sp[0])}" y="0" width="${Math.max(3, tx(sp[1]) - tx(sp[0]))}" height="${H - 26}" fill="var(--dp-fill)"/>`;
+    for (const l of lanes) {
+      const top = y + 14;
+      labels += `<text x="0" y="${y + 10}" fill="var(--dp-text-2)" style="font:600 10px var(--dp-family-text)">${l.k}</text><text x="${w}" y="${y + 10}" text-anchor="end" fill="var(--dp-text-3)" style="font:600 9px var(--dp-family-numeric)">${l.idx === 3 ? '0–120 km/h' : '±0.6 g'}</text>`;
+      if (l.zero) out += `<line x1="0" x2="${w}" y1="${top + l.h / 2}" y2="${top + l.h / 2}" stroke="var(--dp-data-axis)" stroke-width="1"/>`;
+      out += `<line x1="0" x2="${w}" y1="${top + l.h}" y2="${top + l.h}" stroke="var(--dp-data-grid)"/>`;
+      const est = q.estimated[0];
+      const all = lanePath(rows, l.idx, x0, w, top, l.h, l.lo, l.hi, est ? est[1] : 0, T);
+      out += `<path d="${all}" fill="none" stroke="${l.col}" stroke-width="${l.idx === 3 ? 1.6 : 1.4}" stroke-dasharray="${l.dash}" stroke-linejoin="round"/>`;
+      if (est) out += `<path d="${lanePath(rows, l.idx, x0, w, top, l.h, l.lo, l.hi, 0, est[1] + 6)}" fill="none" stroke="${l.col}" stroke-width="1.6" stroke-dasharray="4 4" opacity=".6"/>`;
+      y += l.h + 18;
+    }
+    // event lane
+    for (const e of trip.events) out += `<g transform="translate(${tx(e.t) - 7} ${y - 2})">${I.pin(e.type, { size: 14 })}</g>`;
+    const cx = cursor * w;
+    out += `<line x1="${cx}" x2="${cx}" y1="0" y2="${y + 12}" stroke="var(--dp-data-cursor)" stroke-width="1.5"/><circle cx="${cx}" cy="${y + 14}" r="4" fill="var(--dp-data-cursor)"/>`;
+    return `<svg width="${w}" height="${y + 20}" viewBox="0 0 ${w} ${y + 20}" style="overflow:visible"><defs><pattern id="hatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="2" height="6" fill="var(--dp-data-excluded-hatch)"/></pattern></defs>${out}${labels}</svg>`;
+  }
+  function gg(trip, s) {
+    const c = s / 2, R = s / 2 - 10, k = R / 0.6;
+    let o = '';
+    for (let g = 0.1; g <= 0.61; g += 0.1) o += `<circle cx="${c}" cy="${c}" r="${g * k}" fill="none" stroke="var(--dp-data-gg-ring)" stroke-width="${Math.abs(g - 0.3) < 0.01 || Math.abs(g - 0.5) < 0.01 ? 1.2 : 0.8}"/>`;
+    o += `<line x1="${c - R}" x2="${c + R}" y1="${c}" y2="${c}" stroke="var(--dp-data-axis)"/><line y1="${c - R}" y2="${c + R}" x1="${c}" x2="${c}" stroke="var(--dp-data-axis)"/>`;
+    for (const [la, lo] of trip.gg.points) o += `<circle cx="${(c + la * k).toFixed(1)}" cy="${(c - lo * k).toFixed(1)}" r="1.6" fill="var(--dp-data-gg-cloud)" opacity=".32"/>`;
+    const env = trip.gg.envelope.radiiG; let d = '';
+    env.forEach((r, i) => { const a = ((i * 15 + 7.5) * Math.PI) / 180; d += `${i ? 'L' : 'M'}${(c + Math.cos(a) * r * k).toFixed(1)} ${(c - Math.sin(a) * r * k).toFixed(1)}`; });
+    o += `<path d="${d}Z" fill="none" stroke="var(--dp-data-gg-envelope)" stroke-width="1.5" stroke-linejoin="round"/>`;
+    const p = U.sampleAt(trip, trip.events[0] ? trip.events[0].t : 300);
+    const dx = c + p.latG * k, dy = c - p.lonG * k;
+    o += `<path d="M${c + 0.02 * k} ${c - 0.05 * k} Q ${c + 0.1 * k} ${c + 0.1 * k} ${dx} ${dy}" fill="none" stroke="var(--dp-data-gg-dot)" stroke-width="3" opacity=".35" stroke-linecap="round"/><circle cx="${dx}" cy="${dy}" r="7" fill="var(--dp-data-gg-dot)" opacity=".2"/><circle cx="${dx}" cy="${dy}" r="4.5" fill="var(--dp-data-gg-dot)"/>`;
+    o += `<text x="${c + 0.5 * k * 0.72}" y="${c - 0.5 * k * 0.72}" fill="var(--dp-text-3)" style="font:600 9px var(--dp-family-numeric)">0.5 g</text><text x="${c + 0.3 * k * 0.72 + 1}" y="${c - 0.3 * k * 0.72 + 1}" fill="var(--dp-text-3)" style="font:600 8px var(--dp-family-numeric)">0.3</text>`;
+    o += `<text x="${c}" y="10" text-anchor="middle" fill="var(--dp-text-3)" style="font:600 9px var(--dp-family-text)">ACCEL</text><text x="${c}" y="${s - 2}" text-anchor="middle" fill="var(--dp-text-3)" style="font:600 9px var(--dp-family-text)">BRAKE</text>`;
+    return `<svg width="${s}" height="${s}" viewBox="0 0 ${s} ${s}">${o}</svg>`;
+  }
+  function evidence(e, w, h) {
+    const n = e.evidence.kmh.length, x = (i) => (i / (n - 1)) * w;
+    const sp = e.evidence.kmh.map((v, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)} ${(30 - (v / 110) * 28).toFixed(1)}`).join('');
+    const gy = (v) => 40 + (h - 52) / 2 - (v / 0.5) * ((h - 52) / 2);
+    const lo = e.evidence.lonG.map((v, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)} ${gy(v).toFixed(1)}`).join('');
+    const la = e.evidence.latG.map((v, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)} ${gy(v).toFixed(1)}`).join('');
+    const m = e.evidence.markers, mx = (t) => x(((t + 10) / 20) * (n - 1));
+    const band = `<rect x="${mx(m.start)}" y="0" width="${Math.max(2, mx(m.end) - mx(m.start))}" height="${h - 12}" fill="var(--dp-data-event-brake)" opacity=".14" rx="3"/><line x1="${mx(0)}" x2="${mx(0)}" y1="0" y2="${h - 12}" stroke="var(--dp-data-event-brake)" stroke-width="1.2" stroke-dasharray="2 3"/>`;
+    const lab = (t, l, anchor) => `<text x="${mx(t)}" y="${h - 1}" text-anchor="${anchor}" fill="var(--dp-text-3)" style="font:600 9px var(--dp-family-text)">${l}</text>`;
+    return `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}"><line x1="0" x2="${w}" y1="${gy(0)}" y2="${gy(0)}" stroke="var(--dp-data-axis)"/>${band}${lab(-10, '−10 s', 'start')}${lab(0, 'Peak', 'middle')}${lab(10, '+10 s', 'end')}<text x="${w}" y="9" text-anchor="end" fill="var(--dp-text-3)" style="font:600 9px var(--dp-family-text)">km/h · long G · lat G</text>
+      <path d="${sp}" fill="none" stroke="var(--dp-data-speed)" stroke-width="1.6"/><path d="${la}" fill="none" stroke="var(--dp-data-lat-g)" stroke-width="1.8" stroke-dasharray="6 3"/><path d="${lo}" fill="none" stroke="var(--dp-data-long-g)" stroke-width="2"/></svg>`;
+  }
+
+  // ---------- panels ----------
+  function panelDrives(p, th) {
+    const recent = D.trips.filter((t) => t.id !== 't20261106-1210').slice(0, 5);
+    const s = hero.smoothness;
+    return `<div class="phone" data-platform="${p}" data-theme="${th}">${sb(p)}<div class="scroll">
+      <div class="lt-head"><h1>Drives</h1><div style="display:flex;gap:8px;align-items:center"><span class="prev-badge ${p === 'ios' ? 'glass' : ''}">PRO</span><span class="avatar ${p === 'ios' ? 'glass' : ''}">M<span class="dot"></span></span></div></div>
+      <div class="story-card"><div><div class="k">● Drive decoded</div><div class="h">${hero.label}</div><div class="m">${hero.partOfDay}<br>${hero.distanceKm} km · ${Math.round(hero.durationS / 60)} min</div>
+        <div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap"><span class="chip rec">${I.svg('rosette', { size: 13 })}New route record</span><span class="chip up">▲ +${s.delta} vs usual</span></div>
+        <div style="margin-top:12px"><span class="btn pri sm glassy">${I.svg('story', { size: 15 })}Watch Story</span></div></div>
+        <div>${ring(s.score, 104, { base: s.baseline, rec: 89, stroke: 9 })}</div></div>
+      <div class="section-label">This week</div>
+      <div class="card" style="margin:0 var(--dp-screen-margin);overflow:hidden">${recent.map((t) => tripRow(t, p)).join('')}</div>
+    </div><div class="fadebot"></div>${accessory(p)}${tabbar(p, 0)}<div class="gbar"></div></div>`;
+  }
+  const cap = (x) => x.charAt(0).toUpperCase() + x.slice(1);
+  const back = (p) => `<span class="icon-btn ${p === 'ios' ? 'glass' : ''}">${I.svg('chevronRight', { size: 20 }).replace('M9.5 5.5L16 12l-6.5 6.5', 'M14.5 5.5L8 12l6.5 6.5')}</span>`;
+  function scrubber(trip, w, frac) {
+    const T = trip.durationS, rows = trip.track.rows;
+    const el = rows.map((r) => r[6]), lo = Math.min(...el), hi = Math.max(...el);
+    let ed = `M0 34`; rows.forEach((r) => { ed += `L${((r[0] / T) * w).toFixed(1)} ${(34 - ((r[6] - lo) / (hi - lo || 1)) * 14).toFixed(1)}`; }); ed += `L${w} 34Z`;
+    const ticks = trip.events.map((e) => `<g transform="translate(${(e.t / T) * w - 6} -15)">${I.pin(e.type, { size: 12, needed: e.needed })}</g>`).join('');
+    const stops = trip.stops.map((st) => `<rect x="${(st.t / T) * w - 3}" y="-1" width="6" height="6" rx="3" fill="var(--dp-text-3)"/>`).join('');
+    const gaps = trip.quality.spans.gap.map((g) => `<rect x="${(g[0] / T) * w}" y="0" width="${Math.max(3, ((g[1] - g[0]) / T) * w)}" height="4" fill="var(--dp-bg-grouped)"/>`).join('');
+    const est = trip.quality.spans.estimated.map((g) => `<line x1="0" x2="${(g[1] / T) * w}" y1="2" y2="2" stroke="var(--dp-accent)" stroke-width="4" stroke-dasharray="3 3"/>`).join('');
+    return `<svg width="${w}" height="70" viewBox="0 -18 ${w} 70" style="overflow:visible;display:block"><rect x="0" y="0" width="${w}" height="4" rx="2" fill="var(--dp-fill-strong)"/><rect x="0" y="0" width="${w * frac}" height="4" rx="2" fill="var(--dp-accent)"/>${est}${gaps}${stops}${ticks}
+      <circle cx="${w * frac}" cy="2" r="8" fill="var(--dp-data-marker)" stroke="var(--dp-accent)" stroke-width="2.5"/>
+      <g transform="translate(0 14)"><path d="${ed}" fill="var(--dp-data-elevation-fill)" stroke="var(--dp-data-elevation)" stroke-width="1.2"/><line x1="${w * frac}" x2="${w * frac}" y1="16" y2="34" stroke="var(--dp-data-cursor)" stroke-width="1.2"/></g>
+      <text x="0" y="50" fill="var(--dp-text-3)" style="font:600 9px var(--dp-family-numeric)">0:00</text><text x="${w}" y="50" text-anchor="end" fill="var(--dp-text-3)" style="font:600 9px var(--dp-family-numeric)">${U.fmtClock(T)} · ↗ ${trip.elevGainM} m ↘ ${trip.elevLossM} m</text></svg>`;
+  }
+  function panelReplay(p, th) {
+    const frac = 0.62, t = gapTrip.durationS * frac, smp = U.sampleAt(gapTrip, t);
+    const dist = (gapTrip.distanceKm * 0.6).toFixed(1);
+    return `<div class="phone" data-platform="${p}" data-theme="${th}" style="background:var(--dp-data-map-land)">${sb(p)}
+      <div class="map" style="position:absolute;left:0;right:0;top:150px">${mapSvg(gapTrip, 330, 380, { marker: t })}</div>
+      <div style="position:absolute;top:${p === 'ios' ? 52 : 40}px;left:0;right:0;z-index:5">
+        <div class="detail-head">${back(p)}<div class="tt"><b>Replay</b><span>${gapTrip.partOfDay} · ${gapTrip.label}</span></div><span class="icon-btn ${p === 'ios' ? 'glass' : ''}">${I.svg('layers', { size: 20 })}</span></div>
+        <div style="position:relative;height:56px"><div class="readouts glass"><div><b>${Math.round(smp.kmh)}<span class="u">km/h</span></b><span>Speed</span></div><div><b>${U.fmtClock(t)}</b><span>Elapsed</span></div><div><b>${dist}<span class="u">km</span></b><span>Distance</span></div></div></div>
+        <div style="display:flex;gap:6px;padding:4px 12px"><span class="chip ${p === 'ios' ? 'glass' : ''}">${I.quality(gapTrip.quality.badge, { size: 13 })}Usable · brief GPS gap</span><span class="chip ${p === 'ios' ? 'glass' : ''}" style="font-weight:500">${I.provenance('estimated', { size: 11 })} Estimated start</span></div>
+      </div>
+      <div class="playbar ${p === 'ios' ? 'glass' : ''}" style="bottom:${p === 'ios' ? 26 : 34}px;grid-template-columns:1fr">
+        <div style="display:flex;gap:10px;align-items:center"><span class="playbtn">${I.svg('pause', { size: 20 })}</span><div class="seg" style="flex:1"><span class="on">Auto</span><span>1×</span><span>10×</span><span>30×</span></div></div>
+        <div style="padding:6px 4px 0">${scrubber(gapTrip, 270, frac)}</div>
+      </div><div class="gbar"></div></div>`;
+  }
+  function panelEvidence(p, th) {
+    const e = gapTrip.events[1] || gapTrip.events[0];
+    return `<div class="phone" data-platform="${p}" data-theme="${th}" style="background:var(--dp-data-map-land)">${sb(p)}
+      <div class="map" style="position:absolute;left:0;right:0;top:40px;opacity:.9">${mapSvg(gapTrip, 330, 250, { pins: 'select' })}</div>
+      <div class="sheet"><div class="grab"></div>
+        <h3>${I.pin(e.type, { size: 24 })}${I.eventLabel(e.type)}</h3><div class="t2" style="font:var(--dp-font-meta);margin:2px 0 8px">${cap(e.place)} · 8:${String(14 + Math.round(e.t / 600)).padStart(2, '0')} am · ${e.confidence} confidence</div>
+        ${evidence(e, 286, 104)}
+        <div class="facts"><div><b>${e.peakG.toFixed(2)} g</b><span>Peak</span></div><div><b>${e.durationS} s</b><span>Duration</span></div><div><b>${e.speedBeforeKmh}→${e.speedAfterKmh}</b><span>km/h</span></div><div><b style="display:flex;gap:4px;align-items:center">${I.provenance('derived', { size: 11 })}Derived</b><span>Provenance</span></div></div>
+        <div class="tipbox"><b>THIS DRIVE'S TIP</b>${gapTrip.tip.text}</div>
+        <div class="two" style="margin-top:10px"><span class="btn sec">Was it needed?</span><span class="btn ter" style="justify-content:center">Not accurate?</span></div>
+      </div><div class="gbar"></div></div>`;
+  }
+  function panelAnalysis(p, th) {
+    const t = exTrip;
+    return `<div class="phone" data-platform="${p}" data-theme="${th}">${sb(p)}<div class="scroll">
+      <div class="detail-head"><span class="icon-btn ${p === 'ios' ? 'glass' : ''}">${I.svg('chevronRight', { size: 20 }).replace('M9.5 5.5L16 12l-6.5 6.5', 'M14.5 5.5L8 12l6.5 6.5')}</span><div class="tt"><b>Analysis</b><span>${t.partOfDay} · ${t.label}</span></div><span class="icon-btn ${p === 'ios' ? 'glass' : ''}">${I.svg('filter', { size: 20 })}</span></div>
+      <div class="pad" style="display:flex;gap:6px;align-items:center;margin-bottom:6px"><div class="seg" style="width:150px"><span class="on">Time</span><span>Distance</span></div>${qBadge('Limited', '3 min left out')}</div>
+      <div class="pad">${timeline(t, 298, { cursor: 0.36 })}</div>
+      <div class="legend"><span><i style="border-top:2px solid var(--dp-data-speed)"></i>Speed</span><span><i style="border-top:2px solid var(--dp-data-long-g)"></i>Long G</span><span><i style="border-top:2px dashed var(--dp-data-lat-g)"></i>Lat G</span><span><i style="border-top:2px dashed var(--dp-data-route);opacity:.6"></i>Estimated</span><span><i class="dp-hatch" style="height:10px;width:14px;border:0"></i>Not scored</span></div>
+      <div class="pad" style="display:grid;grid-template-columns:150px 1fr;gap:10px;align-items:center;margin-top:4px">
+        <div class="card" style="padding:4px;display:grid;place-items:center">${gg(t, 132)}</div>
+        <div><div class="tiles" style="grid-template-columns:1fr"><div class="tile"><div class="l">Smoothness</div><div class="v">${t.smoothness.score}</div><div class="l" style="margin-top:2px">${I.quality('Limited', { size: 11 })} Based on 31 of 34 min</div></div><div class="tile"><div class="l">Max speed</div><div class="v">${t.maxKmh}<span class="u">km/h</span></div><span class="p">${I.provenance('derived', { size: 11 })}</span></div></div></div>
+      </div>
+      <div class="pad" style="margin-top:12px"><div class="lock-panel"><div class="dp-locked" style="padding:10px 12px;background:var(--dp-surface);height:84px;overflow:hidden">${timeline(U.trip('t20261002-0745'), 280, { cursor: 0.6 })}</div><div class="lock-over" style="grid-template-columns:auto 1fr auto;gap:10px;text-align:left"><span>${I.svg('lock', { size: 20 })}</span><b style="margin:0;font-size:13px;line-height:17px">Your 2 Oct drive · Analysis older than 30 days is Pro</b><span class="btn pri sm">See plans</span></div></div></div>
+    </div><div class="gbar"></div></div>`;
+  }
+  function panelRoute(p, th) {
+    const r = route, runs = r.runs, n = runs.length;
+    const recIdx = runs.findIndex((x) => x.tripId === r.record.tripId);
+    const share = hero;
+    return `<div class="phone" data-platform="${p}" data-theme="${th}">${sb(p)}<div class="scroll">
+      <div class="lt-head"><h1>Routes</h1><span class="avatar ${p === 'ios' ? 'glass' : ''}">M</span></div>
+      <div class="route-hero"><div style="display:flex;justify-content:space-between;align-items:flex-start"><div><div style="font:var(--dp-font-section-title)">${r.name}</div><div class="t2" style="font:var(--dp-font-meta)">Home ⇄ Work · ${r.runCount} drives · ${r.distanceKm} km</div></div>
+        <span class="chip rec">${I.svg('rosette', { size: 13 })}<span class="num">${r.record.score}</span> · 5 Nov</span></div>
+        <div style="display:grid;place-items:center;margin:-6px 0 -8px">${glyphSvg(r.glyph, 118, 'var(--dp-data-route)', 3)}</div>
+        <div class="dotstrip">${runs.map((x, i) => `<i class="${i === recIdx ? 'rec' : i === n - 2 ? 'last' : ''}" style="left:${(i / (n - 1)) * 100}%"></i>`).join('')}</div>
+        <div style="display:flex;justify-content:space-between;font:var(--dp-font-meta)" class="t3"><span>29 Sep</span><span>Record is Smoothness only</span><span>5 Nov</span></div>
+      </div>
+      <div class="section-label">Candidate · Free plan</div>
+      <div class="pad" style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <div class="card" style="padding:10px;display:flex;gap:8px;align-items:center">${glyphSvg(U.route('r_cand_gym_home').glyph, 40, 'var(--dp-text-2)', 2.2)}<div style="min-width:0"><b style="font:var(--dp-font-card-title);font-size:14px;display:block">Route 4</b><span class="btn sec sm" style="height:26px;margin-top:4px;padding:0 10px;font-size:12px">Name it</span></div></div>
+        <div class="card lock-panel" style="padding:10px;display:flex;gap:8px;align-items:center"><div class="dp-locked" style="display:flex;gap:8px;align-items:center">${glyphSvg(U.route('r_gym').glyph, 40)}<b style="font-size:14px">Gym</b></div><div class="lock-over" style="padding:6px;grid-template-columns:auto 1fr;gap:6px;text-align:left">${I.svg('lock', { size: 16 })}<b style="font-size:12px;margin:0;line-height:15px">3rd route is Pro</b></div></div>
+      </div>
+      <div class="section-label">Runs · durations shown neutrally</div>
+      <div class="card" style="margin:0 var(--dp-screen-margin);overflow:hidden">${r.runs.slice(-4).reverse().map((x) => `<div class="trip" style="grid-template-columns:1fr auto auto;padding:9px 14px"><div><div class="ti" style="font-size:14px">${U.fmtDate(x.date)} · ${x.partOfDay.split(' ')[0]}</div></div><span class="t2" style="font:500 13px var(--dp-family-text);font-variant-numeric:tabular-nums">${Math.round(x.durationS / 60)} min</span><span class="num" style="font-weight:650;min-width:44px;text-align:right;color:${x.tripId === r.record.tripId ? 'var(--dp-record)' : 'var(--dp-text)'}">${x.tripId === r.record.tripId ? I.svg('rosette', { size: 13 }) : ''}${x.score}</span></div>`).join('')}</div>
+    </div><div class="fadebot" style="height:110px"></div>${tabbar(p, 1)}<div class="gbar"></div></div>`;
+  }
+  function compSheet(p, th) {
+    const pr = D.entitlement.prices.CA;
+    const items = D.health[p].items.slice(0, 4), preset = D.health.presets.alwaysLost.status;
+    const hglyph = (s) => s === 'red' ? '<svg width="20" height="20" viewBox="0 0 20 20"><path d="M6.5 1.5h7l5 5v7l-5 5h-7l-5-5v-7z" fill="var(--dp-critical)"/><path d="M10 5.5v5.5" stroke="#fff" stroke-width="2" stroke-linecap="round"/><circle cx="10" cy="14.3" r="1.2" fill="#fff"/></svg>' : s === 'amber' ? '<svg width="20" height="20" viewBox="0 0 20 20"><path d="M10 2l8.5 15h-17z" fill="var(--dp-warning)"/></svg>' : '<svg width="20" height="20" viewBox="0 0 20 20"><circle cx="10" cy="10" r="9" fill="var(--dp-data-quality-good)"/><path d="M6 10.3l2.6 2.6L14 7.5" stroke="var(--dp-bg-grouped)" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+    const live = D.liveTrip.states.manual;
+    const sh = hero;
+    const shareCards = `<div><h5>Share cards · route glyph 9:16 · ring 4:5</h5><div style="display:flex;gap:10px;align-items:flex-end">
+        <div class="share"><div style="position:absolute;inset:12px 0 auto 0;text-align:center;font:600 8px/1 var(--dp-family-text);letter-spacing:.3px;color:#A3AAB6;white-space:nowrap">THURSDAY MORNING · GTI</div>
+          <div style="position:absolute;left:0;right:0;top:30px;display:grid;place-items:center">${glyphSvg(sh.glyph, 112, '#5BE7C4', 3)}</div>
+          <div style="position:absolute;left:0;right:0;top:140px;display:grid;place-items:center" data-theme="dark">${ring(sh.smoothness.score, 60, { stroke: 5 })}</div>
+          <div style="position:absolute;bottom:10px;left:0;right:0;display:flex;justify-content:center;gap:4px;align-items:center;font:650 9px/1 var(--dp-family-text);color:#F2F4F7">${I.loop({ size: 14, color: '#5BE7C4', dot: '#fff' })}DrivePerf</div></div>
+        <div class="share" style="height:165px;width:132px" data-theme="dark"><div style="position:absolute;left:0;right:0;top:16px;display:grid;place-items:center">${ring(sh.smoothness.score, 92, { stroke: 7 })}</div>
+          <div style="position:absolute;left:0;right:0;top:114px;text-align:center;font:650 10px/1.3 var(--dp-family-text);color:#FFC24B">${I.svg('rosette', { size: 11 })} Route record<br><span style="color:#A3AAB6;font-weight:500">GTI · Thursday morning</span></div>
+          <div style="position:absolute;bottom:8px;left:0;right:0;display:flex;justify-content:center">${I.loop({ size: 12, color: '#5BE7C4', dot: '#fff' })}</div></div>
+        </div><div class="t2" style="font:var(--dp-font-caption);margin-top:8px">Shape only, ends trimmed 400–800 m, no basemap. <b style="color:var(--dp-text)">Never</b> speed, G, time or places. Pro: smaller mark, never none.</div></div>`;
+    return `<div class="comp" data-platform="${p}" data-theme="${th}">${shareCards}
+      <div><h5>Paywall · day 15</h5><div style="font:var(--dp-font-section-title);margin-bottom:8px">Your first two weeks, decoded.</div>
+        <div class="plans"><div class="plan on"><div><b>Annual</b><small>${pr.annualPerMonth}/month · <span class="found">FOUNDING: FIRST YEAR ${pr.founding}</span></small></div><div class="pr">${pr.annual}<small>/year</small></div></div>
+        <div class="plan"><div><b>Monthly</b><small>Cancel any time</small></div><div class="pr">${pr.monthly}<small>/month</small></div></div></div>
+        <div class="two" style="margin-top:10px"><span class="btn pri">Start Pro</span><span class="btn sec">Continue with Free</span></div>
+        <div class="t3" style="font:var(--dp-font-caption);margin-top:6px;text-align:center">Renews automatically. Cancel in Settings · Terms · Privacy · Restore</div></div>
+      <div class="primer">${p === 'ios' ? '<div style="display:grid;place-items:center">' : '<div>'}${I.svg('gps', { size: 34 })}</div><b>Record drives automatically</b><p>DrivePerf uses your location in the background only to record the route of drives it detects.</p>
+        <ul><li style="color:var(--dp-positive)">${I.svg('check', { size: 15 })}<span style="color:var(--dp-text)">Auto-detects most drives</span></li><li>${I.svg('close', { size: 15 })}Never sold, never shared with insurers</li></ul>
+        <div style="display:grid;gap:6px"><span class="btn pri" style="height:46px">Continue</span><span class="btn ter" style="justify-content:center">Use manual mode</span></div></div>
+      <div><h5>Health Check · Always lost</h5>${items.map((it) => `<div class="hrow">${hglyph(preset[it.id] || 'green')}<div><b>${it.label}</b><span>${preset[it.id] ? 'While Using only' : 'Allowed'}</span></div>${preset[it.id] ? `<span class="btn sec sm">Fix</span>` : `<span class="t3">${I.svg('chevronRight', { size: 16 })}</span>`}</div>`).join('')}</div>
+      <div class="states">
+        <div class="stt">${I.svg('drives', { size: 22 })}<b>Your drives will appear here.</b>Just drive.</div>
+        <div class="stt"><div class="skel" style="width:60%"></div><div class="skel"></div><div class="skel" style="width:80%"></div><b style="margin-top:10px">Decoding your drive…</b></div>
+        <div class="stt" style="color:var(--dp-text-2)"><span style="color:var(--dp-warning)">${I.svg('info', { size: 22 })}</span><b>Couldn't decode this drive.</b>Your recording is safe. <span style="color:var(--dp-accent-text);font-weight:600">Try again</span></div>
+        <div class="stt" style="background:#000;color:#A3AAB6">${I.loop({ size: 22 })}<b style="color:#F2F4F7">Your Story will be ready when you've parked.</b></div>
+      </div>
+      ${p === 'ios' ? `<div class="wallpaper"><div class="lockscreen"><div style="display:flex;justify-content:space-between;align-items:center"><div style="display:flex;gap:8px;align-items:center">${I.loop({ size: 22, color: '#5BE7C4', dot: 'currentColor' })}<b style="font:600 14px var(--dp-family-text)">Recording · GTI</b></div><span class="btn sm" style="background:#ffffff26;color:inherit">${I.svg('stop', { size: 14 })}Stop</span></div>
+          <div style="display:flex;gap:18px;margin-top:6px"><b class="num" style="font-size:28px;font-weight:650">${U.fmtClock(live.elapsedS)}</b><b class="num" style="font-size:28px;font-weight:650">${live.distanceKm}<span class="u" style="color:inherit;opacity:.7">km</span></b></div></div>
+          <div style="height:10px"></div><div class="island">${I.loop({ size: 20, color: '#5BE7C4', dot: '#fff' })}<span class="num" style="font-weight:650;font-size:14px">${U.fmtClock(live.elapsedS)}</span></div></div>`
+        : `<div class="wallpaper"><div class="notif"><div style="display:flex;gap:8px;align-items:center;font:500 12px var(--dp-family-text);color:var(--md-sys-color-on-surface-variant)">${I.loop({ size: 16, mono: true, color: 'currentColor' })}DrivePerf · now<span style="margin-left:auto;padding:3px 8px;border-radius:99px;background:var(--md-sys-color-primary);color:var(--md-sys-color-on-primary);font-weight:600">14 min</span></div>
+          <b style="display:block;font:500 15px/20px var(--dp-family-text);margin-top:6px">Recording your drive</b><span style="font:400 13px var(--dp-family-text);color:var(--md-sys-color-on-surface-variant)">14 min · ${live.distanceKm} km · GTI</span>
+          <div style="margin-top:8px"><span class="btn sec sm">${I.svg('stop', { size: 14 })}Stop</span></div></div>
+          <div style="height:10px"></div><span class="qs">${I.svg('record', { size: 22 })}<span>Recording<small>14:24</small></span></span></div>`}
+      <div class="indrive"><div style="display:flex;gap:8px;align-items:center"><span class="live-dot"></span><b style="font:600 18px var(--dp-family-text)">Recording</b><span class="chip" style="margin-left:auto;background:#ffffff1a;color:#F2F4F7"><span class="car-dot" style="background:var(--dp-car-carmine)"></span>GTI</span></div>
+        <div style="display:flex;gap:18px;margin:10px 0 4px"><span class="big">${U.fmtClock(live.elapsedS)}</span><span class="big" style="font-size:30px;align-self:flex-end">${live.distanceKm}<span class="u" style="color:#A3AAB6">km</span></span></div>
+        <div class="bt" style="background:#262E3B">Stop</div><div class="bt" style="border:1.5px solid #3A4351">I'm a passenger</div></div>
+    </div>`;
+  }
+
+  // ---------- token boards ----------
+  function swatches() {
+    const sw = [['Night', '#080B10', 'ink 50 · bg'], ['Surface', '#131822', 'ink 150'], ['Surface 3', '#262E3B', 'ink 300'], ['Glide', '#5BE7C4', 'accent · dark'], ['Glide deep', '#06775E', 'accent text · light'], ['Sodium', '#FFC24B', 'route record'],
+      ['Day', '#F2F3F6', 'bg · light'], ['Card', '#FFFFFF', 'surface · light'], ['Ink text', '#0B0E13', 'text · light'], ['Signal red', '#FF6B6B', 'critical'], ['Signal amber', '#F5B648', 'warning'], ['Kings Red', '#E5484D', 'car · GTI']];
+    return `<div class="sw-grid">${sw.map(([n, c, u]) => `<div class="sw"><div class="c" style="background:${c}"></div><div class="t"><b>${n}</b>${c}<br><span style="color:#7A8392">${u}</span></div></div>`).join('')}</div>`;
+  }
+  function dataRows() {
+    const T = window.DP_TOKENS.color.data;
+    const rows = [['Speed (neutral)', 'speed', 'line'], ['Longitudinal G', 'longG', 'line'], ['Lateral G', 'latG', 'dash'], ['Elevation', 'elevation', 'area'], ['Hard braking', 'eventBrake', 'brake'], ['Hard acceleration', 'eventAccel', 'accel'], ['Hard cornering', 'eventCorner', 'corner'], ['Quality: Good', 'qualityGood', 'Good'], ['Usable', 'qualityUsable', 'Usable'], ['Limited', 'qualityLimited', 'Limited'], ['Unscorable', 'qualityUnscorable', 'Unscorable']];
+    const vis = (k, kind, theme) => {
+      const c = T[theme][k];
+      if (['brake', 'accel', 'corner'].includes(kind)) return `<span data-theme="${theme}" style="display:inline-flex">${I.pin(kind, { size: 22 })}</span>`;
+      if (['Good', 'Usable', 'Limited', 'Unscorable'].includes(kind)) return `<span data-theme="${theme}" style="display:inline-flex">${I.quality(kind, { size: 18 })}</span>`;
+      if (kind === 'area') return `<svg width="46" height="16"><path d="M0 16L0 9 10 5 20 8 30 2 46 6 46 16Z" fill="${c}" opacity=".35"/><path d="M0 9 10 5 20 8 30 2 46 6" fill="none" stroke="${c}" stroke-width="1.5"/></svg>`;
+      return `<svg width="46" height="10"><path d="M0 5 C10 0 14 10 24 5 S38 0 46 5" fill="none" stroke="${c}" stroke-width="2.2" stroke-dasharray="${kind === 'dash' ? '6 3' : ''}"/></svg>`;
+    };
+    return rows.map(([l, k, kind]) => `<div class="data-row"><span class="lbl">${l}</span><span class="s dk" data-theme="dark">${vis(k, kind, 'dark')}<code>${T.dark[k]}</code></span><span class="s lt" data-theme="light">${vis(k, kind, 'light')}<code>${T.light[k]}</code></span></div>`).join('');
+  }
+  function typeBoard() {
+    const T = window.DP_TOKENS.type;
+    const col = (p, list) => `<div class="type-col" data-platform="${p}"><h4>${p === 'ios' ? 'iOS · SF Pro (HIG, Large)' : 'Android · Google Sans Flex (M3E)'}</h4>${list.map((n) => { const s = T[p][n]; return `<div class="ts"><span style="font:${s[2]} ${s[0]}px/${s[1]}px var(--dp-family-${s[0] >= 20 ? 'display' : 'text'});letter-spacing:${s[3]}px">${n}</span><small>${s[0]}/${s[1]} · ${s[2]}</small></div>`; }).join('')}</div>`;
+    const nums = (p) => `<div class="num-demo" data-platform="${p}"><div><span style="font:var(--dp-num-hero)" class="num">84</span><small>num.hero 72</small></div><div><span style="font:var(--dp-num-l)" class="num">24.6<span class="u">km</span></span><small>num.l 34</small></div><div><span style="font:var(--dp-num-m)" class="num">0.42<span class="u">g</span></span><small>num.m 24</small></div><div><span style="font:var(--dp-num-s)" class="num">1:12:08</span><small>num.s 17 · tabular</small></div></div>`;
+    return `<div class="type-grid">${col('ios', ['largeTitle', 'title2', 'title3', 'headline', 'body', 'subheadline', 'footnote', 'caption1'])}${col('android', ['headlineLargeEmphasized', 'headlineSmall', 'titleLargeEmphasized', 'titleMediumEmphasized', 'bodyLarge', 'bodyMedium', 'bodySmall', 'labelMedium'])}</div>
+      <div class="type-grid" style="margin-top:6px"><div>${nums('ios')}<div style="color:#7A8392;font-size:12px;margin-top:6px">DP Numerals · SF Pro Expanded Semibold, tabular</div></div><div>${nums('android')}<div style="color:#7A8392;font-size:12px;margin-top:6px">DP Numerals · Google Sans Flex wdth 120 wght 600, tabular</div></div></div>`;
+  }
+  function springBoard() {
+    const S = window.DP_TOKENS.motion.spring;
+    const curve = (z, k) => { const w0 = Math.sqrt(k); const x = (t) => z < 1 ? 1 - Math.exp(-z * w0 * t) * (Math.cos(w0 * Math.sqrt(1 - z * z) * t) + (z / Math.sqrt(1 - z * z)) * Math.sin(w0 * Math.sqrt(1 - z * z) * t)) : 1 - Math.exp(-w0 * t) * (1 + w0 * t); let d = ''; for (let i = 0; i <= 60; i++) { const t = (i / 60) * 0.9; d += `${i ? 'L' : 'M'}${(i / 60) * 180} ${56 - x(t) * 40}`; } return d; };
+    const cell = (name, ios, and) => { const zi = 1 - ios.bounce, ki = (2 * Math.PI / ios.duration) ** 2; return `<div class="spr"><b>spring.${name}</b>iOS ${ios.duration}s/${ios.bounce} · M3E ${and.dampingRatio}/${and.stiffness}<svg viewBox="0 0 180 64" preserveAspectRatio="none"><line x1="0" x2="180" y1="16" y2="16" stroke="#ffffff1a" stroke-dasharray="3 3"/><path d="${curve(zi, ki)}" fill="none" stroke="#5BE7C4" stroke-width="2"/><path d="${curve(and.dampingRatio, and.stiffness)}" fill="none" stroke="#A3AAB6" stroke-width="1.6" stroke-dasharray="4 3"/></svg></div>`; };
+    return `<div class="springs">${['fast', 'default', 'slow', 'effects', 'bouncy', 'sheet'].map((n) => cell(n, S.ios[n], S.android[n])).join('')}</div><div style="color:#7A8392;font-size:12px;margin-top:8px">Solid mint = iOS (SwiftUI duration/bounce) · dashed grey = Android (M3 Expressive damping/stiffness) · 0–900 ms · baked into tokens.css as <code>linear()</code> easings</div>`;
+  }
+
+  const colHeads = `<div class="row">${PLAT.map(([p, t]) => `<div class="colhead">${NAME[p]}<span class="pill">${t}</span></div>`).join('')}</div>`;
+  const A = '../system/assets/';
+  document.getElementById('page').innerHTML = `
+    <div class="hero"><div><span class="tag">${I.loop({ size: 22, color: '#5BE7C4', dot: '#fff' })} DrivePerf design system · v1.0 · DRIVE-99</span>
+      <h1>Night Drive</h1><p>Smooth is a skill. Dark-first, one luminous accent, and your own drive as the art. One UX with native cosmetics: iOS 26 Liquid Glass and Android M3 Expressive. Every value on this page is read live from <code>prototypes/shared/tokens.css</code>, <code>data.js</code> and <code>icons.js</code>.</p></div>
+      <div class="hero-art"><figure><img src="assets/logo-a-loop.svg" alt="The Loop"><figcaption>A · The Loop ★ recommended</figcaption></figure><figure><img src="assets/logo-b-line.svg" alt="The Line"><figcaption>B · The Line</figcaption></figure><figure><img src="assets/logo-c-trace.svg" alt="The Trace"><figcaption>C · The Trace</figcaption></figure></div></div>
+    <div style="display:grid;grid-template-columns:872px 1fr;gap:20px;margin-top:20px;align-items:center"><img src="assets/icon-ios-appearances-preview.svg" style="width:100%;border-radius:24px;display:block"><img src="assets/lockup-horizontal.svg" style="width:100%;display:block;border-radius:24px"></div>
+    <img src="assets/icon-android-adaptive-preview.svg" style="width:100%;margin-top:20px;border-radius:24px;display:block">
+
+    <h2 class="sec" id="colour">Colour</h2><div class="sec-title">Night, Glide and Sodium, plus fixed, colour-blind-safe data colours</div><p class="sec-sub">Data colours never follow dynamic colour. Every meaning also has a shape or pattern: pins (square, circle, diamond), quality glyphs, dashed lateral G, area elevation.</p>
+    <div class="board"><div class="card0">${swatches()}<div style="height:16px"></div>${typeBoard()}</div><div class="card0"><div class="data-row" style="font-weight:600;color:#7A8392"><span>Data</span><span>Dark</span><span>Light</span></div>${dataRows()}</div></div>
+    <h2 class="sec" id="motion">Motion</h2><div class="sec-title">Springs: the same choreography, native physics</div>
+    <div class="card0">${springBoard()}</div>
+
+    <h2 class="sec" id="shell">Shell · Drives tab</h2><div class="sec-title">Four tabs and an avatar, with capture status always one glance away</div><p class="sec-sub">iOS: floating glass tab bar + <code>tabViewBottomAccessory</code>. Android: navigation bar + M3E floating toolbar. Score badges: ring (iOS) / <code>Cookie9Sided</code> (Android). The passenger trip is greyed and not scored.</p>
+    ${colHeads}<div class="row">${PLAT.map(([p, t]) => panelDrives(p, t)).join('')}</div>
+    <h2 class="sec" id="replay">Trip Replay</h2><div class="sec-title">Speed-neutral readouts, pins by shape, a scrubber with event ticks and elevation</div><p class="sec-sub">Real Oakville → King West geometry (QEW + Gardiner). The dashed estimated start, the dotted GPS gap downtown, the hollow "needed" pin at Spadina & King, the neutral max-speed triangle and the stop capsules. iOS: glass playback bar + segmented control; Android: floating toolbar + connected button group.</p>
+    ${colHeads}<div class="row">${PLAT.map(([p, t]) => panelReplay(p, t)).join('')}</div>
+    <h2 class="sec">Event evidence sheet</h2><div class="sec-title">Tap a pin: the trace around the moment, the facts, this drive's tip</div><p class="sec-sub">iOS sheet at the medium detent with glass; Android modal bottom sheet. Playback pauses and the map centres on the event. Hollow pin = marked as needed.</p>
+    ${colHeads}<div class="row">${PLAT.map(([p, t]) => panelEvidence(p, t)).join('')}</div>
+    <h2 class="sec" id="analysis">Analysis · synced timeline · G-G</h2><div class="sec-title">One cursor across the channels, with honest gaps and exclusions</div><p class="sec-sub">The hatched band is the 3 minutes the phone moved (not scored). The G-G cloud has its envelope and the G-dot. The lock shows the user's own older drive, blurred: locked, not lost.</p>
+    ${colHeads}<div class="row">${PLAT.map(([p, t]) => panelAnalysis(p, t)).join('')}</div>
+    <h2 class="sec" id="routes">Routes · records</h2><div class="sec-title">Records are Smoothness only. Durations are neutral, never a delta.</div><p class="sec-sub">The route glyph hero, a dot strip of every run (the record in gold, the latest outlined), a candidate to name, the Free plan's third route locked, and the runs table with neutral durations.</p>
+    ${colHeads}<div class="row">${PLAT.map(([p, t]) => panelRoute(p, t)).join('')}</div>
+    <h2 class="sec" id="comp">Components · states · live surfaces</h2><div class="sec-title">Share cards, a paywall with equal weight, primers, Health Check, states, live surfaces, in-drive</div><p class="sec-sub">Live surfaces show recording status only: time, distance, car. Never speed, score or record pace.</p>
+    ${colHeads}<div class="row" style="align-items:start">${PLAT.map(([p, t]) => compSheet(p, t)).join('')}</div>
+    <div class="footer"><span>Sources: <code>docs/design/system/tokens.json</code> → <code>tools/build-tokens.mjs</code> → <code>prototypes/shared/tokens.css</code> · fixtures <code>prototypes/shared/data.js</code> (road geometry © OpenStreetMap contributors, elevation Open-Meteo)</span><span>DrivePerf · Smooth is a skill. · Every drive, decoded.</span></div>`;
+  document.title = 'DrivePerf Design System';
+  document.body.dataset.height = document.documentElement.scrollHeight;
+})();
+</script>
+</body>
+</html>

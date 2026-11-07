@@ -78,7 +78,7 @@ The research names two audiences. A v1 that serves both equally will serve neith
 | Shared core | Kotlin 2.x, Coroutines/Flow, **SQLDelight** (or Room KMP), Ktor client, kotlinx.serialization, Koin | Proven KMP stack; the scoring logic is unit-tested once |
 | Platform sensors | iOS: CoreLocation (`CLLocationUpdate`, `CLServiceSession`), CoreMotion (`CMDeviceMotion`, `CMMotionActivityManager`). Android: Fused Location, Activity Recognition Transition API, SensorManager, FGS `location` type | |
 | Maps | MapKit (iOS) + Google Maps SDK (Android) for v1. Evaluate MapLibre + a vector tile provider for one shared style and cost control | |
-| **Backend v1** | **Firebase project "DrivePerf"**, starting on **Spark (free)**: Auth (Apple/Google/email), **Firestore for trip summaries and user documents**, Hosting, FCM, Crashlytics, Analytics, Remote Config, App Check. **Needs the Blaze plan:** Cloud Storage (compressed trip files) and Cloud Functions (TypeScript jobs). | Spark covers prototyping, the website and the waitlist, which writes directly to Firestore under create-only security rules. Upgrade to **Blaze** (pay-as-you-go, which keeps the same no-cost quotas) with a budget alert of about $5 only when cloud backup or Functions are built (A17). A few thousand DAU should stay near the free quotas. |
+| **Backend v1** | **Firebase project "DrivePerf"**, starting on **Spark (free)**: Auth (Apple/Google/email), **Firestore for trip summaries and user documents**, Hosting, FCM, Crashlytics, Analytics, Remote Config, App Check. **Needs the Blaze plan:** Cloud Run (our Kotlin `/v1` API) and Cloud Scheduler (ADR-004). Compressed trip files go to **Cloudflare R2** (free to 10 GB, no egress fees; Gate 4, 6 Nov 2026). | Spark covers prototyping, the website and the waitlist, which writes directly to Firestore under create-only security rules. Upgrade to **Blaze** (pay-as-you-go, which keeps the same no-cost quotas) with a budget alert of about $5 only when cloud backup or the API is built (A17). A few thousand DAU should stay near the free quotas. |
 | **Migration seam** | Clients talk to Firebase only through a `SyncRepository` interface in the KMP core. Raw trips are stored as **portable files** (protobuf or gzip NDJSON, versioned schema), not as Firestore documents. User IDs are Firebase UIDs that a self-hosted auth server (such as Supabase or Keycloak) can import. Each Firestore collection is documented as a SQL table in the data-model ADR. | Moving to a Hostinger VPS (Postgres + MinIO/S3 + a Ktor or Node API) is then a data copy plus a new repository implementation, with no client rewrite. **A VPS is not needed for v1.** |
 | Web | **Astro** static site (landing, privacy, terms, support, waitlist) on **Firebase Hosting** (Spark), deployed from GitHub Actions. `driveperf.com` is connected later through Namecheap DNS records. The v1.1 account dashboard can use Next.js on Firebase App Hosting, which needs Blaze. | Free plan, global CDN, automatic SSL, preview channels for each PR |
 | Payments | RevenueCat (StoreKit 2 + Play Billing) | One entitlement model across both stores |
@@ -98,7 +98,7 @@ Each **phase gate** needs your approval before the next phase starts. Prompts in
 | **0. Housekeeping** ✅ done 6 Nov (DRIVE-11) | — | Rebrand committed, legacy tagged, monorepo layout, `docs/` folders | 1 day |
 | **1. Discovery** ✅ done 6 Nov (DRIVE-12, Gate 1 approved) | A1 ∥ A2 ∥ A3 | Market refresh incl. iOS, personas/positioning/pricing, iOS+Android feasibility | 3–5 days |
 | **2. PRD & backlog** ✅ done 6 Nov (DRIVE-13, Gate 2; 192 Jira issues, see docs/product/jira-map.md) | A4 → A5 | `docs/product/PRD-v1.md`, Jira epics, stories and design tasks | 2–3 days |
-| **3. Design & prototypes** | A6 → (A7 ∥ A8 ∥ A9) | Design system + motion language; **screen-by-screen** iOS, Android and web HTML prototypes, with each screen's artifacts in `docs/design/<JIRA-KEY>/` and linked from its Jira story | 1–2 weeks |
+| **3. Design & prototypes** 🟡 built 6 Nov, awaiting Gate 3 (DRIVE-136, PR #16; 106 app screens × 2 platforms + 11 web pages, 123 stories ready) | A6 → (A7 ∥ A8 ∥ A9) | Design system + motion language; **screen-by-screen** iOS, Android and web HTML prototypes, with each screen's artifacts in `docs/design/<JIRA-KEY>/` and linked from its Jira story | 1–2 weeks |
 | **4. Architecture** (documents only; can overlap phase 3) | A10 ∥ A11 ∥ A12 | ADRs, data model + migration plan, sensor/scoring algorithm spec | 1 week |
 | **5. Foundations build** | **A13a iOS capture test app (Spike 1) first**, then A13 → (A14 ∥ A15 ∥ A16 ∥ A17 ∥ A18) | Capture benchmark vs Mileon; monorepo + CI, shared core, app shells, Firebase, live landing page | 3–4 weeks |
 | **6. Feature build → field test → beta** | @PM/@dev workflow from Jira tickets + A19 field-test protocol | TestFlight + Play internal testing, calibration data | 6–10 weeks |
@@ -627,6 +627,8 @@ migration seam. Never commit secrets; use GitHub environments.
 ```
 
 ### A18 — Landing page build & Firebase Hosting deploy · *Sonnet 5.5* · Phase 5 ∥
+
+**Use the full session prompt:** [`docs/planning/prompts/A18-website-hosting-session.md`](prompts/A18-website-hosting-session.md) (Jira DRIVE-79). It supersedes the short version below.
 
 ```
 Jira: <key>. Convert prototypes/web/ into an Astro static site in web/. Wire the waitlist form

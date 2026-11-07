@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en-CA" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Email preferences · DrivePerf</title>
+<meta name="description" content="Unsubscribe from DrivePerf waitlist and launch emails.">
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#05070A">
+<link rel="icon" href="../assets/brand/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../css/site.css">
+</head>
+<body data-screen="S-WEB-09">
+<a class="skip-link" href="#main">Skip to content</a>
+<div data-partial="header" data-solid></div>
+<main id="main">
+  <section class="status" data-component="StatusPanel">
+    <div class="wrap wrap--narrow">
+      <div class="state-view" data-state-view="unsubscribed" role="status">
+        <div class="status__icon" data-loop="96" aria-hidden="true"></div>
+        <p class="eyebrow">Email preferences</p>
+        <h1 class="h1">You're unsubscribed.</h1>
+        <p class="lede"><b>marcus@example.com</b> won't get any more DrivePerf waitlist, beta or launch emails. It took effect straight away.</p>
+        <div class="btn-row"><button class="btn btn--ghost" type="button" id="resub">Resubscribe</button><a class="btn btn--quiet" href="../index.html">Back to driveperf.com</a></div>
+        <ul class="next-steps">
+          <li><span class="ico" data-icon="info"></span><div><b>One last email? No.</b><span>We don't send a "sorry to see you go" email. This page is the confirmation.</span></div></li>
+          <li><span class="ico" data-icon="shield"></span><div><b>Your waitlist place</b><span>Your email stays on file only as unsubscribed, so we never email you again by mistake. To remove it completely, email <a href="mailto:privacy@driveperf.com">privacy@driveperf.com</a>.</span></div></li>
+        </ul>
+      </div>
+
+      <div class="state-view" data-state-view="err">
+        <div class="status__icon" style="width:72px;height:72px;margin-bottom:28px;border-radius:20px;background:var(--warning-container);color:var(--warning);display:grid;place-items:center"><span data-icon="alert" style="--is:34px"></span></div>
+        <p class="eyebrow">Email preferences</p>
+        <h1 class="h1">That link didn't work.</h1>
+        <p class="lede">It may have expired, or been cut short by your email app. Enter your email and we'll unsubscribe it right away.</p>
+        <form class="waitlist" id="unsub-form" novalidate style="box-shadow:none">
+          <div class="field" id="f-unsub">
+            <label for="unsub-email">Email address</label>
+            <input class="input" id="unsub-email" type="email" autocomplete="email" inputmode="email" placeholder="you@example.com" aria-describedby="unsub-err">
+            <p class="field-error" id="unsub-err"></p>
+          </div>
+          <button class="btn btn--lg" type="submit">Unsubscribe</button>
+        </form>
+        <p class="small muted" style="margin-top:20px">Or reply to any DrivePerf email with "unsubscribe". We honour every request within 10 business days, usually immediately.</p>
+      </div>
+
+      <p class="tiny" style="margin-top:56px;border-top:1px solid var(--line);padding-top:20px">Emails are sent by DrivePerf (Keval Langalia, Ontario, Canada) only to people who joined the waitlist and agreed to emails. Every email says who it’s from, includes our postal contact details and has a one-click unsubscribe.</p>
+    </div>
+  </section>
+</main>
+<div data-partial="footer"></div>
+<script src="../js/site.js"></script>
+<script src="../js/pages.js"></script>
+</body>
+</html>

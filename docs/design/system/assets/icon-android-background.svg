@@ -1,0 +1,3 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="108" height="108" viewBox="0 0 108 108"><title>Android adaptive icon: background layer (108 dp)</title><defs><radialGradient id="bg" cx="0.3" cy="0.15" r="1.15"><stop offset="0" stop-color="#17344C"/><stop offset="0.45" stop-color="#0A1420"/><stop offset="1" stop-color="#05070A"/></radialGradient><radialGradient id="halo" cx="0.5" cy="0.5" r="0.5"><stop offset="0.55" stop-color="#5BE7C4" stop-opacity="0.16"/><stop offset="1" stop-color="#5BE7C4" stop-opacity="0"/></radialGradient></defs>
+  <rect width="108" height="108" fill="url(#bg)"/>
+</svg>

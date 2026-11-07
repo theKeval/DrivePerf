@@ -1,0 +1,386 @@
+<!doctype html>
+<html lang="en-CA" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>DrivePerf: Smooth is a skill.</title>
+<meta name="description" content="DrivePerf records your drives automatically and turns each one into a short Story, a replay with evidence and a Smoothness score against your own baseline. Private by design. Coming to iPhone and Android.">
+<meta name="theme-color" content="#05070A">
+<link rel="canonical" href="https://driveperf.com/">
+<link rel="icon" href="assets/brand/favicon.svg" type="image/svg+xml">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="DrivePerf">
+<meta property="og:title" content="DrivePerf: Smooth is a skill.">
+<meta property="og:description" content="Every drive, decoded: automatic recording, a Smoothness score you can improve, and recaps worth sharing. Private by design.">
+<meta property="og:url" content="https://driveperf.com/">
+<meta property="og:image" content="https://driveperf.com/og/home-1200x630.png">
+<meta property="og:image:alt" content="The DrivePerf Loop mark beside a route line drawn in mint on a night-blue background.">
+<meta name="twitter:card" content="summary_large_image">
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"SoftwareApplication","name":"DrivePerf: Drive Tracker","operatingSystem":"iOS, Android","applicationCategory":"LifestyleApplication","description":"Automatic drive recording, a Smoothness score against your own baseline, Trip Replay with evidence and weekly recaps. Private by design.","url":"https://driveperf.com/","offers":[{"@type":"Offer","price":"0","priceCurrency":"USD","name":"Free"},{"@type":"Offer","price":"39.99","priceCurrency":"USD","name":"Pro annual"},{"@type":"Offer","price":"6.99","priceCurrency":"USD","name":"Pro monthly"},{"@type":"Offer","price":"49.99","priceCurrency":"CAD","name":"Pro annual (Canada)"},{"@type":"Offer","price":"8.99","priceCurrency":"CAD","name":"Pro monthly (Canada)"}]}
+</script>
+<link rel="stylesheet" href="css/site.css">
+</head>
+<body data-screen="S-WEB-01" data-variant="A">
+<a class="skip-link" href="#main">Skip to content</a>
+<div data-partial="header"></div>
+
+<main id="main">
+  <!-- ============ Hero (variant A / B) ============ -->
+  <section class="hero" aria-labelledby="hero-title" data-component="Hero">
+    <div class="hero__route" aria-hidden="true"><svg id="hero-route"></svg></div>
+    <div class="wrap hero__grid">
+      <div class="hero__copy">
+        <p class="eyebrow">Coming to iPhone and Android · early 2027</p>
+        <h1 class="display" id="hero-title">
+          <span data-variant-only="A">Smooth is<br>a <span class="gradient-text">skill.</span></span>
+          <span data-variant-only="B">Every drive, <span class="gradient-text">decoded.</span></span>
+        </h1>
+        <p class="lede" data-variant-only="A"><strong>Every drive, decoded:</strong> automatic recording, a Smoothness score you can improve, and recaps worth sharing. Private by design.</p>
+        <p class="lede" data-variant-only="B">Each drive becomes a 15-second Story, a replay with evidence and a <strong>weekly recap worth sharing.</strong> Recorded automatically. Private by design.</p>
+
+        <form class="waitlist" id="waitlist" novalidate data-component="WaitlistForm" aria-labelledby="wl-title">
+          <div class="waitlist__title"><h2 id="wl-title">Join the waitlist</h2><span class="chip chip--record" title="Founding Drivers price">Founding price</span></div>
+          <div class="form-banner" id="wl-banner" role="status" aria-live="polite"></div>
+          <div class="field" id="f-email">
+            <label for="wl-email">Email</label>
+            <div class="waitlist__email">
+              <input class="input" id="wl-email" name="email" type="email" inputmode="email" autocomplete="email" placeholder="you@example.com" aria-describedby="wl-email-err" required>
+            </div>
+            <p class="field-error" id="wl-email-err"></p>
+          </div>
+          <div class="waitlist__row waitlist__row--2">
+            <fieldset class="field" id="f-platform" aria-describedby="wl-platform-err">
+              <legend class="label">Your phone</legend>
+              <div class="seg"><label><input type="radio" name="platform" value="ios"><span>iPhone</span></label><label><input type="radio" name="platform" value="android"><span>Android</span></label></div>
+              <p class="field-error" id="wl-platform-err"></p>
+            </fieldset>
+            <fieldset class="field" id="f-country" aria-describedby="wl-country-err">
+              <legend class="label">Country</legend>
+              <div class="seg"><label><input type="radio" name="country" value="CA"><span>Canada</span></label><label><input type="radio" name="country" value="US"><span>US</span></label><label><input type="radio" name="country" value="other"><span>Other</span></label></div>
+              <p class="field-error" id="wl-country-err"></p>
+            </fieldset>
+          </div>
+          <div class="field" id="f-consent">
+            <label class="check"><input type="checkbox" name="consent" id="wl-consent" aria-describedby="wl-consent-err"><span>Email me about the DrivePerf beta and launch, including the founding price. Unsubscribe in one click from any email.</span></label>
+            <p class="field-error" id="wl-consent-err"></p>
+          </div>
+          <div class="hp" aria-hidden="true"><label for="wl-company">Company</label><input id="wl-company" name="company" tabindex="-1" autocomplete="off"></div>
+          <input type="hidden" name="variant" id="wl-variant" value="A">
+          <button class="btn btn--lg" type="submit" id="wl-submit">Join the waitlist</button>
+          <p class="tiny" style="margin:0">We use your email only for DrivePerf beta and launch news. <a href="pages/privacy.html#website">Privacy policy</a>.</p>
+        </form>
+
+        <div class="hero__meta">
+          <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="8.5" r="3.5"/><path d="M5 20c1.2-3.6 3.9-5.5 7-5.5s5.8 1.9 7 5.5"/><path d="M4 4l16 16"/></svg>No account needed</span>
+          <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l7.5 3v5.5c0 4.6-3.2 8.2-7.5 9.5-4.3-1.3-7.5-4.9-7.5-9.5V6z"/><path d="M9 12l2.2 2.2L15.5 10"/></svg>Never sold or shared with insurers</span>
+          <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><rect x="6.5" y="2.5" width="11" height="19" rx="3"/><path d="M10.5 18.5h3"/></svg>Just your phone. No hardware.</span>
+        </div>
+      </div>
+      <div class="hero__devices" id="hero-devices" aria-label="DrivePerf on iPhone showing a Drive Story with a new route record of 91, and on Android showing a weekly recap with an average Smoothness of 87." role="img"></div>
+    </div>
+    <p class="hero__attrib">A real commute along the QEW and Gardiner, ends trimmed · Route geometry © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a></p>
+  </section>
+
+  <!-- ============ Proof points ============ -->
+  <section class="proof" aria-label="What DrivePerf does" data-component="ProofStrip">
+    <div class="wrap"><ul>
+      <li><span data-icon="car"></span>Records automatically</li>
+      <li><span data-icon="ring"></span>Scored against you</li>
+      <li><span data-icon="replay"></span>Replay with evidence</li>
+      <li><span data-icon="calendar"></span>Recaps worth sharing</li>
+      <li><span data-icon="shield"></span>Private by design</li>
+    </ul></div>
+  </section>
+
+  <!-- ============ Drive Story: scroll-driven card stack ============ -->
+  <section class="story-scroll" id="how" aria-labelledby="story-title" data-component="StoryStack">
+    <div class="story-scroll__track" id="story-track">
+      <div class="story-scroll__sticky">
+        <div class="wrap story-scroll__grid">
+          <div>
+            <p class="eyebrow">The Drive Story</p>
+            <h2 class="h2" id="story-title">Park. Your drive is already decoded.</h2>
+            <p class="lede" style="margin-top:20px">Seconds after you park, each drive becomes a short Story. It plays only once you've stopped, never while you drive.</p>
+            <ol class="story-steps" id="story-steps">
+              <li data-n="1" class="is-active"><button type="button" class="step-btn"><b>The drive</b><span>Part of day and car. No timestamps, no addresses.</span></button></li>
+              <li data-n="2"><button type="button" class="step-btn"><b>The route draws on</b><span>Start to finish, with the first and last stretch trimmed.</span></button></li>
+              <li data-n="3"><button type="button" class="step-btn"><b>Your inputs, replayed</b><span>Every brake and turn as a dot gliding around the friction circle.</span></button></li>
+              <li data-n="4"><button type="button" class="step-btn"><b>Smoothness</b><span>Compared with your usual on this route. Records glow gold.</span></button></li>
+              <li data-n="5"><button type="button" class="step-btn"><b>Cleanest stretch</b><span>We always lead with what went well.</span></button></li>
+              <li data-n="6"><button type="button" class="step-btn"><b>One thing for next time</b><span>Exactly one tip, with the evidence one tap away.</span></button></li>
+            </ol>
+            <button class="btn btn--quiet btn--sm story-toggle" type="button" id="story-toggle" aria-pressed="false" aria-controls="stack"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="6.5" y="5" width="3.5" height="14" rx="1"/><rect x="14" y="5" width="3.5" height="14" rx="1"/></svg><span>Pause</span></button>
+          </div>
+          <div class="stack" id="stack" aria-hidden="true"></div>
+          <div class="stack-static" id="stack-static" role="list" aria-label="Drive Story frames"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ Smoothness ============ -->
+  <section class="section section--alt" aria-labelledby="score-title" data-component="ScoreSection">
+    <div class="wrap split">
+      <div class="score-visual" data-reveal>
+        <div class="score-glow"></div>
+        <div id="score-ring"></div>
+        <div class="legend" style="position:absolute;bottom:-12px"><span><i></i>Your usual</span><span><i class="gold"></i>Route record</span></div>
+      </div>
+      <div>
+        <p class="eyebrow">Smoothness</p>
+        <h2 class="h2" id="score-title">Scored against you. Not against anyone else.</h2>
+        <p class="lede" style="margin-top:20px">Smoothness measures how gently you brake, accelerate and turn, compared with your own usual on the same route. Your first three drives set the baseline. After that, every number comes with a reason.</p>
+        <ul class="contrib" id="contrib"></ul>
+        <p class="small muted" style="margin-top:20px">A full, gentle stop scores as well as not stopping, so rolling stops are never rewarded. There are no leaderboards and no streaks.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ Replay and evidence ============ -->
+  <section class="section" aria-labelledby="replay-title" data-component="ReplaySection">
+    <div class="wrap split split--flip">
+      <div class="panel" data-reveal id="evidence-panel">
+        <div class="panel__map" id="evidence-map"></div>
+        <div class="panel__body evidence-card">
+          <div class="evidence-head"><span class="pin pin--needed" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 6.5l5.5 6 5.5-6"/><path d="M6 17.5h12"/></svg></span><div><b class="h4" style="display:block">Hard stop at Spadina &amp; King</b><span class="small muted">Tuesday morning · The Commute</span></div></div>
+          <svg class="trace" id="evidence-trace" viewBox="0 0 600 120" preserveAspectRatio="none" role="img" aria-label="Braking and turning trace for the 10 seconds either side of the stop. Braking rises sharply, then settles."></svg>
+          <div class="trace-legend"><span><i></i>Braking and acceleration</span><span><i class="dash"></i>Turning</span></div>
+          <p class="small" style="margin:4px 0 0">Was it needed?</p>
+          <div class="answer-row" role="group" aria-label="Was it needed?"><button class="chip" type="button" aria-pressed="true">Yes, it was needed</button><button class="chip" type="button" aria-pressed="false">Not quite</button></div>
+          <p class="tiny" style="margin:0">Left out of your score. Map © OpenStreetMap contributors.</p>
+        </div>
+      </div>
+      <div>
+        <p class="eyebrow">Trip Replay</p>
+        <h2 class="h2" id="replay-title">Every brake, with evidence.</h2>
+        <p class="lede" style="margin-top:20px">Scrub through any drive. Pins mark hard braking, acceleration and cornering, and each one opens the trace around the moment and the tip it led to.</p>
+        <ul class="never-list" style="margin-top:28px">
+          <li><span data-icon="check"></span><div><b>Someone ran the light?</b><span>Mark the stop as needed. It comes out of your score, no questions asked.</span></div></li>
+          <li><span data-icon="info"></span><div><b>Honest data, always labelled</b><span>Estimated stretches are dashed, GPS gaps are gaps, and a phone that moved around is left out.</span></div></li>
+          <li><span data-icon="eye"></span><div><b>Yours alone</b><span>Speed appears plainly in your own replay. Never on share cards, records or recaps.</span></div></li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ Routes and records ============ -->
+  <section class="section section--alt" aria-labelledby="routes-title" data-component="RouteRecordSection">
+    <div class="wrap split">
+      <div class="panel" data-reveal>
+        <div class="panel__body">
+          <div style="display:grid;grid-template-columns:1fr auto;gap:20px;align-items:start">
+            <div><p class="small muted" style="margin:0 0 4px">Home → Work · 10 drives</p><h3 class="h3">The Commute</h3></div>
+            <svg id="route-glyph" width="120" height="96" viewBox="0 0 120 96" aria-hidden="true"></svg>
+          </div>
+          <div class="dotstrip" id="dotstrip" role="img" aria-label="Ten runs of The Commute from 29 September to 5 November. Smoothness climbed from 76 to 91. The most recent run is the route record."></div>
+          <div class="dotstrip-axis"><span>29 Sep</span><span>5 Nov</span></div>
+          <div class="record-line" style="margin-top:22px">
+            <span class="rosette" aria-hidden="true" data-icon="rosette"></span>
+            <span><b>Route record 91</b> <span class="muted">· 5 Nov · beating 89 from 14 Oct</span></span>
+          </div>
+          <div class="gained"><span data-icon="sparkle"></span><div><b style="display:block">Where you gained most: the Gardiner.</b><span class="muted small">You braked earlier and lighter than on the other run. (Ghost comparison, Pro.)</span></div></div>
+        </div>
+      </div>
+      <div>
+        <p class="eyebrow">Routes and records</p>
+        <h2 class="h2" id="routes-title">Your commute, as a craft.</h2>
+        <p class="lede" style="margin-top:20px">Drive the same trip twice and it becomes a route. Every run lands on the strip, and your smoothest is the route record. Overlay today's run on your best to see exactly where you gained.</p>
+        <p class="small muted">Records are Smoothness only, never time. Run durations are listed plainly, with no deltas and no "beat your time".</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ Recap and share ============ -->
+  <section class="section" aria-labelledby="recap-title" data-component="RecapSection">
+    <div class="wrap split split--flip">
+      <div class="grid-2" style="align-items:end" data-reveal>
+        <div class="panel"><div class="panel__body">
+          <p class="small muted" style="margin:0 0 2px">Week of 26 Oct</p>
+          <h3 class="h3" style="margin-bottom:12px">Your week, decoded.</h3>
+          <div class="recap-strip" id="recap-strip" role="img" aria-label="Five drives this week: two on Tuesday, two on Thursday and one on Sunday."></div>
+          <div class="recap-big" style="margin-top:16px">
+            <div class="stat"><b class="num">87</b><span>Average Smoothness · ▲ +2</span></div>
+            <div class="stat"><b class="num">5</b><span>drives</span></div>
+          </div>
+          <p class="small" style="margin:16px 0 0"><b>Drive of the week:</b> <span class="muted">Sunday morning, Home → Port Credit, 90.</span></p>
+        </div></div>
+        <div id="share-card" aria-label="Share card: the shape of a Thursday morning drive in a GTI, Smoothness 91. No map, no start or end points." role="img"></div>
+      </div>
+      <div>
+        <p class="eyebrow">Weekly recap and Drive Wrapped</p>
+        <h2 class="h2" id="recap-title">Your week, decoded.</h2>
+        <p class="lede" style="margin-top:20px">Every Sunday evening: your drives, your average, your drive of the week and one habit to focus on. Each month brings a mini Wrapped, and your year gets the full one.</p>
+        <p class="small muted">Share cards show the shape of a route and its score, with the ends trimmed. Never a map unless you choose it, never where you start or stop, never speed.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ Honest capture promise ============ -->
+  <section class="section section--tight" id="capture" aria-labelledby="capture-title" data-component="CapturePromise">
+    <div class="wrap">
+      <div class="promise" data-reveal>
+        <p class="eyebrow">The honest capture promise</p>
+        <h2 class="sr-only" id="capture-title">How DrivePerf records</h2>
+        <blockquote>Auto-detects most drives. <span>The first few hundred metres may be estimated.</span> Force-quitting pauses auto-detect.</blockquote>
+        <div class="promise__facts">
+          <div class="fact"><b><span class="num">2–4%</span> battery an hour</b><span>Our estimate for driving with the screen off. We'll publish measured numbers from the beta.</span></div>
+          <div class="fact"><b>Manual when you want it</b><span>Start a drive before you set off: Control Center or a widget on iPhone, a Quick Settings tile on Android.</span></div>
+          <div class="fact"><b>Nothing to do while moving</b><span>No live score, no alerts, no tips on the road. Your Story waits until you're parked.</span></div>
+        </div>
+        <p style="margin:28px 0 0"><a class="link-arrow" href="pages/how-it-records.html">How DrivePerf records, on iPhone and Android</a></p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ Privacy ============ -->
+  <section class="section" id="privacy" aria-labelledby="privacy-title" data-component="PrivacyPromise">
+    <div class="wrap split">
+      <div>
+        <p class="eyebrow">Private by design</p>
+        <h2 class="h2" id="privacy-title">Your drives stay on your phone.</h2>
+        <p class="lede" style="margin-top:20px">DrivePerf is local-first. You don't need an account, there are no ad or tracking SDKs, and nothing about your trips leaves the phone unless you turn on Pro backup.</p>
+        <ul class="never-list" style="margin-top:28px">
+          <li><span data-icon="download"></span><div><b>Download all your data, free</b><span>Every trip, route and score in an open format. It's yours, and you can leave with it.</span></div></li>
+          <li><span data-icon="trash"></span><div><b>Delete anything, any time</b><span>A trip, a range, or everything, on the phone and in the cloud.</span></div></li>
+          <li><span data-icon="shield"></span><div><b>Not an insurance app</b><span>Your data is never sold, and never shared with insurers.</span></div></li>
+        </ul>
+        <p style="margin:24px 0 0"><a class="link-arrow" href="pages/privacy.html">Read the privacy policy</a></p>
+      </div>
+      <div class="data-map" data-reveal aria-label="Where your data lives">
+        <div class="row"><span class="ico" data-icon="phone"></span><div><b>On your phone</b><span>Trips, routes, cars and scores. Everything works without an account.</span></div></div>
+        <div class="row"><span class="ico" data-icon="cloud"></span><div><b>In the cloud</b><span>Only if you turn on Pro backup, with your consent first. Delete it any time.</span></div></div>
+        <div class="row"><span class="ico" data-icon="info"></span><div><b>Crash reports and usage statistics</b><span>Only if you say yes. Never your locations, routes or speeds.</span></div></div>
+        <div class="row row--never"><span class="ico" data-icon="noentry"></span><div><b>Never</b><span>Sold. Shared with insurers. Used for ads.</span></div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ Pricing ============ -->
+  <section class="section section--alt" id="pricing" aria-labelledby="pricing-title" data-component="Pricing">
+    <div class="wrap">
+      <div class="section__head">
+        <p class="eyebrow">Free and Pro</p>
+        <h2 class="h2" id="pricing-title">Generous Free. Pro for the long game.</h2>
+        <p class="lede">Free covers every drive, every Story and every score, forever. Pro adds depth over time.</p>
+      </div>
+      <div class="pricing-top">
+        <div class="region" role="group" aria-label="Show prices for">
+          <button type="button" data-region="US" aria-pressed="true">United States</button>
+          <button type="button" data-region="CA" aria-pressed="false">Canada</button>
+        </div>
+        <p class="small muted" style="margin:0">Two plans. No weekly plan, no lifetime plan, no ads.</p>
+      </div>
+      <div class="preview-banner" data-reveal>
+        <span class="num">14</span>
+        <div><b>Every new driver starts with a 14-day Pro Preview. No card.</b><span>When it ends you keep everything in Free, and every trip stays yours.</span></div>
+      </div>
+      <div class="plans">
+        <article class="plan" aria-labelledby="plan-free">
+          <div class="plan__name"><span id="plan-free">Free</span></div>
+          <div class="plan__price"><span class="num" data-price="free">US$0</span><small>forever</small></div>
+          <p class="plan__sub">Everything you need after every drive.</p>
+          <ul>
+            <li><span data-icon="check"></span>Automatic and manual recording</li>
+            <li><span data-icon="check"></span>Drive Story, Smoothness and one tip per drive</li>
+            <li><span data-icon="check"></span>Replay and Analysis for the last 30 days</li>
+            <li><span data-icon="check"></span>Weekly recap and Drive Wrapped</li>
+            <li><span data-icon="check"></span>2 routes, 1 car, full data download</li>
+          </ul>
+          <a class="btn btn--ghost" href="#waitlist">Join the waitlist</a>
+        </article>
+        <article class="plan plan--feature" aria-labelledby="plan-annual">
+          <div class="plan__name"><span id="plan-annual">Pro · Annual</span><span class="chip chip--accent">Best value</span></div>
+          <div class="plan__price"><span class="num" data-price="annual">US$39.99</span><small>/ year</small></div>
+          <p class="plan__sub"><span data-price="annualPerMonth">US$3.33</span> a month, billed yearly</p>
+          <div class="founding"><b><span data-icon="rosette"></span>Founding Drivers: <span data-price="founding">US$29.99</span> first year</b><span>For the waitlist, the beta and the first 30 days after launch.</span></div>
+          <ul>
+            <li><span data-icon="check"></span>Replay and Analysis for every drive</li>
+            <li><span data-icon="check"></span>Unlimited routes and ghost comparison</li>
+            <li><span data-icon="check"></span>Month, year, car and route trends</li>
+            <li><span data-icon="check"></span>Cloud backup, GPX/CSV export, unlimited cars</li>
+          </ul>
+          <a class="btn" href="#waitlist">Join for the founding price</a>
+        </article>
+        <article class="plan" aria-labelledby="plan-monthly">
+          <div class="plan__name"><span id="plan-monthly">Pro · Monthly</span></div>
+          <div class="plan__price"><span class="num" data-price="monthly">US$6.99</span><small>/ month</small></div>
+          <p class="plan__sub">Everything in Pro, month to month.</p>
+          <ul>
+            <li><span data-icon="check"></span>All Pro features</li>
+            <li><span data-icon="check"></span>Cancel any time in the App Store or Google Play</li>
+            <li><span data-icon="check"></span>Your trips stay yours if you stop</li>
+          </ul>
+          <a class="btn btn--ghost" href="#waitlist">Join the waitlist</a>
+        </article>
+      </div>
+
+      <div class="table-scroll">
+        <table class="compare" data-component="FreeProTable">
+          <caption>Free vs Pro, line by line</caption>
+          <thead><tr><th scope="col">What you get</th><th scope="col">Free</th><th scope="col">Pro</th></tr></thead>
+          <tbody>
+            <tr><th scope="row">Recording (auto and manual), Drive Story, Smoothness, events, efficiency habits, coaching tip</th><td><span class="yes" data-yes></span></td><td class="pro"><span class="yes" data-yes></span></td></tr>
+            <tr><th scope="row">Trip summaries</th><td>Forever ("locked, not lost")</td><td class="pro">Forever</td></tr>
+            <tr><th scope="row">Trip Replay and Analysis</th><td>Last 30 days</td><td class="pro">Full history, plus range stats and advanced channels</td></tr>
+            <tr><th scope="row">Routes and route records</th><td>2 active routes</td><td class="pro">Unlimited, plus ghost comparison and "where you gained"</td></tr>
+            <tr><th scope="row">Trends</th><td>Weekly, plus a 4-week line</td><td class="pro">Month, year, per car, per route</td></tr>
+            <tr><th scope="row">Weekly recap · Drive Wrapped</th><td><span class="yes" data-yes></span> · core chapters</td><td class="pro"><span class="yes" data-yes></span> · extra chapters and card styles</td></tr>
+            <tr><th scope="row">Share cards · Ride-along pass</th><td><span class="yes" data-yes></span></td><td class="pro"><span class="yes" data-yes></span> · extra styles, minimal mark</td></tr>
+            <tr><th scope="row">Garage</th><td>1 car</td><td class="pro">Unlimited</td></tr>
+            <tr><th scope="row">Download all my data · delete anything</th><td><span class="yes" data-yes></span></td><td class="pro"><span class="yes" data-yes></span></td></tr>
+            <tr><th scope="row">Per-trip GPX/CSV export</th><td><span class="no">—</span><span class="sr-only">Not included</span></td><td class="pro"><span class="yes" data-yes></span></td></tr>
+            <tr><th scope="row">Cloud backup and restore</th><td><span class="no">—</span><span class="sr-only">Not included</span></td><td class="pro"><span class="yes" data-yes></span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="price-notes">
+        <p style="margin:0" id="price-alt">In Canada: CA$8.99 a month or CA$49.99 a year, with a founding first year at CA$39.99.</p>
+        <p style="margin:0">Prices are set by the App Store and Google Play in your country, and taxes may apply. Subscriptions renew until you cancel in your store account. The Pro Preview never charges you.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ FAQ teaser ============ -->
+  <section class="section" aria-labelledby="faq-title" data-component="FaqTeaser">
+    <div class="wrap wrap--mid split split--wide-left" style="align-items:start">
+      <div>
+        <p class="eyebrow">Questions</p>
+        <h2 class="h2" id="faq-title">Straight answers.</h2>
+        <p class="lede" style="margin-top:20px">The things drivers ask us first.</p>
+        <p style="margin-top:24px"><a class="link-arrow" href="pages/support.html">All questions and support</a></p>
+      </div>
+      <div class="faq">
+        <details><summary>Will it drain my battery?</summary><div class="answer"><p>We estimate about 2–4% an hour of driving with the screen off. Between drives, DrivePerf waits for the phone to tell it you're moving instead of keeping GPS on. We'll publish measured numbers from the beta.</p></div></details>
+        <details><summary>Is this an insurance app?</summary><div class="answer"><p>No, and it never will be. Your data is never sold and never shared with insurers. DrivePerf is for people who enjoy driving and want to get smoother.</p></div></details>
+        <details><summary>Do I need an account?</summary><div class="answer"><p>No. Everything in Free and the Pro Preview works without one. You only sign in if you want Pro cloud backup or a second device.</p></div></details>
+        <details><summary>What happens when the Pro Preview ends?</summary><div class="answer"><p>You choose. Continue with Free and keep every trip summary forever, or keep Pro. Replay and Analysis older than 30 days are locked on Free, not lost.</p></div></details>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ Final CTA ============ -->
+  <section class="section section--tight" aria-labelledby="cta-title" data-component="CtaBand">
+    <div class="wrap">
+      <div class="cta-band" data-reveal>
+        <span class="cta-band__loop" data-loop="88" data-glow></span>
+        <h2 class="h2" id="cta-title">Be a Founding Driver.</h2>
+        <p class="lede">Join the waitlist for the beta this winter, and a founding first year of Pro when we launch.</p>
+        <a class="btn btn--lg" href="#waitlist">Join the waitlist</a>
+        <div data-partial="badges"></div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<div data-partial="footer"></div>
+
+<script src="../shared/tokens.js"></script>
+<script src="../shared/data.js"></script>
+<script src="../shared/motion.js"></script>
+<script src="js/site.js"></script>
+<script src="js/mockups.js"></script>
+<script src="js/waitlist.js"></script>
+<script src="js/home.js"></script>
+</body>
+</html>
