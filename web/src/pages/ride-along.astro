@@ -1,0 +1,67 @@
+---
+// S-WEB-08 · Ride-along landing (DRIVE-181). Served at /ride-along and, via a Hosting rewrite, at /r/{code}
+// (ADR-009). noindex: pass URLs are personal. Mobile vs desktop is decided by CSS width (no layout shift); the
+// script reads the optional code (/r/{code} or ?code=), shows the invalid state only for a malformed code, and
+// re-encodes the QR with the pass URL. There is no pass API yet (DRIVE-76), so the page never says a pass is
+// valid or active, and doesn't name the sender.
+import Base from '../layouts/Base.astro';
+import IconSlot from '../components/pages/IconSlot.astro';
+import StoreBadges from '../components/site/StoreBadges.astro';
+import PassCard from '../components/pages/PassCard.astro';
+import QrCode from '../components/pages/QrCode.astro';
+---
+<Base title="A Ride-along pass for you · DrivePerf" description="A friend sent you a Ride-along pass: 30 days of DrivePerf Pro, no card. Get the app and the pass is applied on first open." ogDescription="30 days of DrivePerf Pro, no card. Smooth is a skill." path="/ride-along" screen="S-WEB-08" noindex solidHeader>
+  <section class="hero ra" style="min-height:0;padding-bottom:96px" aria-labelledby="ra-title" data-component="RideAlongLanding" data-ra-mode="valid">
+    <div class="wrap hero__grid">
+      <div class="hero__copy">
+        <p class="eyebrow">Ride-along pass</p>
+        <h1 class="h1" id="ra-title"><span class="ra-valid">A friend sent you 30 days of Pro.</span><span class="ra-invalid">This pass link doesn't work.</span></h1>
+        <p class="lede ra-valid" style="margin:20px 0 32px">DrivePerf records your drives automatically and turns each one into a short Story and a Smoothness score you can improve. A Ride-along pass doubles the usual 14-day Pro Preview. No card.</p>
+        <div class="ra-valid ra-mobile">
+          <div style="margin-bottom:16px"><StoreBadges /></div>
+          <p class="small muted" style="max-width:32em">Install DrivePerf from this phone and your pass is applied the first time you open the app.<span data-ra-open hidden> Already have it? <a data-ra-link href="/ride-along">Open in DrivePerf</a>.</span></p>
+        </div>
+        <div class="ra-valid ra-desktop">
+          <div class="qr-wrap" style="max-width:560px">
+            <QrCode text="https://driveperf.com/ride-along" id="qr" />
+            <div><h2 class="h4" style="margin-bottom:6px">Open it on your phone</h2><p class="small muted" style="margin:0 0 14px">Point your phone's camera at the code. DrivePerf is an iPhone and Android app, so the pass goes with you.</p><p class="tiny" style="margin:0">Or open <b style="color:var(--text)" data-ra-short>driveperf.com/ride-along</b> on your phone.</p></div>
+          </div>
+        </div>
+        <!-- Invalid: a code is present but malformed (no API yet to check used or expired passes). -->
+        <div class="ra-invalid">
+          <p class="lede" style="margin:20px 0 32px">The code in the link looks cut short or mistyped. Ask your friend to send it again. You can still try everything in DrivePerf Pro free for 14 days, no card.</p>
+          <div class="btn-row"><a class="btn btn--lg" href="/#waitlist">Join the waitlist</a><a class="btn btn--lg btn--ghost" href="/">What is DrivePerf?</a></div>
+        </div>
+      </div>
+
+      <div class="ra-valid">
+        <PassCard />
+        <p class="tiny" style="margin-top:20px;max-width:440px">Your friend only sees "Your friend is set up". Nothing about your drives, ever.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="section section--tight section--alt" aria-labelledby="ra-what">
+    <div class="wrap">
+      <h2 class="h3" id="ra-what" style="margin-bottom:24px">What you get with DrivePerf</h2>
+      <div class="grid-3">
+        <div class="card card--flat"><IconSlot name="car" class="icon-tile" /><h3 class="h4">Records automatically</h3><p class="muted small">From the phone alone. No hardware, nothing to do while you drive.</p></div>
+        <div class="card card--flat"><IconSlot name="ring" class="icon-tile" /><h3 class="h4">Smoothness, against you</h3><p class="muted small">Every drive compared with your own usual. No leaderboards.</p></div>
+        <div class="card card--flat"><IconSlot name="shield" class="icon-tile" /><h3 class="h4">Private by design</h3><p class="muted small">No account needed. Never sold or shared with insurers.</p></div>
+      </div>
+    </div>
+  </section>
+  <script>import '../scripts/pages/ride-along';</script>
+</Base>
+
+<style is:global>
+  /* Mobile (< 900 px) shows store placeholders; desktop shows the QR (prototype: innerWidth >= 900). */
+  .ra .ra-desktop { display: none; }
+  @media (min-width: 900px) { .ra .ra-mobile { display: none; } .ra .ra-desktop { display: block; } }
+  .ra .ra-invalid { display: none; }
+  .ra[data-ra-mode="invalid"] .ra-valid { display: none; }
+  .ra[data-ra-mode="invalid"] .ra-invalid { display: block; animation: fadein var(--dur-medium) var(--ease-glide); }
+  .ra[data-ra-mode="invalid"] h1 .ra-invalid { display: inline; }
+  html[data-rm="true"] .ra .ra-invalid { animation: none; }
+  .ra .avatar { display: grid; place-items: center; }
+</style>

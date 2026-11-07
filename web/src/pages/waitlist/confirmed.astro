@@ -1,0 +1,42 @@
+---
+// S-WEB-02 · Waitlist confirmation (DRIVE-171). Reached after a successful waitlist write with ?platform=&country=.
+// The platform sentence switches for Android (src/scripts/pages/confirmed.ts). noindex.
+import Base from '../../layouts/Base.astro';
+import IconSlot from '../../components/pages/IconSlot.astro';
+import LoopMark from '../../components/site/LoopMark.astro';
+import { icon } from '../../lib/icons';
+---
+<Base title="You're on the list · DrivePerf" description="You're on the DrivePerf waitlist. We'll email you when the beta opens and at launch, with your founding price." path="/waitlist/confirmed" screen="S-WEB-02" noindex solidHeader>
+  <section class="status" data-component="StatusPanel">
+    <div class="wrap split split--wide-left" style="align-items:start">
+      <div class="status__card">
+        <div class="status__icon" data-loop-trace aria-hidden="true"><LoopMark size={96} glow /></div>
+        <p class="eyebrow">Waitlist</p>
+        <h1 class="h1">You're on the list.</h1>
+        <p class="lede">Thanks for joining. We'll email you when the <span data-pl data-ios="iPhone" data-android="Android" data-both="iPhone and Android">iPhone</span> beta opens, and again at launch with your founding price.</p>
+        <ul class="next-steps">
+          <li><IconSlot name="mail" class="ico" /><div><b>Beta invite, this winter</b><span>Founding Drivers test DrivePerf on <span data-pl data-ios="TestFlight" data-android="Google Play closed testing" data-both="TestFlight or Google Play closed testing">TestFlight</span> before launch. Places are limited, so not everyone on the list gets one.</span></div></li>
+          <li><IconSlot name="rosette" class="ico" /><div><b>Launch email, with the founding price</b><span>Your first year of Pro for US$29.99 or CA$39.99, then the regular annual price. Every new driver also gets a 14-day Pro Preview, no card.</span></div></li>
+          <li><IconSlot name="shield" class="ico" /><div><b>Nothing else</b><span>We only email about the DrivePerf beta and launch. Every email has a one-click unsubscribe.</span></div></li>
+        </ul>
+        <div class="btn-row">
+          <a class="btn btn--lg" href="/how-it-records">See how DrivePerf records</a>
+          <button class="btn btn--lg btn--ghost" type="button" id="copy-link" data-icon-copy={icon('copy')} data-icon-check={icon('check')}><Fragment set:html={icon('copy')} />Copy link to driveperf.com</button>
+        </div>
+        <p class="tiny" id="copy-status" role="status" aria-live="polite" style="margin:12px 0 0"></p>
+        <p class="tiny" style="margin-top:24px">Changed your mind? <a href="/email-preferences">Unsubscribe</a> any time. <a href="/privacy#website">How we handle your email</a>.</p>
+      </div>
+      <aside class="card" style="padding:28px" aria-label="While you wait">
+        <p class="eyebrow eyebrow--plain" style="margin-bottom:10px">While you wait</p>
+        <h2 class="h3" style="margin-bottom:12px">Smooth is a skill.</h2>
+        <p class="muted small">DrivePerf compares every drive with your own usual, so the score only goes one way if you do. A few things that help from day one:</p>
+        <ul class="never-list">
+          <li><IconSlot name="check" /><div><b>Ease off earlier</b><span>Long, gentle stops score better than late, firm ones.</span></div></li>
+          <li><IconSlot name="check" /><div><b>Roll on, don't punch it</b><span>Smooth starts read beautifully in the friction circle.</span></div></li>
+          <li><IconSlot name="check" /><div><b>Mount your phone</b><span>A mounted phone gives the cleanest data. In a bag, we can't score fairly.</span></div></li>
+        </ul>
+      </aside>
+    </div>
+  </section>
+  <script>import '../../scripts/pages/confirmed';</script>
+</Base>

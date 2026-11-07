@@ -1,0 +1,33 @@
+---
+// DeletionRequestForm (S-WEB-07). Until the backend exists (DRIVE-76) the request is an email from the user's own
+// mailbox to privacy@driveperf.com, prefilled by src/scripts/pages/delete-account.ts. States: form, formErr
+// (inline), ready ("finish in your email app"). The spec's emailSent/verified states need the backend.
+import IconSlot from './IconSlot.astro';
+import { SITE } from '../../config/site';
+const subject = 'Delete my DrivePerf account';
+const fallbackHref = `mailto:${SITE.emails.privacy}?subject=${encodeURIComponent(subject)}`;
+---
+<div class="state-view is-on" data-del-view="form" data-component="DeletionRequestForm">
+  <h2 class="h3" style="margin-bottom:8px">Request deletion</h2>
+  <p class="muted">Enter the email on your DrivePerf account. Your email app opens with the request ready to send to <a href={`mailto:${SITE.emails.privacy}`}>{SITE.emails.privacy}</a>. Sending it from that address shows the account is yours, so nobody else can delete it.</p>
+  <form class="waitlist" id="del-form" novalidate style="box-shadow:none;max-width:none">
+    <div class="field" id="f-del-email">
+      <label for="del-email">Account email</label>
+      <input class="input" id="del-email" type="email" autocomplete="email" inputmode="email" placeholder="you@example.com" aria-describedby="del-email-err del-email-hint">
+      <p class="field-error" id="del-email-err"></p>
+      <p class="field-hint" id="del-email-hint">Signed in with Apple and hid your email? Enter the relay address ending in privaterelay.appleid.com. We'll confirm with a reply to it.</p>
+    </div>
+    <button class="btn btn--lg" id="del-submit" type="submit">Write the deletion email</button>
+    <noscript><p class="small" style="margin:0">This button needs JavaScript. Instead, email <a href={fallbackHref}>{SITE.emails.privacy}</a> from your account's address with the subject “{subject}”.</p></noscript>
+    <p class="tiny" style="margin:0">If you have an active Pro subscription, cancel it in your App Store or Google Play account too. Deleting your account doesn't cancel it.</p>
+  </form>
+</div>
+
+<div class="state-view" data-del-view="ready" role="status">
+  <div class="status__icon" style="width:72px;height:72px;margin-bottom:24px;border-radius:20px;background:var(--accent-container);color:var(--on-accent-container);display:grid;place-items:center"><IconSlot name="mail" style="--is:34px" /></div>
+  <h2 class="h2" id="del-ready-title" tabindex="-1" style="margin-bottom:16px">Finish in your email app.</h2>
+  <p class="lede">Your email app should open with a deletion request for <b data-sent-from></b>, addressed to {SITE.emails.privacy}. <strong>Nothing has been sent yet:</strong> press Send to finish.</p>
+  <p class="muted">Send it from that address, so we know the account is yours. We reply to confirm, then delete your account and cloud data, usually within 7 days and always within 30.</p>
+  <p class="muted">Didn't open? <a id="del-mail-again" href={fallbackHref}>Try again</a>, or email <a href={fallbackHref}>{SITE.emails.privacy}</a> yourself with the subject “{subject}” and your account email in the message.</p>
+  <button class="btn btn--ghost" type="button" id="del-restart">Use a different address</button>
+</div>

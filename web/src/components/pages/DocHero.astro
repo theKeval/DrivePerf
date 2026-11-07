@@ -1,0 +1,21 @@
+---
+// DocHero: breadcrumb, optional eyebrow, h1 and whatever follows (lede, meta chips, banner, search) via the slot.
+export interface Crumb { label: string; href?: string }
+interface Props { crumbs: Crumb[]; title: string; eyebrow?: string }
+const { crumbs, title, eyebrow } = Astro.props;
+---
+<header class="page-hero" data-component="DocHero">
+  <div class="wrap">
+    <nav class="crumbs" aria-label="Breadcrumb">
+      {crumbs.map((c, i) => (
+        <Fragment>
+          {i > 0 && <span aria-hidden="true">/</span>}
+          {c.href ? <a href={c.href}>{c.label}</a> : <span aria-current="page">{c.label}</span>}
+        </Fragment>
+      ))}
+    </nav>
+    {eyebrow && <p class="eyebrow">{eyebrow}</p>}
+    <h1 class="h1">{title}</h1>
+    <slot />
+  </div>
+</header>

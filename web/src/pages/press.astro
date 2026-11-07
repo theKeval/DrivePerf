@@ -1,0 +1,85 @@
+---
+// S-WEB-10 · Press kit (DRIVE-188). Device mockups and Story frames are rendered at build time from the shared
+// fixtures; the ring reveal and G-dot replay run in src/scripts/pages/press.ts (static under reduced motion).
+import Base from '../layouts/Base.astro';
+import LoopMark from '../components/site/LoopMark.astro';
+import { device, screenStoryRing, screenRecap, screenReplay, storyFrames, ggSamples, HERO_TRIP } from '../lib/mockups';
+import { SITE } from '../config/site';
+
+const shots = device('ios', screenStoryRing(), { width: 150 }) + device('android', screenRecap(), { width: 140 }) + device('ios', screenReplay(), { width: 150 });
+const frames = storyFrames().slice(1, 5);
+const gg = JSON.stringify(ggSamples(HERO_TRIP()));
+const press = SITE.emails.hello;
+---
+<Base title="Press kit · DrivePerf" description="DrivePerf press kit: fact sheet, logo pack, app screens, Story previews, the privacy one-pager and press contact." path="/press" screen="S-WEB-10" solidHeader>
+  <header class="page-hero" data-component="DocHero">
+    <div class="wrap split split--wide-left">
+      <div>
+        <nav class="crumbs" aria-label="Breadcrumb"><a href="/">Home</a><span aria-hidden="true">/</span><span aria-current="page">Press kit</span></nav>
+        <h1 class="h1">Press kit</h1>
+        <p class="lede">Everything you need to write about DrivePerf. Use these freely in coverage. For interviews, early access or anything else: <a href={`mailto:${press}`}>{press}</a>.</p>
+        <div class="btn-row" style="margin-top:28px"><a class="btn" href="#logos">Logos and colours</a><a class="btn btn--ghost" href="/privacy#short">Privacy one-pager</a></div>
+      </div>
+      <div style="display:grid;place-items:center" aria-hidden="true"><LoopMark size={200} glow /></div>
+    </div>
+  </header>
+
+  <section class="section section--tight" aria-labelledby="facts">
+    <div class="wrap wrap--mid">
+      <h2 class="h2" id="facts" style="margin-bottom:28px">Fact sheet</h2>
+      <dl class="fact-sheet">
+        <div><dt>Product</dt><dd>DrivePerf: Drive Tracker, for iPhone and Android</dd></div>
+        <div><dt>In one line</dt><dd>Smooth is a skill. DrivePerf records your drives automatically and turns each one into a short Story, a replay with evidence and a Smoothness score against your own baseline.</dd></div>
+        <div><dt>For</dt><dd>People who love driving and do it every day, aged 18 and over</dd></div>
+        <div><dt>Launch</dt><dd>Early 2027 · Canada and the United States · English</dd></div>
+        <div><dt>Price</dt><dd>Free, with Pro at US$6.99 a month or US$39.99 a year (CA$8.99 / CA$49.99). Every new user gets a 14-day Pro Preview, no card</dd></div>
+        <div><dt>Privacy</dt><dd>Local-first, no account needed, no ad or tracking SDKs. Never sold, never shared with insurers</dd></div>
+        <div><dt>What it doesn't do</dt><dd>No speed contests, top-speed or 0–100 timing, leaderboards, streaks or insurance features. Nothing to look at while driving</dd></div>
+        <div><dt>Based in</dt><dd>Oakville, Ontario, Canada</dd></div>
+      </dl>
+    </div>
+  </section>
+
+  <section class="section section--tight section--alt" aria-labelledby="logos">
+    <div class="wrap">
+      <h2 class="h2" id="logos" style="margin-bottom:12px">Logo pack</h2>
+      <p class="muted" style="margin-bottom:28px;max-width:40em">The mark is The Loop: a fading trail that ends in a G-dot. Keep the dot leading clockwise, keep clear space of two dot widths, and don't recolour, rotate or add effects.</p>
+      <div class="asset-grid">
+        <article class="asset"><div class="asset__art"><img src="/brand/logo-a-loop.svg" alt="The Loop mark on a dark background" width="128" height="128" style="width:46%;height:auto"></div><div class="asset__body"><b>The Loop, colour</b><span>SVG · on dark backgrounds</span><a class="btn btn--sm btn--quiet" href="/brand/logo-a-loop.svg" download>Download SVG</a></div></article>
+        <article class="asset"><div class="asset__art asset__art--light"><img src="/brand/logo-a-loop-on-light.svg" alt="The Loop mark on a light background" width="128" height="128" style="width:46%;height:auto"></div><div class="asset__body"><b>The Loop, on light</b><span>SVG · ink dot, deep Glide trail</span><a class="btn btn--sm btn--quiet" href="/brand/logo-a-loop-on-light.svg" download>Download SVG</a></div></article>
+        <article class="asset"><div class="asset__art"><img src="/brand/lockup-horizontal.svg" alt="DrivePerf horizontal lockup with the tagline Smooth is a skill." width="560" height="128" style="width:86%;height:auto"></div><div class="asset__body"><b>Horizontal lockup</b><span>Mark, wordmark and "Smooth is a skill."</span><a class="btn btn--sm btn--quiet" href="/brand/lockup-horizontal.svg" download>Download SVG</a></div></article>
+      </div>
+      <h3 class="h3" style="margin:48px 0 18px">Colours</h3>
+      <div class="swatches">
+        <div class="swatch"><i style="background:#080B10;box-shadow:inset 0 0 0 1px #ffffff1f"></i><div><b>Night</b>#080B10</div></div>
+        <div class="swatch"><i style="background:#5BE7C4"></i><div><b>Glide</b>#5BE7C4 · the one accent</div></div>
+        <div class="swatch"><i style="background:#FFC24B"></i><div><b>Sodium</b>#FFC24B · route records only</div></div>
+        <div class="swatch"><i style="background:#F2F4F7"></i><div><b>Daylight</b>#F2F4F7 · text</div></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section section--tight" aria-labelledby="screens">
+    <div class="wrap">
+      <h2 class="h2" id="screens" style="margin-bottom:12px">App screens and Story previews</h2>
+      <p class="muted" style="margin-bottom:32px;max-width:44em">Pre-release designs. High-resolution PNGs and Story GIFs will be added at launch. All footage shows a <b>parked</b> car: we never show a phone being used while driving.</p>
+      <div class="split" style="align-items:center">
+        <div id="press-shots" style="display:flex;gap:18px;justify-content:center;flex-wrap:wrap" aria-label="App screens on iPhone and Android: a Drive Story with a new route record, a weekly recap and a trip replay." role="img" set:html={shots} />
+        <div id="press-story" style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap" aria-label="Four frames from a Drive Story: the route, the friction circle, the Smoothness ring and the cleanest stretch." role="img" data-gg={gg}>
+          {frames.map((f) => <div class="stack__card press-frame" style="position:relative;left:auto;top:auto;margin:0;--w:150px" set:html={f.html} />)}
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section section--tight" aria-labelledby="contact">
+    <div class="wrap">
+      <div class="cta-band">
+        <h2 class="h2" id="contact">Press contact</h2>
+        <p class="lede">Interviews, early access to the beta, or a closer look at how scoring works.</p>
+        <a class="btn btn--lg" href={`mailto:${press}`}>{press}</a>
+      </div>
+    </div>
+  </section>
+  <script>import '../scripts/pages/press';</script>
+</Base>

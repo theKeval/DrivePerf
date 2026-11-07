@@ -1,0 +1,49 @@
+---
+// S-WEB-09 · Email preferences / unsubscribe (DRIVE-183). noindex. No email provider or signed unsubscribe tokens
+// yet (DRIVE-76): the page writes an unsubscribe email the user sends themself. The spec's one-click
+// "unsubscribed" and "resubscribe" states need the backend and are not shown.
+import Base from '../layouts/Base.astro';
+import IconSlot from '../components/pages/IconSlot.astro';
+import LoopMark from '../components/site/LoopMark.astro';
+import { SITE } from '../config/site';
+const subject = 'Unsubscribe from DrivePerf emails';
+const fallbackHref = `mailto:${SITE.emails.privacy}?subject=${encodeURIComponent(subject)}`;
+---
+<Base title="Email preferences · DrivePerf" description="Unsubscribe from DrivePerf waitlist and launch emails." path="/email-preferences" screen="S-WEB-09" noindex solidHeader>
+  <section class="status" data-component="StatusPanel">
+    <div class="wrap wrap--narrow">
+      <div class="state-view is-on" data-pref-view="form">
+        <div class="status__icon" data-loop-trace aria-hidden="true"><LoopMark size={96} /></div>
+        <p class="eyebrow">Email preferences</p>
+        <h1 class="h1">Unsubscribe from DrivePerf emails.</h1>
+        <p class="lede">Enter your email and your email app opens with an unsubscribe request to {SITE.emails.privacy}. Sending it from that address shows it's yours.</p>
+        <form class="waitlist" id="unsub-form" novalidate style="box-shadow:none">
+          <div class="field" id="f-unsub">
+            <label for="unsub-email">Email address</label>
+            <input class="input" id="unsub-email" type="email" autocomplete="email" inputmode="email" placeholder="you@example.com" aria-describedby="unsub-err">
+            <p class="field-error" id="unsub-err"></p>
+          </div>
+          <button class="btn btn--lg" type="submit">Write the unsubscribe email</button>
+          <noscript><p class="small" style="margin:0">This button needs JavaScript. Instead, email <a href={fallbackHref}>{SITE.emails.privacy}</a> with the subject “{subject}”.</p></noscript>
+        </form>
+        <p class="small muted" style="margin-top:20px">Or reply to any DrivePerf email with "unsubscribe". We honour every request within 10 business days, usually immediately.</p>
+      </div>
+
+      <div class="state-view" data-pref-view="ready" role="status">
+        <div class="status__icon" style="width:72px;height:72px;margin-bottom:28px;border-radius:20px;background:var(--accent-container);color:var(--on-accent-container);display:grid;place-items:center"><IconSlot name="mail" style="--is:34px" /></div>
+        <p class="eyebrow">Email preferences</p>
+        <h2 class="h1" id="pref-ready-title" tabindex="-1">Finish in your email app.</h2>
+        <p class="lede">Your email app should open with an unsubscribe request for <b data-sent-from></b>. <strong>Nothing has been sent yet:</strong> press Send to finish. We stop emailing that address as soon as we read it, and always within 10 business days.</p>
+        <div class="btn-row"><button class="btn btn--ghost" type="button" id="unsub-restart">Use a different address</button><a class="btn btn--quiet" href="/">Back to driveperf.com</a></div>
+        <ul class="next-steps">
+          <li><IconSlot name="info" class="ico" /><div><b>Didn't open?</b><span><a id="unsub-mail-again" href={fallbackHref}>Try again</a>, or email <a href={fallbackHref}>{SITE.emails.privacy}</a> yourself with the subject “{subject}”.</span></div></li>
+          <li><IconSlot name="info" class="ico" /><div><b>One last email? No.</b><span>We don't send a "sorry to see you go" email. A short reply confirms it's done.</span></div></li>
+          <li><IconSlot name="shield" class="ico" /><div><b>Your waitlist place</b><span>Your email stays on file only as unsubscribed, so we never email you again by mistake. To remove it completely, say so in the email.</span></div></li>
+        </ul>
+      </div>
+
+      <p class="tiny" style="margin-top:56px;border-top:1px solid var(--line);padding-top:20px">Emails are sent by DrivePerf (Keval Langalia, Ontario, Canada) only to people who joined the waitlist and agreed to emails. Every email says who it’s from, includes our postal contact details and has a one-click unsubscribe.</p>
+    </div>
+  </section>
+  <script>import '../scripts/pages/email-preferences';</script>
+</Base>

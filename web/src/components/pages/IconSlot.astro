@@ -1,0 +1,8 @@
+---
+// Icon slot: <span data-icon="name"> with the inline SVG rendered at build time (the prototype filled these
+// spans with JS). Sizing comes from site.css ([data-icon] > svg, --is).
+import { icon, type IconName } from '../../lib/icons';
+interface Props { name: IconName; class?: string; style?: string }
+const { name, class: cls, style } = Astro.props;
+---
+<span class={cls} style={style} data-icon={name} set:html={icon(name)} />
