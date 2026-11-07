@@ -23,7 +23,10 @@ The repo already holds the config: `backend/firebase/firebase.json` (Hosting + h
 - **Prod:** Keval created `driveperf-prod` ("DrivePerf") in the console. At Keval's request, the agent then unlinked Google Analytics (property 563092806 still exists in the GA account; delete it there if unused), created Firestore and registered "DrivePerf Web".
 - **Dev:** the agent created `driveperf-dev` ("DrivePerf Dev") with `firebase projects:create`, which adds no Analytics. It registered "DrivePerf Web" with `firebase apps:create` and created Firestore in the console.
 - **Both:** Spark plan, no Analytics, Firestore Native / Standard / `us-central1`. The web configs are in `web/src/config/site.ts`.
-- **Still open:** §5 (WIF and the GitHub Environments), which Keval does.
+- **§5 is also done.** At Keval's request, the agent ran it with Keval's signed-in `gcloud` and `gh`:
+  - Each project has a `github` pool, a `driveperf-repo` provider and a `github-web-deploy` account with the four roles. Each account is bound to its own GitHub Environment.
+  - GitHub Environment `dev` has its two variables.
+  - GitHub Environment `prod` has its two variables, required reviewer theKeval, and deployment branch `main` only.
 
 ## 2. Create the two projects (console)
 
