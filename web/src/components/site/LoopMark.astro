@@ -1,0 +1,6 @@
+---
+// The Loop mark (brand.md §3.1). Props mirror the prototype's loop(): size, glow, colours, optional title.
+import { loop, type LoopOptions } from '../../lib/loop';
+type Props = LoopOptions;
+---
+<Fragment set:html={loop(Astro.props)} />

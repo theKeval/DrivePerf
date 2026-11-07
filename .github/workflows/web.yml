@@ -1,0 +1,133 @@
+name: web
+
+# driveperf.com (DRIVE-79, ADR-008/009): build + checks + Firestore rules tests on every PR; a Firebase Hosting
+# preview channel per PR on driveperf-dev (expires in 7 days); live deploy to driveperf-prod on merge to main.
+# Auth is Workload Identity Federation (ADR-008: no long-lived keys in this public repo). Setup:
+# docs/launch/firebase-setup.md §5. Fork PRs never get credentials (no pull_request_target).
+
+on:
+  pull_request:
+    paths: ['web/**', 'backend/firebase/**', '.github/workflows/web.yml']
+  push:
+    branches: [main]
+    paths: ['web/**', 'backend/firebase/**', '.github/workflows/web.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: web-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Build, checks and rules tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: |
+            web/package-lock.json
+            backend/firebase/package-lock.json
+      - uses: actions/setup-java@v6
+        with: { distribution: temurin, java-version: 21 }
+
+      - name: Install
+        run: |
+          npm ci --prefix web
+          npm ci --prefix backend/firebase
+
+      - name: Firestore rules tests (emulator)
+        run: npm test --prefix backend/firebase
+
+      - name: Type check
+        run: npm run check --prefix web
+
+      - name: Build (prod config) + dist checks
+        run: npm run build --prefix web
+        env: { PUBLIC_DP_ENV: prod }
+
+      - name: Lighthouse CI (mobile, every page)
+        working-directory: web
+        run: npx lhci autorun --config=lighthouserc.cjs
+
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with: { name: lighthouse, path: web/.lighthouseci, if-no-files-found: ignore }
+
+  preview:
+    name: Preview channel (driveperf-dev)
+    needs: test
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    environment: dev
+    permissions:
+      contents: read
+      id-token: write       # Workload Identity Federation
+      pull-requests: write  # preview link comment
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with: { node-version: 24, cache: npm, cache-dependency-path: "web/package-lock.json\nbackend/firebase/package-lock.json" }
+      - run: npm ci --prefix web && npm ci --prefix backend/firebase
+      - name: Build (dev config)
+        run: npm run build --prefix web
+        env: { PUBLIC_DP_ENV: dev }
+      - uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
+          service_account: ${{ vars.GCP_DEPLOY_SA }}
+      - name: Deploy Firestore rules to dev (the preview's waitlist writes go to the dev database)
+        working-directory: backend/firebase
+        run: npx firebase deploy --only firestore:rules --project dev --non-interactive
+      - name: Deploy preview channel
+        id: deploy
+        working-directory: backend/firebase
+        run: |
+          npx firebase hosting:channel:deploy "pr-${{ github.event.pull_request.number }}" \
+            --project dev --expires 7d --json --non-interactive > deploy.json
+          url=$(node -e "const r=require('./deploy.json').result;console.log(Object.values(r)[0].url)")
+          expires=$(node -e "const r=require('./deploy.json').result;console.log(Object.values(r)[0].expireTime)")
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+          echo "expires=$expires" >> "$GITHUB_OUTPUT"
+      - name: Comment preview URL
+        uses: actions/github-script@v9
+        env: { URL: "${{ steps.deploy.outputs.url }}", EXPIRES: "${{ steps.deploy.outputs.expires }}" }
+        with:
+          script: |
+            const marker = '<!-- web-preview -->';
+            const body = `${marker}\n**Website preview (driveperf-dev):** ${process.env.URL}\nExpires ${process.env.EXPIRES} · commit ${context.sha.slice(0, 7)} · writes go to the dev Firestore.`;
+            const { owner, repo } = context.repo, issue_number = context.issue.number;
+            const comments = await github.paginate(github.rest.issues.listComments, { owner, repo, issue_number });
+            const mine = comments.find((c) => c.body?.startsWith(marker));
+            if (mine) await github.rest.issues.updateComment({ owner, repo, comment_id: mine.id, body });
+            else await github.rest.issues.createComment({ owner, repo, issue_number, body });
+
+  live:
+    name: Live deploy (driveperf-prod)
+    needs: test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: prod        # requires Keval's approval (ADR-008)
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with: { node-version: 24, cache: npm, cache-dependency-path: "web/package-lock.json\nbackend/firebase/package-lock.json" }
+      - run: npm ci --prefix web && npm ci --prefix backend/firebase
+      - name: Build (prod config)
+        run: npm run build --prefix web
+        env: { PUBLIC_DP_ENV: prod }
+      - uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
+          service_account: ${{ vars.GCP_DEPLOY_SA }}
+      - name: Deploy Hosting + Firestore rules
+        working-directory: backend/firebase
+        run: npx firebase deploy --only hosting,firestore:rules --project prod --non-interactive --message "${GITHUB_SHA::7}"

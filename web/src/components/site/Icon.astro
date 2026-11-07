@@ -1,0 +1,7 @@
+---
+// Inline icon from the site icon set (src/lib/icons.ts). Decorative: aria-hidden.
+import { icon, type IconName } from '../../lib/icons';
+interface Props { name: IconName; attrs?: string }
+const { name, attrs = '' } = Astro.props;
+---
+<Fragment set:html={icon(name, attrs)} />

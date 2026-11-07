@@ -1,0 +1,45 @@
+---
+// SiteFooter: columns, privacy line, store badges, Night/Day toggle (behaviour in src/scripts/site.ts).
+import LoopMark from './LoopMark.astro';
+import Icon from './Icon.astro';
+import StoreBadges from './StoreBadges.astro';
+import { SITE } from '../../config/site';
+---
+<footer class="site-footer" data-component="SiteFooter">
+  <div class="wrap">
+    <div class="footer-grid">
+      <div class="footer-brand">
+        <a class="brand" href="/" aria-label="DrivePerf home"><LoopMark size={36} id="dplf" /><span class="brand__word">DrivePerf</span></a>
+        <p class="footer-tagline">Smooth is a skill.</p>
+        <p>Automatic drive recording, a Smoothness score against your own baseline, and recaps worth sharing. For iPhone and Android in Canada and the US.</p>
+        <StoreBadges />
+      </div>
+      <div class="footer-col"><h2>Product</h2><ul>
+        <li><a href="/#how">How it works</a></li>
+        <li><a href="/how-it-records">How DrivePerf records</a></li>
+        <li><a href="/#pricing">Free and Pro</a></li>
+        <li><a href="/ride-along">Ride-along pass</a></li>
+        <li><a href="/press">Press kit</a></li>
+      </ul></div>
+      <div class="footer-col"><h2>Help</h2><ul>
+        <li><a href="/support">Support and FAQ</a></li>
+        <li><a href="/delete-account">Delete your account</a></li>
+        <li><a href="/email-preferences">Email preferences</a></li>
+        <li><a href={`mailto:${SITE.emails.support}`}>{SITE.emails.support}</a></li>
+      </ul></div>
+      <div class="footer-col"><h2>Legal</h2><ul>
+        <li><a href="/privacy">Privacy policy</a></li>
+        <li><a href="/terms">Terms of use</a></li>
+        <li><a href="/privacy#rights">Your privacy rights</a></li>
+      </ul></div>
+    </div>
+    <div class="footer-bottom">
+      <p class="privacy-pill"><Icon name="shield" />No cookies. No trackers. We honour Global Privacy Control.</p>
+      <p>© 2026 DrivePerf · Oakville, Ontario, Canada · For drivers 18+</p>
+      <div class="theme-toggle" role="group" aria-label="Theme">
+        <button type="button" data-theme-set="dark" aria-pressed="true">Night</button>
+        <button type="button" data-theme-set="light" aria-pressed="false">Day</button>
+      </div>
+    </div>
+  </div>
+</footer>

@@ -1,0 +1,15 @@
+{
+  "applinks": {
+    "details": [
+      {
+        "appIDs": ["<TEAM_ID>.com.driveperf.app"],
+        "components": [
+          { "/": "/r/*", "comment": "Ride-along pass links (F-WEB-06)" }
+        ]
+      }
+    ]
+  },
+  "webcredentials": {
+    "apps": ["<TEAM_ID>.com.driveperf.app"]
+  }
+}
