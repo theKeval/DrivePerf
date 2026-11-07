@@ -121,7 +121,7 @@ Depending on your state, you have the right to know, access, delete, correct and
 
 ### How to make a request
 
-Use the Privacy Centre in the app, or email <a href="mailto:privacy@driveperf.com">privacy@driveperf.com</a>. We may ask you to confirm your email address so we know the request is yours. We answer within 30 days in Canada and 45 days in the US.
+Use the Privacy Centre in the app, or email [privacy@driveperf.com](mailto:privacy@driveperf.com). We may ask you to confirm your email address so we know the request is yours. We answer within 30 days in Canada and 45 days in the US.
 
 <h2 id="gpc">Global Privacy Control and Do Not Track</h2>
 
@@ -133,7 +133,7 @@ driveperf.com sets **no cookies** and uses no browser storage for tracking. Page
 
 <h2 id="website">The website and waitlist</h2>
 
-If you join the waitlist we collect your **email**, your **phone type** (iPhone or Android), your **country** (Canada, US or other), which headline you saw (the A/B variant), and a record of your consent: the time, the version of the wording you agreed to and the page. Nothing else. It is stored in Google Cloud Firestore in the United States (us-central1). We use it only to email you about the DrivePerf beta and launch, and keep it until you unsubscribe or <span class="placeholder">12 months after launch</span>. Every email says who it's from, includes our postal contact details and has a one-click unsubscribe, honoured immediately and always within 10 business days, as Canada's Anti-Spam Legislation (CASL) and CAN-SPAM require. To have your entry removed completely, email <a href="mailto:privacy@driveperf.com">privacy@driveperf.com</a>. Waitlist data is never combined with app data.
+If you join the waitlist we collect your **email**, your **phone type** (iPhone or Android), your **country** (Canada, US or other), which headline you saw (the A/B variant), and a record of your consent: the time, the version of the wording you agreed to and the page. Nothing else. It is stored in Google Cloud Firestore in the United States (us-central1). We use it only to email you about the DrivePerf beta and launch, and keep it until you unsubscribe or <span class="placeholder">12 months after launch</span>. Every email says who it's from, includes our postal contact details and has a one-click unsubscribe, honoured immediately and always within 10 business days, as Canada's Anti-Spam Legislation (CASL) and CAN-SPAM require. To have your entry removed completely, email [privacy@driveperf.com](mailto:privacy@driveperf.com). Waitlist data is never combined with app data.
 
 Like any website, our host (Firebase Hosting) receives your IP address and browser details to deliver the pages; we don't use them to identify you.
 
@@ -153,6 +153,6 @@ Each version has a number and a date. When we make a material change we'll tell 
 
 DrivePerf has no separate privacy office. The person responsible for privacy and personal information, including as the person in charge of the protection of personal information under Quebec's Law 25, is:
 
-**Keval Langalia, responsible for privacy and personal information** · <a href="mailto:privacy@driveperf.com">privacy@driveperf.com</a>
+**Keval Langalia, responsible for privacy and personal information** · [privacy@driveperf.com](mailto:privacy@driveperf.com)
 
 Write to that address for any question, request or complaint about your personal information. You can also contact the Office of the Privacy Commissioner of Canada or, in Quebec, the Commission d'accès à l'information.

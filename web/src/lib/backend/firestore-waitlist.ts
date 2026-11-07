@@ -13,6 +13,8 @@ export function warmUp() {
   ready ??= (async () => {
     const [{ initializeApp }, lite] = await Promise.all([import('firebase/app'), import('firebase/firestore/lite')]);
     const app = initializeApp(SITE.firebase, 'driveperf-web');
+    // A duplicate sign-up is an expected PERMISSION_DENIED; don't let the SDK log it as a console error.
+    lite.setLogLevel('silent');
     const db = lite.getFirestore(app);
     if (SITE.firestoreEmulator) lite.connectFirestoreEmulator(db, SITE.firestoreEmulator.host, SITE.firestoreEmulator.port);
     return { lite, db };

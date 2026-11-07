@@ -341,8 +341,10 @@ html[data-rm="true"][data-js] [data-reveal] { opacity: 1; transform: none; trans
 .story-close { width: 2em; height: 2em; border-radius: 50%; background: #FFFFFF14; display: grid; place-items: center; font-size: .9em; color: #F2F4F7cc; }
 .story-title { margin-top: .9em; font-weight: 600; color: #A3AAB6; font-size: .9em; }
 .story-stage { flex: 1; display: grid; place-items: center; position: relative; }
-.story-copy h4 { font: 700 1.45em/1.12 -apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif; letter-spacing: -0.02em; margin: 0 0 .35em; color: #F2F4F7; }
-.device--android .story-copy h4 { font-family: "Google Sans Flex", Roboto, system-ui, sans-serif; letter-spacing: -0.01em; }
+/* Story-frame titles are paragraphs, not headings: they sit inside decorative phone mockups (heading order). */
+.story-copy .sh { text-wrap: balance; }
+.story-copy h4, .story-copy .sh { font: 700 1.45em/1.12 -apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif; letter-spacing: -0.02em; margin: 0 0 .35em; color: #F2F4F7; }
+.device--android .story-copy h4, .device--android .story-copy .sh { font-family: "Google Sans Flex", Roboto, system-ui, sans-serif; letter-spacing: -0.01em; }
 .story-copy p { margin: 0; color: #A3AAB6; font-size: .92em; line-height: 1.4; }
 .story-chip { display: inline-flex; align-items: center; gap: .4em; margin-top: .8em; height: 2.1em; padding: 0 .9em; border-radius: 99px; font-weight: 600; font-size: .86em; }
 .story-chip--record { background: #3D2700; color: #FFC24B; }

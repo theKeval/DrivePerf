@@ -78,4 +78,4 @@ We'll tell you in the app before material changes take effect, and each version 
 
 <h2 id="contact">Contact</h2>
 
-Questions: <a href="mailto:support@driveperf.com">support@driveperf.com</a>. Privacy questions: <a href="mailto:privacy@driveperf.com">privacy@driveperf.com</a>.
+Questions: [support@driveperf.com](mailto:support@driveperf.com). Privacy questions: [privacy@driveperf.com](mailto:privacy@driveperf.com).
