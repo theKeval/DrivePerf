@@ -111,7 +111,8 @@
       <div class="table-scroll"><table>
         <thead><tr><th scope="col">Provider</th><th scope="col">What for</th><th scope="col">When</th></tr></thead>
         <tbody>
-          <tr><td>Google Firebase (Authentication, Firestore, Crashlytics, Analytics, Hosting)</td><td>Sign-in, cloud backup, crash reports, usage statistics, this website and the waitlist</td><td>Only for the features above that you use or allow</td></tr>
+          <tr><td>Google Firebase (Authentication, Firestore, Analytics, Remote Config, Hosting)</td><td>Sign-in, cloud backup, usage statistics, turning app features on or off, this website and the waitlist</td><td>Only for the features above that you use or allow</td></tr>
+          <tr><td>Sentry (EU data region)</td><td>Crash and error reports, without your IP address or account</td><td>You say yes to crash reports</td></tr>
           <tr><td>Cloudflare (R2 storage, Web Analytics)</td><td>Storing backed-up trip files; counting visits to this website without cookies</td><td>Cloud backup is on; you visit this website</td></tr>
           <tr><td>RevenueCat</td><td>Managing Pro subscriptions and Ride-along passes</td><td>When you buy, restore or redeem</td></tr>
           <tr><td>Apple App Store and Google Play</td><td>Payments. They process your payment details; we never see them</td><td>When you buy Pro</td></tr>
@@ -129,7 +130,8 @@
         <li><strong>Pro cloud backup</strong> (including during the Pro Preview or a Ride-along pass): until you delete it or delete your account. A trip you delete on your phone is deleted from backup at the next sync, within 24 hours.</li>
         <li><strong>When Pro ends:</strong> backup stops and the cloud copy is kept for 30 days, with reminders when 30, 7 and 1 days are left, then deleted. The data on your phone is untouched.</li>
         <li><strong>Your account:</strong> Free users who sign in upload no trip data. The account record is kept until you delete your account, in the app or on our <a href="delete-account.html">account deletion page</a>. Deletion is completed within 30 days, usually within 7.</li>
-        <li><strong>Crash reports and usage statistics:</strong> <span class="placeholder">[provider retention period]</span>, not linked to you.</li>
+        <li><strong>Usage statistics:</strong> 2 months at Google Firebase, not linked to you.</li>
+        <li><strong>Crash reports:</strong> up to 90 days at Sentry, not linked to you.</li>
         <li><strong>Waitlist email:</strong> until you unsubscribe, or <span class="placeholder">[12 months]</span> after launch.</li>
       </ul>
 

@@ -18,7 +18,7 @@ Launch in January 2027 with one developer · ops burden and security risk · cos
 ## Considered options
 
 1. **Firebase now, behind our own API; migrate to a VPS when triggers fire** (ADR-004 seam).
-2. **VPS from day one** (Postgres + S3-compatible storage + Ktor API on Hostinger), Firebase only for Analytics/Crashlytics/Remote Config/App Check.
+2. **VPS from day one** (Postgres + S3-compatible storage + Ktor API on Hostinger), Firebase only for Analytics/Remote Config/App Check (crash reports in Sentry either way).
 3. **Hybrid from day one:** Firebase for everything except trip files on Cloudflare R2 or Backblaze B2.
 
 ## Decision outcome
@@ -35,7 +35,7 @@ What would change this recommendation: v1 needing SQL across users, long-running
 | VPS server | KVM 2: 8.79 intro / 14.99 renewal | KVM 2: 8.79 / 14.99 | KVM 4 for headroom: 12.99 / 28.99 |
 | Object storage for R1 trip files (Backblaze B2 ≈ US$6.95/TB-mo; 45 / 225 / 900 GB) | ≈ 0.3 | ≈ 1.6 | ≈ 6.3 |
 | Off-box DB backups, uptime monitor (free tiers), domain TLS (Caddy) | ≈ 0.5 | ≈ 0.5 | ≈ 1 |
-| Firebase pieces kept (Analytics, Crashlytics, Remote Config, App Check, Auth ≤ 50K MAU) | 0 | 0 | 0 |
+| Firebase pieces kept (Analytics, Remote Config, App Check, Auth ≤ 50K MAU); Sentry free plan | 0 | 0 | 0 |
 | **VPS total (option 2)** | **≈ 10–16** | **≈ 11–17** | **≈ 20–36** |
 | Ops time, Firebase vs VPS | ~1 h vs 6–10 h | ~1 h vs 6–10 h | ~2 h vs 8–12 h |
 | One-off exit egress for trip files when migrating | 0 | 0 | 0 (R2 has no egress fees and the files stay on R2) |
@@ -49,7 +49,7 @@ Reading: a VPS is **more expensive** at 1k–5k DAU. At 20k DAU it saves ≈ US$
 | OS and runtime patching | none | `unattended-upgrades`, monthly kernel reboots, Docker image and Postgres minor updates | writing Ansible/cloud-init and update scripts; **you still own the reboot window** |
 | Backups and restore | Firestore PITR/exports and Storage durability are Google's | WAL-G/pgBackRest to off-box storage, retention policy, **monthly restore drill** | scripting drills; cannot make an untested backup safe |
 | TLS | automatic (Hosting) | Caddy automatic certificates (easy) | — |
-| Monitoring and alerting | Cloud Monitoring, Crashlytics, budget alerts | off-box uptime checks, disk/CPU/Postgres alerts, log shipping, alert routing to your phone | dashboards as code |
+| Monitoring and alerting | Cloud Monitoring, Sentry, budget alerts | off-box uptime checks, disk/CPU/Postgres alerts, log shipping, alert routing to your phone | dashboards as code |
 | Auth security | Google-run Auth, token signing keys, abuse protection | if self-hosted: IdP CVEs, key rotation, brute-force and email-link abuse | keep Firebase Auth even after migration (recommended) |
 | Uptime | multi-zone, no single box | **one VPS is a single point of failure**; host maintenance and disk failure are yours to recover | runbooks; a warm standby doubles cost |
 | Abuse/DDoS | Google front end, App Check, `max-instances` | Wanguard filtering, firewall, rate limits in Caddy/API | — |
@@ -71,7 +71,7 @@ Review quarterly (first review at the v1.1 release). Start when **any one** hold
 
 ### Target VPS architecture (when triggered)
 
-Ubuntu LTS, SSH keys only, `ufw`, `fail2ban`, unattended security upgrades; Docker Compose with **Caddy** (TLS, reverse proxy, rate limits), the **same `backend/api` image** that runs on Cloud Run (configured with Postgres and S3 adapters), **Postgres** (current major; native `uuid`, `timestamptz`, `jsonb`); trip files stay on **Cloudflare R2** (already in use), not a self-hosted store on the 100 GB local disk, which the 5k-DAU stock outgrows in about five months (and MinIO's community edition stopped publishing binaries in Dec 2025, data-model.md §3.7); scheduled jobs as systemd timers calling the same `/v1/jobs/*` endpoints; WAL-G to off-box storage plus Hostinger weekly backups; external uptime checks. **Firebase Auth, Analytics, Crashlytics, Remote Config, App Check and FCM stay** (free, device-side or identity-critical); moving Auth is a separate, optional step (M6).
+Ubuntu LTS, SSH keys only, `ufw`, `fail2ban`, unattended security upgrades; Docker Compose with **Caddy** (TLS, reverse proxy, rate limits), the **same `backend/api` image** that runs on Cloud Run (configured with Postgres and S3 adapters), **Postgres** (current major; native `uuid`, `timestamptz`, `jsonb`); trip files stay on **Cloudflare R2** (already in use), not a self-hosted store on the 100 GB local disk, which the 5k-DAU stock outgrows in about five months (and MinIO's community edition stopped publishing binaries in Dec 2025, data-model.md §3.7); scheduled jobs as systemd timers calling the same `/v1/jobs/*` endpoints; WAL-G to off-box storage plus Hostinger weekly backups; external uptime checks. **Firebase Auth, Analytics, Remote Config, App Check and FCM stay, and so does Sentry** (free, device-side or identity-critical); moving Auth is a separate, optional step (M6).
 
 ### Migration runbook outline (zero-downtime)
 
