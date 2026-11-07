@@ -3,7 +3,9 @@
 // this audit; they are checked with curl -I on the preview channel (docs/launch/firebase-setup.md).
 const indexed = ['/', '/privacy', '/terms', '/support', '/how-it-records', '/delete-account', '/press'];
 const noindex = ['/waitlist/confirmed', '/email-preferences', '/ride-along', '/404'];
-const url = (p) => `http://localhost${p === '/' ? '/' : p + '.html'}`;
+// The home hero is an A/B test picked at random per load; audit both variants explicitly so a shift in either is
+// caught every run instead of on whichever variant the run happened to draw.
+const url = (p) => (p === '/' ? ['http://localhost/?variant=A', 'http://localhost/?variant=B'] : [`http://localhost${p}.html`]);
 
 const base = {
   'categories:performance': ['error', { minScore: 0.95 }],
@@ -14,7 +16,7 @@ const base = {
 
 module.exports = {
   ci: {
-    collect: { staticDistDir: './dist', url: [...indexed, ...noindex].map(url), numberOfRuns: 1 },
+    collect: { staticDistDir: './dist', url: [...indexed, ...noindex].flatMap(url), numberOfRuns: 1 },
     assert: {
       assertMatrix: [
         { matchingUrlPattern: '^(?!.*(waitlist/confirmed|email-preferences|ride-along|404)).*$', assertions: { ...base, 'categories:seo': ['error', { minScore: 1 }] } },
