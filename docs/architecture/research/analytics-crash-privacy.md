@@ -1,6 +1,6 @@
 # Research: product analytics, crash diagnostics and privacy for DrivePerf
 
-- **Date:** 6 Nov 2026 · **Author:** research for A10 / ADR-007 · **Status:** input to Gate 4, not a decision
+- **Date:** 6 Nov 2026 · **Author:** research for A10 / ADR-007 · **Status:** input to Gate 4. **Outcome (7 Nov 2026):** Keval chose Firebase Analytics + Remote Config with **Sentry (EU) for crashes**; the PostHog relay was not adopted. See ADR-007
 - **Question:** what is the best, industry-standard way for DrivePerf to collect (a) product usage analytics and (b) crash and performance diagnostics, with the least privacy and compliance friction worldwide?
 - **Read with:** [ADR-007](../adr/ADR-007-analytics-crash-flags-privacy.md), [ADR-004](../adr/ADR-004-backend-v1-and-migration-seam.md), [ADR-010](../adr/ADR-010-firebase-now-vs-vps.md), PRD §3.0.4, §6.4–6.6, F-ONB-08, F-PRV-01/06, F-ANA-01…05, OQ-02.
 - **Not legal advice.** Items marked **[unverified]** could not be confirmed from a primary source on 6 Nov 2026. Counsel should confirm the consent rules before launch (PRD OQ-02).

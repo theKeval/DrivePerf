@@ -1501,7 +1501,7 @@ Privacy basics (delete, full data download) are **never** paywalled (A2 §5.3).
 - **Platform notes:** Apple 5.1.1(v); Play account-deletion policy. Robust cascade uses Cloud Functions (Blaze).
 - **Analytics:** `account_deletion_requested`, `account_deleted` (anonymous count)
 - **Edge cases:** EC-NET (queued with retry; user told).
-- **Privacy:** includes service providers (RevenueCat customer deletion, Crashlytics data by installation ID where possible).
+- **Privacy:** includes service providers (RevenueCat customer deletion). Crash reports in Sentry are never linked to the account and expire with Sentry's retention.
 - **Free/Pro:** Free.
 
 #### F-PRV-06 · Analytics and diagnostics controls · P0
@@ -1510,7 +1510,7 @@ Privacy basics (delete, full data download) are **never** paywalled (A2 §5.3).
 - **Acceptance criteria:**
   1. Given S-PRV-07, when the user toggles "Share usage statistics" or "Send crash reports", then collection stops or starts within the session, and "Reset analytics ID" deletes the pseudonymous ID.
   2. Given usage statistics off, when the app runs, then no analytics network calls are made (network test).
-- **Platform notes:** Firebase Analytics `setAnalyticsCollectionEnabled`; Crashlytics `setCrashlyticsCollectionEnabled`.
+- **Platform notes:** Firebase Analytics `setAnalyticsCollectionEnabled`; Sentry `init` / `close()` for crash reports (ADR-007).
 - **Analytics:** `analytics_consent_set` (only when turned on).
 - **Edge cases:** none.
 - **Privacy:** §6.4.
@@ -1964,10 +1964,10 @@ Informational site plus a waitlist on Firebase Hosting (Spark); Astro static bui
 - **Story:** As the team, we need crash and ANR reports to hold crash-free sessions ≥ 99.5%.
 - **Screens:** none; consent via S-ONB-13, S-PRV-07
 - **Acceptance criteria:**
-  1. Given crash reporting allowed, when a crash or ANR occurs, then a report with symbolicated stack, device, OS and app version reaches Crashlytics; custom keys and logs never contain locations (lint rule + review).
+  1. Given crash reporting allowed, when a crash or ANR occurs, then a report with symbolicated stack, device, OS and app version reaches Sentry; tags, breadcrumbs and logs never contain locations (lint rule + review).
   2. Given background crashes during capture, when they occur, then they are tagged `in_trip=true` so capture regressions are visible.
   3. Given a release, when its crash-free sessions drop below 99.5% on ≥ 1,000 sessions, then staged rollout is halted (Play staged rollout; App Store phased release paused).
-- **Platform notes:** Crashlytics (Spark); dSYM upload in CI.
+- **Platform notes:** Sentry KMP SDK, EU region, free Developer plan at launch (ADR-007); dSYM and R8 mapping upload in CI. Xcode Organizer and Android vitals are the consent-free cross-check for AC3.
 - **Analytics:** n/a.
 - **Edge cases:** EC-NET.
 - **Privacy:** declared as Crash Data / Diagnostics, not linked, not used to track.
@@ -2267,7 +2267,7 @@ Target: **no "Data Used to Track You"** on iOS; **no data shared** on Play; mini
 | Waitlist email (website) | Website form | n/a (not the app) | n/a |
 | Advertising ID / IDFA | **Never** | — | — |
 
-Rules: no ad, attribution or data-broker SDKs; no locations in Crashlytics logs or keys; no location or route names in analytics; every SDK is reviewed against these targets before it is added (A10 ADR-007).
+Rules: no ad, attribution or data-broker SDKs; no locations in crash-report tags, breadcrumbs or logs; no location or route names in analytics; every SDK is reviewed against these targets before it is added (A10 ADR-007).
 
 ### 6.5 Canada: PIPEDA, Quebec Law 25, CASL
 
@@ -2391,7 +2391,7 @@ The website and waitlist go live as soon as the web ticket is done (Phase 5) so 
 |---|---|---|---|
 | **Apple Developer Program** (US$99/yr) | Sign in with Apple, In-App Purchase, TestFlight, App Store, App Attest (App Check), Associated Domains (universal links), push (later) | Not bought (Gate 1 #13). A free Personal Team is enough for Spike 1 on a real iPhone (7-day profiles, 3 devices) | Buy after Spike 1, before the iOS shell needs SIWA/IAP/TestFlight (start of Phase 6 at the latest) |
 | **Google Play Console** | Closed testing, declarations, Data Safety, launch | Exists | Policy pre-check early Phase 6 |
-| **Firebase "DrivePerf" on Spark** | Auth, Firestore, Hosting (website, waitlist), Crashlytics, Analytics, Remote Config, App Check | **Not created yet**: Keval creates it on Spark | Before Phase 5 |
+| **Firebase "DrivePerf" on Spark** | Auth, Firestore, Hosting (website, waitlist), Analytics, Remote Config, App Check (crash reports use **Sentry**, a separate free account: ADR-007) | **Not created yet**: Keval creates it on Spark | Before Phase 5 |
 | **Firebase Blaze** (pay-as-you-go, budget alert ≈ US$5) | Cloud Run API and Cloud Scheduler (backup, account-deletion cascade, Ride-along reward validation; ADR-004), BigQuery export. Trip files go to Cloudflare R2 (free up to 10 GB) | Not yet (Gate 1 #13) | Before building F-ACC-03 / F-SHR-05 (§9 OQ-16) |
 | **RevenueCat** | Entitlements across StoreKit 2 and Play Billing, offers, promotional entitlements, experiments | To set up | Phase 5 (backend) |
 | **Map provider** | Replay, Analysis, map share card | iOS: MapKit. Android: Google Maps SDK or MapLibre + a tile provider (ADR-005) | Decided in Phase 4 |
