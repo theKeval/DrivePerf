@@ -14,13 +14,13 @@ if (!['local', 'dev', 'prod'].includes(env)) throw new Error(`PUBLIC_DP_ENV must
 
 export interface FirebaseWebConfig { apiKey: string; authDomain: string; projectId: string; appId: string }
 
-// Registered web apps ("DrivePerf Web") in each Firebase project. Values from Firebase console →
-// Project settings → Your apps. Empty values mean the app is not registered yet: the waitlist then
-// shows its network-error state (never a fake success).
+// Registered web apps ("DrivePerf Web", 7 Nov 2026) in each Firebase project, from
+// `firebase apps:sdkconfig WEB <appId> --project <id>`. Empty values would mean no registered app: the
+// waitlist then shows its network-error state (never a fake success).
 const FIREBASE: Record<SiteEnv, FirebaseWebConfig> = {
   local: { apiKey: 'demo-key', authDomain: 'demo-driveperf.firebaseapp.com', projectId: 'demo-driveperf', appId: 'demo-app' },
-  dev: { apiKey: '', authDomain: 'driveperf-dev.firebaseapp.com', projectId: 'driveperf-dev', appId: '' },
-  prod: { apiKey: '', authDomain: 'driveperf-prod.firebaseapp.com', projectId: 'driveperf-prod', appId: '' },
+  dev: { apiKey: 'AIzaSyBi0RUMQLEddexdQFQ3T3AMn3pf_hNnNW8', authDomain: 'driveperf-dev.firebaseapp.com', projectId: 'driveperf-dev', appId: '1:953389700040:web:76466df054156ef96fa6fd' },
+  prod: { apiKey: 'AIzaSyDCDtRmFwy57q2IX7TDUd_cNSqUHOEJ_Fw', authDomain: 'driveperf-prod.firebaseapp.com', projectId: 'driveperf-prod', appId: '1:515445599875:web:5c4e489889058947c235b6' },
 };
 
 export const SITE = {

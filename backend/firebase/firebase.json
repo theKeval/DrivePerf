@@ -4,7 +4,8 @@
     "indexes": "firestore.indexes.json"
   },
   "hosting": {
-    "public": "../../web/dist",
+    "public": "public",
+    "predeploy": "rm -rf \"$PROJECT_DIR/public\" && cp -R \"$PROJECT_DIR/../../web/dist\" \"$PROJECT_DIR/public\"",
     "cleanUrls": true,
     "trailingSlash": false,
     "ignore": ["firebase.json", "**/.DS_Store", "**/node_modules/**"],

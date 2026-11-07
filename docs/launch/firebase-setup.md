@@ -17,6 +17,14 @@ The repo already holds the config: `backend/firebase/firebase.json` (Hosting + h
 
 `firebase --version` is 15.35.0 and the CLI is signed in as keval.langalia@gmail.com (`firebase login:list`). If it ever needs signing in again, run `firebase login` yourself in a terminal. It is interactive.
 
+## Status (7 Nov 2026)
+
+§2–§4 are done in both projects, verified with `firebase projects:list` and `firestore:databases:get`.
+- **Prod:** Keval created `driveperf-prod` ("DrivePerf") in the console. At Keval's request, the agent then unlinked Google Analytics (property 563092806 still exists in the GA account; delete it there if unused), created Firestore and registered "DrivePerf Web".
+- **Dev:** the agent created `driveperf-dev` ("DrivePerf Dev") with `firebase projects:create`, which adds no Analytics. It registered "DrivePerf Web" with `firebase apps:create` and created Firestore in the console.
+- **Both:** Spark plan, no Analytics, Firestore Native / Standard / `us-central1`. The web configs are in `web/src/config/site.ts`.
+- **Still open:** §5 (WIF and the GitHub Environments), which Keval does.
+
 ## 2. Create the two projects (console)
 
 1. Go to <https://console.firebase.google.com> → **Create a project** (or **Add project**).
@@ -92,6 +100,8 @@ npx firebase deploy --only firestore:rules --project dev
 (cd ../../web && PUBLIC_DP_ENV=dev npm run build)
 npx firebase hosting:channel:deploy pr-first --project dev --expires 7d
 ```
+
+Firebase won't deploy a `public` folder outside `backend/firebase`. So the Hosting `predeploy` hook in `firebase.json` copies `web/dist` to `backend/firebase/public`, which is git-ignored, before every deploy. `web/dist` stays the single, host-neutral build output.
 
 The agent then checks the preview URL: every page and state, the links, the motion, a real waitlist write (it shows in the dev Firestore, and a repeat shows "You're already on the list"), and the headers:
 
