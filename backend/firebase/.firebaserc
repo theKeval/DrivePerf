@@ -1,0 +1,7 @@
+{
+  "projects": {
+    "default": "driveperf-dev",
+    "dev": "driveperf-dev",
+    "prod": "driveperf-prod"
+  }
+}

@@ -1,0 +1,38 @@
+rules_version = '2';
+// DrivePerf Firestore rules (DRIVE-79). Production rule of ADR-004: clients never touch Firestore directly; the API's
+// service account bypasses rules. The one exception is the website waitlist (F-WEB-02), written from the browser on
+// the Spark plan: create-only, validated, never readable by clients. Spam protection per ADR-007 (resolves PRD
+// OQ-13): honeypot + minimum time-to-submit on the page, and these field/size checks. No reCAPTCHA/App Check yet.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ---------- website waitlist (F-WEB-02): create-only, validated, no reads ----------
+    // Document ID = lowercase hex SHA-256 of the lowercased email, so a repeat sign-up targets the same document;
+    // that write is an update, which is denied, and the page shows "You're already on the list".
+    match /waitlist/{entryId} {
+      allow create: if isValidWaitlistEntry(entryId, request.resource.data);
+      allow read, update, delete: if false;
+    }
+
+    function isValidWaitlistEntry(entryId, d) {
+      return d.keys().hasOnly(['email', 'platform', 'country', 'consent', 'consentTextVersion', 'sourcePage', 'variant', 'createdAt', 'consentAt'])
+        && d.keys().hasAll(['email', 'platform', 'country', 'consent', 'consentTextVersion', 'sourcePage', 'variant', 'createdAt', 'consentAt'])
+        && d.email is string && d.email.size() <= 254 && d.email == d.email.lower()
+        && d.email.matches('^[^@\\s]+@[^@\\s]+[.][^@\\s]{2,}$')
+        && entryId == hashing.sha256(d.email).toHexString().lower()
+        && d.platform in ['ios', 'android', 'both']
+        && d.country in ['CA', 'US', 'other']
+        && d.consent == true
+        && d.consentTextVersion is string && d.consentTextVersion.size() > 0 && d.consentTextVersion.size() <= 40
+        && d.sourcePage is string && d.sourcePage.matches('^S-WEB-[0-9]{2}$')
+        && d.variant in ['A', 'B']
+        && d.createdAt == request.time
+        && d.consentAt == request.time;
+    }
+
+    // Everything else: deny. App data flows through https://api.driveperf.com/v1 (ADR-004, DRIVE-76).
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
