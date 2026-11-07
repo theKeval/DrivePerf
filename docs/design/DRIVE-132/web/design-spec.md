@@ -1,7 +1,7 @@
 # DRIVE-132 · DES-31 · Web prototype: driveperf.com pages (11)
 
 **Agent:** A9 · **Date:** 6 Nov 2026 · **Status:** ready for Gate 3 review
-**Prototype:** [`prototypes/web/`](../../../../prototypes/web/README.md) (open `index.html`) · **Contact sheet:** [`mockup.html`](mockup.html) · [`mockup.webp`](mockup.webp) · full-page captures in [`screens/`](screens/)
+**Prototype:** [`prototypes/web/`](../../../../prototypes/web/README.md) (open `index.html`) · **Contact sheet:** [`mockup.html`](mockup.html) · [`mockup.webp`](mockup.webp) · full-page captures in the shared gallery [`docs/design/screens/web/`](../../screens/web/)
 
 All eleven S-WEB screens are built as a static, componentised site that will be ported to Astro on Firebase Hosting. Per-story specs:
 
@@ -20,7 +20,7 @@ All eleven S-WEB screens are built as a static, componentised site that will be 
 | DRIVE-188 | F-WEB-08 Press kit | S-WEB-10 | [web/design-spec.md](../../DRIVE-188/web/design-spec.md) |
 
 ## Design direction
-Night Drive, dark by default with a full light peer. Large expressive display type (system SF Pro / Google Sans Flex when installed, with expanded tabular numerals for scores), one accent (Glide mint), Sodium gold only on the route record and the founding badge. The hero illustration is a real fixture drive (the QEW commute with its new route record of 91), drawn on in light with its ends trimmed for privacy. App screens are HTML/CSS device mockups for both iPhone and Android, built from the shared fixtures. Motion: route draw-on, ring reveal with the record notch flipping gold, a scroll-driven Story card stack, quiet reveals; every one has a reduced-motion state.
+Night Drive, dark by default with a full light peer. Large expressive display type (system SF Pro / Google Sans Flex when installed, with expanded tabular numerals for scores), one accent (Glide mint), Sodium gold only on the route record and the founding badge. The hero illustration is a real fixture drive (the QEW commute with its new route record of 91), drawn on in light with its ends trimmed for privacy. App screens are HTML/CSS device mockups for both iPhone and Android, built from the shared fixtures. Motion (v2, after Gate 3): the Loop traces itself in the header; the hero route draws on and a replay marker glides it, lighting the cleanest stretch; the Story stack auto-cycles (with pause); the Smoothness ring counts up on a spring; the route-record strip and the weekly dots fill in sequence. Transform, opacity and SVG stroke only, paused off screen, 60 fps measured, CLS 0; reduced motion and `?shot=1` show the final state. Details in [DRIVE-169 §6](../../DRIVE-169/web/design-spec.md#6-motion).
 
 ## Global rules applied
 No speed or max-G as an achievement; no streaks; no leaderboards; no insurance or energy claims; honest capture promise and "Private by design" on the landing page; no cookies, no trackers, GPC/DNT honoured; WCAG 2.2 AA; neutral store badges; "© OpenStreetMap contributors" on every map visual; no network requests.

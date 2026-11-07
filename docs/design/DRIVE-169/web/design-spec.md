@@ -2,7 +2,7 @@
 
 **Agent:** A9 (web prototype) · **Prototype story:** DES-31 [DRIVE-132](https://thekeval.atlassian.net/browse/DRIVE-132) · **Date:** 6 Nov 2026 · **Status:** ready for Gate 3 review
 **Inputs:** PRD v1 §3.16 and §4 · A2 §2, §6 · brand.md, components.md, motion.md, accessibility.md · fixtures `prototypes/shared/data.js`
-**Artifacts:** [`mockup.html`](mockup.html) (contact sheet: live 1440 and 390 iframes + full-page captures) · [`mockup.webp`](mockup.webp) · [`screens/`](screens/) · prototype [`prototypes/web/`](../../../../prototypes/web/README.md)
+**Artifacts:** [`mockup.html`](mockup.html) (contact sheet: live 1440 and 390 iframes + full-page captures) · [`mockup.webp`](mockup.webp) · full-page shots in the shared gallery [`docs/design/screens/web/`](../../screens/web/) · prototype [`prototypes/web/`](../../../../prototypes/web/README.md)
 
 ## 1. Purpose
 Explain DrivePerf to a car enthusiast in one screen and get them onto the waitlist, while A/B testing the lead line: **A** "Smooth is a skill." vs **B** "Every drive, decoded." (recap-led). Each visit is assigned at random without cookies or storage, and the variant is stored with any sign-up (F-WEB-01.1). Also covers the 404 page (S-WEB-11).
@@ -13,7 +13,7 @@ Explain DrivePerf to a car enthusiast in one screen and get them onto the waitli
 | `S-WEB-01` | Home (landing + waitlist) | [`index.html`](../../../../prototypes/web/index.html) | `variantA` (= `default`) · `variantB` · form states in DRIVE-171 |
 | `S-WEB-11` | 404 | [`404.html`](../../../../prototypes/web/404.html) | `default` |
 
-Screenshots: `screens/<S-ID>--1440.png` (desktop, scale 1) and `screens/<S-ID>--390.png` (mobile, scale 2) for the first state; other states as `screens/<S-ID>-<state>--<width>.png`.
+Screenshots (shared gallery, WebP): `../../screens/web/<S-ID>--1440.webp` (desktop) and `<S-ID>--390.webp` (mobile, 2×) for the first state; other states as `<S-ID>-<state>--<width>.webp`. Shots use `?shot=1`, so every animation is captured in its final state.
 
 ## 3. Sections and components
 | # | Component | Content | Notes |
@@ -59,17 +59,18 @@ Variant A/B only changes the headline, the lede, the page title and the `variant
 Collected fields, and nothing else (F-WEB-02.1): email, platform (iPhone/Android), country (Canada/US/Other), consent (with timestamp, consent text version, source page), A/B variant.
 
 ## 6. Motion
-| Element | Full motion | Reduced motion |
-|---|---|---|
-| Hero route | Draw-on 2.4 s `ease.drawOn` after 350 ms, glowing head rides the tip, then the cleanest stretch (QEW, 14.2 km) brightens and the G-dot pops at the end | Complete route, 220 ms fade |
-| Devices | Rise 40 px + fade, 900 ms `ease.glide`, staggered 140 ms | Static |
-| Hero ring | Arc sweeps 0 → 91 locked to the count-up (1.4 s `ease.countUp`); the gold record notch flips solid as the arc passes 89, one glow, no confetti (motion.md §3.4) | Full ring, final number |
-| Story stack | Scroll-linked: active frame front, previous frames fly up and out, next frames fan behind (+26 px, +3.2°, dimmed). Frame 2 route draws on; frame 3 G-dot replays the friction circle with a spring follower; frame 4 ring reveal | Static row of frames |
-| Reveal | Sections fade + rise 12 px, 700 ms | Shown immediately |
-| Evidence trace | Long-G line draws on 1.4 s | Static |
-| Dot strip / recap dots | Scale in, staggered 60–90 ms | Static |
+Motion v2 (Gate 3 follow-up): six restrained moments, one hero motion per section. Everything animates transform, opacity or SVG stroke only, runs on `requestAnimationFrame` or the Web Animations API with the token springs (`--spring-pin-pop`, a damped spring for the ring), starts from IntersectionObserver, and pauses when off screen or when the tab is hidden. Measured in headless Chrome while scrolling the whole page: p95 frame 16.7 ms at 390, 768 and 1440 px, no frames over 33 ms, CLS 0.
 
-One hero motion per section (motion.md §1.2). All animation is transform/opacity or SVG stroke; nothing loops forever (the needed-stop pulse runs 3 times).
+| # | Where | Moment | Trigger | Reduced motion / `?shot=1` |
+|---|---|---|---|---|
+| 1 | Header (every page) | The Loop traces itself: six trail sub-arcs draw in sequence (620 ms), then the G-dot pops ahead with the pin-pop spring | Page load, once | Static mark |
+| 2 | Hero | Route draws on (2.4 s `ease.drawOn`), the cleanest stretch brightens, then a **replay marker** with a short bright trail glides the visible part of the route (≈ 15 s for the full route, 1.6 s gap, looped); entering the QEW cleanest stretch lifts the segment and fades in a "Cleanest stretch · 14.2 km, QEW" chip (desktop) | Load; loop pauses off screen / hidden tab | Complete route, end dot, no marker |
+| 3 | Drive Story (`#how`) | **Auto-cycling Story stack**: each frame dwells 3.4 s while its progress segment fills, then flies up and out as the next springs forward. Frame 2 draws its route, frame 3 replays the G-dot round the friction circle (spring follower), frame 4 springs its ring. Steps are buttons that jump to a frame; a Pause/Play button and hover pause it (WCAG 2.2.2) | Plays only while ≥ 45 % in view and the tab is visible | Static row of six frames, steps all shown, no Pause button |
+| 4 | Smoothness | Ring **counts up on a spring** (ζ 0.78, settles in ≈ 1.6 s); the arc may overshoot 1–2 %, the number never exceeds 91; the gold record notch fills as the arc passes 89, then one soft glow | 35 % in view, once | Full ring, final number |
+| 5 | Routes and records | Track fills left to right (1.5 s), each run pops in as the fill reaches it, the gold record lands last with two ring pulses | 40 % in view, once | All dots shown |
+| 6 | Weekly recap | One dot per drive drops into its day with the pin-pop spring, 150 ms apart | 40 % in view, once | All dots shown |
+
+Supporting (unchanged): section reveals (fade + 12 px rise), device rise-in on load, evidence trace draw-on, the needed-stop pulse (3 times). Not added, to keep it restrained: device parallax or pointer tilt, looping glows.
 
 ## 7. Accessibility checklist (accessibility.md §9, web)
 - [x] Dark (default) and light ("Day Drive", `?theme=light`) both render; text pairs meet WCAG 2.2 AA (`--text` 17.9:1, `--text-2` 8.6:1, `--text-3` 5.9:1 on `--bg`; Glide `#5BE7C4` 12.8:1 dark, `#06775E` 5.5:1 light).

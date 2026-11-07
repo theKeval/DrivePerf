@@ -628,6 +628,8 @@ migration seam. Never commit secrets; use GitHub environments.
 
 ### A18 — Landing page build & Firebase Hosting deploy · *Sonnet 5.5* · Phase 5 ∥
 
+**Use the full session prompt:** [`docs/planning/prompts/A18-website-hosting-session.md`](prompts/A18-website-hosting-session.md) (Jira DRIVE-79). It supersedes the short version below.
+
 ```
 Jira: <key>. Convert prototypes/web/ into an Astro static site in web/. Wire the waitlist form
 to the Firestore waitlist collection (A17) with spam protection (honeypot, App Check, rules-based

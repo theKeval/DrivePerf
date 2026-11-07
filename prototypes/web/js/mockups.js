@@ -87,7 +87,7 @@
     </div>`;
   }
   /** Ring reveal (motion.md §3.4): arc sweeps, number locked to the arc, record notch flips gold as it passes. */
-  function animateRing(el, { delay = 0, onDone } = {}) {
+  function animateRing(el, { delay = 0, onDone, spring = false } = {}) {
     const arc = el.querySelector('.ring-arc'), num = el.querySelector('.ring-num'), rec = el.querySelector('.ring-record .notch-flip'), inner = el.querySelector('.ring-record .notch-inner');
     const score = +el.dataset.score, prev = el.dataset.recordPrev ? +el.dataset.recordPrev : null, isNew = el.dataset.newRecord === 'true';
     const C = +arc.dataset.c;
@@ -95,6 +95,25 @@
     if (reduced()) { arc.style.strokeDashoffset = C * (1 - score / 100); num.textContent = score; finish(); return; }
     arc.style.strokeDashoffset = C; num.textContent = '0';
     let flipped = false;
+    const flip = (v) => {
+      if (rec && isNew && !flipped && v >= prev) {
+        flipped = true; if (inner) inner.setAttribute('opacity', '0');
+        rec.style.transformBox = 'fill-box'; rec.style.transformOrigin = 'center';
+        rec.animate([{ transform: 'scale(1)' }, { transform: 'scale(1.5)' }, { transform: 'scale(1)' }], { duration: 520, easing: 'cubic-bezier(0.32, 0.72, 0, 1)' });
+      }
+    };
+    const land = () => {
+      num.animate([{ transform: 'scale(1)' }, { transform: 'scale(1.06)' }, { transform: 'scale(1)' }], { duration: 360, easing: 'cubic-bezier(0.32, 0.72, 0, 1)' });
+      if (isNew) arc.animate([{ opacity: 1 }, { opacity: 0.72 }, { opacity: 1 }], { duration: 900, easing: 'ease-in-out' });
+      finish();
+    };
+    if (spring) { // Spring count-up (motion.md §2.1, ios.slow-like: settles in ~1.6 s with a 1–2 % overshoot on the arc only)
+      setTimeout(() => window.DP_MOTION.spring({ from: 0, to: score, zeta: 0.78, k: 16, precision: 0.05, el, onUpdate: (v) => {
+        const c = Math.max(0, v); arc.style.strokeDashoffset = C * (1 - Math.min(c, 100) / 100);
+        num.textContent = Math.round(Math.min(c, score)); flip(c);
+      }, onDone: land }), delay);
+      return;
+    }
     setTimeout(() => {
       window.DP_MOTION.tween({ from: 0, to: score, duration: 1400, ease: 'countUp', onUpdate: (v) => {
         arc.style.strokeDashoffset = C * (1 - v / 100); num.textContent = Math.round(v);
@@ -166,7 +185,7 @@
   const RECAP = D.recaps.find((r) => r.complete);  // week of 26 Oct: 5 drives, average 87, up 2
   const NEEDED_TRIP = U.trip('t20261020-0740');    // needed brake at Spadina & King
 
-  const progress = (n, of = 7) => `<div class="story-progress" aria-hidden="true">${Array.from({ length: of }, (_, i) => `<i class="${i < n - 1 ? 'on' : i === n - 1 ? 'half' : ''}"></i>`).join('')}</div>`;
+  const progress = (n, of = 7) => `<div class="story-progress" aria-hidden="true">${Array.from({ length: of }, (_, i) => (i < n - 1 ? '<i class="on"></i>' : i === n - 1 ? '<i class="cur"><b></b></i>' : '<i></i>')).join('')}</div>`;
   const storyTop = (trip) => { const v = U.vehicle(trip.vehicleId); return `<div class="story-top"><span class="story-car"><i style="background:var(--car-${v.colour}, ${v.colour === 'lucid' ? '#7FA7D9' : '#E5484D'})"></i>${esc(v.nickname)}</span><span class="story-close" aria-hidden="true">✕</span></div>`; };
 
   function screenStoryRing(trip = HERO_TRIP) {

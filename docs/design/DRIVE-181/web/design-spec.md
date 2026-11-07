@@ -2,7 +2,7 @@
 
 **Agent:** A9 (web prototype) · **Prototype story:** DES-31 [DRIVE-132](https://thekeval.atlassian.net/browse/DRIVE-132) · **Date:** 6 Nov 2026 · **Status:** ready for Gate 3 review
 **Inputs:** PRD v1 §3.16 and §4 · A2 §2, §6 · brand.md, components.md, motion.md, accessibility.md · fixtures `prototypes/shared/data.js`
-**Artifacts:** [`mockup.html`](mockup.html) (contact sheet: live 1440 and 390 iframes + full-page captures) · [`mockup.webp`](mockup.webp) · [`screens/`](screens/) · prototype [`prototypes/web/`](../../../../prototypes/web/README.md)
+**Artifacts:** [`mockup.html`](mockup.html) (contact sheet: live 1440 and 390 iframes + full-page captures) · [`mockup.webp`](mockup.webp) · full-page shots in the shared gallery [`docs/design/screens/web/`](../../screens/web/) · prototype [`prototypes/web/`](../../../../prototypes/web/README.md)
 
 ## 1. Purpose
 When a Ride-along pass link is opened on a device without the app, explain the pass (30 days of Pro instead of 14), point to the right store, and keep the pass for first open. On desktop, hand off to the phone with a QR code. Handle used or expired passes kindly.
@@ -12,7 +12,7 @@ When a Ride-along pass link is opened on a device without the app, explain the p
 |---|---|---|---|
 | `S-WEB-08` | Ride-along landing | [`pages/ride-along.html`](../../../../prototypes/web/pages/ride-along.html) | `default` (mobile below 900 px, desktop QR above) · `mobile` · `desktop` · `invalid` |
 
-Screenshots: `screens/<S-ID>--1440.png` (desktop, scale 1) and `screens/<S-ID>--390.png` (mobile, scale 2) for the first state; other states as `screens/<S-ID>-<state>--<width>.png`.
+Screenshots (shared gallery, WebP): `../../screens/web/<S-ID>--1440.webp` (desktop) and `<S-ID>--390.webp` (mobile, 2×) for the first state; other states as `<S-ID>-<state>--<width>.webp`. Shots use `?shot=1`, so every animation is captured in its final state.
 
 ## 3. Sections and components
 `RideAlongLanding` hero: eyebrow "Ride-along pass", h1 "{Priya} sent you 30 days of Pro." (sender name from `entitlement.states.rideAlong.from`), lede · **mobile:** neutral store placeholders + "Install DrivePerf from this phone and your pass is applied the first time you open the app." · **desktop:** `QrCode` card "Open it on your phone" + short URL · `PassCard` (30 days of Pro, what's included, from Priya; dashed tear line) · privacy note "Priya only sees “Your friend is set up”. Nothing about your drives, ever." · three value cards. **Invalid:** h1 "This pass has already been used." + 14-day Preview fallback + waitlist CTA.

@@ -9,8 +9,9 @@
 //   2. converts mockup.png (the contact sheet) to mockup.webp;
 //   3. rewrites the links in design-spec.md and mockup.html, then deletes the PNGs.
 // Run it after every export:  node prototypes/tools/export.mjs && node prototypes/tools/pack.mjs
-// Needs cwebp (brew install webp). Idempotent: an existing gallery file is reused, not re-encoded,
-// unless you pass --force.
+// Needs cwebp (brew install webp). Idempotent: every PNG present comes from a fresh export, so the
+// first copy of each name in a run is re-encoded (overwriting the gallery file) and duplicates
+// from other stories are dropped.
 import { readdirSync, existsSync, mkdirSync, readFileSync, writeFileSync, rmSync, statSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { execFileSync } from 'node:child_process';
@@ -31,6 +32,7 @@ const cwebp = (src, out, q, width) => {
   execFileSync('cwebp', ['-quiet', '-q', String(q), '-m', '6', ...(tw ? ['-resize', String(tw), '0'] : []), src, '-o', out]);
 };
 
+const done = new Set();
 let moved = 0, reused = 0, sheets = 0, before = 0, after = 0;
 for (const key of readdirSync(DESIGN).filter((d) => /^DRIVE-\d+$/.test(d)).sort()) {
   for (const platform of ['ios', 'android', 'web']) {
@@ -42,7 +44,8 @@ for (const key of readdirSync(DESIGN).filter((d) => /^DRIVE-\d+$/.test(d)).sort(
       for (const f of readdirSync(sdir).filter((n) => n.endsWith('.png'))) {
         const src = join(sdir, f), out = join(GALLERY, platform, f.replace(/\.png$/, '.webp'));
         before += statSync(src).size;
-        if (FORCE || !existsSync(out)) {
+        if (FORCE || !done.has(out)) {
+          done.add(out);
           const isDefault = !f.includes('--');
           if (platform === 'web') cwebp(src, out, 80);
           else cwebp(src, out, isDefault ? 85 : 80, isDefault ? 0 : STATE_W[platform]);

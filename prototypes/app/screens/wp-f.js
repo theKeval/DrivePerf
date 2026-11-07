@@ -832,7 +832,7 @@
         ui.section('Support', ui.list([
           web('Help centre', 'help'),
           ui.row({ icon: 'bell', title: 'Contact support', sub: 'support@driveperf.com', toast: 'Opens Mail to support@driveperf.com', trailing: 'chevron' }),
-          ui.row({ icon: 'shield', title: 'Privacy officer', sub: 'privacy@driveperf.com', toast: 'Opens Mail to privacy@driveperf.com', trailing: 'chevron' }),
+          ui.row({ icon: 'shield', title: 'Privacy contact', sub: 'Keval Langalia · privacy@driveperf.com', toast: 'Opens Mail to privacy@driveperf.com', trailing: 'chevron' }),
           ui.row({ icon: 'edit', title: 'Report a problem', nav: 'S-SET-09' }),
         ]), { style: 'caption', footer: 'Map data © OpenStreetMap contributors (ODbL). Elevation data: Open-Meteo (CC BY 4.0).' }),
       ];
@@ -840,10 +840,10 @@
     },
     mount(el, ctx) { const l = el.querySelector('.wf-abt-logo'); if (l && !still(ctx, el)) M.animate(l, [{ opacity: 0, transform: 'rotate(-90deg) scale(.7)' }, { opacity: 1, transform: 'none' }], { preset: 'slow' }); ctx.ui.anim.rise(el, '[data-rise]', { stagger: 30, delay: 60 }); },
     spec: {
-      purpose: 'Version, scoring algorithm version, legal documents, open-source licences, support and the privacy officer contact (F-SET-05).',
-      layout: ['Hero: The Loop mark 54 (Glide + text-colour dot), “DrivePerf” (title 2), tagline “Smooth is a skill.”', 'Version 1.0.0 (1) · Scoring algorithm smooth-v0.3 (values trailing).', 'Legal: Privacy Policy · Terms of Use (in-app browser, URL shown as subtitle) · Open-source licences.', 'Support: Help centre (S-WEB-05) · Contact support (email) · Privacy officer (email) · Report a problem → S-SET-09. Footer: OSM + Open-Meteo attribution.'],
+      purpose: 'Version, scoring algorithm version, legal documents, open-source licences, support and the privacy contact, Keval Langalia (F-SET-05).',
+      layout: ['Hero: The Loop mark 54 (Glide + text-colour dot), “DrivePerf” (title 2), tagline “Smooth is a skill.”', 'Version 1.0.0 (1) · Scoring algorithm smooth-v0.3 (values trailing).', 'Legal: Privacy Policy · Terms of Use (in-app browser, URL shown as subtitle) · Open-source licences.', 'Support: Help centre (S-WEB-05) · Contact support (email) · Privacy contact (email) · Report a problem → S-SET-09. Footer: OSM + Open-Meteo attribution.'],
       components: ['navBar', 'list', 'row', 'section'],
-      interactions: ['Privacy Policy / Terms / Help → SFSafariViewController (iOS) / Custom Tab (Android) at driveperf.com (S-WEB-03/04/05) — prototype toast.', 'Contact support / Privacy officer → mail composer.', 'Open-source licences → licence list (native: iOS acknowledgements page, Android OSS Licenses plugin).', 'Report a problem → S-SET-09.'],
+      interactions: ['Privacy Policy / Terms / Help → SFSafariViewController (iOS) / Custom Tab (Android) at driveperf.com (S-WEB-03/04/05) — prototype toast.', 'Contact support / Privacy contact → mail composer.', 'Open-source licences → licence list (native: iOS acknowledgements page, Android OSS Licenses plugin).', 'Report a problem → S-SET-09.'],
       motion: ['The Loop turns in (−90° → 0°, scale 0.7 → 1, spring.slow) once; groups rise. RM: static.'],
       a11y: ['Logo is decorative; “DrivePerf, Smooth is a skill.” is read as one heading.', 'External links announce “link, opens in browser”.', SET_COMMON_A11Y],
       platformDiffs: { ios: 'SFSafariViewController for web pages; MFMailComposeViewController for email.', android: 'Custom Tabs for web pages; ACTION_SENDTO mailto: for email; OSS licences activity.' },

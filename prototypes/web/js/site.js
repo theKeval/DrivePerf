@@ -124,6 +124,7 @@
   <a class="btn btn--lg" href="${url('index.html#waitlist')}">Join the waitlist</a>
 </div>`;
     const header = doc.querySelector('.site-header'), btn = header.querySelector('.menu-btn'), menu = doc.getElementById('mobile-menu');
+    traceLoop(header.querySelector('.brand svg'));
     btn.addEventListener('click', () => {
       const open = btn.getAttribute('aria-expanded') !== 'true';
       btn.setAttribute('aria-expanded', String(open));
@@ -135,6 +136,21 @@
     doc.addEventListener('keydown', (e) => { if (e.key === 'Escape' && btn.getAttribute('aria-expanded') === 'true') { btn.click(); btn.focus(); } });
     const onScroll = () => header.classList.toggle('is-scrolled', scrollY > 8);
     addEventListener('scroll', onScroll, { passive: true }); onScroll();
+  }
+
+  /* The Loop traces itself once on load (motion.md §3.3 draw-on, compressed): trail sub-arcs draw in sequence, the head
+     lands, then the G-dot pops ahead of it with the pin-pop spring. Reduced motion / shot: static mark. */
+  function traceLoop(svg, { delay = 120, total = 620 } = {}) {
+    if (!svg || reduced() || !svg.animate) return;
+    const arcs = [...svg.querySelectorAll('path')], dots = [...svg.querySelectorAll('circle')];
+    const per = total / arcs.length;
+    arcs.forEach((p, i) => {
+      const L = p.getTotalLength(); p.style.strokeDasharray = `${L} ${L}`;
+      p.animate([{ strokeDashoffset: L }, { strokeDashoffset: 0 }], { duration: per + 20, delay: delay + i * per, easing: i === arcs.length - 1 ? 'cubic-bezier(0.16, 1, 0.3, 1)' : 'linear', fill: 'both' });
+    });
+    const pop = getComputedStyle(doc.documentElement).getPropertyValue('--spring-pin-pop').trim() || 'cubic-bezier(0.32, 0.72, 0, 1)';
+    dots.forEach((c, i) => { c.style.transformBox = 'fill-box'; c.style.transformOrigin = 'center';
+      c.animate([{ transform: 'scale(0)', opacity: 0 }, { transform: 'scale(1)', opacity: 1 }], { duration: 540, delay: delay + total - 40 + i * 160, easing: pop, fill: 'both' }); });
   }
 
   function storeBadges({ compact = false } = {}) {
@@ -310,7 +326,7 @@
     track('page_view', { path: location.pathname.split('/prototypes/web/')[1] || location.pathname });
   }
 
-  window.DPW = Object.assign(window.DPW || {}, { ROOT, url, SCREENS, icon, loop, storeBadges, reduced, shot, track, setInvalid, setBusy, banner, EMAIL_RE, ready: (window.DPW && window.DPW.ready) || [] });
+  window.DPW = Object.assign(window.DPW || {}, { ROOT, url, SCREENS, icon, loop, traceLoop, storeBadges, reduced, shot, track, setInvalid, setBusy, banner, EMAIL_RE, ready: (window.DPW && window.DPW.ready) || [] });
   window.DPW.onReady = (fn) => window.DPW.ready.push(fn);
   if (doc.readyState === 'loading') doc.addEventListener('DOMContentLoaded', boot); else queueMicrotask(boot);
 })();

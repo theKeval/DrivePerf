@@ -2,7 +2,7 @@
 
 **Agent:** A9 (web prototype) · **Prototype story:** DES-31 [DRIVE-132](https://thekeval.atlassian.net/browse/DRIVE-132) · **Date:** 6 Nov 2026 · **Status:** ready for Gate 3 review
 **Inputs:** PRD v1 §3.16 and §4 · A2 §2, §6 · brand.md, components.md, motion.md, accessibility.md · fixtures `prototypes/shared/data.js`
-**Artifacts:** [`mockup.html`](mockup.html) (contact sheet: live 1440 and 390 iframes + full-page captures) · [`mockup.webp`](mockup.webp) · [`screens/`](screens/) · prototype [`prototypes/web/`](../../../../prototypes/web/README.md)
+**Artifacts:** [`mockup.html`](mockup.html) (contact sheet: live 1440 and 390 iframes + full-page captures) · [`mockup.webp`](mockup.webp) · full-page shots in the shared gallery [`docs/design/screens/web/`](../../screens/web/) · prototype [`prototypes/web/`](../../../../prototypes/web/README.md)
 
 ## 1. Purpose
 Confirm a one-click unsubscribe immediately (CASL, CAN-SPAM), offer an undo, and recover gracefully when the link is broken.
@@ -12,10 +12,10 @@ Confirm a one-click unsubscribe immediately (CASL, CAN-SPAM), offer an undo, and
 |---|---|---|---|
 | `S-WEB-09` | Email preferences / unsubscribe | [`pages/email-preferences.html`](../../../../prototypes/web/pages/email-preferences.html) | `unsubscribed` · `err` |
 
-Screenshots: `screens/<S-ID>--1440.png` (desktop, scale 1) and `screens/<S-ID>--390.png` (mobile, scale 2) for the first state; other states as `screens/<S-ID>-<state>--<width>.png`.
+Screenshots (shared gallery, WebP): `../../screens/web/<S-ID>--1440.webp` (desktop) and `<S-ID>--390.webp` (mobile, 2×) for the first state; other states as `<S-ID>-<state>--<width>.webp`. Shots use `?shot=1`, so every animation is captured in its final state.
 
 ## 3. Sections and components
-**Unsubscribed:** Loop glyph, h1 "You're unsubscribed.", the address, "It took effect straight away.", buttons Resubscribe (ghost) and Back to driveperf.com, two notes (no goodbye email; the address is kept only as unsubscribed, full removal via privacy@). **Err:** warning glyph, h1 "That link didn't work.", email field + Unsubscribe, reply-"unsubscribe" fallback and the 10-business-day promise. Footer line: sender identity and mailing address (F-WEB-07.1).
+**Unsubscribed:** Loop glyph, h1 "You're unsubscribed.", the address, "It took effect straight away.", buttons Resubscribe (ghost) and Back to driveperf.com, two notes (no goodbye email; the address is kept only as unsubscribed, full removal via privacy@). **Err:** warning glyph, h1 "That link didn't work.", email field + Unsubscribe, reply-"unsubscribe" fallback and the 10-business-day promise. Footer line: "Emails are sent by DrivePerf (Keval Langalia, Ontario, Canada)… Every email says who it's from, includes our postal contact details and has a one-click unsubscribe." The postal address lives in the emails themselves (CASL/CAN-SPAM), not on the website (F-WEB-07.1).
 
 ## 4. Copy
 No guilt, no "we'll miss you" (A2 §6 rule 7).

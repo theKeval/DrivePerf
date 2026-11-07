@@ -2,7 +2,7 @@
 
 **Agent:** A9 (web prototype) · **Prototype story:** DES-31 [DRIVE-132](https://thekeval.atlassian.net/browse/DRIVE-132) · **Date:** 6 Nov 2026 · **Status:** ready for Gate 3 review
 **Inputs:** PRD v1 §3.16 and §4 · A2 §2, §6 · brand.md, components.md, motion.md, accessibility.md · fixtures `prototypes/shared/data.js`
-**Artifacts:** [`mockup.html`](mockup.html) (contact sheet: live 1440 and 390 iframes + full-page captures) · [`mockup.webp`](mockup.webp) · [`screens/`](screens/) · prototype [`prototypes/web/`](../../../../prototypes/web/README.md)
+**Artifacts:** [`mockup.html`](mockup.html) (contact sheet: live 1440 and 390 iframes + full-page captures) · [`mockup.webp`](mockup.webp) · full-page shots in the shared gallery [`docs/design/screens/web/`](../../screens/web/) · prototype [`prototypes/web/`](../../../../prototypes/web/README.md)
 
 ## 1. Purpose
 Plain answers for users and store reviewers about capture, battery, privacy and pricing (S-WEB-05), and the capture and battery explainer linked from onboarding and used in review notes (S-WEB-06).
@@ -13,7 +13,7 @@ Plain answers for users and store reviewers about capture, battery, privacy and 
 | `S-WEB-05` | Support and FAQ | [`pages/support.html`](../../../../prototypes/web/pages/support.html) | `default` |
 | `S-WEB-06` | How DrivePerf records | [`pages/how-it-records.html`](../../../../prototypes/web/pages/how-it-records.html) | `ios` (= `default` on iPhone/desktop) · `android` |
 
-Screenshots: `screens/<S-ID>--1440.png` (desktop, scale 1) and `screens/<S-ID>--390.png` (mobile, scale 2) for the first state; other states as `screens/<S-ID>-<state>--<width>.png`.
+Screenshots (shared gallery, WebP): `../../screens/web/<S-ID>--1440.webp` (desktop) and `<S-ID>--390.webp` (mobile, 2×) for the first state; other states as `<S-ID>-<state>--<width>.webp`. Shots use `?shot=1`, so every animation is captured in its final state.
 
 ## 3. Sections and components
 **S-WEB-05:** `DocHero` with a live FAQ search (filters questions, opens matches, announces the count, empty state with the support email) → `Toc` of topics → `FaqList` groups: Recording and capture (how auto works, estimated start, force-quit/force-stop, missed drive + Health Check, manual) · Battery (screen-off estimate, between drives) · Passenger trips · Scores and tips (Smoothness, needed stops, nothing while driving) · Your data and privacy (no account, not insurance, download/delete, share cards) · Pro and the Pro Preview (Free list, Preview, prices, what happens when Pro ends) · Cancelling and refunds (iPhone and Android paths) → contact band (support@ and privacy@).

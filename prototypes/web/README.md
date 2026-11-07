@@ -47,7 +47,7 @@ node prototypes/web/tools/export-web.mjs            # all page shots + every sto
 node prototypes/web/tools/export-web.mjs shots S-WEB-07
 node prototypes/web/tools/export-web.mjs sheets
 ```
-Output goes to `docs/design/<story key>/web/`: `screens/<S-ID>[-<state>]--1440.png` (scale 1) and `--390.png` (scale 2), `mockup.html` (contact sheet with live iframes at 1440 and 390, plus full-page captures) and `mockup.png`. The story → screen map is in `STORIES` at the top of the script.
+Output goes to `docs/design/<story key>/web/`: `screens/<S-ID>[-<state>]--1440.png` (scale 1) and `--390.png` (scale 2), `mockup.html` (contact sheet with live iframes at 1440 and 390, plus full-page captures) and `mockup.png`. Then run `node prototypes/tools/pack.mjs --force` (PNGs are git-ignored): it moves the shots into the shared WebP gallery `docs/design/screens/web/`, converts `mockup.png` to `mockup.webp` and rewrites the links. `--force` is needed after a re-export so changed web shots are re-encoded rather than reused. The story → screen map is in `STORIES` at the top of the script.
 
 ## Components (Astro port map)
 
@@ -62,8 +62,8 @@ Each row is one `.astro` component. `data-component` attributes in the HTML mark
 | `Hero` | `variant: 'A' \| 'B'` | S-WEB-01 | Pick the variant per request with an edge-free approach: Astro builds both and a 200-byte inline script picks one at random before paint (no cookies, no storage); record it in the form and analytics |
 | `RouteLine` | `tripId, box, rotate, trim` | hero, evidence, 404 | **Precompute the SVG path at build time** from `data.js` (only the `d` string ships). Ends trimmed 650 / 520 m. Draw-on is a client island |
 | `DevicePhone` | `platform: 'ios' \| 'android', width` + slot | hero, press | Pure CSS frame; screens are slots |
-| `StoryFrame` / `StoryStack` | `frames[]` | S-WEB-01, press | Scroll-driven stack is an island (IntersectionObserver + scroll progress); static fan for RM / no-JS |
-| `ScoreRing` | `score, baseline, recordPrev, isNewRecord` | hero, score section, Story, share card | SVG; reveal follows motion.md §3.4 |
+| `StoryFrame` / `StoryStack` | `frames[]`, `dwell = 3400` | S-WEB-01, press | Auto-cycling stack is an island (see Motion); static row of frames for RM / no-JS |
+| `ScoreRing` | `score, baseline, recordPrev, isNewRecord, spring?` | hero, score section, Story, share card | SVG; reveal follows motion.md §3.4; `spring` uses `DP_MOTION.spring` (ζ 0.78, k 16) |
 | `GGCircle` | `points, envelope` | Story frame 3 | Precompute the cloud; G-dot replay is an island |
 | `ProofStrip`, `ScoreSection`, `ReplaySection`, `RouteRecordSection`, `RecapSection`, `ShareCard` | — | S-WEB-01 | Static, with reveal-on-scroll |
 | `CapturePromise` | `platform?` | S-WEB-01, S-WEB-06 | Binding copy (Gate 1 #10, F-ONB-03) |
@@ -77,6 +77,21 @@ Each row is one `.astro` component. `data-component` attributes in the HTML mark
 | `DeletionRequestForm` | — | S-WEB-07 | Island. Neutral confirmation (no account enumeration), email-link verification |
 | `RideAlongLanding`, `PassCard`, `QrCode` | `code, from` | S-WEB-08 | Real QR generated at build or edge time (the prototype draws a non-scannable pattern). `/.well-known/apple-app-site-association` and `assetlinks.json` deploy alongside |
 | `NotFound` | — | S-WEB-11 | |
+
+## Motion (v2) for the Astro port
+
+Six moments, one hero motion per section. All of them animate only `transform`, `opacity` or SVG stroke, start from an IntersectionObserver, pause when off screen or when `document.hidden`, and fall back to the final static state under `prefers-reduced-motion`, `?rm=1` and `?shot=1`. Each is a small `client:visible` island over static SVG/HTML; port the code named here.
+
+| Motion component | Code today | What it does | Trigger · loop |
+|---|---|---|---|
+| `LoopTrace` | `traceLoop()` in js/site.js | The header Loop draws its six trail sub-arcs in sequence, then the G-dot pops (pin-pop spring) | Load, once |
+| `HeroReplay` | `drawHero()` + `replay` in js/home.js | Route draw-on → replay marker with a bright trail glides the visible window of the route (the window is computed so it never runs behind the copy mask or the phones); entering the cleanest stretch lifts it and shows a chip | Load; loops every ≈ 15 s; paused off screen |
+| `StoryStack` (auto) | Story stack block in js/home.js | 3.4 s per frame with a filling progress segment; fly-out/fly-in with the card transition; frame effects (route draw-on, G-dot replay, spring ring); step buttons; Pause/Play + hover pause | ≥ 45 % in view; loops; paused off screen |
+| `ScoreRing spring` | `animateRing({spring:true})` in js/mockups.js | Damped spring count-up; arc may overshoot 1–2 %, number clamps to the score; record notch fills as it passes | 35 % in view, once |
+| `DotStripFill` | `routes()` in js/home.js | Track fills, runs pop in as the fill reaches them, gold record lands last with a two-beat ring pulse | 40 % in view, once |
+| `WeekDots` | `recap()` in js/home.js | Drive dots drop into their days with the pin-pop spring, 150 ms apart | 40 % in view, once |
+
+Spring easings are CSS `linear()` curves copied into `css/site.css` (`--spring-pin-pop`, `--spring-default`, `--spring-bouncy`) from `shared/tokens.css`. Review tools in `tools/export-web.mjs`: `timeline <url> <prefix> <w> <#target|y> <ms…>` (mid-animation captures) and `perf <url> <w>` (rAF frame pacing, CLS and long tasks while scrolling the page; last run: p95 16.7 ms, 0 frames over 33 ms, CLS 0 at 390/768/1440).
 
 Proto-only (drop in the port): the prototype panel, the hash state router, `?shot=1`.
 

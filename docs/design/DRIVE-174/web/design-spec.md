@@ -2,7 +2,7 @@
 
 **Agent:** A9 (web prototype) · **Prototype story:** DES-31 [DRIVE-132](https://thekeval.atlassian.net/browse/DRIVE-132) · **Date:** 6 Nov 2026 · **Status:** ready for Gate 3 review
 **Inputs:** PRD v1 §3.16 and §4 · A2 §2, §6 · brand.md, components.md, motion.md, accessibility.md · fixtures `prototypes/shared/data.js`
-**Artifacts:** [`mockup.html`](mockup.html) (contact sheet: live 1440 and 390 iframes + full-page captures) · [`mockup.webp`](mockup.webp) · [`screens/`](screens/) · prototype [`prototypes/web/`](../../../../prototypes/web/README.md)
+**Artifacts:** [`mockup.html`](mockup.html) (contact sheet: live 1440 and 390 iframes + full-page captures) · [`mockup.webp`](mockup.webp) · full-page shots in the shared gallery [`docs/design/screens/web/`](../../screens/web/) · prototype [`prototypes/web/`](../../../../prototypes/web/README.md)
 
 ## 1. Purpose
 Publish a clear privacy policy and terms of use, linked from both stores and the app (S-SET-08, F-ONB-02). Both are drafts written from the PRD and flagged for counsel.
@@ -13,17 +13,17 @@ Publish a clear privacy policy and terms of use, linked from both stores and the
 | `S-WEB-03` | Privacy policy | [`pages/privacy.html`](../../../../prototypes/web/pages/privacy.html) | `default` (draft flagged for counsel) |
 | `S-WEB-04` | Terms of use | [`pages/terms.html`](../../../../prototypes/web/pages/terms.html) | `default` (draft) |
 
-Screenshots: `screens/<S-ID>--1440.png` (desktop, scale 1) and `screens/<S-ID>--390.png` (mobile, scale 2) for the first state; other states as `screens/<S-ID>-<state>--<width>.png`.
+Screenshots (shared gallery, WebP): `../../screens/web/<S-ID>--1440.webp` (desktop) and `<S-ID>--390.webp` (mobile, 2×) for the first state; other states as `<S-ID>-<state>--<width>.webp`. Shots use `?shot=1`, so every animation is captured in its final state.
 
 ## 3. Sections and components
-Shared layout: `DocHero` (breadcrumb, h1, lede, version chips "Version 0.9 · Draft · 6 Nov 2026", `DraftBanner` in warning colours) → `Toc` (sticky on desktop, a card on mobile, highlights the section in view) → `Prose`. Unconfirmed facts are marked inline with `.placeholder` (developer legal name, privacy officer, mailing address, Android map SDK, email provider, retention periods).
+Shared layout: `DocHero` (breadcrumb, h1, lede, version chips "Version 0.9 · Draft · 6 Nov 2026", `DraftBanner` in warning colours) → `Toc` (sticky on desktop, a card on mobile, highlights the section in view) → `Prose`. Developer: **Keval Langalia**, an individual in Ontario, who is also named as responsible for privacy and personal information ("Keval Langalia, responsible for privacy and personal information · privacy@driveperf.com"; no separate privacy officer). No postal address on the site. Still open and marked `.placeholder`: Android map SDK, email provider, crash/analytics provider retention, waitlist-email retention, and the counsel notes in the terms.
 
-**S-WEB-03 sections:** the short version (4 cards: local-first, backup optional, never sold or shared, yours to take or delete) · who we are · what we collect and when it leaves your phone (table) · location and motion data · how we use it · what we never do · service providers (Firebase, RevenueCat, App Store / Google Play, Apple MapKit / Google Maps SDK or MapLibre, email provider) · where it's stored (Firebase US; transfer outside Quebec; PIA) · retention · your rights (all users; Canada and Quebec; US states; how to request, 30/45 days) · GPC and DNT (CalOPPA) · cookies (none) · website and waitlist (CASL) · 18+ · security · changes and versions · contact and privacy officer (Law 25 person in charge).
+**S-WEB-03 sections:** the short version (4 cards: local-first, backup optional, never sold or shared, yours to take or delete) · who we are · what we collect and when it leaves your phone (table) · location and motion data · how we use it · what we never do · service providers (Firebase, RevenueCat, App Store / Google Play, Apple MapKit / Google Maps SDK or MapLibre, email provider) · where it's stored (Firebase US; transfer outside Quebec; PIA) · retention · your rights (all users; Canada and Quebec; US states; how to request, 30/45 days) · GPC and DNT (CalOPPA) · cookies (none) · website and waitlist (CASL) · 18+ · security · changes and versions · contact and who is responsible (Keval Langalia, Law 25 person in charge).
 
 **S-WEB-04 sections:** safety callout first ("Never interact with DrivePerf while you're driving.") · agreement and 18+ · safe use · what DrivePerf is and isn't (not insurance, not a safety system, no energy claims) · your account and data · Pro, Preview and payments (prices, founding offer, renewal, cancel in store, refunds via stores, "locked, not lost") · Ride-along passes · acceptable use (no racing; no track mode) · IP and OSM credit · accuracy (honest capture promise) · liability (counsel) · ending · changes and governing law (Ontario; consumer-law carve-outs) · contact.
 
 ## 4. Copy
-Every PRD F-WEB-03.1 topic is covered: PIPEDA, Law 25 (privacy officer, transfers outside Quebec, rights), US state rights with "we don't sell or share", CalOPPA, location and motion data, Firebase/RevenueCat/map providers, retention, cookies (none), children (under 18 not allowed), contact. Terms (F-WEB-03.2): 18+, no-insurance purpose, safe use, subscription terms.
+Every PRD F-WEB-03.1 topic is covered: PIPEDA, Law 25 (person responsible, transfers outside Quebec, rights), US state rights with "we don't sell or share", CalOPPA, location and motion data, Firebase/RevenueCat/map providers, retention, cookies (none), children (under 18 not allowed), contact. Terms (F-WEB-03.2): 18+, no-insurance purpose, safe use, subscription terms.
 
 ## 5. States and behaviour
 Single default state each. Version and date are shown at the top and bottom (F-WEB-03.3); the app records the accepted version.
@@ -63,4 +63,4 @@ TOC highlight follows scroll (IntersectionObserver). No other motion.
 - Lighthouse mobile targets ≥ 95 in all four categories (F-WEB-01.2): no client JS except small islands, no web fonts by default, SVG only.
 - Store the documents as Markdown content collections with `version` and `date` front matter; keep previous versions at `/privacy/v0-9` etc.
 ## 12. Deviations and open items
-- Retention periods for crash data, waitlist emails and deletion records are not decided in the PRD (OQ-09 proposes 90 days for lapsed backup). They are shown as placeholders.
+- Retention (Keval, Gate 3 follow-up): on-device data until you delete it (every plan); Pro cloud backup, including during the Preview or a Ride-along pass, until you delete it or your account; when Pro ends, backup stops and the cloud copy is kept 30 days with reminders at 30, 7 and 1 days left, then deleted, phone data untouched; Free users who sign in upload no trip data and the account record is kept until account deletion. Crash/analytics provider retention and waitlist-email retention remain placeholders.

@@ -784,7 +784,7 @@
       } else {
         const [cl, tone, title, sub] = cell(state);
         blocks.push(ui.pad(ui.card(`<div class="acc-st">${art(ctx, CLOUD(cl), { tone })}<div><b>${ui.esc(title)}</b><p>${ui.esc(sub)}</p></div></div>${state === 'Err' ? `<div class="acc-st-a">${ui.button('Try again', { kind: 'tonal', size: 's', icon: 'refresh', toast: 'Backing up…' })}</div>` : ''}`, { hero: true })));
-        if (state === 'lapsedProWarning') blocks.push(ui.pad(ui.banner({ kind: 'attention', icon: 'clock', title: 'Your cloud copy is kept until 4 February 2027', text: 'Then it’s deleted. Drives on this phone aren’t affected. We’ll remind you 30, 7 and 1 day before.', action: { text: 'Keep it', nav: 'S-SUB-04', params: { from: 'backup' } } })));
+        if (state === 'lapsedProWarning') blocks.push(ui.pad(ui.banner({ kind: 'attention', icon: 'clock', title: 'Your cloud copy is kept until 6 December 2026', text: 'Then it’s deleted. Drives on this phone aren’t affected. We’ll remind you 30, 7 and 1 day before.', action: { text: 'Keep it', nav: 'S-SUB-04', params: { from: 'backup' } } })));
         if (state === 'pending' || state === 'wiFiOnly') blocks.push(ui.section('Waiting to upload', `<div class="ui-card is-flush acc-pend" role="list">${PENDING.map((id) => ui.tripRow(data.trip(id), { ent: ctx.ent })).join('')}</div>`, { style: 'caption' }));
         if (state === 'lapsedProWarning') blocks.push(ui.section('Your cloud copy', ui.list([
           ui.row({ icon: 'export', title: 'Download all my data', sub: 'Free, from this phone, any time', nav: 'S-PRV-03' }),
@@ -821,7 +821,7 @@
       layout: [
         'Push with title “Cloud backup” (iOS inline + glass back · Android MediumFlexibleTopAppBar).',
         'Status hero card (radius 32/28): cloud illustration 104 (off = slashed, up to date = check on a positive halo, waiting = up arrow, error = “!” on a critical halo) + title (cardTitle) + one line. Err adds a tonal “Try again”.',
-        'lapsed Pro warning: attention banner “Your cloud copy is kept until 4 February 2027 …” + “Keep it” → S-SUB-04.',
+        'lapsed Pro warning: attention banner “Your cloud copy is kept until 6 December 2026 …” + “Keep it” → S-SUB-04.',
         'pending / Wi-Fi only: “Waiting to upload” trip cards (the two newest drives).',
         'Toggle row “Back up my drives”. When on: Options (Also use mobile data · Include raw sensor data 151 MB of 186 MB · battery rule, informational) and Your backup (Restore · What’s backed up · Sign out), then a facts card (Stored in Google Firebase, US region · Encryption · When · Delete).',
         'Lock (Free): the user’s own backup status blurred (14 px, 35% dim) in a lock panel: “Back up your drives and restore them on any phone with Pro.” + See plans; then reassurance checklist and “Download all my data”.',
@@ -842,11 +842,11 @@
         Pending: '2 drives waiting. They’ll upload on Wi-Fi when you’re not driving.',
         'Wi-Fi only': 'Waiting for Wi-Fi. 2 drives will upload when this phone is on Wi-Fi. Backup doesn’t use mobile data.',
         Err: 'Backup didn’t finish. Your drives are safe on this phone. We’ll try again on Wi-Fi.',
-        Lapsed: 'Backup has stopped. Your Pro plan ended, so nothing new is backed up. Your cloud copy is kept until 4 February 2027. Then it’s deleted. Drives on this phone aren’t affected. We’ll remind you 30, 7 and 1 day before.',
+        Lapsed: 'Backup has stopped. Your Pro plan ended, so nothing new is backed up. Your cloud copy is kept until 6 December 2026. Then it’s deleted. Drives on this phone aren’t affected. We’ll remind you 30, 7 and 1 day before.',
         Lock: 'Back up your drives and restore them on any phone with Pro. (entitlement.lockSheets.backup)',
       },
-      freePro: 'Pro (and Preview / Ride-along). Free: Lock state with the user’s own backup preview blurred. Lapsed: backup stops, cloud copy retained per OQ-09 (proposal: 90 days, warnings at 30/7/1 days).',
-      data: 'Sizes from privacy.dataSize (30 drives, 186 MB, raw 151 MB). Pending = the two newest drives (t20261106-1210, t20261105-1745). “Last backup today, 2:05 pm” and the 4 Feb 2027 retention date (today + 90 days, OQ-09 proposal) are prototype values.',
+      freePro: 'Pro (and Preview / Ride-along). Free: Lock state with the user’s own backup preview blurred. Lapsed: backup stops, cloud copy kept 30 days (OQ-09, decided 6 Nov), warnings at 30/7/1 days).',
+      data: 'Sizes from privacy.dataSize (30 drives, 186 MB, raw 151 MB). Pending = the two newest drives (t20261106-1210, t20261105-1745). “Last backup today, 2:05 pm” and the 6 Dec 2026 retention date (today + 30 days, OQ-09 decision) are prototype values.',
       icons: ['cloud', 'refresh', 'gps', 'analysis', 'battery', 'info', 'export', 'clock', 'lock'],
       assets: [],
     },
@@ -862,7 +862,7 @@
       const what = [['pin', 'Your routes, with precise location', 'Every drive’s GPS track'], ['analysis', 'Sensor data from each drive', 'Motion and G, for Replay and Analysis'], ['story', 'Scores, Stories and records', 'Plus routes, events and tips'], ['car', 'Cars and trip settings', 'Names, colours, which car you drove']];
       return `<div class="acc5">${ui.sheetHeader('Before you turn on backup', { sub: 'Here’s exactly what leaves this phone.' })}
         <div class="acc5-what" data-rise>${what.map(([ic, t, s]) => `<div class="acc5-w"><span class="ui-row-ic">${ui.icon(ic, 20)}</span><span><b>${t}</b><small>${s}</small></span></div>`).join('')}</div>
-        ${ui.section('Where it goes', `<div class="ui-card" data-rise><div class="e-kv"><div><span>Stored by</span><b>Google Firebase</b></div><div><span>Region</span><b>United States (outside Canada)</b></div><div><span>Protection</span><b>Encrypted in transit and at rest</b></div><div><span>Kept</span><b>Until you delete it, or 90 days after Pro ends</b></div></div></div>`, { style: 'caption' })}
+        ${ui.section('Where it goes', `<div class="ui-card" data-rise><div class="e-kv"><div><span>Stored by</span><b>Google Firebase</b></div><div><span>Region</span><b>United States (outside Canada)</b></div><div><span>Protection</span><b>Encrypted in transit and at rest</b></div><div><span>Kept</span><b>Until you delete it, or 30 days after Pro ends</b></div></div></div>`, { style: 'caption' })}
         <div data-rise>${checks(ctx, [{ kind: 'ok', text: 'Turn it off or delete the cloud copy any time', sub: 'Privacy Centre → Delete data' }, { kind: 'ok', text: 'Nothing uploads during a trip' }, { kind: 'no', text: 'Never sold, never shared with insurers, never used for ads' }])}</div>
         <div class="e-sheetacts">${ui.button('Turn on backup', { kind: 'filled', size: 'l', block: true, action: 'agree', haptic: 'confirm' })}${ui.button('Not now', { kind: 'tonal', size: 'l', block: true, back: true })}</div></div>`;
     },
@@ -875,7 +875,7 @@
       layout: [
         'Large-detent sheet. Header “Before you turn on backup” + sub “Here’s exactly what leaves this phone.”',
         'What: 4 rows on a card (icon tile 30 · title · sub): routes with precise location · sensor data · scores, Stories and records · cars and trip settings.',
-        'Where it goes (caption section): facts card — Stored by Google Firebase · Region United States (outside Canada) · Encrypted in transit and at rest · Kept until you delete it, or 90 days after Pro ends.',
+        'Where it goes (caption section): facts card — Stored by Google Firebase · Region United States (outside Canada) · Encrypted in transit and at rest · Kept until you delete it, or 30 days after Pro ends.',
         'Checklist: ✓ turn it off or delete any time · ✓ nothing uploads during a trip · ✕ never sold, never shared with insurers, never used for ads.',
         'Stacked large buttons: “Turn on backup” (filled) · “Not now” (tonal). No pre-ticked boxes.',
       ],
@@ -885,9 +885,9 @@
       a11y: ['Focus on the title. Each “what” row is one element (“Your routes, with precise location. Every drive’s GPS track.”).', 'XL: facts stack; buttons wrap.'],
       platformDiffs: { ios: 'Sheet .large with glass close; buttons glassProminent / glass.', android: 'Expanded ModalBottomSheet; filled + tonal buttons.' },
       analytics: ['backup_consent_viewed', 'backup_enabled'],
-      copy: { Title: 'Before you turn on backup', Sub: 'Here’s exactly what leaves this phone.', What: 'Your routes, with precise location · Sensor data from each drive · Scores, Stories and records · Cars and trip settings', Where: 'Google Firebase · United States (outside Canada) · Encrypted in transit and at rest · Until you delete it, or 90 days after Pro ends', Never: 'Never sold, never shared with insurers, never used for ads' },
+      copy: { Title: 'Before you turn on backup', Sub: 'Here’s exactly what leaves this phone.', What: 'Your routes, with precise location · Sensor data from each drive · Scores, Stories and records · Cars and trip settings', Where: 'Google Firebase · United States (outside Canada) · Encrypted in transit and at rest · Until you delete it, or 30 days after Pro ends', Never: 'Never sold, never shared with insurers, never used for ads' },
       freePro: 'Pro only (reached from S-ACC-04).',
-      data: 'Retention “90 days after Pro ends” is the OQ-09 proposal; region per F-ACC-03.1.',
+      data: 'Retention “30 days after Pro ends” is the OQ-09 decision (6 Nov 2026); region per F-ACC-03.1.',
       icons: ['pin', 'analysis', 'story', 'car', 'check', 'close'],
       assets: [],
     },
@@ -1036,7 +1036,7 @@
           ui.row({ icon: 'insights', title: 'Analytics and diagnostics', sub: 'Details, and reset your analytics ID', nav: 'S-PRV-07' }),
         ]), { style: 'caption' }),
         ui.section('Questions', ui.list([
-          ui.row({ icon: 'bell', title: 'Privacy officer', sub: 'privacy@driveperf.com · we answer within 30 days', toast: 'Opens a new email to privacy@driveperf.com' }),
+          ui.row({ icon: 'bell', title: 'Privacy contact', sub: 'Keval Langalia · privacy@driveperf.com · we answer within 30 days', toast: 'Opens a new email to privacy@driveperf.com' }),
           ui.row({ icon: 'info', title: 'Privacy policy', sub: 'driveperf.com/privacy', toast: 'Opens driveperf.com/privacy' }),
         ]), { style: 'caption' }),
       ];
@@ -1048,19 +1048,19 @@
       crash: (ctx) => { const on = !(ctx.store.crash ?? (ctx.state === 'analyticsOnOff' ? false : D.user.consent.crashReports)); ctx.store.crash = on; ctx.update(); ctx.toast(on ? 'Crash reports on' : 'Crash reports off', { icon: 'check' }); return false; },
     },
     spec: {
-      purpose: 'One place that shows what is stored where and lets the user control it (F-PRV-01): a plain data map (phone, cloud, usage statistics, crash reports, privacy zones), the “never” promise, links to every control, and the privacy officer contact (PIPEDA, Law 25).',
+      purpose: 'One place that shows what is stored where and lets the user control it (F-PRV-01): a plain data map (phone, cloud, usage statistics, crash reports, privacy zones), the “never” promise, links to every control, and the privacy contact, Keval Langalia (PIPEDA, Law 25).',
       layout: [
         'Push, title “Privacy Centre”. Hero: shield illustration 104 + headline (28/34) “Your drives live on this phone.” (with backup: “…, with a backup you control.”) + lead.',
         '“Never” card (radius 18, Glide-tinted outline): kicker “NEVER” with shield + three ✕ items: Sold · Shared with insurers · Used for ads.',
         'Where your data is (list): On this phone (30 drives, 4 routes, 2 cars and their scores · 186 MB) · In the cloud (Off / On + region) · Usage statistics (toggle) · Crash reports (toggle) · Privacy zones (1 zone · Home, 400 m). Footer: changes apply straight away.',
         'Your controls (list): Download all my data (Free, always) · Export a drive (GPX/CSV; PRO + lock on Free) · Delete data · Delete account and cloud data (signed in only) · Analytics and diagnostics.',
-        'Questions (list): Privacy officer (email, response time) · Privacy policy (web).',
+        'Questions (list): Privacy contact, Keval Langalia (email, response time) · Privacy policy (web).',
       ],
       components: ['navBar', 'list', 'row', 'toggle', 'section'],
       interactions: [
         'On this phone → S-SET-07 storage · In the cloud → S-ACC-04 · toggles flip usage/crash consent immediately (toast; haptic toggleOn/Off) · Privacy zones → S-PRV-02.',
         'Download → S-PRV-03 · Export → S-PRV-04 (date range) or S-SUB-03 export (Free) · Delete data → S-PRV-05 · Delete account → S-PRV-06 · Analytics and diagnostics → S-PRV-07.',
-        'Privacy officer → mailto: · Privacy policy → in-app browser (S-WEB-03).',
+        'Privacy contact → mailto: · Privacy policy → in-app browser (S-WEB-03).',
       ],
       motion: ['Shield pops in, blocks rise 8 px with a 30 ms stagger. RM: fade.'],
       a11y: ['The never card is one group: “Never sold, never shared with insurers, never used for ads”.', 'Toggles are switches labelled “Usage statistics” / “Crash reports”, with the sub line as their hint.', 'XL: rows wrap; the hero stacks.'],
@@ -1073,10 +1073,10 @@
         Cloud: 'Nothing. Cloud backup is off. · Backup on · 30 drives · Google Firebase, US region',
         Usage: 'Screens and features used. No locations, routes, speeds or car names.',
         Crash: 'Technical details when the app crashes. No locations.',
-        Officer: 'Privacy officer · privacy@driveperf.com · we answer within 30 days',
+        Officer: 'Privacy contact · Keval Langalia · privacy@driveperf.com · we answer within 30 days',
       },
       freePro: 'Everything here is Free, including the full download and every deletion. Only per-trip GPX/CSV export is Pro (lock → S-SUB-03 export).',
-      data: 'Consent defaults from DP_DATA.user.consent (usage off, crash on); analytics on/off flips both. Sizes from privacy.dataSize; counts from routes (4) and vehicles (2); zones from user.privacyZones. The privacy officer address and 30-day response are placeholders pending legal (no fixture).',
+      data: 'Consent defaults from DP_DATA.user.consent (usage off, crash on); analytics on/off flips both. Sizes from privacy.dataSize; counts from routes (4) and vehicles (2); zones from user.privacyZones. The privacy contact is Keval Langalia (decided 6 Nov 2026); the 30-day response time is a placeholder pending legal (no fixture).',
       icons: ['shield', 'close', 'phone', 'cloud', 'insights', 'info', 'pin', 'export', 'routes', 'trash', 'profile', 'bell'],
       assets: [],
     },

@@ -732,3 +732,33 @@ html[data-shot="1"] .hero { min-height: 0; }
 .placeholder { white-space: normal; }
 .doc-meta .chip { white-space: normal; height: auto; min-height: 30px; padding: 6px 12px; line-height: 1.3; }
 .faq summary { overflow: hidden; } /* the rotated plus icon must not widen the page */
+
+/* ---------- 24. Motion graphics (v2): spring easings copied from shared/tokens.css (DP_TOKENS motion.spring) ---------- */
+:root {
+  --spring-pin-pop: linear(0, 0.0428, 0.1536, 0.3069, 0.4799, 0.6537, 0.8138, 0.9505, 1.0582, 1.1351, 1.1824, 1.2033, 1.2025, 1.1854, 1.1572, 1.123, 1.0869, 1.0525, 1.0221, 0.9972, 0.9786, 0.9662, 0.9596, 0.9579, 0.96, 0.9649, 0.9715, 0.9788, 0.9861, 0.9928, 0.9984, 1.0028, 1.006, 1.0078, 1.0086, 1.0085, 1.0077, 1.0065, 1.005, 1.0035, 1);
+  --spring-pin-pop-duration: 539ms;
+  --spring-default: linear(0, 0.0181, 0.0644, 0.1294, 0.2052, 0.2863, 0.3682, 0.448, 0.5236, 0.5935, 0.6571, 0.714, 0.7641, 0.8078, 0.8454, 0.8774, 0.9043, 0.9267, 0.9451, 0.9601, 0.9721, 0.9815, 0.9889, 0.9945, 0.9987, 1.0017, 1.0037, 1.0051, 1.0059, 1.0062, 1.0063, 1.0061, 1.0057, 1.0053, 1.0048, 1.0043, 1.0038, 1.0033, 1.0028, 1.0024, 1);
+  --spring-default-duration: 538ms;
+  --spring-bouncy: linear(0, 0.0257, 0.0918, 0.1839, 0.2901, 0.4015, 0.511, 0.614, 0.7071, 0.7887, 0.8578, 0.9147, 0.9599, 0.9945, 1.0197, 1.037, 1.0476, 1.053, 1.0543, 1.0525, 1.0487, 1.0436, 1.0378, 1.0317, 1.0258, 1.0203, 1.0153, 1.011, 1.0073, 1.0043, 1.0019, 1.0001, 0.9988, 0.9979, 0.9974, 0.9971, 0.9971, 0.9972, 0.9974, 0.9977, 1);
+  --spring-bouncy-duration: 763ms;
+}
+
+/* Story stack v2: auto-cycling, no scroll track */
+.story-scroll__track { height: auto; }
+.story-scroll__sticky { position: relative; top: auto; height: auto; min-height: 0; padding: 120px 0; overflow: hidden; }
+@media (max-width: 959px) { .story-scroll__sticky { padding: 88px 0 72px; } .story-scroll:not([data-static]) .lede { display: block; } }
+.step-btn { all: unset; display: block; cursor: pointer; border-radius: 10px; }
+.step-btn:focus-visible { outline: 3px solid var(--focus); outline-offset: 4px; }
+.step-btn:hover b { color: var(--text); }
+.story-toggle { margin-top: 20px; }
+.story-toggle svg { width: 16px; height: 16px; }
+.story-progress i.cur { position: relative; background: #FFFFFF38; }
+.story-progress i.cur b { position: absolute; inset: 0; border-radius: inherit; background: #F2F4F7; transform-origin: left center; transform: scaleX(.55); }
+.ring-num { display: inline-block; }
+/* Dot strip v2 */
+.dotstrip .fill { position: absolute; left: 0; top: 50%; height: 4px; margin-top: -2px; border-radius: 4px; background: linear-gradient(90deg, color-mix(in srgb, var(--text-3) 60%, transparent), var(--record)); transform-origin: left center; opacity: .55; }
+.dotstrip i { transition: none; }
+.rec-pulse { position: absolute; top: 50%; width: 20px; height: 20px; margin: -10px 0 0 -10px; border-radius: 50%; border: 2px solid var(--record); opacity: 0; pointer-events: none; }
+.recap-strip span { transform: none; transition: none; }
+.device { will-change: auto; }
+[data-partial="header"] { display: block; height: var(--header-h); } /* reserve the header slot before JS injects it (no CLS) */

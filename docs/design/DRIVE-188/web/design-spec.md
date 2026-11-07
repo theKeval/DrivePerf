@@ -2,7 +2,7 @@
 
 **Agent:** A9 (web prototype) · **Prototype story:** DES-31 [DRIVE-132](https://thekeval.atlassian.net/browse/DRIVE-132) · **Date:** 6 Nov 2026 · **Status:** ready for Gate 3 review
 **Inputs:** PRD v1 §3.16 and §4 · A2 §2, §6 · brand.md, components.md, motion.md, accessibility.md · fixtures `prototypes/shared/data.js`
-**Artifacts:** [`mockup.html`](mockup.html) (contact sheet: live 1440 and 390 iframes + full-page captures) · [`mockup.webp`](mockup.webp) · [`screens/`](screens/) · prototype [`prototypes/web/`](../../../../prototypes/web/README.md)
+**Artifacts:** [`mockup.html`](mockup.html) (contact sheet: live 1440 and 390 iframes + full-page captures) · [`mockup.webp`](mockup.webp) · full-page shots in the shared gallery [`docs/design/screens/web/`](../../screens/web/) · prototype [`prototypes/web/`](../../../../prototypes/web/README.md)
 
 ## 1. Purpose
 Give journalists the logo pack, screens, Story previews, the privacy one-pager and a contact, without any footage of a phone used in a moving car.
@@ -12,7 +12,7 @@ Give journalists the logo pack, screens, Story previews, the privacy one-pager a
 |---|---|---|---|
 | `S-WEB-10` | Press kit | [`pages/press.html`](../../../../prototypes/web/pages/press.html) | `default` |
 
-Screenshots: `screens/<S-ID>--1440.png` (desktop, scale 1) and `screens/<S-ID>--390.png` (mobile, scale 2) for the first state; other states as `screens/<S-ID>-<state>--<width>.png`.
+Screenshots (shared gallery, WebP): `../../screens/web/<S-ID>--1440.webp` (desktop) and `<S-ID>--390.webp` (mobile, 2×) for the first state; other states as `<S-ID>-<state>--<width>.webp`. Shots use `?shot=1`, so every animation is captured in its final state.
 
 ## 3. Sections and components
 `DocHero` with a large glowing Loop and buttons (Logos and colours, Privacy one-pager) → fact sheet (`dl`: product, one line, for, launch, price, privacy, what it doesn't do, based in) → logo pack (Loop colour, Loop on light, horizontal lockup; SVG downloads from `assets/brand/`) + usage rules + four colour swatches (Night, Glide, Sodium "route records only", Daylight) → app screens (three `DevicePhone` mockups) and four live Story frames → press contact band.

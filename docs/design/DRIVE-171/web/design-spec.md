@@ -2,7 +2,7 @@
 
 **Agent:** A9 (web prototype) · **Prototype story:** DES-31 [DRIVE-132](https://thekeval.atlassian.net/browse/DRIVE-132) · **Date:** 6 Nov 2026 · **Status:** ready for Gate 3 review
 **Inputs:** PRD v1 §3.16 and §4 · A2 §2, §6 · brand.md, components.md, motion.md, accessibility.md · fixtures `prototypes/shared/data.js`
-**Artifacts:** [`mockup.html`](mockup.html) (contact sheet: live 1440 and 390 iframes + full-page captures) · [`mockup.webp`](mockup.webp) · [`screens/`](screens/) · prototype [`prototypes/web/`](../../../../prototypes/web/README.md)
+**Artifacts:** [`mockup.html`](mockup.html) (contact sheet: live 1440 and 390 iframes + full-page captures) · [`mockup.webp`](mockup.webp) · full-page shots in the shared gallery [`docs/design/screens/web/`](../../screens/web/) · prototype [`prototypes/web/`](../../../../prototypes/web/README.md)
 
 ## 1. Purpose
 Collect the minimum needed to invite people to the right beta and send launch news: email, platform, country, CASL express consent (unticked) and the A/B variant. Confirm on S-WEB-02.
@@ -13,7 +13,7 @@ Collect the minimum needed to invite people to the right beta and send launch ne
 | `S-WEB-01` | Home: WaitlistForm | [`index.html`](../../../../prototypes/web/index.html) | `variantA` · `formErr` · `submitting` · `duplicate` · `networkErr` |
 | `S-WEB-02` | Waitlist confirmation | [`pages/waitlist-confirmed.html`](../../../../prototypes/web/pages/waitlist-confirmed.html) | `default` (iPhone) · `android` |
 
-Screenshots: `screens/<S-ID>--1440.png` (desktop, scale 1) and `screens/<S-ID>--390.png` (mobile, scale 2) for the first state; other states as `screens/<S-ID>-<state>--<width>.png`.
+Screenshots (shared gallery, WebP): `../../screens/web/<S-ID>--1440.webp` (desktop) and `<S-ID>--390.webp` (mobile, 2×) for the first state; other states as `<S-ID>-<state>--<width>.webp`. Shots use `?shot=1`, so every animation is captured in its final state.
 
 ## 3. Sections and components
 **WaitlistForm** (hero, `#waitlist`): title "Join the waitlist" + gold "Founding price" chip (founding badge is a permitted Sodium use) · error/info banner (live region) · Email · "Your phone" segmented radio (iPhone / Android) · "Country" segmented radio (Canada / US / Other) · consent checkbox (unticked) · hidden honeypot · hidden variant · primary button "Join the waitlist" · privacy line with link to S-WEB-03 §website.

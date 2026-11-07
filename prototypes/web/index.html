@@ -103,13 +103,14 @@
             <h2 class="h2" id="story-title">Park. Your drive is already decoded.</h2>
             <p class="lede" style="margin-top:20px">Seconds after you park, each drive becomes a short Story. It plays only once you've stopped, never while you drive.</p>
             <ol class="story-steps" id="story-steps">
-              <li data-n="1" class="is-active"><div><b>The drive</b><span>Part of day and car. No timestamps, no addresses.</span></div></li>
-              <li data-n="2"><div><b>The route draws on</b><span>Start to finish, with the first and last stretch trimmed.</span></div></li>
-              <li data-n="3"><div><b>Your inputs, replayed</b><span>Every brake and turn as a dot gliding around the friction circle.</span></div></li>
-              <li data-n="4"><div><b>Smoothness</b><span>Compared with your usual on this route. Records glow gold.</span></div></li>
-              <li data-n="5"><div><b>Cleanest stretch</b><span>We always lead with what went well.</span></div></li>
-              <li data-n="6"><div><b>One thing for next time</b><span>Exactly one tip, with the evidence one tap away.</span></div></li>
+              <li data-n="1" class="is-active"><button type="button" class="step-btn"><b>The drive</b><span>Part of day and car. No timestamps, no addresses.</span></button></li>
+              <li data-n="2"><button type="button" class="step-btn"><b>The route draws on</b><span>Start to finish, with the first and last stretch trimmed.</span></button></li>
+              <li data-n="3"><button type="button" class="step-btn"><b>Your inputs, replayed</b><span>Every brake and turn as a dot gliding around the friction circle.</span></button></li>
+              <li data-n="4"><button type="button" class="step-btn"><b>Smoothness</b><span>Compared with your usual on this route. Records glow gold.</span></button></li>
+              <li data-n="5"><button type="button" class="step-btn"><b>Cleanest stretch</b><span>We always lead with what went well.</span></button></li>
+              <li data-n="6"><button type="button" class="step-btn"><b>One thing for next time</b><span>Exactly one tip, with the evidence one tap away.</span></button></li>
             </ol>
+            <button class="btn btn--quiet btn--sm story-toggle" type="button" id="story-toggle" aria-pressed="false" aria-controls="stack"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="6.5" y="5" width="3.5" height="14" rx="1"/><rect x="14" y="5" width="3.5" height="14" rx="1"/></svg><span>Pause</span></button>
           </div>
           <div class="stack" id="stack" aria-hidden="true"></div>
           <div class="stack-static" id="stack-static" role="list" aria-label="Drive Story frames"></div>

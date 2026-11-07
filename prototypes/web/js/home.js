@@ -56,6 +56,11 @@
       const r = M.route(heroTrip, w, h, { pad: 0, rotate: -6, box });
       const clean = r.segment(heroTrip.cleanest.t0, heroTrip.cleanest.t1);
       const roads = others.map((t) => M.route(t, w, h, { P: r.P }).d).join(' ');
+      // Where the cleanest stretch sits along the line, as a fraction of its length (polyline approximation)
+      const cum = [0]; for (let i = 1; i < r.xy.length; i++) cum.push(cum[i - 1] + Math.hypot(r.xy[i][0] - r.xy[i - 1][0], r.xy[i][1] - r.xy[i - 1][1]));
+      const tot = cum[cum.length - 1], fr = (t) => { const i = r.pts.findIndex((p) => p.t >= t); return cum[Math.max(0, i)] / tot; };
+      const c0 = fr(heroTrip.cleanest.t0), c1 = fr(heroTrip.cleanest.t1);
+      const mid = r.xy[r.pts.findIndex((p) => p.t >= (heroTrip.cleanest.t0 + heroTrip.cleanest.t1) / 2)];
       svg.innerHTML = `
         <defs>
           <filter id="hglow" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="${desktop ? 10 : 7}"/></filter>
@@ -67,16 +72,26 @@
         <path class="hr-glow" d="${r.d}" fill="none" stroke="#5BE7C4" stroke-width="${desktop ? 16 : 12}" stroke-linecap="round" opacity=".28" filter="url(#hglow)"/>
         <path class="hr-main" d="${r.d}" fill="none" stroke="url(#hfade)" stroke-width="${desktop ? 4 : 3.2}" stroke-linecap="round" stroke-linejoin="round"/>
         <path class="hr-clean" d="${clean}" fill="none" stroke="#C6F8EA" stroke-width="${desktop ? 6 : 5}" stroke-linecap="round" opacity="0"/>
+        ${desktop && mid ? `<g class="hr-chip" opacity="0" transform="translate(${Math.max(16, mid[0] - 245).toFixed(1)} ${Math.max(84, mid[1] - 58).toFixed(1)})"><rect width="236" height="34" rx="17" fill="var(--glass)" stroke="var(--glass-stroke)"/><circle cx="18" cy="17" r="4" fill="#5BE7C4"/><text x="31" y="21.5" font-size="12.5" font-weight="600" fill="var(--text)" style="font-family:var(--f-text)">Cleanest stretch · 14.2 km, QEW</text></g>` : ''}
+        <path class="hr-trail" d="${r.d}" fill="none" stroke="#FFFFFF" stroke-width="${desktop ? 3.5 : 3}" stroke-linecap="round" opacity="0"/>
+        <g class="hr-marker" opacity="0"><circle r="${desktop ? 20 : 15}" fill="url(#hhead)" opacity=".85"/><circle r="${desktop ? 5.5 : 4.5}" fill="#fff"/></g>
         <circle class="hr-head" r="${desktop ? 18 : 13}" fill="url(#hhead)" opacity="0"/>
         <circle class="hr-dot" r="${desktop ? 6 : 5}" fill="#fff" opacity="0"/>`;
-      const main = svg.querySelector('.hr-main'), glow = svg.querySelector('.hr-glow'), head = svg.querySelector('.hr-head'), dot = svg.querySelector('.hr-dot'), cl = svg.querySelector('.hr-clean');
+      const q = (s) => svg.querySelector(s);
+      const main = q('.hr-main'), glow = q('.hr-glow'), head = q('.hr-head'), dot = q('.hr-dot'), cl = q('.hr-clean');
       const L = main.getTotalLength(), end = main.getPointAtLength(L);
+      // Run the marker only over the longest stretch of line that isn't hidden by the copy mask or the phones
+      const hr = hero.getBoundingClientRect(), devRects = [...devs.querySelectorAll('.device')].map((d) => { const b = d.getBoundingClientRect(); return { l: b.left - hr.left - 8, t: b.top - hr.top - 8, r: b.right - hr.left + 8, b: b.bottom - hr.top + 8 }; });
+      const seen = (x, y) => (desktop ? x > w * 0.52 : y > h * 0.6) && y > 70 && x < w - 8 && !devRects.some((q) => x > q.l && x < q.r && y > q.t && y < q.b);
+      let best = [0, 1], run = null, bestLen = 0;
+      for (let k = 0; k <= 240; k++) { const u = k / 240, pt = main.getPointAtLength(L * u); if (seen(pt.x, pt.y)) { if (run === null) run = u; if (u - run > bestLen) { bestLen = u - run; best = [run, u]; } } else run = null; }
+      replay.set({ main, L, c0, c1, cl, win: bestLen > 0.12 ? best : [0, 1], trail: q('.hr-trail'), marker: q('.hr-marker'), chip: q('.hr-chip'), dot, head });
       const settle = () => {
         dot.setAttribute('cx', end.x); dot.setAttribute('cy', end.y); dot.setAttribute('opacity', '1');
         head.setAttribute('cx', end.x); head.setAttribute('cy', end.y); head.setAttribute('opacity', '.55');
         cl.setAttribute('opacity', '.9');
       };
-      if (!animate || reduced) { settle(); if (animate) [main, glow].forEach((p) => p.animate([{ opacity: 0 }, { opacity: getComputedStyle(p).opacity }], { duration: 220 })); return; }
+      if (!animate || reduced) { settle(); if (animate && !W.shot) [main, glow].forEach((p) => p.animate([{ opacity: 0 }, { opacity: getComputedStyle(p).opacity }], { duration: 220 })); replay.start(animate ? 2400 : 600); return; }
       [main, glow].forEach((p) => { p.style.strokeDasharray = `${L} ${L}`; });
       const ease = (t) => window.DP_MOTION.ease.drawOn(t);
       const dur = 2400, delay = 350; let t0;
@@ -90,52 +105,122 @@
           main.style.strokeDasharray = ''; glow.style.strokeDasharray = '';
           settle();
           cl.animate([{ opacity: 0 }, { opacity: 0.9 }], { duration: 700, easing: 'ease-out' });
-          dot.animate([{ transform: 'scale(0)', transformOrigin: `${end.x}px ${end.y}px` }, { transform: 'scale(1)', transformOrigin: `${end.x}px ${end.y}px` }], { duration: 520, easing: 'cubic-bezier(0.32, 0.72, 0, 1)' });
+          dot.style.transformBox = 'fill-box'; dot.style.transformOrigin = 'center';
+          dot.animate([{ transform: 'scale(0)' }, { transform: 'scale(1)' }], { duration: 540, easing: getComputedStyle(document.documentElement).getPropertyValue('--spring-pin-pop').trim() || 'ease-out' });
+          replay.start(1600);
         }
       };
       requestAnimationFrame(tick);
     }
+
+    /* Hero replay marker (motion v2): after the draw-on, a marker glides the route like Trip Replay, a bright trail
+       follows it, and as it enters the cleanest stretch the segment brightens and a chip pops in. Pauses when the hero
+       is off screen or the tab is hidden. Reduced motion / shot: no marker, the static final state above. */
+    const replay = (() => {
+      let el = null, raf = 0, startAt = 0, pausedAt = 0, visible = true, armed = false, wait = 0;
+      const SPEED = 1 / 15000, GAP = 1600, TRAIL = 0.07; // full route in 15 s; the visible window takes its share
+      const ss = (a, b, x) => { const t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
+      const frame = (now) => {
+        raf = 0;
+        if (!el || !visible || document.hidden) return;
+        const [ua, ub] = el.win, PERIOD = Math.max(4000, (ub - ua) / SPEED);
+        const t = (now - startAt) % (PERIOD + GAP), v = Math.min(1, t / PERIOD), u = ua + (ub - ua) * v;
+        const fade = t > PERIOD ? 0 : ss(0, 0.06, v) * (1 - ss(0.92, 1, v));
+        const pt = el.main.getPointAtLength(el.L * u);
+        el.marker.setAttribute('transform', `translate(${pt.x.toFixed(1)} ${pt.y.toFixed(1)})`);
+        el.marker.setAttribute('opacity', fade.toFixed(3));
+        const tl = el.L * TRAIL, head = el.L * u;
+        el.trail.style.strokeDasharray = `${Math.min(tl, head).toFixed(1)} ${el.L.toFixed(1)}`;
+        el.trail.style.strokeDashoffset = (-(Math.max(0, head - tl))).toFixed(1);
+        el.trail.setAttribute('opacity', (0.85 * fade).toFixed(3));
+        const inClean = ss(el.c0 - 0.01, el.c0 + 0.02, u) * (1 - ss(el.c1 + 0.05, el.c1 + 0.12, u));
+        el.cl.setAttribute('opacity', (0.55 + 0.45 * inClean).toFixed(3));
+        if (el.chip) { el.chip.setAttribute('opacity', inClean.toFixed(3)); }
+        raf = requestAnimationFrame(frame);
+      };
+      const kick = () => { if (!raf && armed && visible && !document.hidden) raf = requestAnimationFrame(frame); };
+      if ('IntersectionObserver' in window) new IntersectionObserver((en) => { visible = en[0].isIntersecting; if (visible) { startAt += performance.now() - pausedAt; kick(); } else pausedAt = performance.now(); }, { threshold: 0.05 }).observe(hero);
+      document.addEventListener('visibilitychange', () => { if (document.hidden) pausedAt = performance.now(); else { startAt += performance.now() - pausedAt; kick(); } });
+      return {
+        set(x) { el = x; },
+        start(delay) {
+          if (reduced) return;
+          clearTimeout(wait);
+          wait = setTimeout(() => { armed = true; startAt = performance.now(); pausedAt = startAt; kick(); }, delay);
+        },
+      };
+    })();
     layoutDevices(); drawHero(true);
     let rz; addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(() => { layoutDevices(); drawHero(false); }, 150); });
 
-    /* ---------- Story stack (scroll-driven) ---------- */
+    /* ---------- Story stack (motion v2: auto-cycles like the real Story player) ----------
+       Each frame dwells 3.4 s while its progress segment fills, then flies up and out; the next card springs forward.
+       Plays only while the section is on screen and the tab is visible; pauses on hover and with the Pause button
+       (WCAG 2.2.2). Steps are buttons that jump to a frame. Reduced motion / shot: static row of frames. */
     const frames = M.storyFrames();
-    const stack = $('stack'), stat = $('stack-static'), scrollSec = document.querySelector('.story-scroll'), track = $('story-track');
+    const stack = $('stack'), stat = $('stack-static'), storySec = document.querySelector('.story-scroll');
     const steps = [...document.querySelectorAll('#story-steps li')];
+    const toggle = $('story-toggle');
     const card = (f) => `<div class="stack__card" data-frame="${f.n}" role="listitem" aria-label="Story frame ${f.n}: ${f.label}">${f.html}</div>`;
     stack.innerHTML = frames.map(card).join('');
     stat.innerHTML = M.storyFrames().map(card).join(''); // separate render: SVG gradient ids must be unique
-    const isStatic = reduced || W.shot;
-    if (isStatic) {
-      scrollSec.setAttribute('data-static', '');
-      steps.forEach((s) => s.classList.add('is-active'));
+    if (reduced || W.shot) {
+      storySec.setAttribute('data-static', '');
+      steps.forEach((s) => { s.classList.add('is-active'); s.querySelector('button')?.setAttribute('tabindex', '-1'); });
+      if (toggle) toggle.hidden = true;
       stat.querySelectorAll('[data-ring-host] .ring').forEach((r) => M.animateRing(r));
       stat.querySelectorAll('[data-gg] svg').forEach((s) => M.animateGG(s, M.HERO_TRIP));
     } else {
-      const cards = [...stack.children]; let active = -1, stopGG = null;
-      const enter = (i) => {
-        const c = cards[i];
+      const cards = [...stack.children], n = cards.length, DWELL = 3400;
+      let idx = 0, timer = 0, fill = null, stopGG = null, playing = true, visible = false, hover = false, entered = -1, remaining = DWELL;
+      const place = () => cards.forEach((c, i) => {
+        const d = (i - idx + n) % n; let tf, op;
+        if (d === 0) { tf = 'none'; op = 1; }
+        else if (d === n - 1) { tf = 'translate3d(-6%, -112%, 0) rotate(-8deg)'; op = 0; }
+        else if (d <= 3) { tf = `translate3d(${d * 26}px, ${d * 14}px, ${-d * 70}px) rotate(${d * 3.2}deg)`; op = 1 - d * 0.2; }
+        else { tf = 'translate3d(104px, 56px, -280px) rotate(12.8deg)'; op = 0; }
+        c.style.transform = tf; c.style.opacity = op; c.style.zIndex = String(20 - d);
+        c.style.filter = d > 0 && d < n - 1 ? `brightness(${1 - d * 0.18})` : '';
+      });
+      const running = () => playing && visible && !hover && !document.hidden;
+      const effects = () => {
         if (stopGG) { stopGG(); stopGG = null; }
-        if (i === 1) { const p = c.querySelector('.sf-draw'); if (p) window.DP_MOTION.drawOn(p, { duration: 1800 }); }
-        if (i === 2) stopGG = M.animateGG(c.querySelector('svg.gg'), M.HERO_TRIP);
-        if (i === 3) M.animateRing(c.querySelector('.ring'), { delay: 200 });
+        const c = cards[idx];
+        if (entered !== idx) {
+          entered = idx;
+          if (idx === 1) { const p = c.querySelector('.sf-draw'); if (p) window.DP_MOTION.drawOn(p, { duration: 1800, delay: 200 }); }
+          if (idx === 3) M.animateRing(c.querySelector('.ring'), { delay: 250, spring: true });
+        }
+        if (idx === 2 && running()) stopGG = M.animateGG(c.querySelector('svg.gg'), M.HERO_TRIP);
       };
-      const layout = () => {
-        const rect = track.getBoundingClientRect(), span = rect.height - innerHeight;
-        const p = Math.max(0, Math.min(0.9999, -rect.top / span));
-        const idx = Math.floor(p * cards.length);
-        cards.forEach((c, i) => {
-          const d = i - idx;
-          let tf, op;
-          if (d < 0) { tf = `translate3d(-8%, -118%, 0) rotate(-9deg)`; op = 0; }
-          else if (d === 0) { tf = 'none'; op = 1; }
-          else { tf = `translate3d(${d * 26}px, ${d * 14}px, ${-d * 70}px) rotate(${d * 3.2}deg)`; op = d > 3 ? 0 : 1 - d * 0.2; }
-          c.style.transform = tf; c.style.opacity = op; c.style.zIndex = 20 - Math.abs(d); c.style.filter = d > 0 ? `brightness(${1 - d * 0.18})` : '';
-        });
-        if (idx !== active) { active = idx; steps.forEach((s, i) => s.classList.toggle('is-active', i === idx)); enter(idx); }
+      const arm = () => {
+        clearTimeout(timer);
+        if (!running()) { fill?.pause(); if (stopGG) { stopGG(); stopGG = null; } return; }
+        fill?.play();
+        if (idx === 2 && !stopGG) stopGG = M.animateGG(cards[2].querySelector('svg.gg'), M.HERO_TRIP);
+        const left = fill ? Math.max(0, DWELL - (fill.currentTime || 0)) : remaining;
+        timer = setTimeout(() => go(idx + 1), left);
       };
-      addEventListener('scroll', () => requestAnimationFrame(layout), { passive: true });
-      addEventListener('resize', layout); layout();
+      const go = (i) => {
+        idx = (i + n) % n; place();
+        steps.forEach((s, k) => { s.classList.toggle('is-active', k === idx); s.querySelector('button')?.setAttribute('aria-current', k === idx ? 'step' : 'false'); });
+        if (idx === 0) entered = -1;
+        fill?.cancel();
+        const b = cards[idx].querySelector('.story-progress .cur b');
+        fill = b ? b.animate([{ transform: 'scaleX(0)' }, { transform: 'scaleX(1)' }], { duration: DWELL, easing: 'linear', fill: 'forwards' }) : null;
+        effects(); arm();
+      };
+      steps.forEach((s, k) => s.querySelector('button')?.addEventListener('click', () => { go(k); }));
+      stack.addEventListener('pointerenter', () => { hover = true; arm(); });
+      stack.addEventListener('pointerleave', () => { hover = false; arm(); });
+      toggle?.addEventListener('click', () => {
+        playing = !playing; toggle.setAttribute('aria-pressed', String(!playing));
+        toggle.innerHTML = playing ? `${W.icon('pause')}<span>Pause</span>` : `${W.icon('play')}<span>Play</span>`;
+        arm();
+      });
+      document.addEventListener('visibilitychange', arm);
+      if ('IntersectionObserver' in window) new IntersectionObserver((en) => { visible = en[0].isIntersecting; arm(); }, { threshold: 0.45 }).observe(stack);
+      place(); go(0);
     }
 
     /* ---------- Smoothness ring section ---------- */
@@ -143,7 +228,7 @@
     $('score-ring').innerHTML = `<div style="width:min(420px,78vw);aspect-ratio:1;font-size:min(140px,27vw)">${M.ring({ score: sm.score, baseline: sm.baseline, recordPrev: sm.record.previous.score, isNewRecord: true, strokeW: 7 })}</div>`;
     const bigRing = $('score-ring').querySelector('.ring');
     if (!reduced) { bigRing.querySelector('.ring-arc').style.strokeDashoffset = bigRing.querySelector('.ring-arc').dataset.c; bigRing.querySelector('.ring-num').textContent = '0'; }
-    io(bigRing, () => M.animateRing(bigRing));
+    io(bigRing, () => M.animateRing(bigRing, { spring: true, delay: 120 }));
     $('contrib').innerHTML = sm.contributors.map((c) => `<li><b>${c.label}</b><span>${c.reason}</span><em class="${c.band === 'smoother' ? 'better' : ''}">${c.band === 'smoother' ? '▲ Smoother' : c.band === 'rougher' ? '▼ Rougher' : '● Usual'}</em></li>`).join('');
 
     /* ---------- Evidence panel (needed brake, Spadina & King) ---------- */
@@ -181,27 +266,44 @@
       document.querySelectorAll('.answer-row .chip').forEach((b) => b.addEventListener('click', () => document.querySelectorAll('.answer-row .chip').forEach((x) => x.setAttribute('aria-pressed', String(x === b)))));
     })();
 
-    /* ---------- Route glyph + dot strip ---------- */
+    /* ---------- Route glyph + dot strip (motion v2: the track fills left to right, each run pops in as the fill
+       reaches it, and the gold record lands last with one ring pulse). Trigger: 40 % in view, once. ---------- */
+    const POP = getComputedStyle(document.documentElement).getPropertyValue('--spring-pin-pop').trim() || 'cubic-bezier(0.32, 0.72, 0, 1)';
     (function routes() {
       const rt = U.route('r_commute');
       $('route-glyph').innerHTML = `<path d="${U.glyphPath(rt.glyph, 120, 96, 8)}" fill="none" stroke="var(--accent)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>`;
       const runs = rt.runs, t0 = +new Date(runs[0].date), t1 = +new Date(runs[runs.length - 1].date);
       const strip = $('dotstrip');
-      strip.innerHTML = runs.map((x, i) => {
-        const left = 2 + ((+new Date(x.date) - t0) / (t1 - t0)) * 96, rec = x.tripId === rt.record.tripId;
-        return `<i class="${rec ? 'rec' : ''}" style="left:${left}%;${reduced ? '' : 'transform:scale(0);'}transition-delay:${i * 60}ms" title="${U.fmtDate(x.date)} · ${x.score}"></i>`;
-      }).join('');
-      io(strip, () => strip.querySelectorAll('i').forEach((d) => (d.style.transform = 'scale(1)')));
+      const pos = runs.map((x) => 2 + ((+new Date(x.date) - t0) / (t1 - t0)) * 96);
+      strip.innerHTML = `<b class="fill" style="width:${pos[pos.length - 1]}%"></b>` + runs.map((x, i) => {
+        const rec = x.tripId === rt.record.tripId;
+        return `<i class="${rec ? 'rec' : ''}" style="left:${pos[i]}%" title="${U.fmtDate(x.date)} · ${x.score}"></i>`;
+      }).join('') + `<span class="rec-pulse" style="left:${pos[runs.findIndex((x) => x.tripId === rt.record.tripId)]}%"></span>`;
+      if (reduced) return;
+      const fillEl = strip.querySelector('.fill'), dots = [...strip.querySelectorAll('i')], pulse = strip.querySelector('.rec-pulse');
+      const FILL = 1500, last = pos[pos.length - 1];
+      fillEl.style.transform = 'scaleX(0)'; dots.forEach((d) => (d.style.opacity = '0'));
+      io(strip, () => {
+        fillEl.animate([{ transform: 'scaleX(0)' }, { transform: 'scaleX(1)' }], { duration: FILL, easing: 'cubic-bezier(0.45, 0, 0.25, 1)', fill: 'forwards' });
+        dots.forEach((d, i) => {
+          const at = Math.round((pos[i] / last) * FILL * 0.92) + 60;
+          d.animate([{ transform: 'scale(0)', opacity: 0 }, { transform: 'scale(1)', opacity: 1 }], { duration: 540, delay: at, easing: POP, fill: 'forwards' });
+        });
+        pulse.animate([{ transform: 'scale(.6)', opacity: 0.7 }, { transform: 'scale(2.6)', opacity: 0 }], { duration: 1100, delay: FILL + 120, easing: 'cubic-bezier(0.32, 0.72, 0, 1)', iterations: 2 });
+      }, { threshold: 0.4 });
     })();
 
-    /* ---------- Weekly recap strip ---------- */
+    /* ---------- Weekly recap strip (motion v2: one dot per drive lands day by day with the pin-pop spring) ---------- */
     (function recap() {
       const rc = M.RECAP, host = $('recap-strip');
-      host.innerHTML = rc.days.map((d, di) => {
-        const dots = d.drives.length ? d.drives.map((x, k) => { const s = Math.round(Math.min(34, 10 + Math.sqrt(x.km) * 4)); return `<span style="width:${s}px;height:${s}px;--s:${reduced ? 1 : 0};--d:${di * 90 + k * 60}ms"></span>`; }).join('') : '<span class="empty"></span>';
+      host.innerHTML = rc.days.map((d) => {
+        const dots = d.drives.length ? d.drives.map((x) => { const s = Math.round(Math.min(34, 10 + Math.sqrt(x.km) * 4)); return `<span style="width:${s}px;height:${s}px"></span>`; }).join('') : '<span class="empty"></span>';
         return `<div>${dots}<em style="font-style:normal">${d.dow}</em></div>`;
       }).join('');
-      io(host, () => host.querySelectorAll('span:not(.empty)').forEach((s) => s.style.setProperty('--s', '1')));
+      if (reduced) return;
+      const spans = [...host.querySelectorAll('span:not(.empty)')];
+      spans.forEach((s) => (s.style.opacity = '0'));
+      io(host, () => spans.forEach((s, k) => s.animate([{ transform: 'translateY(-28px) scale(.4)', opacity: 0 }, { transform: 'none', opacity: 1 }], { duration: 640, delay: 120 + k * 150, easing: POP, fill: 'forwards' })), { threshold: 0.4 });
     })();
 
     /* ---------- Share card (route glyph style: no map, no place names, no speed) ---------- */
