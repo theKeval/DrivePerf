@@ -55,9 +55,15 @@ jobs:
         working-directory: web
         run: npx lhci autorun --config=lighthouserc.cjs
 
+      - name: Lighthouse summary (scores, layout-shift elements)
+        if: always()
+        working-directory: web
+        run: node scripts/lhci-summary.mjs .lighthouseci
+
       - uses: actions/upload-artifact@v7
         if: always()
-        with: { name: lighthouse, path: web/.lighthouseci, if-no-files-found: ignore }
+        # .lighthouseci is a dot-folder, which upload-artifact skips unless told otherwise.
+        with: { name: lighthouse, path: web/.lighthouseci, include-hidden-files: true, if-no-files-found: ignore }
 
   preview:
     name: Preview channel (driveperf-dev)
