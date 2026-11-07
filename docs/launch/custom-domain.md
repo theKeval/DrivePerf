@@ -8,9 +8,18 @@
 
 Namecheap → **Domain List** → driveperf.com → **Manage** → **Advanced DNS**. Send the agent a screenshot or a list of every record under *Host Records* and *Mail Settings*.
 
-| Type | Host | Value | TTL | Keep? |
+What public DNS shows today (agent, `dig`, 7 Nov 2026). It can't see the URL-redirect records or any unused ones, so the screenshot is still needed:
+
+| Type | Host | Value | What it is | During this runbook |
 |---|---|---|---|---|
-| *(fill in from Keval's screenshot)* | | | | |
+| A | `@` | `162.255.119.193` | Namecheap URL forward (`http://driveperf.com` → 302 → `http://www.driveperf.com/`) | **remove** (with its URL Redirect record) |
+| CNAME | `www` | `parkingpage.namecheap.com.` | parking page | **remove** |
+| MX | `@` | `eforward1…5.registrar-servers.com` (10/10/10/15/20) | Namecheap email forwarding | **keep** (replaced later by Zoho's MX in [email.md](email.md)) |
+| TXT | `@` | `v=spf1 include:spf.efwd.registrar-servers.com ~all` | SPF for Namecheap forwarding | **keep** (replaced by Zoho's SPF in [email.md](email.md)) |
+| NS | | `dns1/dns2.registrar-servers.com` | Namecheap BasicDNS | keep (DNS stays at Namecheap) |
+| — | `_dmarc`, DKIM, CAA, AAAA | none | | |
+
+Keval's screenshot of *Advanced DNS*: _(to add)_
 
 **Keep every MX, SPF (`v=spf1 …` TXT), DKIM (`…._domainkey` TXT) and DMARC (`_dmarc` TXT) record.** They carry email ([email.md](email.md)). Only the parking records go.
 

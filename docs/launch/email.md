@@ -10,7 +10,9 @@ The site publishes three addresses: **privacy@** (privacy policy, account deleti
 | **B** (free) | New **Zoho Mail Forever Free** organisation for driveperf.com: one user (e.g. `keval@driveperf.com`) plus the three addresses as aliases (or **groups** if the free plan doesn't allow aliases) | $0 | yes | Up to 5 users, 5 GB each, web and mobile apps only, no IMAP |
 | **C** (minimum) | Namecheap free **email forwarding** to Keval's inbox | $0 | **no** (receive only) | Can't reply from @driveperf.com, which is weak for privacy requests |
 
-**Chosen:** _(Keval to fill in)_
+**Chosen: option A** (Keval, 7 Nov 2026): add driveperf.com to the existing paid Zoho Mail organisation, with privacy@, support@ and hello@ as aliases of Keval's mailbox.
+
+Steps for A (Keval, in the Zoho Mail Admin Console, mailadmin.zoho.com): **Domains → Add Domain** → `driveperf.com` → verify with the TXT method (copy the TXT into the table below) → after verification, **Users → (your user) → Mail aliases → Add** `privacy@driveperf.com`, `support@driveperf.com` and `hello@driveperf.com` → **Domains → driveperf.com → Email configuration**, which shows the MX, SPF and DKIM values for your data centre (generate the DKIM key there with the selector Zoho suggests).
 
 ## Records to add at Namecheap (options A and B)
 
@@ -27,6 +29,7 @@ Zoho shows the exact values during domain setup (*Zoho Mail Admin Console → Do
 | TXT | `_dmarc` | `v=DMARC1; p=none; rua=mailto:privacy@driveperf.com` | — | DMARC (monitor first; tighten to `quarantine` after a few clean weeks) |
 
 Rules:
+- **Today the domain uses Namecheap email forwarding** (MX `eforward1…5.registrar-servers.com`, SPF `v=spf1 include:spf.efwd.registrar-servers.com ~all`; seen with `dig` on 7 Nov 2026). For option A, switching **Mail Settings** from *Email Forwarding* to **Custom MX** removes the forwarding MX records. **Replace** the old SPF TXT with Zoho's, rather than adding a second one. Check first that no forwarding rule in Namecheap is still needed.
 - **Exactly one SPF record.** If §0 of [custom-domain.md](custom-domain.md) shows an existing `v=spf1` TXT, merge the includes into it (for example `v=spf1 include:zoho.com include:… ~all`). Never add a second one.
 - In Namecheap, set **Mail Settings → Custom MX** first; the MX rows then appear under Host Records.
 - These records coexist with the Firebase Hosting **A** and **TXT** (`hosting-site=…`) records at `@`.

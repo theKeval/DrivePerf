@@ -29,7 +29,7 @@ Then tell the agent both project IDs. It updates `.firebaserc` if they differ an
 
 ## 3. Firestore database in each project (console)
 
-**Confirm the location first: `us-central1` (ADR-004). It can never be changed.**
+**Location confirmed by Keval (7 Nov 2026): `us-central1` (ADR-004). It can never be changed.**
 
 Firebase console → *Build* → **Firestore Database** → **Create database**:
 - Edition **Standard**, database ID **(default)**.
@@ -46,7 +46,7 @@ Optional hardening: Google Cloud console → *APIs & Services → Credentials* �
 
 ## 5. CI deploy credentials: Workload Identity Federation (ADR-008)
 
-ADR-008 forbids long-lived cloud keys in this public repository. So CI does **not** use a `FIREBASE_SERVICE_ACCOUNT_*` JSON secret or `firebase init hosting:github`, which creates such a key, or `FirebaseExtended/action-hosting-deploy`, which accepts only a key. Instead, GitHub's OIDC token is exchanged for short-lived credentials of a deploy service account, with `google-github-actions/auth`.
+ADR-008 forbids long-lived cloud keys in this public repository, and Keval chose the keyless setup (7 Nov 2026). So CI does **not** use a `FIREBASE_SERVICE_ACCOUNT_*` JSON secret or `firebase init hosting:github`, which creates such a key, or `FirebaseExtended/action-hosting-deploy`, which accepts only a key. Instead, GitHub's OIDC token is exchanged for short-lived credentials of a deploy service account, with `google-github-actions/auth`.
 
 Run these yourself, once per project (`gcloud auth login` first; `gcloud` is installed at `/opt/homebrew/bin/gcloud`). For the dev project, use `PROJECT=driveperf-dev` and `ENV=dev`. For prod, use `PROJECT=driveperf-prod` and `ENV=prod`.
 
