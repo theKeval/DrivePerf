@@ -41,6 +41,11 @@ Move DRIVE-79 to In Progress when you start.
   - On-device data is kept until the user deletes it.
   - Pro cloud backup is kept until the user deletes it.
   - When Pro ends, the cloud copy is kept 30 days, then deleted.
+- Gate 4 answers (Keval, 6 Nov 2026; decisions.md):
+  - Website page views use **Cloudflare Web Analytics**.
+  - The app ID is **`com.driveperf.app`** on both stores (dev builds `com.driveperf.app.dev`).
+  - Trip files will live on Cloudflare R2. That is not part of this session.
+  - Email: Zoho Mail is recommended for privacy@, support@ and hello@, pending Keval's choice (step 9).
 - npm on this machine: use `node /opt/homebrew/lib/node_modules/npm/bin/npm-cli.js <args>`
   (npx: `.../npx-cli.js`). `npm`/`npx` directly are broken. Never download npm tarballs or
   borrow node_modules.
@@ -75,17 +80,26 @@ Move DRIVE-79 to In Progress when you start.
      SEO 100. Zero CLS from animations.
    - Add per-page meta/OG tags, an OG image (1200×630, made from the brand assets in
      docs/design/system/assets), `sitemap.xml`, `robots.txt`, favicon set and a web manifest.
-   - Analytics must be cookie-less and privacy-preserving, or none at launch if the ADRs
-     don't choose a provider. No cookie banner is needed if no cookies are set; verify that
-     none are set.
+   - Analytics: **Cloudflare Web Analytics** (approved at Gate 4). Use the JavaScript beacon,
+     which needs no DNS change. Keval adds the site in the Cloudflare dashboard (Analytics &
+     Logs → Web Analytics) and gives you the public beacon token. The token is not a secret;
+     keep it in the site config.
+     - Load the beacon only in production builds, and only when the browser sends neither
+       Global Privacy Control nor Do Not Track (ADR-007).
+     - Allow `static.cloudflareinsights.com` (script) and `cloudflareinsights.com` (connect)
+       in the CSP.
+     - No cookie banner is needed if no cookies are set. Verify that none are set.
 3. **Waitlist (F-WEB-02)** on Spark, with no Cloud Functions.
    - Write from the client to the Firestore collection `waitlist`. Rules allow create only,
      no read/update/delete. Validate fields (email format and length, consent === true,
      variant in [A,B], platform in [ios,android,both], createdAt == request.time). The
      document ID is the SHA-256 of the lowercased email, so duplicates are idempotent.
-   - Spam protection: a honeypot field, plus App Check with reCAPTCHA v3 or Enterprise
-     enforced on Firestore. Keval creates the reCAPTCHA key in the console; you tell
-     Keval exactly where.
+   - Spam protection, per ADR-007 (resolves PRD OQ-13): a honeypot field, a minimum
+     time-to-submit, and Firestore rules that validate fields and size.
+     - **No reCAPTCHA at launch**, because it can set Google cookies.
+     - Escalate to App Check with reCAPTCHA Enterprise only if spam is observed. If that
+       happens, Keval creates the key in the console (you tell them exactly where) and the
+       privacy page's cookie note is updated.
    - Implement the prototype's form, submitting, duplicate, network-error and success states.
    - Put the rules in `firebase/firestore.rules` with emulator tests (@firebase/rules-unit-testing).
    - Double opt-in and confirmation emails need a backend (Blaze or the later VPS). For now,
@@ -104,8 +118,12 @@ Move DRIVE-79 to In Progress when you start.
      endpoints actually used, HSTS (no preload yet), X-Content-Type-Options,
      Referrer-Policy strict-origin-when-cross-origin, and a Permissions-Policy that denies
      camera/mic/geolocation.
-   - Add `/.well-known/apple-app-site-association` and `/.well-known/assetlinks.json`
-     placeholders with the correct content-type, for future universal/app links.
+   - Add `/.well-known/apple-app-site-association` and `/.well-known/assetlinks.json` with the
+     correct content-type (`application/json`, no redirect), for future universal/app links.
+     - Android package: `com.driveperf.app`. The SHA-256 fingerprint comes from Play Console
+       → App integrity later, so leave a placeholder.
+     - iOS app ID: `<TEAM_ID>.com.driveperf.app`. The Team ID exists once the Apple Developer
+       account is bought.
 6. **CI.**
    - Add `.github/workflows/web-deploy.yml` using FirebaseExtended/action-hosting-deploy: a
      preview channel per PR (expires in 7 days) and the live channel on merge to main.
@@ -130,9 +148,32 @@ Move DRIVE-79 to In Progress when you start.
      `dig TXT`, `dig www.driveperf.com`, and the console status (it can take up to 24 h).
      Then confirm HTTPS (the certificate is auto-provisioned), the www redirect and HSTS.
 9. **Email addresses used on the site.** The site uses privacy@, support@ and hello@driveperf.com.
-   - Tell Keval to set up free email forwarding in Namecheap (Domain → Redirect Email) to
-     their inbox, or a mailbox provider. Add the SPF record that the forwarding needs.
-   - Verify the MX records exist with dig before launch.
+   Firebase has no mailboxes. The recommended setup is in decisions.md (6 Nov 2026, "Email").
+   First ask Keval which option they choose:
+   - **A (recommended if Keval's existing Zoho organisation is on a paid plan):** add
+     driveperf.com as a domain in that Zoho organisation. Make privacy@, support@ and hello@
+     aliases of Keval's existing mailbox. There is no extra cost.
+   - **B (free):** a new Zoho Mail Forever Free organisation for driveperf.com: up to 5 users,
+     5 GB each, web and mobile apps only, no IMAP. Create one user, for example
+     keval@driveperf.com, and add the three addresses as aliases. If Zoho's free plan doesn't
+     allow aliases, make them groups.
+   - **C (minimum):** Namecheap free email forwarding to Keval's inbox. It is receive-only;
+     Keval can't send from @driveperf.com.
+
+   Keval creates the account and does all console steps; you never handle their credentials.
+   Give Keval the exact Namecheap records Zoho shows:
+   - the verification TXT;
+   - MX `mx.zoho.com`, `mx2.zoho.com` and `mx3.zoho.com` (use Zoho's own values for the
+     account's data centre);
+   - SPF `v=spf1 include:zoho.com ~all`. Merge it with any existing SPF; never create two SPF
+     records.
+   - the DKIM TXT;
+   - DMARC, starting at `v=DMARC1; p=none; rua=mailto:privacy@driveperf.com`.
+
+   These records coexist with the Firebase Hosting A and TXT records at the apex.
+
+   Verify with `dig MX driveperf.com` and `dig TXT driveperf.com`. Then ask Keval to send a
+   test email to each address, and reply from one, before launch.
 10. **Done.**
     - Open the PR "DRIVE-79: website on Firebase Hosting with driveperf.com" with a summary,
       screenshots, Lighthouse scores, the preview URL, and the follow-ups (double opt-in

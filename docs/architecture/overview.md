@@ -15,7 +15,7 @@
 4. **Sensors and background execution are native** and feed the shared pipeline in ~1 s batches.
 5. **Apps talk to our own API, `api.driveperf.com/v1`, for all user data**: sync, trip-file tickets, account, deletion, grants ([ADR-004](adr/ADR-004-backend-v1-and-migration-seam.md)).
 6. **SDK-direct only where it must be:** Firebase Auth, App Check, Analytics, Crashlytics, Remote Config, (later) FCM, and RevenueCat.
-7. **Backend v1 = Firebase project "DrivePerf"**: Spark first; Blaze at the start of Phase 6 for Cloud Run (Kotlin/Ktor API), Cloud Storage and Cloud Scheduler. Firestore holds server records; trip files are portable gzip-protobuf blobs.
+7. **Backend v1 = Firebase project "DrivePerf"**: Spark first; Blaze at the start of Phase 6 for Cloud Run (Kotlin/Ktor API) and Cloud Scheduler. Firestore holds server records; trip files are portable gzip-protobuf blobs on **Cloudflare R2** (S3-compatible, no egress fees; Gate 4).
 8. **Portable by construction:** UUIDv7 keys, UTC timestamps, versioned schemas, issuer-agnostic JWT checks, presigned-URL blobs, no Firestore triggers.
 9. **Stay on Firebase until a trigger fires** (cost, storage, scale, features, compliance, vendor risk), then move the server side to a VPS without an app release ([ADR-010](adr/ADR-010-firebase-now-vs-vps.md)).
 10. **Web:** Astro static site on Firebase Hosting at `driveperf.com`; Namecheap is registrar/DNS only ([ADR-009](adr/ADR-009-web-stack.md)).
@@ -72,7 +72,7 @@ flowchart LR
         hostapi["Hosting site: api.driveperf.com<br/>[rewrite → Cloud Run]"]
         api["API service<br/>[Kotlin/Ktor container on Cloud Run]<br/>OpenAPI /v1"]
         fs[("Firestore<br/>users, identities, synced entities,<br/>blobs, entitlements, waitlist")]
-        gcs[("Cloud Storage<br/>trip-file backups")]
+        r2[("Cloudflare R2<br/>trip-file backups")]
         sched["Cloud Scheduler<br/>daily maintenance · hourly deletion"]
         auth["Firebase Auth<br/>Apple · Google · email link"]
         appcheck["App Check"]
@@ -84,9 +84,9 @@ flowchart LR
     kmpa -->|"HTTPS /v1"| hostapi
     hostapi --> api
     api --> fs
-    api -->|"mints presigned URLs"| gcs
-    kmpi -.->|"PUT/GET presigned URL<br/>(URLSession background)"| gcs
-    kmpa -.->|"PUT/GET presigned URL<br/>(WorkManager)"| gcs
+    api -->|"mints presigned URLs"| r2
+    kmpi -.->|"PUT/GET presigned URL<br/>(URLSession background)"| r2
+    kmpa -.->|"PUT/GET presigned URL<br/>(WorkManager)"| r2
     sched -->|"OIDC-authenticated POST /v1/jobs/*"| api
     ios -->|"SDK"| auth
     andapp -->|"SDK"| auth
@@ -153,7 +153,7 @@ flowchart TB
     end
     subgraph backend["backend/api"]
         broutes["routes"] --> bapp["application"] --> bports["ports"]
-        badapt["adapters<br/>Firestore, GCS (later Postgres, S3)"] --> bports
+        badapt["adapters<br/>Firestore, R2 (later Postgres)"] --> bports
     end
 
     domain --> foundation
@@ -201,7 +201,7 @@ sequenceDiagram
     participant Sync as shared data/sync
     participant API as api.driveperf.com/v1
     participant Store as Firestore
-    participant Blob as Cloud Storage
+    participant Blob as Cloudflare R2
     BG->>Sync: runOnce()
     Sync->>API: POST /sync/push (mutations with mutationId, tombstones)
     API->>API: verify ID token + App Check, check Pro mirror
@@ -226,11 +226,15 @@ sequenceDiagram
 - **Retention:** on device until the user deletes; Pro cloud until the user deletes; 30 days after Pro ends, then deleted ([ADR-003](adr/ADR-003-local-storage-trip-files-retention.md)).
 - **Markets:** Canada + US, English only; Firebase region us-central1 (disclosed; Law 25 PIA covers the transfer).
 
-## 7. Open questions for Keval (Gate 4)
+## 7. Gate 4 answers (Keval, 6 Nov 2026)
 
-1. **Full-rate R0 sensor log kept 30 days by default** (A11's recommendation, data-model.md §2.6, with a "Forever" setting) — this changes your 6 Nov retention rule ("on-device until the user deletes it"); ADR-003 keeps your rule until you approve.
-2. **Blaze at the start of Phase 6** (first account/backup feature), with budget alerts at US$5/25/50 — consistent with PRD OQ-16. Also move the website to Blaze before any launch push expected to exceed ~700 visits/day (Spark Hosting is a hard cap).
-3. **Two Firebase projects:** `driveperf-prod` (display name "DrivePerf") and `driveperf-dev`. Project IDs, the Firestore location (`us-central1`) and the iOS bundle ID (`com.driveperf.app`) are permanent once created.
-4. **Trip files:** Cloud Storage now (default, per your direction) or Cloudflare R2/Backblaze B2 from day one to avoid a later blob migration and its egress bill?
-5. **Website page-view analytics:** Cloudflare Web Analytics (free, cookie-less, third-party script) acceptable, or wait for a first-party beacon on our API?
-6. **Counsel items:** sharing Android Google Maps snapshots on the map card (ADR-005); whether any consent-free, identifier-free aggregate usage count is allowed (PRD OQ-02).
+1. **R0 sensor log:** not pruned automatically; kept on the phone until the user deletes it (data-model.md §2.6).
+2. **30-day window after Pro:** restore to a new phone and download stay possible (read-only).
+3. **Privacy zones:** included in Pro backup; never in analytics.
+4. **Email:** Zoho Mail recommended for the mailboxes, pending Keval's choice; the sending provider is picked before Phase 6 email features.
+5. **Website analytics:** Cloudflare Web Analytics. App analytics and crash reporting: see `research/analytics-crash-privacy.md` and ADR-007.
+6. **Trip files:** Cloudflare R2 from day one (ADR-004, ADR-010).
+7. **Minimum OS:** iOS 26, Android 10.
+8. **App ID:** `com.driveperf.app` on both stores.
+
+Still open: Blaze at the start of Phase 6 and the two project IDs (`driveperf-prod`, `driveperf-dev`), confirmed when Keval creates them in the hosting session; counsel items (Android map snapshots, ADR-005; PRD OQ-02).

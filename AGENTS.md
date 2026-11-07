@@ -16,8 +16,8 @@ agentic engineering team. Agent-specific rules live in the sibling files.
 - **Design flag:** the Jira label **`design-needed`** marks tickets requiring design work.
 - **Pilot product repo:** `theKeval/DrivePerf` (GitHub) — Android app, Kotlin, Jetpack
   Compose. Default branch: `main`.
-- **Product identity:** **DrivePerf**, domain **`driveperf.com`**, Android package
-  **`com.driveperf`** (subpackages `com.driveperf.*`).
+- **Product identity:** **DrivePerf**, domain **`driveperf.com`**, app ID
+  **`com.driveperf.app`** on both stores (dev builds `com.driveperf.app.dev`); Kotlin packages `com.driveperf.*`.
 - **Slack:** workspace `AgenticWorkflow`, channel **#agentic-team**. Bot handles:
   **@product_manager** (PM), **@developer** (dev), **@senior_developer** (reviewer),
   **@designer**.

@@ -4,7 +4,7 @@
 |---|---|
 | **Jira** | DRIVE-51 (FND-04) · kickoff prompt A11 |
 | **Author** | Agent A11 (backend and data) · 6 Nov 2026 |
-| **Status** | Draft for Gate 4. Written in parallel with A10's ADRs and aligned with them afterwards (§0.4): ADR-003 storage and file format, ADR-004 backend and migration seam, ADR-006 payments, ADR-007 analytics, ADR-010 Firebase vs VPS. |
+| **Status** | Draft for Gate 4; updated with Keval's Gate 4 answers (6 Nov 2026: R0 kept, privacy zones backed up, restore in the 30-day window, trip files on Cloudflare R2). Written in parallel with A10's ADRs and aligned with them afterwards (§0.4): ADR-003 storage and file format, ADR-004 backend and migration seam, ADR-006 payments, ADR-007 analytics, ADR-010 Firebase vs VPS. |
 | **Binding inputs** | [decisions.md](../product/decisions.md) (incl. the 6 Nov 2026 retention decision that resolves OQ-09), [PRD v1](../product/PRD-v1.md) (F-ACC, F-PRV, F-SUB, F-RTE, F-RPL, F-ANA, §5, §6, §9), [A3 feasibility](../research/2026-11/A3-platform-feasibility.md), [fixtures](../design/system/fixtures.md) and `prototypes/shared/data.js`, product-owner brief of 6 Nov 2026 (Firebase first, then a self-managed VPS with no client rewrite). |
 | **Consumers** | A14 (shared KMP core: schema, sync engine), A15/A16 (platform adapters, file protection), A17 (API, Firestore/Storage rules, indexes, jobs), A12 (trip file channels), A20 (store privacy forms), counsel (PIA, policy). |
 
@@ -15,13 +15,13 @@
 ## Summary
 
 - **Local-first.** The phone's SQLite database (SQLDelight) and per-trip files are the source of truth for every tier. The cloud is a *backup and multi-device mirror* that only Pro (including Pro Preview and the Ride-along pass) writes to.
-- **Five representations, one domain model.** Domain entities (pure Kotlin) ↔ device schema (SQLDelight DDL + trip files) ↔ wire DTOs (the sync contract) ↔ cloud storage (Firestore documents now, Postgres rows later) ↔ blob objects (Cloud Storage now, S3-compatible later). Mappers live only at the edges; nothing above the data layer sees a Firestore type or a SQL row.
+- **Five representations, one domain model.** Domain entities (pure Kotlin) ↔ device schema (SQLDelight DDL + trip files) ↔ wire DTOs (the sync contract) ↔ cloud storage (Firestore documents now, Postgres rows later) ↔ blob objects (Cloudflare R2, S3-compatible, before and after the VPS move). Mappers live only at the edges; nothing above the data layer sees a Firestore type or a SQL row.
 - **Portable identity.** Every record ID is a client-generated **UUIDv7**. The only server-assigned ID is the account ID (the Firebase UID), which is kept as an opaque string forever, including after migration (it is also the RevenueCat app user ID).
 - **Every record** carries `schemaVersion`, `createdAt`, `updatedAt`, `deletedAt` (tombstone) and, in the cloud, a per-account change counter `rev` (identical in Firestore and Postgres) plus `serverUpdatedAt`. Times are UTC epoch milliseconds plus the local UTC offset in minutes (and an IANA zone where it matters).
-- **What leaves the phone.** For Pro backup: trip summaries, events, scores, a simplified preview track, the analysis-grade trip file ("R1", ≈ 0.6 MB per driving hour), routes, cars, places, settings and consents. **Never:** full-rate raw sensor logs ("R0"), privacy zones, car photos, recaps, glyphs and other recomputable data. Free users who sign in upload **only an account record**.
-- **Sync contract** is API-shaped: resources, per-resource cursors, mutations with idempotency keys, per-field last-writer-wins on hybrid logical clocks, tombstones that never resurrect. ADR-004 implements it as **our own `/v1` HTTP API on Cloud Run** in front of Firestore and Cloud Storage, so the move to a VPS changes only server adapters (§4.9). The contract would also work over Firebase SDKs; that variant is kept only as a documented fallback.
+- **What leaves the phone.** For Pro backup: trip summaries, events, scores, a simplified preview track, the analysis-grade trip file ("R1", ≈ 0.6 MB per driving hour), routes, cars, places, privacy zones, settings and consents. **Never:** full-rate raw sensor logs ("R0"), car photos, recaps, glyphs and other recomputable data. Free users who sign in upload **only an account record**.
+- **Sync contract** is API-shaped: resources, per-resource cursors, mutations with idempotency keys, per-field last-writer-wins on hybrid logical clocks, tombstones that never resurrect. ADR-004 implements it as **our own `/v1` HTTP API on Cloud Run** in front of Firestore and Cloudflare R2, so the move to a VPS changes only server adapters (§4.9). The contract would also work over Firebase SDKs; that variant is kept only as a documented fallback.
 - **Retention** follows the 6 Nov 2026 decision: device data kept until the user deletes it; Pro cloud data kept until the user deletes it or the account; when Pro ends the cloud copy is kept 30 days with reminders at 30/7/1 days, then a daily purge job deletes it (Cloud Scheduler calling the API's job endpoint on Firebase/Cloud Run, a systemd timer calling the same endpoint on the VPS; one codebase behind ports).
-- **Cost.** About **US$0.005 per backed-up user per month** after a year; data storage, operations and the API come to roughly **US$1–2/mo at 1k DAU, US$6–8/mo at 5k DAU and US$27–40/mo at 20k DAU** with 25 % of DAU backing up (§7; ADR-004's ≈ US$45–55 at 20k adds website hosting). Firestore stays inside the free daily operation quotas up to about 20k DAU; storage volume is the cost driver.
+- **Cost.** About **US$0.005 per backed-up user per month** after a year; data storage, operations and the API come to roughly **about US$1/mo at 1k DAU, US$4–6/mo at 5k DAU and US$20–32/mo at 20k DAU** with 25 % of DAU backing up (§7; ADR-004's ≈ US$40–50 at 20k adds website hosting). Firestore stays inside the free daily operation quotas up to about 20k DAU; storage volume is the cost driver.
 
 ---
 
@@ -56,7 +56,7 @@ flowchart LR
   D --> P
   P <-->|mappers| W
   W <-->|"HTTPS /v1 (ADR-004)"| A["DrivePerf API<br/>(Ktor on Cloud Run now, on the VPS later)"]
-  A <-->|"Firestore + GCS store adapters (now)"| F["Firestore docs + Storage objects (§3.2–3.5)"]
+  A <-->|"Firestore + R2 store adapters (now)"| F["Firestore docs + R2 objects (§3.2–3.5)"]
   A <-->|"Postgres + S3 store adapters (later)"| V["Postgres rows + S3 objects (§3.6–3.7)"]
 ```
 
@@ -66,7 +66,7 @@ flowchart LR
 | Device persistence | `shared/data/local` | SQLDelight `.sq` files, trip-file codec | Firestore, HTTP |
 | Wire DTOs | `shared/data/sync` | JSON/protobuf DTOs of §4, mappers to domain | SQL tables, Firestore types |
 | Remote adapter (client) | `shared/data/remote` (Ktor, ADR-004) | HTTP client for the §4 contract | Firestore, SQL, domain internals |
-| Server | `backend/api` (same image on Cloud Run and the VPS) | contract DTOs, merge, Firestore/GCS and Postgres/S3 store adapters, jobs | client code |
+| Server | `backend/api` (same image on Cloud Run and the VPS) | contract DTOs, merge, Firestore and Postgres store adapters, the R2 (S3) blob adapter, jobs | client code |
 
 ### 0.3 Ports the clients code against
 
@@ -112,7 +112,7 @@ interface AccountService {
 |---|---|---|---|
 | ADR-002/004 | Own `/v1` HTTP API on Cloud Run; clients use one Ktor adapter; Firestore/Storage rules deny clients; no Functions triggers; Scheduler jobs call `/v1/jobs/*` | Adopted throughout (§3.1, §3.3–3.4, §4.9, §5.4) | — |
 | ADR-003 | SQLDelight; chunked protobuf + gzip; R0/R1 tiers; UUIDv7 as BLOB or TEXT ("A11 picks") | **TEXT** (canonical lower-case) everywhere on the device — readable in debugging and identical to the wire and Firestore IDs; 20 extra bytes per key is irrelevant at this scale | — |
-| ADR-003 | R0 30-day default needs PO approval | Marked pending (§2.6, §5.2, OQ-A11-04) | PO |
+| ADR-003 | R0 30-day default needs PO approval | ✅ Not approved at Gate 4: R0 is kept until the user deletes it (§2.6, §5.2) | — |
 | ADR-004 rule 3 | `updatedAt` is server-assigned; `rev` incremented per write | `updatedAt` = the device's last-edit time (HLC wall, needed for LWW and offline display); the server stamps are **`rev`** (cursor, ordering) and **`serverUpdatedAt`** (commit time) | A10 to rename in rule 3 |
 | ADR-004 rule 6 | Cursor `(updatedAt, id)` | Cursor = per-account **`rev`** assigned under per-account serialisation, because a timestamp cursor can skip a slow Postgres transaction (§4.5). Clients see an opaque string either way | A10 to update rule 6 |
 | ADR-004 | Region `us-central1` | Adopted | — |
@@ -218,9 +218,9 @@ Deleting a vehicle tombstones it; trips keep `vehicleId` and render as "Unknown 
 
 | PrivacyZone field | Type | Unit | Prov. | Sync | Notes |
 |---|---|---|---|---|---|
-| `name` | String | | U | — | |
-| `lat`, `lng` | Double | deg | U | — | |
-| `radiusM` | `200`/`400`/`800` | m | U | — | F-PRV-07.2: **device only**, never in analytics or backup (see OQ-A11-03) |
+| `name` | String | | U | ✓ | |
+| `lat`, `lng` | Double | deg | U | ✓ | Precise location: covered by the backup consent |
+| `radiusM` | `200`/`400`/`800` | m | U | ✓ | F-PRV-07.2 (changed at Gate 4): kept on the device and in **Pro backup**; never in analytics or on share cards |
 
 ### 1.7 Trip (fixture `trips[]`)
 
@@ -451,7 +451,7 @@ Consents are part of the **account record**: they upload for every signed-in use
 | `glyph` | not stored or synced | Derived at share time with privacy zones and random trimming (F-SHR-02) |
 | `gg {points, envelope}` | not stored | Derived from R1 |
 | `routes[].runs/record/trend` | derived | P9 |
-| `user.places`, `user.privacyZones` | `Place`, `PrivacyZone` | Places sync; zones are device only |
+| `user.places`, `user.privacyZones` | `Place`, `PrivacyZone` | Both sync with Pro backup (zones since Gate 4) |
 | `quality.excludedMin/scoredMin/totalMin` | `excludedS/scoredS/totalS` | P5 |
 
 ---
@@ -564,13 +564,18 @@ CREATE TABLE place (
   field_clock      TEXT NOT NULL DEFAULT '{}'
 );
 
-CREATE TABLE privacy_zone (                              -- device only (F-PRV-07.2)
+CREATE TABLE privacy_zone (                              -- synced with Pro backup (F-PRV-07.2, Gate 4)
   id               TEXT NOT NULL PRIMARY KEY,
   name             TEXT NOT NULL,
   lat              REAL NOT NULL,
   lng              REAL NOT NULL,
   radius_m         INTEGER NOT NULL CHECK (radius_m IN (200, 400, 800)),
-  created_at       INTEGER NOT NULL
+  schema_version   INTEGER NOT NULL DEFAULT 1,
+  created_at       INTEGER NOT NULL,
+  updated_at       INTEGER NOT NULL,
+  deleted_at       INTEGER,
+  origin_device_id TEXT NOT NULL,
+  field_clock      TEXT NOT NULL DEFAULT '{}'
 );
 
 -- Trip.sq
@@ -920,15 +925,15 @@ The preview track is the fixture `track`: ≤ 400 time-ordered rows (≈ every 5
 
 | Tier | Content | Est. size per driving hour | Kept on device | Backed up |
 |---|---|---|---|---|
-| **R0 capture log** | Device-frame IMU at 50 Hz (14 channels), every GNSS fix, marks | ≈ 3–5 MB gzip (10–20 MB raw, A3 §2) | **30 days** after the trip by default; setting "Keep full-rate sensor data: 30 days · Forever" | **Never** in v1 |
+| **R0 capture log** | Device-frame IMU at 50 Hz (14 channels), every GNSS fix, marks | ≈ 3–5 MB gzip (10–20 MB raw, A3 §2) | **Until the user deletes the trip** or removes detailed data (F-SET-04); no automatic pruning (Gate 4). Settings shows its size | **Never** in v1 |
 | **R1 analysis file** | Vehicle-frame lon/lat/vert G + yaw rate at 25 Hz, GNSS 1 Hz, quality, marks | ≈ 0.4–1.0 MB gzip (planning value **0.6 MB/h**) | Until the user deletes the trip, or removes detailed data with F-SET-04 ("older than 6/12/24 months") | Yes (Pro) |
 | **Summary + preview** | Trip row, events, score, preview track | ≈ 10 KB per trip (DB ≈ 4–5 KB incl. indexes + preview ≈ 4 KB) | Until the user deletes the trip | Yes (Pro) |
 
-**Approval needed.** The 6 Nov 2026 decision keeps on-device data until the user deletes it. Pruning R0 after 30 days is automatic deletion of on-device data, so (as ADR-003 notes) it needs the product owner's approval and a decisions-log entry before it ships (OQ-A11-04). If it is not approved, R0 is kept until the user deletes the trip or uses F-SET-04, and Settings shows its size.
+**Decided at Gate 4 (6 Nov 2026):** R0 is **not** pruned automatically. It stays until the user deletes the trip or uses F-SET-04, and Settings → Storage shows its size. Revisit after beta with real storage numbers; any automatic pruning would need a new decision and a clear setting.
 
 **Why this split.** Everything the product shows — Replay, Analysis, event evidence, G-G, range statistics, ghost comparison — runs from R1, so "locked, not lost" (F-HIS-03.3) holds for old trips with ≈ 0.6 MB/h instead of the ≈ 1.5 GB/yr that OQ-23 warned about (1 h/day of R0). R0 exists for **reprocessing** after a pipeline change that touches frame alignment or filtering, and for diagnosing capture bugs. Thirty days covers a release cycle: a new pipeline version reprocesses the last 30 days from R0 and older trips from R1 (or keeps their stored score, labelled with its `algorithmVersion`). A12 confirms that 25 Hz vehicle-frame data is enough for its jerk and event detectors; if not, R1 moves to 50 Hz (≈ 1.2 MB/h, still under the F-SET-04 target of ≤ 5 MB/h).
 
-**Storage per year at 1 h of driving per day:** R1 ≈ 220 MB + summaries ≈ 10 MB + rolling R0 ≈ 90–150 MB. EC-STO still applies (below 100 MB free, stop R0 but keep GNSS and summaries).
+**Storage per year at 1 h of driving per day:** R1 ≈ 220 MB + summaries ≈ 10 MB + R0 ≈ 1.1–1.8 GB (kept until deleted). EC-STO still applies (below 100 MB free, stop R0 but keep GNSS and summaries).
 
 ### 2.7 OS device backups (F-ACC-01 platform note)
 
@@ -948,13 +953,13 @@ S-ACC-01 shows the OS backup status note (F-ACC-01.2). OS backups are controlled
 
 | Item | v1 choice | Notes |
 |---|---|---|
-| Firebase project | `DrivePerf` (one project + Emulator Suite; a separate prod project only if ADR-004 says so) | Spark until cloud backup is built, then Blaze with a ≈ US$5 budget alert (decisions log, PRD OQ-16) |
-| Firestore | Standard edition, **`us-central1`** (regional) | Cheapest US location; co-located with the bucket. The Firestore location cannot be changed later; ADR-004 confirms. A Canadian location (`northamerica-northeast1`) is possible but costs more and is outside the Storage free tier; the Law 25 PIA covers the transfer to the US either way (PRD §6.5) |
-| Cloud Storage | Default `driveperf-….firebasestorage.app` bucket, `us-central1`, Standard class | The free tier only applies in `us-central1`, `us-west1`, `us-east1` [FB-PRICE]. Soft delete keeps deleted objects 7 days by default [GCS-SD]; keep it (accidental-deletion safety) and disclose it (§5.6) |
+| Firebase projects | `driveperf-prod` (display name "DrivePerf") and `driveperf-dev`, plus the Emulator Suite (ADR-008) | Spark until cloud backup is built, then Blaze with a ≈ US$5 budget alert (decisions log, PRD OQ-16) |
+| Firestore | Standard edition, **`us-central1`** (regional) | Cheapest US location. The Firestore location cannot be changed later; ADR-004 confirms. A Canadian location (`northamerica-northeast1`) is possible but costs more; the Law 25 PIA covers the transfer to the US either way (PRD §6.5) |
+| Trip files | **Cloudflare R2** buckets `driveperf-trips-prod` / `-dev`, ENAM location hint, Standard class (Gate 4) | 10 GB-month, 1M writes and 10M reads a month free; US$0.015/GB-month after; no egress fees [R2-PRICE]. Deleted objects are removed by the purge job 7 days after the tombstone (§5.6) |
 | Auth | Firebase Authentication: Apple, Google, email link | 50K MAU at no cost [FB-PRICE] |
-| API | Cloud Run service `api` (Kotlin/Ktor container) behind `api.driveperf.com` (ADR-004): sync, blobs (V4 signed URLs), entitlement, Preview claim, RevenueCat webhook, account deletion, job endpoints | No Cloud Functions triggers (they do not port to a VPS) |
+| API | Cloud Run service `api` (Kotlin/Ktor container) behind `api.driveperf.com` (ADR-004): sync, blobs (S3 presigned URLs for R2), entitlement, Preview claim, RevenueCat webhook, account deletion, job endpoints | No Cloud Functions triggers (they do not port to a VPS) |
 | Scheduler | Cloud Scheduler: `daily` (03:17 UTC) and `deletion` (hourly) → `POST /v1/jobs/{daily|deletion}` with OIDC | §5.4 |
-| App Check | Verified by the API on every request; enforced on the waitlist collection | App Attest needs the paid Apple account |
+| App Check | Verified by the API on every request. The waitlist uses a honeypot, a minimum time-to-submit and validating rules, with no reCAPTCHA unless spam appears (ADR-007) | App Attest needs the paid Apple account |
 
 ### 3.2 Firestore document tree
 
@@ -965,6 +970,7 @@ users/{accountId}/settings/profile             synced preferences (singleton)   
 users/{accountId}/devices/{deviceId}                                                            ← Pro backup
 users/{accountId}/vehicles/{vehicleId}                                                          ← Pro backup
 users/{accountId}/places/{placeId}                                                              ← Pro backup
+users/{accountId}/privacyZones/{zoneId}                                                         ← Pro backup (Gate 4)
 users/{accountId}/routes/{routeId}                                                              ← Pro backup
 users/{accountId}/trips/{tripId}               summary + events + feedback + score + preview    ← Pro backup
 accounts/{accountId}                           server-only: status, backup window, epoch, entitlement mirror (owner may read)
@@ -1241,61 +1247,18 @@ service cloud.firestore {
 
 **Notes for A17.** (1) Rules unit tests (Emulator): every path except `waitlist` create is denied; the waitlist rejects extra fields, wrong types and client-supplied timestamps. (2) The API's authorisation checks above get their own contract tests, run against both the Firestore and the Postgres store adapters. (3) The waitlist uses auto IDs; duplicates are removed at export, so the page can say "You're on the list" without revealing whether an email was already present.
 
-### 3.4 Cloud Storage layout and rules draft
+### 3.4 Trip-file object storage (Cloudflare R2): layout and access
 
 ```text
-gs://<project>.firebasestorage.app/
+r2://driveperf-trips-prod/
   u/{accountId}/t/{tripId}/r1.v{formatVersion}.{sha256[0:16]}.pb.gz   R1 analysis file (content-addressed, immutable)
   u/{accountId}/t/{tripId}/r0.v{formatVersion}.{sha256[0:16]}.pb.gz   reserved, not uploaded in v1
   x/{accountId}/{exportId}.zip                                         reserved for server-built exports (lifecycle: delete after 7 days)
 ```
 
-Object metadata: `contentType: application/x-protobuf`, custom metadata `sha256` (hex, full), `tripId`, `formatVersion`. No `Content-Encoding: gzip` (avoids decompressive transcoding; the client decompresses). Reprocessing writes a new key and deletes the old one. The same keys are used unchanged in S3 after migration (§3.6).
+Object metadata: `contentType: application/x-protobuf`, custom metadata `sha256` (hex, full), `tripId`, `formatVersion`. No `Content-Encoding: gzip` (avoids decompressive transcoding; the client decompresses). Reprocessing writes a new key and deletes the old one. The same keys stay unchanged after the VPS migration, because the bucket does not move (§8).
 
-**Production (ADR-004):** all client access is denied; devices upload and download through **V4 signed URLs** minted by the API after its ownership, entitlement and size checks (`POST /v1/blobs:prepare`, `GET /v1/blobs/{key}`, 15-minute expiry, `Content-Type` and the `x-goog-meta-sha256` header bound into the signature). The same flow works with S3 presigned URLs after migration.
-
-```js
-rules_version = '2';
-service firebase.storage {
-  match /b/{bucket}/o {
-    match /{allPaths=**} { allow read, write: if false; }   // signed URLs bypass rules by design
-  }
-}
-```
-
-<details>
-<summary>Variant for SDK-direct clients (not deployed; same authorisation model as §3.3's variant)</summary>
-
-```js
-rules_version = '2';
-service firebase.storage {
-  match /b/{bucket}/o {
-    function isOwner(uid)     { return request.auth != null && request.auth.uid == uid; }
-    function nowMs()          { return request.time.toMillis(); }
-    function canBackupWrite() { return request.auth.token.get('bkw', 0) > nowMs(); }
-    function canBackupRead()  { return request.auth.token.get('bkr', 0) > nowMs(); }
-    function notDeleting()    { return request.auth.token.get('del', false) == false; }
-
-    match /u/{uid}/t/{tripId}/{fileName} {
-      allow get:    if isOwner(uid) && canBackupRead();
-      allow list:   if false;                                   // the trip document lists its files
-      allow create: if isOwner(uid) && notDeleting() && canBackupWrite()
-        && tripId.matches('^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$')
-        && fileName.matches('^r1[.]v[0-9]{1,3}[.][0-9a-f]{16}[.]pb[.]gz$')
-        && request.resource.size > 0
-        && request.resource.size < 32 * 1024 * 1024                 // 32 MB ≈ 30+ h of R1
-        && request.resource.contentType == 'application/x-protobuf'
-        && request.resource.metadata.sha256.matches('^' + fileName.split('[.]')[2] + '[0-9a-f]{48}$')
-        && request.resource.metadata.tripId == tripId;
-      allow update: if false;                                   // content-addressed, immutable
-      allow delete: if isOwner(uid);                            // deletion is always allowed
-    }
-    match /{allPaths=**} { allow read, write: if false; }
-  }
-}
-```
-
-</details>
+**Production (ADR-004, Gate 4):** the bucket is private (no public access, no `r2.dev` URL). Devices upload and download only through **S3 SigV4 presigned URLs** minted by the API after its ownership, entitlement and size checks (`POST /v1/blobs:prepare`, `GET /v1/blobs/{key}`, 15-minute expiry; `Content-Type`, `Content-Length` and the `x-amz-meta-sha256` header are bound into the signature). The API's R2 token is scoped to this bucket (Object Read & Write) and kept in Secret Manager. There are no Firebase Storage rules, because R2 is not a Firebase product.
 
 ### 3.5 Firestore indexes
 
@@ -1483,6 +1446,23 @@ CREATE TABLE dp.places (
   rev              bigint NOT NULL
 );
 CREATE INDEX places_account_rev ON dp.places (account_id, rev);
+
+CREATE TABLE dp.privacy_zones (                         -- Pro backup since Gate 4 (F-PRV-07.2)
+  id               uuid PRIMARY KEY,
+  account_id       text NOT NULL REFERENCES dp.accounts(id) ON DELETE CASCADE,
+  name             text,
+  lat              double precision CHECK (lat BETWEEN -90 AND 90),
+  lng              double precision CHECK (lng BETWEEN -180 AND 180),
+  radius_m         integer CHECK (radius_m IN (200, 400, 800)),
+  schema_version   integer NOT NULL,
+  created_at       timestamptz NOT NULL,
+  updated_at       timestamptz NOT NULL,
+  deleted_at       timestamptz,
+  origin_device_id uuid NOT NULL,
+  field_clock      jsonb NOT NULL,
+  rev              bigint NOT NULL
+);
+CREATE INDEX privacy_zones_account_rev ON dp.privacy_zones (account_id, rev);
 
 CREATE TABLE dp.routes (
   id                   uuid PRIMARY KEY,
@@ -1675,7 +1655,7 @@ CREATE UNIQUE INDEX waitlist_email ON dp.waitlist_entries (lower(email));
 DO $$
 DECLARE t text;
 BEGIN
-  FOREACH t IN ARRAY ARRAY['consents','settings','devices','vehicles','places','routes','trips','trip_events','blobs']
+  FOREACH t IN ARRAY ARRAY['consents','settings','devices','vehicles','places','privacy_zones','routes','trips','trip_events','blobs']
   LOOP
     EXECUTE format('ALTER TABLE dp.%I ENABLE ROW LEVEL SECURITY', t);
     EXECUTE format('ALTER TABLE dp.%I FORCE ROW LEVEL SECURITY', t);
@@ -1707,7 +1687,7 @@ END $$;
 | Consent | `consent` | `consents` (append) | `users/{a}/consents/{id}` | `dp.consents` | — |
 | Vehicle | `vehicle` | `vehicles` | `users/{a}/vehicles/{id}` | `dp.vehicles` | — |
 | Place | `place` | `places` | `users/{a}/places/{id}` | `dp.places` | — |
-| PrivacyZone | `privacy_zone` | — | — | — | — |
+| PrivacyZone | `privacy_zone` | `privacyZones` | `users/{a}/privacyZones/{id}` | `dp.privacy_zones` | Gate 4 |
 | Trip (+ TripSegment, Score, RouteMatch, EventFeedback) | `trip`, `trip_segment`, `score`, `route_match`, `event_feedback` | `trips` | `users/{a}/trips/{id}` | `dp.trips` | — |
 | DrivingEvent | `driving_event` | `trips[].events[]` | embedded | `dp.trip_events` | — |
 | LocationSample, MotionSample | trip files | blobs | — | `dp.blobs` (registry) | `u/{a}/t/{trip}/r1…` |
@@ -1728,6 +1708,7 @@ END $$;
 | Devices | ✓ | — | ✓ |
 | Vehicles (no photo) | ✓ | — | ✓ |
 | Places (Home, Work, custom) | ✓ | — | ✓ |
+| Privacy zones (Gate 4) | ✓ | — | ✓ |
 | Routes (name, link, active, merge pointer, cluster centroids) | ✓ | — | ✓ |
 | Trip summary + segments + events + feedback + score + route match + preview track | ✓ | — | ✓ (one document per trip) |
 | R1 analysis file | ✓ | — | ✓ (one object per trip) |
@@ -1740,7 +1721,7 @@ END $$;
 
 ### 4.2 Resources and operations (contract v1)
 
-ADR-004 implements this contract as our own versioned HTTP API (`https://api.driveperf.com/v1`, OpenAPI in `backend/openapi/v1.yaml`). Clients have one Ktor adapter in `shared/data/remote`; the server has two store adapters (Firestore + GCS now, Postgres + S3 later) behind a `SyncStore` port, so the contract never changes when the backend moves.
+ADR-004 implements this contract as our own versioned HTTP API (`https://api.driveperf.com/v1`, OpenAPI in `backend/openapi/v1.yaml`). Clients have one Ktor adapter in `shared/data/remote`; the server has two store adapters (Firestore now, Postgres later) and one R2 blob adapter behind a `SyncStore` port, so the contract never changes when the backend moves.
 
 | Operation | HTTP form | Purpose |
 |---|---|---|
@@ -1756,7 +1737,7 @@ ADR-004 implements this contract as our own versioned HTTP API (`https://api.dri
 | Wipe cloud copy | `POST /v1/backup:wipe` | "Delete cloud copy" and "Delete all trips" (§4.11) |
 | Delete account | `POST /v1/account:delete` (recent auth required) | §5.5 |
 
-Resources: `settings`, `devices`, `consents` (append-only), `vehicles`, `places`, `routes`, `trips`. All requests carry `Authorization: Bearer <ID token>` and an App Check token, plus `DP-Contract: 1` and `DP-App: ios/1.0.0`. Unknown fields are ignored by every reader (forward compatibility); a resource body change that is not additive bumps that entity's `schemaVersion`.
+Resources: `settings`, `devices`, `consents` (append-only), `vehicles`, `places`, `privacyZones`, `routes`, `trips`. All requests carry `Authorization: Bearer <ID token>` and an App Check token, plus `DP-Contract: 1` and `DP-App: ios/1.0.0`. Unknown fields are ignored by every reader (forward compatibility); a resource body change that is not additive bumps that entity's `schemaVersion`.
 
 ### 4.3 Wire records and mutations
 
@@ -1823,6 +1804,7 @@ merge(a, b):                                  # a, b: two versions of the same r
 | Vehicle | id | all user fields | Two defaults after a race: the vehicle with the latest `isDefault` clock stays default; the first device to notice pushes the repair (idempotent). A tombstoned car shows as "Unknown car" on its trips with no trip rewrite |
 | Route | id, createdAt | name, namePreset, linkedRouteId, isActive, state, centroids, referenceTripId | **Merge:** the merged route is tombstoned with `mergedIntoRouteId`; trips are resolved through the pointer chain at read time and rewritten only when next edited (no fan-out writes) |
 | Place | id | all | — |
+| PrivacyZone | id | all | — |
 | Settings | — | each top-level field | — |
 | Device | id, platform | osVersion, appVersion, lastBackupAt | Each device writes only its own record |
 | Consent | everything | — | Append-only; never conflicts |
@@ -1873,10 +1855,10 @@ CREATE TABLE sync_record (
 | Situation | Behaviour |
 |---|---|
 | **Turn backup on** (S-ACC-05, consent recorded first) | Enqueue every local record, **newest trips first** (recent drives protected soonest), then older ones. Progress on S-ACC-04 |
-| **Restore / new device** (F-ACC-04) | Sign in → entitlement → pull settings, vehicles, places, routes, then trip documents (≈ 9 MB for 1,000 trips; target ≤ 60 s on Wi-Fi) → the list and summaries appear → R1 files download in the background newest-first, or on demand when Replay opens. Local-only trips already on the device are merged in (IDs never collide) and uploaded |
+| **Restore / new device** (F-ACC-04) | Sign in → entitlement → pull settings, vehicles, places, privacy zones, routes, then trip documents (≈ 9 MB for 1,000 trips; target ≤ 60 s on Wi-Fi) → the list and summaries appear → R1 files download in the background newest-first, or on demand when Replay opens. Local-only trips already on the device are merged in (IDs never collide) and uploaded |
 | **Two devices** | Both push and pull; conflicts resolve by §4.4. Each device computes its own recaps; notifications are local per device |
 | **Sign out** (F-ACC-05) | Pending uploads are warned about first. "Keep my drives on this phone" keeps local data and pauses the outbox; "Remove" deletes local data. Cloud data is untouched. If a *different* account signs in later, the app asks before adding this phone's drives to it |
-| **Pro ends** | Pushes get `backup_not_allowed`; the outbox pauses; S-ACC-04 shows the lapsed state with the purge date; reads and restore still work until `readUntil` (OQ-A11-02) |
+| **Pro ends** | Pushes get `backup_not_allowed`; the outbox pauses; S-ACC-04 shows the lapsed state with the purge date; reads, restore and download still work until `readUntil` (decided at Gate 4) |
 | **Pro returns within 30 days** | The window reopens; the paused outbox drains; nothing is re-uploaded |
 | **Cloud copy purged** | The server increments `backupEpoch`. On the next check the device sees the epoch change, resets cursors and `sync_record`, and — if Pro and backup are on — re-uploads everything. Local data is never deleted because of an epoch change |
 
@@ -1884,7 +1866,7 @@ CREATE TABLE sync_record (
 
 ### 4.9 Transport (decided in ADR-004) and what it simplifies
 
-ADR-004 chose **our own versioned HTTP API from day one**, on Cloud Run in front of Firestore and Cloud Storage. Consequences for this data model:
+ADR-004 chose **our own versioned HTTP API from day one**, on Cloud Run in front of Firestore and Cloudflare R2. Consequences for this data model:
 
 | Concern | With the HTTP API (chosen) | What it would have been with Firebase SDKs on devices |
 |---|---|---|
@@ -1893,7 +1875,7 @@ ADR-004 chose **our own versioned HTTP API from day one**, on Cloud Run in front
 | Cursor | Per-account `rev`, identical in Firestore and Postgres (§4.5) | `serverUpdatedAt` + document name |
 | Authorisation | API checks + deny-all rules; Postgres RLS later | Rules with custom claims |
 | Offline cache | None besides SQLite (no Firestore SDK on devices) | Firestore persistence would have to be disabled |
-| Blobs | Signed URLs (GCS V4 now, S3 presigned later): same client code | Storage SDK uploads |
+| Blobs | S3 presigned URLs (R2): same client code before and after the VPS move | Storage SDK uploads |
 | Migration | Server-only: new store adapters, data copy, traffic switch (§8, ADR-010) | App release, forced upgrade and a long Firestore↔Postgres bridge for old versions |
 | Cost | Cloud Run within its free tier at these volumes (ADR-004 cost model); 1 counter read + 2 writes per push | ≈ same Firestore operations, no Cloud Run |
 
@@ -1912,9 +1894,9 @@ The SDK-direct variants of the rules (§3.3, §3.4) are kept only as documentati
 |---|---|---|
 | Delete one trip (S-TRP-03) | Rows and files removed in one transaction + file unlink, ≤ 5 s (F-HIS-02.3) | Tombstone mutation (body scrubbed) + R1 object delete, at the next sync, ≤ 24 h |
 | Delete trips older than 3/6/12 months (F-PRV-04.2) | Same, batched; baselines recompute | Tombstones in batches of 100 |
-| Delete all trips (typed "DELETE") | All trips, files, routes and derived data, ≤ 30 s (F-PRV-04.1) | `backup:wipe` (server-side purge of trips, routes and objects; keeps account, consents, settings, vehicles, places) instead of thousands of tombstones; epoch increments |
+| Delete all trips (typed "DELETE") | All trips, files, routes and derived data, ≤ 30 s (F-PRV-04.1) | `backup:wipe` (server-side purge of trips, routes and objects; keeps account, consents, settings, vehicles, places, privacy zones) instead of thousands of tombstones; epoch increments |
 | Remove detailed sensor data older than N months (F-SET-04) | R0/R1 files deleted; `rawState = SUMMARY_ONLY` | Trip `files` emptied + R1 objects deleted (the cloud mirrors the device; a later restore must not bring back data the user removed) |
-| Turn backup off (S-ACC-04) | Nothing deleted locally | Choice: "Keep cloud copy" (default; kept while Pro, §5.1) or "Delete cloud copy now" (`backup:wipe` + delete settings, vehicles, places, devices) |
+| Turn backup off (S-ACC-04) | Nothing deleted locally | Choice: "Keep cloud copy" (default; kept while Pro, §5.1) or "Delete cloud copy now" (`backup:wipe` + delete settings, vehicles, places, privacy zones, devices) |
 | Delete account (S-PRV-06) | Keep or remove local data, user's choice | Full cascade, §5.5 |
 
 Pending uploads for deleted items are cancelled first (F-PRV-04 edge case).
@@ -1998,21 +1980,21 @@ Decided by the product owner on 6 Nov 2026 (resolves PRD OQ-09); this section im
 
 ### 5.1 Retention by tier
 
-| Tier | On the device | Cloud trip data (summaries, routes, cars, places, settings, R1 files) | Account record (account root, consents, entitlement mirror) |
+| Tier | On the device | Cloud trip data (summaries, routes, cars, places, privacy zones, settings, R1 files) | Account record (account root, consents, entitlement mirror) |
 |---|---|---|---|
 | **No account** (any plan) | Kept until the user deletes it | None | None |
 | **Free, signed in** | Kept until the user deletes it | **None — no trip data is uploaded** | Kept until the user deletes the account |
 | **Pro, Pro Preview or Ride-along pass, backup on** | Kept until the user deletes it | Kept until the user deletes it (per item, range, "delete cloud copy") or deletes the account | Kept until account deletion |
-| **Pro ended** (expiry, refund, Preview or pass ends without purchase) | **Untouched** | Backup stops at once. Cloud copy kept **30 days** (readable for restore and download, OQ-A11-02) with reminders at **30, 7 and 1 days left**, then deleted by the purge job. Pro again within the 30 days → backup resumes, nothing lost | Kept |
+| **Pro ended** (expiry, refund, Preview or pass ends without purchase) | **Untouched** | Backup stops at once. Cloud copy kept **30 days** (readable for restore and download, Gate 4) with reminders at **30, 7 and 1 days left**, then deleted by the purge job. Pro again within the 30 days → backup resumes, nothing lost | Kept |
 | **Backup turned off while still Pro** | Untouched | Kept (user may choose "Delete cloud copy now"); if Pro later ends, the 30-day rule applies | Kept |
 
 ### 5.2 Retention by data class
 
 | Data | Retention | Mechanism |
 |---|---|---|
-| R0 full-rate capture log (device) | Proposed: 30 days after the trip (default) or forever (setting) — **pending PO approval** (OQ-A11-04); otherwise until the user deletes it | Device maintenance task |
+| R0 full-rate capture log (device) | Until the user deletes the trip or removes detailed data (Gate 4: no automatic pruning) | User action only (EC-STO stops new R0 capture when space is low) |
 | Rejected trip candidates (walking, transit, too short) | ≤ 24 h | Device maintenance task (PRD §6.5) |
-| Trip summaries, R1, routes, cars, places (device) | Until the user deletes them | User action only |
+| Trip summaries, R1, routes, cars, places, privacy zones (device) | Until the user deletes them | User action only |
 | Cloud trip data | §5.1 | Purge job, wipe, tombstones |
 | Tombstones (cloud) | 90 days after deletion (envelope only, no body) | Purge job, step 6 |
 | Account record | Until account deletion | Deletion cascade |
@@ -2046,7 +2028,7 @@ Reminder schedule while `LAPSED`: `D30` at lapse (or immediately if the lapse is
 
 1. **In-app:** S-ACC-04 and Profile show "Cloud copy kept until 13 Dec" from the moment the device sees `LAPSED`.
 2. **Local notifications** scheduled by the device for the three dates (v1 notifications are local, PRD A-3), respecting quiet hours and never during a trip (SAF-03). Copy names the date and that drives on the phone are unaffected; per F-SUB-08.4 it contains no price or upgrade pitch — the tap opens S-ACC-04, which offers "Keep backup with Pro", "Download a copy" and "Let it go".
-3. **Email** to the account email, sent by the purge job once an email provider exists (PRD OQ-14), tracked in `remindersSent` so each is sent once. Users who uninstalled the app are only reachable this way (OQ-A11-05).
+3. **Email** to the account email, sent by the purge job once the sending provider is chosen (PRD OQ-14; Zoho ZeptoMail, Amazon SES or Resend, decisions log 6 Nov 2026), tracked in `remindersSent` so each is sent once. Users who uninstalled the app are only reachable this way (OQ-A11-05).
 
 ### 5.4 The daily maintenance job
 
@@ -2090,7 +2072,7 @@ The same cascade runs for under-18 discoveries (PRD §6.7, `source = age`). Free
 | System | Protection | Deleted data persists up to |
 |---|---|---|
 | Firestore | Point-in-time recovery, 7 days | 7 days |
-| Cloud Storage | Soft delete, 7-day default [GCS-SD] | 7 days |
+| Cloudflare R2 (trip files) | Delayed delete: the purge job removes objects 7 days after the tombstone | 7 days |
 | Postgres (VPS) | pgBackRest full weekly + WAL archive, 14-day retention, off-site encrypted bucket | 14 days |
 | Object store (VPS) | Daily replication to an off-site bucket with a 14-day delayed delete | 14 days |
 
@@ -2104,8 +2086,8 @@ Policy wording: "Deleted data is removed from our live systems within 24 hours a
 
 | Datum | Created by | Where it goes | Retention | User control |
 |---|---|---|---|---|
-| GNSS track (R0, R1, preview), stops, max-speed location, event locations | Phone sensors during trips | Device. **Pro backup:** Firestore (preview track, summary) + Cloud Storage (R1), `us-central1`. Exports: wherever the user sends them | Device: until deleted (R0 30 d). Cloud: §5.1 | Delete trip/range/all; remove detailed data; backup toggle; export; auto trips are opt-in (S-ONB-08) |
-| Full-rate motion data (R0) | IMU | Device only | 30 days default | Setting; delete |
+| GNSS track (R0, R1, preview), stops, max-speed location, event locations | Phone sensors during trips | Device. **Pro backup:** Firestore (preview track, summary) + Cloudflare R2 (R1), North America. Exports: wherever the user sends them | Device: until deleted. Cloud: §5.1 | Delete trip/range/all; remove detailed data; backup toggle; export; auto trips are opt-in (S-ONB-08) |
+| Full-rate motion data (R0) | IMU | Device only | Until the user deletes it (Gate 4) | Delete trip; remove detailed data |
 | Vehicle-frame motion (R1), G values, events, scores, tips, efficiency, quality | Shared core on device | Device; Pro backup | As above | Delete; "Was it needed?" / "Not accurate?" feedback |
 | Trip labels, road and place names | Places (device) and the platform reverse geocoder | **Coordinates of trip ends, stops and events are sent to Apple's or Google's geocoding service** (not to DrivePerf); results stored on device / backup | As trips | OQ-A11-07 (on-device alternative) |
 | Map tiles | Platform map SDK | Apple MapKit / Google Maps or MapLibre tile host receive tile requests (area viewed) and IP; no trip data | Provider policy | ADR-005 |
@@ -2214,7 +2196,7 @@ The background-location, foreground-service and fine-location declarations (PRD 
 | Firestore reads / writes / deletes | 50K / 20K / 20K per day | US$0.03 / 0.09 / 0.01 per 100K (`us-central1`) | [FB-PRICE], [FS-STD] |
 | Firestore stored data | 1 GiB | ≈ US$0.15 per GiB-month (`us-central1`; `nam5` ≈ US$0.18) | [FS-PRICE] |
 | Firestore egress | 10 GiB/month | Google Cloud network pricing | [FB-PRICE] |
-| Cloud Storage (`*.firebasestorage.app`, Blaze only) | 5 GB-months, 100 GB egress/month, 5K uploads/month, 50K downloads/month (US-CENTRAL1/WEST1/EAST1) | Standard ≈ US$0.020 per GB-month; Class A ≈ US$0.005 per 1K; Class B ≈ US$0.0004 per 1K | [FB-PRICE], [GCS-PRICE] |
+| Cloudflare R2 (trip files, Gate 4) | 10 GB-month, 1M Class A (writes) and 10M Class B (reads) a month; egress always free | US$0.015 per GB-month; Class A US$4.50 per million; Class B US$0.36 per million | [R2-PRICE] |
 | Cloud Run (API, ADR-004) | 2M requests, 180K vCPU-s, 360K GiB-s per month | per ADR-004 cost model | ADR-004 |
 | Authentication | 50K MAU | Google Cloud pricing | [FB-PRICE] |
 | Remote Config | 100K fetches/day | US$0.06 per 10K above that (from 1 Sep 2026) | [FB-PRICE] |
@@ -2226,7 +2208,7 @@ Listener and query billing that matters for sync: every query costs at least one
 
 | Unit | Storage added | One-time ops cost | Monthly holding cost |
 |---|---|---|---|
-| **Per backed-up trip** | 0.25 MB object + 11 KB document | ≈ US$0.00001 (≈ 2 Class A + ≈ 3 Firestore writes, beyond free tiers) | ≈ US$0.0000066 (US$0.000005 object + US$0.0000016 document) |
+| **Per backed-up trip** | 0.25 MB object + 11 KB document | ≈ US$0.00001 (≈ 2 Class A + ≈ 3 Firestore writes, beyond free tiers) | ≈ US$0.0000054 (US$0.0000038 object + US$0.0000016 document) |
 | **Per backed-up user per month** (month 12: ≈ 180 MB objects + ≈ 8 MB documents) | +15 MB objects, +0.66 MB documents | ≈ US$0.0006 | **≈ US$0.005 total** |
 | Per Free signed-in user | ≈ 2 KB (account root + consents), ≈ 6 writes once | ≈ 0 | ≈ 0 |
 | Per local-only user | 0 | 0 | 0 |
@@ -2240,16 +2222,16 @@ Against Pro revenue of ≥ US$2.50/month per paying user (founding annual), back
 | Firestore writes/day | ≈ 1.4K (free) | ≈ 7.1K (free) | ≈ 28K → 8K over → **US$0.22** |
 | Firestore reads/day | ≈ 2.5K (free) | ≈ 12.5K (free) | ≈ 50K (at the quota) → ≈ US$0.05 |
 | Firestore stored | ≈ 1.8 GiB → **US$0.13** | ≈ 9.2 GiB → **US$1.23** | ≈ 37 GiB → **US$5.40** |
-| Cloud Storage stored | 45 GB → **US$0.80** | 225 GB → **US$4.40** | 900 GB → **US$17.90** |
-| Storage Class A ops | 30K → US$0.13 | 150K → US$0.73 | 600K → US$2.98 |
-| Storage Class B, egress | free | free | ≈ US$0.01 (egress ≈ 15 GB, free) |
+| R2 stored | 45 GB → **US$0.53** | 225 GB → **US$3.23** | 900 GB → **US$13.35** |
+| R2 Class A ops | 30K (free) | 150K (free) | 600K (free) |
+| R2 Class B, egress | free | free | free |
 | Cloud Run API, Scheduler | free | free | ≈ US$2–10 (ADR-004) |
 | Auth, Analytics, Crashlytics, Remote Config | free | free | free (≈ 27K signed-in MAU; ≈ 50K RC fetches/day) |
-| PITR / soft-delete overhead | < US$0.10 | ≈ US$0.30 | ≈ US$1 |
-| **Total (data and API)** | **≈ US$1–2** | **≈ US$6–8** | **≈ US$27–40** |
+| Firestore PITR overhead | < US$0.10 | ≈ US$0.20 | ≈ US$0.70 |
+| **Total (data and API)** | **≈ US$1** | **≈ US$4–6** | **≈ US$20–32** |
 | Sensitivity: 100 % of DAU backing up | ≈ US$5 | ≈ US$27 | ≈ US$110–120 |
 
-Website hosting transfer (≈ US$16/month at 20k DAU in ADR-004's model) is excluded here; ADR-004's full Firebase total is ≈ US$2 / 10 / 45–55.
+Website hosting transfer (≈ US$16/month at 20k DAU in ADR-004's model) is excluded here; ADR-004's full total is ≈ US$2 / 9 / 40–50.
 
 **Spark phase (before backup ships).** Only account roots, consents and waitlist entries are written: far inside the free quotas. The tightest Spark limit is **Hosting transfer (360 MB/day)**: a launch-day spike on a motion-heavy landing page could exceed it, which is another reason to move to Blaze before launch (A18).
 
@@ -2263,11 +2245,11 @@ Hostinger KVM 2 is 2 vCPU, 8 GB RAM, 100 GB NVMe and 8 TB bandwidth; advertised 
 
 ## 8. Firebase → VPS migration runbook (outline)
 
-Goal: move sync data, objects and server jobs from Firestore + Cloud Storage + Cloud Run to a self-managed VPS (Postgres + S3-compatible storage + the same API image) with **no client change, no downtime visible to users, a verified backfill and a rollback path**. Because ADR-004 put every client behind `https://api.driveperf.com/v1`, this is a server-side project. [ADR-010](adr/ADR-010-firebase-now-vs-vps.md) owns *when* to migrate (triggers) and the operational plan (phases M1–M8, VPS hardening); this section gives the data-level steps that plan relies on. Auth may stay on Firebase.
+Goal: move sync data and server jobs from Firestore + Cloud Run to a self-managed VPS (Postgres + the same API image); trip files stay on Cloudflare R2 with **no client change, no downtime visible to users, a verified backfill and a rollback path**. Because ADR-004 put every client behind `https://api.driveperf.com/v1`, this is a server-side project. [ADR-010](adr/ADR-010-firebase-now-vs-vps.md) owns *when* to migrate (triggers) and the operational plan (phases M1–M8, VPS hardening); this section gives the data-level steps that plan relies on. Auth may stay on Firebase.
 
 ### 8.0 Preconditions designed into v1
 
-UUIDv7 IDs and an account ID that never changes; content-addressed object keys identical in GCS and S3; contract v1 with opaque `rev` cursors (§4.5); the `SyncStore`, `BlobStore`, `AccountStore` and job ports on the server with a contract test suite every store adapter must pass; per-account `backend` (`firebase`/`vps`) and `migrating` fields; a `dp.blobs`-style registry that records which store holds each object; the Firestore ↔ Postgres mapping of §3.8; Postgres DDL (§3.6) kept in migrations from day one and exercised in CI against the contract tests.
+UUIDv7 IDs and an account ID that never changes; content-addressed object keys on R2 that never move; contract v1 with opaque `rev` cursors (§4.5); the `SyncStore`, `BlobStore`, `AccountStore` and job ports on the server with a contract test suite every store adapter must pass; per-account `backend` (`firebase`/`vps`) and `migrating` fields; a `dp.blobs`-style registry that records which store holds each object; the Firestore ↔ Postgres mapping of §3.8; Postgres DDL (§3.6) kept in migrations from day one and exercised in CI against the contract tests.
 
 ### 8.1 Steps
 
@@ -2276,11 +2258,11 @@ UUIDv7 IDs and an account ID that never changes; content-addressed object keys i
 | 1 | **Build the target** | VPS: Postgres (§3.6 via migrations), external S3-compatible bucket (ADR-010; not MinIO CE [MINIO]), the same API image configured with the Postgres + S3 adapters, pgBackRest/WAL-G, monitoring. The API keeps trusting Firebase ID tokens (issuer-agnostic verification, ADR-004) | Contract tests green on Postgres/S3; load test at 2× peak |
 | 2 | **Legal and policy** | Update the PIA/DPA (new processor and location), the privacy policy's processor list and backup-latency wording (§5.6); store labels only change if a data type changes (they do not) | Counsel sign-off |
 | 3 | **Dual-write (Firebase primary)** | The Cloud Run API appends every applied mutation (after merge, with its `rev`) to an outbox; a relay applies it to Postgres idempotently by `(id, rev)` — re-running is harmless because the Postgres adapter applies the same `merge`. New R1 objects are copied to S3 after commit; deletions are replayed too, so no deleted trip survives on the new side | Relay lag p99 < 60 s for 7 days |
-| 4 | **Backfill** | Page every account's collections in `rev` order (the same query as a pull) and upsert where the incoming `rev` is newer; preserve `rev` values and `accounts.sync_rev` so device cursors stay valid. Copy objects with `rclone` GCS → S3 by prefix, verifying the `sha256` metadata. Idempotent and restartable | Every account at its high-water `rev` |
+| 4 | **Backfill** | Page every account's collections in `rev` order (the same query as a pull) and upsert where the incoming `rev` is newer; preserve `rev` values and `accounts.sync_rev` so device cursors stay valid. Trip files are not copied (they stay on R2). Idempotent and restartable | Every account at its high-water `rev` |
 | 5 | **Verify** | Per account and resource: count and a hash over sorted `(id, rev, deletedAt)`; object count, total bytes and sampled SHA-256 checks; a 1 % deep compare; shadow reads (the API serves from Firestore and compares with Postgres) for 7 days; the maintenance job in **report-only** mode on the VPS, comparing which accounts it would remind or purge with the live job | Zero unexplained diffs |
 | 6 | **Cut over by cohort** | Internal → 5 % → 25 % → 100 % (ADR-010 M4: Cloud Run traffic split to a proxy revision, then DNS). Per account: set `migrating` (the API answers that account's pushes with a retryable `503 Retry-After: 30`; the device outbox simply waits, typically seconds) → drain the relay → final digest check → `backend = vps` → clear `migrating`. Pulls continue throughout (cursors are store-independent revs). The RevenueCat webhook moves to the VPS and writes entitlements to both stores until 100 % | Sync success rate, error budget, support tickets per cohort |
 | 7 | **Jobs** | The Firebase-side job skips `backend = vps` accounts and the VPS job acts only on them, so no account is reminded, purged or deleted twice; account deletions run against both stores while both hold data | Job reports reconcile |
-| 8 | **Rollback (≤ 30 days)** | The VPS API reverse-writes migrated accounts' changes to Firestore/GCS through its own outbox (ADR-010 M4–M5). Rollback = route the cohort back (`backend = firebase`, traffic split or DNS); both sides are current, and blob records say where each object lives | Rehearsed on the internal cohort |
+| 8 | **Rollback (≤ 30 days)** | The VPS API reverse-writes migrated accounts' changes to Firestore through its own outbox (ADR-010 M4–M5). Rollback = route the cohort back (`backend = firebase`, traffic split or DNS); both sides are current, and blob records say where each object lives | Rehearsed on the internal cohort |
 | 9 | **Decommission** | After 30 stable days: stop reverse writes, run a final diff, **delete** Firestore sync data and the bucket's objects (no stray copies beyond §5 retention), keep the Firebase project for Auth, Analytics, Crashlytics, Remote Config, App Check and FCM; record the change in `decisions.md` | Deletion confirmed |
 | 10 | **Optional: auth** | ADR-010 M6: keep the same account IDs via `auth_identities (issuer, subject) → accountId`; Apple, Google and email link only, so no password hashes to move | All sessions on the new issuer |
 
@@ -2289,17 +2271,17 @@ UUIDv7 IDs and an account ID that never changes; content-addressed object keys i
 | ID | Question | Proposal | Owner |
 |---|---|---|---|
 | OQ-A11-01 | ✅ Transport — resolved by ADR-004 (own `/v1` HTTP API on Cloud Run). Remaining: align ADR-004 rules 3 and 6 with §0.4 (server stamp naming; `rev` cursor instead of `(updatedAt, id)`) | Adopt §0.4 | A10 |
-| OQ-A11-02 | During the 30-day post-Pro window, may the user still restore to a new phone and download the cloud copy? | Yes, read-only (it is the point of the window); no new uploads | PO |
-| OQ-A11-03 | Privacy zones are device-only (F-PRV-07.2), so a restored phone loses them and share cards lose that protection until re-created | Include zones in Pro backup under the same consent, or prompt to re-create them after restore | PO |
-| OQ-A11-04 | Is 25 Hz vehicle-frame data in R1 enough for A12's detectors? May R0 be pruned automatically after 30 days (it is on-device data, which the 6 Nov decision keeps until the user deletes it)? | 25 Hz; approve the 30-day R0 default with a "Forever" setting and record it in `decisions.md`. 50 Hz R1 still fits ≤ 5 MB/h | A12, **PO** |
-| OQ-A11-05 | Lapse reminders reach users who uninstalled only by email, which needs a provider (PRD OQ-14) and a CASL/CAN-SPAM view of these as transactional notices | Pick the provider before cloud backup ships; counsel to confirm the transactional exemption | PO, counsel |
+| OQ-A11-02 | ✅ Restore and download during the 30-day post-Pro window — **yes**, read-only, no new uploads (Keval, Gate 4) | — | — |
+| OQ-A11-03 | ✅ Privacy zones — **included in Pro backup** under the same consent, restored with places (Keval, Gate 4) | — | — |
+| OQ-A11-04 | Is 25 Hz vehicle-frame data in R1 enough for A12's detectors? (The R0 pruning part is ✅ resolved at Gate 4: **no automatic pruning**.) | 25 Hz; 50 Hz R1 still fits ≤ 5 MB/h | A12 |
+| OQ-A11-05 | Lapse reminders reach users who uninstalled only by email, which needs a provider (PRD OQ-14) and a CASL/CAN-SPAM view of these as transactional notices | Pick the sending provider before cloud backup ships (candidates in the 6 Nov decisions log); counsel to confirm the transactional exemption | PO, counsel |
 | OQ-A11-06 | Two devices each deliver the weekly recap notification | Accept in v1, or sync `deliveredAt` for recaps | PO |
 | OQ-A11-07 | Reverse geocoding sends coordinates of trip ends, stops and events to Apple or Google | Geocode only after the trip, rate-limited, and say so in the policy; evaluate an on-device dataset later | A10, A12 |
 | OQ-A11-08 | Request the user's name at sign-in? | No: email and UID suffice; less data to declare | PO |
-| OQ-A11-09 | Client-side (end-to-end) encryption of backups? | Not in v1 (Google-managed encryption at rest + TLS); never claim E2E in copy | PO |
+| OQ-A11-09 | Client-side (end-to-end) encryption of backups? | Not in v1 (provider-managed encryption at rest on Google and Cloudflare + TLS); never claim E2E in copy | PO |
 | OQ-A11-10 | Waitlist retention | Until unsubscribe or 12 months after launch, then delete; hashed suppression list | Counsel |
 | OQ-A11-11 | ✅ Firestore location — resolved by ADR-004: `us-central1` | — | — |
-| OQ-A11-12 | ✅ Object storage after migration — resolved by ADR-010: external S3-compatible bucket (B2 or R2), not the VPS disk | — | — |
+| OQ-A11-12 | ✅ Object storage — resolved at Gate 4: Cloudflare R2 from day one, kept after the VPS move | — | — |
 | OQ-A11-13 | Should GPX/CSV exports apply privacy zones? | Default no (personal export), with an option "Trim privacy zones" | PO |
 | OQ-A11-14 | Turning backup off while still Pro: keep or delete the cloud copy by default? | Keep, with "Delete cloud copy now" one tap away | PO |
 
@@ -2315,7 +2297,8 @@ Web (accessed 6 Nov 2026):
 - **[FS-PRICE]** Cloud Firestore pricing (stored data ≈ US$0.15/GiB-month `us-central1`, US$0.18 `nam5`, as listed on regional pages): https://cloud.google.com/firestore/pricing
 - **[FS-BILL]** Firestore billing behaviour (minimum one read per query, listener re-billing after 30 min offline, index-entry billing, TTL deletes): https://firebase.google.com/docs/firestore/pricing
 - **[GCS-PRICE]** Cloud Storage pricing and examples (Standard ≈ US$0.020/GB-month): https://cloud.google.com/storage/pricing, https://cloud.google.com/storage/pricing-examples
-- **[GCS-SD]** Cloud Storage soft delete (7-day default, 0 or 7–90 days): https://cloud.google.com/storage/docs/soft-delete
+- **[GCS-SD]** Cloud Storage soft delete (7-day default, 0 or 7–90 days), kept for reference: https://cloud.google.com/storage/docs/soft-delete
+- **[R2-PRICE]** Cloudflare R2 pricing (10 GB-month, 1M Class A and 10M Class B free a month; US$0.015/GB-month; no egress fees): https://developers.cloudflare.com/r2/pricing/
 - **[FB2]** Cloud Storage for Firebase requires Blaze since 3 Feb 2026 (via A3): https://firebase.google.com/docs/storage/faqs-storage-changes-announced-sept-2024
 - **[FB4] / [FB5]** Firebase data disclosure for App Store labels and Play Data safety (via A3): https://firebase.google.com/docs/ios/app-store-data-collection, https://firebase.google.com/docs/android/play-data-disclosure
 - **[HOST]** Hostinger KVM 2 specs and prices (secondary sources; confirm at purchase): https://findstack.com/resources/hostinger-vps-for-ai-agents, https://www.vpsbenchmarks.com/hosters/hostinger/plans/kvm-2

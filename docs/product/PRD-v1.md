@@ -1397,12 +1397,12 @@ Binding: local-first, account optional; sign-in only for cloud backup and multi-
 - **Story:** As a Pro user, I want my trips backed up to the cloud, so that I never lose them if I lose or change my phone.
 - **Screens:** S-ACC-04, S-ACC-05, S-SUB-03
 - **Acceptance criteria:**
-  1. Given Pro and signed in, when the user turns on backup, then S-ACC-05 first explains what leaves the device (routes with precise location, sensor data, scores, cars), where it is stored (Firebase, US region), and that it can be deleted any time, and requires explicit consent.
-  2. Given backup is on, when the phone is on Wi-Fi (default; "also on cellular" option) and not in a trip, then new trips upload within 24 h as compressed, versioned trip files (Storage) plus summaries (Firestore), via WorkManager / `BGProcessingTask`; nothing uploads during a trip.
+  1. Given Pro and signed in, when the user turns on backup, then S-ACC-05 first explains what leaves the device (routes with precise location, sensor data, scores, cars), where it is stored (Firebase in the US for records; Cloudflare R2 in North America for trip files), and that it can be deleted any time, and requires explicit consent.
+  2. Given backup is on, when the phone is on Wi-Fi (default; "also on cellular" option) and not in a trip, then new trips upload within 24 h as compressed, versioned trip files (object storage, Cloudflare R2) plus summaries (Firestore), via WorkManager / `BGProcessingTask`; nothing uploads during a trip.
   3. Given S-ACC-04, when opened, then it shows last backup time, items pending, and storage used.
   4. Given a trip deleted on the device, when the next sync runs, then it is deleted from the cloud.
   5. Given Pro lapses, when detected, then backup stops, the cloud copy is retained for the period decided in §9 OQ-09 with in-app warnings, then deleted.
-- **Platform notes:** **Requires Firebase Blaze** (Cloud Storage since 3 Feb 2026, A3 §9). Clients talk to Firebase only through the shared `SyncRepository` (kickoff plan §3).
+- **Platform notes:** **Requires Firebase Blaze** for the Cloud Run API and Cloud Scheduler (ADR-004); trip files are stored on Cloudflare R2 (decisions log, 6 Nov 2026). Clients talk to Firebase only through the shared `SyncRepository` (kickoff plan §3).
 - **Analytics:** `backup_enabled`, `backup_disabled`, `backup_run {result, items_bucket}`
 - **Edge cases:** EC-NET (queued), EC-STO, EC-BAT (upload only when charging or > 50%).
 - **Privacy:** consent before transfer (Apple 5.1.5; PIPEDA; Law 25 transfer outside Quebec needs a PIA, §6.5). Encrypted in transit and at rest.
@@ -1521,7 +1521,7 @@ Privacy basics (delete, full data download) are **never** paywalled (A2 §5.3).
 - **Screens:** S-PRV-02, S-SHR-01
 - **Acceptance criteria:**
   1. Given S-PRV-02, when the user adds a zone (from a recent parking spot or by moving a pin; radius 200/400/800 m), then shared cards remove any route part inside it, in addition to random trimming.
-  2. Given zones, when stored, then they stay on the device only and never appear in analytics.
+  2. Given zones, when stored, then they are kept on the device and, when Pro backup is on, included in the backup (same consent) so a restored phone keeps them; they never appear in analytics or on share cards. *(Changed at Gate 4, 6 Nov 2026.)*
 - **Platform notes:** same.
 - **Analytics:** `privacy_zone_added {radius}` (no location)
 - **Edge cases:** none.
@@ -2281,7 +2281,7 @@ Rules: no ad, attribution or data-broker SDKs; no locations in Crashlytics logs 
 | Breach reporting | Breach-of-security-safeguards records and reporting process (to the OPC and individuals when there is a real risk of significant harm) documented before launch (A11). |
 | **Quebec Law 25**: person in charge of protecting personal information | Same privacy officer; title and contact published. |
 | Law 25: privacy by default; technology that can locate or profile a person | Automatic trips (location in the background) and scoring/archetypes (profiling) are explained before use, and **automatic trips are off until the user turns them on** (S-ONB-08). Sources differ on whether this rule sits in s. 8.1 or s. 9.1 and how far it reaches; counsel to confirm (web search 6 Nov 2026, McCarthy Tétrault and others). |
-| Law 25: privacy impact assessment (PIA) | PIA before launching cloud backup, **including the transfer of personal information outside Quebec** (Firebase, US region). |
+| Law 25: privacy impact assessment (PIA) | PIA before launching cloud backup, **including the transfer of personal information outside Quebec** (Firebase, US region; Cloudflare R2, North America). |
 | Law 25: confidentiality incidents | Incident register and notification process (CAI and affected people where there is a risk of serious injury). |
 | Law 25: portability, deletion | F-PRV-02 (structured, commonly used format), F-PRV-04/05. |
 | Law 25: cookies | Website sets no cookies by default (F-WEB-01). |
@@ -2392,7 +2392,7 @@ The website and waitlist go live as soon as the web ticket is done (Phase 5) so 
 | **Apple Developer Program** (US$99/yr) | Sign in with Apple, In-App Purchase, TestFlight, App Store, App Attest (App Check), Associated Domains (universal links), push (later) | Not bought (Gate 1 #13). A free Personal Team is enough for Spike 1 on a real iPhone (7-day profiles, 3 devices) | Buy after Spike 1, before the iOS shell needs SIWA/IAP/TestFlight (start of Phase 6 at the latest) |
 | **Google Play Console** | Closed testing, declarations, Data Safety, launch | Exists | Policy pre-check early Phase 6 |
 | **Firebase "DrivePerf" on Spark** | Auth, Firestore, Hosting (website, waitlist), Crashlytics, Analytics, Remote Config, App Check | **Not created yet**: Keval creates it on Spark | Before Phase 5 |
-| **Firebase Blaze** (pay-as-you-go, budget alert ≈ US$5) | Cloud Storage (backup, since 3 Feb 2026), Cloud Functions (account-deletion cascade, Ride-along reward validation, email sending via extension), BigQuery export | Not yet (Gate 1 #13) | Before building F-ACC-03 / F-SHR-05 (§9 OQ-16) |
+| **Firebase Blaze** (pay-as-you-go, budget alert ≈ US$5) | Cloud Run API and Cloud Scheduler (backup, account-deletion cascade, Ride-along reward validation; ADR-004), BigQuery export. Trip files go to Cloudflare R2 (free up to 10 GB) | Not yet (Gate 1 #13) | Before building F-ACC-03 / F-SHR-05 (§9 OQ-16) |
 | **RevenueCat** | Entitlements across StoreKit 2 and Play Billing, offers, promotional entitlements, experiments | To set up | Phase 5 (backend) |
 | **Map provider** | Replay, Analysis, map share card | iOS: MapKit. Android: Google Maps SDK or MapLibre + a tile provider (ADR-005) | Decided in Phase 4 |
 | **Email provider** | Waitlist confirmation and launch emails (CASL-compliant) | Not chosen (§9 OQ-14) | Phase 5 |
@@ -2436,16 +2436,16 @@ Gate 1 decisions are not changed here. Where I think one is under strain, it is 
 | OQ-11 | Store age ratings, and whether state app-store age-assurance laws (e.g. Texas, Utah) require us to read store age signals; is self-attestation enough for an 18+ product? | Compliance for the 18+ rule. | Counsel + A20 | Phase 6 |
 | OQ-12 | May we request `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` under Play's acceptable-use rules? | OEM reliability (EC-OEM). Otherwise link to settings only. | A16 (A3 Spike 3) | Phase 5 |
 | OQ-13 | Waitlist bot protection: App Check with reCAPTCHA (may set Google cookies) vs honeypot + rules + rate limiting | Cookie-less promise on the website vs spam. | A18 + A10 | Phase 5 |
-| OQ-14 | Email provider for waitlist confirmation and launch emails (needs Blaze + an extension, or a third-party service) | CASL compliance; Spark cannot send email. | PO + A18 | Phase 5 |
+| OQ-14 | 🟡 **Partly resolved 6 Nov 2026:** mailboxes via Zoho Mail recommended (decisions log; Keval to confirm); the sending provider is chosen before Phase 6 email features. Email provider for waitlist confirmation and launch emails (needs Blaze + an extension, or a third-party service) | CASL compliance; Spark cannot send email. | PO + A18 | Phase 5 |
 | OQ-15 | Android map provider and static map snapshots for the map share card (Google Maps SDK vs MapLibre + tiles; cost; terms) | Replay is P0; cost and licence for images users share. | A10 (ADR-005) | Phase 4 |
 | OQ-16 | When to upgrade Firebase to Blaze | Needed for backup, deletion cascade, Ride-along validation and email. Proposal: at the start of Phase 6 with a US$5 budget alert. | PO | End of Phase 5 |
 | OQ-17 | ✅ *Resolved at Gate 2, see the top of this PRD.* **Scope vs timeline.** 96 P0 features against a 6–10 week feature build. Accept a longer build (launch late May rather than April), or move items — some of which are binding Pro features (cloud backup, trends, export)? | Not a contradiction of Gate 1, but the binding Free/Pro split fixes much of the scope. A5's estimates will make this concrete. | PO | Gate 2 |
 | OQ-18 | Counsel review of the Replay speed readout and max-speed pin (Gate 1 #16) and of share cards, given negligent-design precedent | Decision 16 stands; the question is whether the speed-neutral rule (§3.5) is a sufficient mitigation. | Counsel | Phase 6 (before beta) |
 | OQ-19 | ✅ *Resolved at Gate 2, see the top of this PRD.* Trademark clearance for "DrivePerf" and "Smooth is a skill." | A2 flagged it before brand identity work. | PO | Phase 3 (before A6) |
 | OQ-20 | Transit (bus/train) detection approach and an acceptable Q7 target | Phones can't reliably tell transit from driving; A12 heuristic + one-tap correction. | A12 + A19 | Phase 4 / Phase 6 |
-| OQ-21 | Minimum OS versions (proposed iOS 26+, Android 10+) | Market reach vs test cost and Liquid Glass. | A10 | Phase 4 |
+| OQ-21 | ✅ **Resolved 6 Nov 2026 (Keval):** iOS 26+ and Android 10+ (minSdk 29), ADR-001. Minimum OS versions (proposed iOS 26+, Android 10+) | Market reach vs test cost and Liquid Glass. | A10 | Phase 4 |
 | OQ-22 | Should "Was it needed?" apply to all event types (as specified) or braking only, and how many exclusions may a record-setting run have? | Fairness vs gaming one's own records. | A12 + A2 | Phase 4 |
-| OQ-23 | Raw sensor data retention and stored size per hour | Storage growth (≈ 1.5 GB/yr raw for 1 h/day) vs "locked, not lost" Pro analysis of old trips. | A11 | Phase 4 |
+| OQ-23 | ✅ **Resolved 6 Nov 2026 (Keval):** R1 analysis files are kept and backed up; the full-rate R0 log is not pruned automatically (kept until the user deletes it; Settings shows its size), data-model.md §2.6. Raw sensor data retention and stored size per hour | Storage growth (≈ 1.5 GB/yr raw for 1 h/day) vs "locked, not lost" Pro analysis of old trips. | A11 | Phase 4 |
 | OQ-24 | ✅ *Resolved at Gate 2, see the top of this PRD.* **iOS live surface for automatic trips.** Gate 1 #9 specifies a notification plus a one-tap control/widget that starts a Live Activity. I implemented the control as "Show live drive", which attaches a Live Activity to a running auto trip. Is offering a tap during an auto trip compatible with Gate 1 #12 (no interaction while moving), or should the control only start trips before departure? | Mild tension between #9 and #12. Proposal: keep it, with copy and design that never prompt use while moving; passengers benefit. | A6 + PO | Phase 3 |
 | OQ-25 | Criteria for the push-to-start evaluation (latency, cost, network dependency, privacy) | Planned for v1.2 as a decision. | A10 | v1.2 |
 | OQ-26 | Apple and Google rules for referral rewards (Ride-along) | No referral-specific Apple rule was confirmed (A2 §4.2). | A20 | Phase 7 |

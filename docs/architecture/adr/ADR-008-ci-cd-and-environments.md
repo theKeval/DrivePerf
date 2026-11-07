@@ -50,11 +50,11 @@ Rules: Jira key in every PR title and commit (AGENTS.md); `dorny/paths-filter` t
 
 | Environment | Firebase project | Backend | App builds | Web |
 |---|---|---|---|---|
-| **local** | Emulator Suite (Auth, Firestore, Storage, Hosting) | Ktor run locally against emulators | `devDebug` / `Dev` scheme | `astro dev` |
-| **dev / staging** | **`driveperf-dev`** (Spark until Phase 6, then Blaze with a US$5 alert) | Cloud Run `api` in dev | internal TestFlight group, Play internal track, `com.driveperf.dev` | Hosting preview channels |
+| **local** | Emulator Suite (Auth, Firestore, Hosting) + an S3-compatible emulator for trip files (R2 stand-in) | Ktor run locally against emulators | `devDebug` / `Dev` scheme | `astro dev` |
+| **dev / staging** | **`driveperf-dev`** (Spark until Phase 6, then Blaze with a US$5 alert) | Cloud Run `api` in dev | internal TestFlight group, Play internal track, `com.driveperf.app.dev` | Hosting preview channels |
 | **prod** | **`driveperf-prod`** (display name **"DrivePerf"**) | Cloud Run `api` in prod, `api.driveperf.com` | App Store / Play production | `driveperf.com` |
 
-Staging is the dev project plus release-candidate builds; a separate `driveperf-staging` project is added only for the VPS migration rehearsal ([ADR-010](ADR-010-firebase-now-vs-vps.md)). Project IDs are permanent; confirm them when Keval creates the projects. Bundle/application IDs: Android `com.driveperf` (+ `.dev` suffix), iOS `com.driveperf.app` (+ `.dev`); confirm before registering in App Store Connect.
+Staging is the dev project plus release-candidate builds; a separate `driveperf-staging` project is added only for the VPS migration rehearsal ([ADR-010](ADR-010-firebase-now-vs-vps.md)). Project IDs are permanent; confirm them when Keval creates the projects. Bundle/application ID: **`com.driveperf.app`** on both platforms (Android registered in Play Console; confirmed at Gate 4), dev builds `com.driveperf.app.dev`. Kotlin namespaces stay `com.driveperf.*`. Register the same ID in App Store Connect.
 
 ### Versioning and release safety
 

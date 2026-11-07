@@ -88,8 +88,6 @@ Text sizes scale with `--dp-text-scale` (XL = 2.0×) and numerals with `--dp-num
 
 ## S-SHR-01 · Share card builder
 
-<img src="../../screens/ios/S-SHR-01.webp" width="300" alt="S-SHR-01 default, dark"> <img src="../../screens/ios/S-SHR-01--light.webp" width="300" alt="S-SHR-01 default, light">
-
 - **Presentation:** full · tab: profile — screen map: “Full (builder) → system share sheet”
 - **Entry points:** S-STY-01 f7 · S-TRP-01 · S-RCP-01 W5 · S-WRP-* last frame
 - **Leads to:** S-SHR-02 (Map style) · system share sheet · S-SHR-03 (from card footer)
@@ -102,16 +100,15 @@ Text sizes scale with `--dp-text-scale` (XL = 2.0×) and numerals with `--dp-num
 
 | State | PRD label | Fixture params | Screenshot |
 |---|---|---|---|
-| `default` | Route glyph | `trip=t20261105-0742` | [S-SHR-01.png](../../screens/ios/S-SHR-01.webp) · [open](../../../../prototypes/ios/index.html#S-SHR-01) |
-| `ring` | Ring | `trip=t20261105-0742` | [S-SHR-01--ring.png](../../screens/ios/S-SHR-01--ring.webp) · [open](../../../../prototypes/ios/index.html#S-SHR-01/ring) |
-| `weekStrip` | Week strip | — | [S-SHR-01--weekStrip.png](../../screens/ios/S-SHR-01--weekStrip.webp) · [open](../../../../prototypes/ios/index.html#S-SHR-01/weekStrip) |
-| `archetype` | Archetype | — | [S-SHR-01--archetype.png](../../screens/ios/S-SHR-01--archetype.webp) · [open](../../../../prototypes/ios/index.html#S-SHR-01/archetype) |
-| `map` | Map (opt-in, after S-SHR-02) | `trip=t20261105-0742` | [S-SHR-01--map.png](../../screens/ios/S-SHR-01--map.webp) · [open](../../../../prototypes/ios/index.html#S-SHR-01/map) |
-| `s916And45` | 9:16 and 4:5 | — | [S-SHR-01--s916And45.png](../../screens/ios/S-SHR-01--s916And45.webp) · [open](../../../../prototypes/ios/index.html#S-SHR-01/s916And45) |
-| `shortTrip` | short trip (Ring only) | `trip=t20261104-0755` | [S-SHR-01--shortTrip.png](../../screens/ios/S-SHR-01--shortTrip.webp) · [open](../../../../prototypes/ios/index.html#S-SHR-01/shortTrip) |
-| `proStyles` | Pro styles | `trip=t20261105-0742` | [S-SHR-01--proStyles.png](../../screens/ios/S-SHR-01--proStyles.webp) · [open](../../../../prototypes/ios/index.html#S-SHR-01/proStyles) |
-| `Load` | Load (building) | — | [S-SHR-01--Load.png](../../screens/ios/S-SHR-01--Load.webp) · [open](../../../../prototypes/ios/index.html#S-SHR-01/Load) |
-| default · light | Light theme | `theme=light` | [S-SHR-01--light.png](../../screens/ios/S-SHR-01--light.webp) |
+| `default` | Route glyph | `trip=t20261105-0742` | — · [open](../../../../prototypes/ios/index.html#S-SHR-01) |
+| `ring` | Ring | `trip=t20261105-0742` | — · [open](../../../../prototypes/ios/index.html#S-SHR-01/ring) |
+| `weekStrip` | Week strip | — | — · [open](../../../../prototypes/ios/index.html#S-SHR-01/weekStrip) |
+| `archetype` | Archetype | — | — · [open](../../../../prototypes/ios/index.html#S-SHR-01/archetype) |
+| `map` | Map (opt-in, after S-SHR-02) | `trip=t20261105-0742` | — · [open](../../../../prototypes/ios/index.html#S-SHR-01/map) |
+| `s916And45` | 9:16 and 4:5 | — | — · [open](../../../../prototypes/ios/index.html#S-SHR-01/s916And45) |
+| `shortTrip` | short trip (Ring only) | `trip=t20261104-0755` | — · [open](../../../../prototypes/ios/index.html#S-SHR-01/shortTrip) |
+| `proStyles` | Pro styles | `trip=t20261105-0742` | — · [open](../../../../prototypes/ios/index.html#S-SHR-01/proStyles) |
+| `Load` | Load (building) | — | — · [open](../../../../prototypes/ios/index.html#S-SHR-01/Load) |
 
 Every state also renders in light/dark (`theme=light`), XL text (`text=xl`) and reduced motion (`rm=1`).
 
@@ -233,7 +230,7 @@ UI glyphs may be swapped for SF Symbols / Material Symbols Rounded equivalents; 
 - **PRD features:** F-PRV-07, F-SHR-02 · **Priority:** P1 · **WP:** E
 - **Interactive:** [S-PRV-02](../../../../prototypes/ios/index.html#S-PRV-02)
 
-**Purpose.** Mark home, work or other places as private, so any part of a shared route inside them is removed in addition to the random 400–800 m trimming (F-PRV-07, F-SHR-02). Zones stay on the device.
+**Purpose.** Mark home, work or other places as private, so any part of a shared route inside them is removed in addition to the random 400–800 m trimming (F-PRV-07, F-SHR-02). Zones are kept on the device and in Pro backup (Gate 4), never in analytics.
 
 ### States
 
@@ -251,7 +248,7 @@ Every state also renders in light/dark (`theme=light`), XL text (`text=xl`) and 
 - Push, title “Privacy zones” (adding: “Add a zone”, subtitle “Shared cards skip this area”).
 - Empty: card with a pin illustration, “No privacy zones yet”, one sentence, filled “Add a zone”; then “Recent parking spots” (Home · Work · Gym from places) with an “+ Add” trailing.
 - With zones: zone map (370 × 230, radius = card): plain-canvas roads, the zone as a dashed Glide circle with a 45° hatch fill, the pin at its centre, a glass chip “Home · 400 m”, “© OpenStreetMap contributors”; “Your zones” list (name, radius) + “Add a zone”; info banner “Less exposure, not invisibility”.
-- Adding: map 260 tall with “Drag the map to move the pin” glass hint; “Start from a recent parking spot” filter chips; Radius segmented 200 · 400 · 800 m (live circle); Name field; filled “Save zone”; footnote “Zones stay on this phone…”.
+- Adding: map 260 tall with “Drag the map to move the pin” glass hint; “Start from a recent parking spot” filter chips; Radius segmented 200 · 400 · 800 m (live circle); Name field; filled “Save zone”; footnote “Zones are saved on this phone and, if backup is on, in your backup…”.
 
 ### Components & tokens
 
@@ -299,7 +296,7 @@ Every state also renders in light/dark (`theme=light`), XL text (`text=xl`) and 
 |---|---|
 | Empty | No privacy zones yet. Add a zone around home or work, and share cards will never show that area, on top of the usual trimming. |
 | Radius | Any part of a shared route inside the circle is removed, on top of the usual 400–800 m trimming. |
-| Footnote | Zones stay on this phone. They’re never uploaded or included in analytics. |
+| Footnote | Zones are saved on this phone and, if backup is on, in your backup. They’re never included in analytics. |
 | Banner | Less exposure, not invisibility. Zones and trimming hide where your drives start and end. A distinctive route shape can still be recognised. The Ring card shares no route at all. |
 
 ### Free / Pro

@@ -7,7 +7,7 @@
 
 ## Context and problem statement
 
-Binding (Keval, 6 Nov 2026): v1 runs on a **new Firebase project "DrivePerf"**, starting on **Spark** and upgrading to **Blaze** only when a feature needs it (Cloud Storage since 3 Feb 2026, Cloud Functions/Run, scheduled jobs). Auth, database, server-side APIs and hosting stay on Firebase for now. After launch, when user numbers justify it, the **whole server side moves to a self-managed VPS** (Postgres + S3-compatible storage + API) **without a client rewrite**.
+Binding (Keval, 6 Nov 2026): v1 runs on a **new Firebase project "DrivePerf"**, starting on **Spark** and upgrading to **Blaze** only when a feature needs it (Cloud Run, scheduled jobs). Auth, database, server-side APIs and hosting stay on Firebase for now. After launch, when user numbers justify it, the **whole server side moves to a self-managed VPS** (Postgres + S3-compatible storage + API) **without a client rewrite**.
 
 The only server features in v1 are sign-in, Pro backup/restore, account deletion (with cascade), the 30-day post-Pro retention sweep, Pro Preview and Ride-along grants, RevenueCat webhooks and the website waitlist (PRD A-4). Free users upload no trip data.
 
@@ -57,12 +57,12 @@ Everything that reads or writes **user data** (account record, synced entities, 
 | Phase | Plan | Services |
 |---|---|---|
 | Phase 5 (foundations, website) | **Spark** | Auth (configured; SIWA needs the paid Apple account), Firestore (waitlist only), Hosting (website), Analytics, Crashlytics, Remote Config, App Check (debug provider until the paid Apple account) |
-| Phase 6 start (first account/backup feature) | **Blaze** with budget alerts at US$5, 25 and 50 | + **Cloud Run** service `api` (Kotlin/Ktor container), **Cloud Storage** bucket for trip files, **Cloud Scheduler** (2 jobs, inside the 3 free: `daily` = 30-day purge, lapse reminders, RevenueCat reconcile, orphan-blob sweep; `deletion` = hourly account-deletion cascade), Secret Manager, Artifact Registry |
+| Phase 6 start (first account/backup feature) | **Blaze** with budget alerts at US$5, 25 and 50 | + **Cloud Run** service `api` (Kotlin/Ktor container), **Cloudflare R2** bucket for trip files (outside Firebase, see below), **Cloud Scheduler** (2 jobs, inside the 3 free: `daily` = 30-day purge, lapse reminders, RevenueCat reconcile, orphan-blob sweep; `deletion` = hourly account-deletion cascade), Secret Manager, Artifact Registry |
 | Later, optional | Blaze | BigQuery export for dashboards (F-ANA-04), FCM sending |
 
 **Not used:** Cloud Functions event triggers (Firestore/Auth `onDelete`, etc.) because they do not port to a VPS; every server action is an explicit API endpoint or a scheduled HTTP job. Phone Auth (billed per SMS). Password sign-in.
 
-**Region:** Firestore (Native mode, Standard edition), Cloud Storage and Cloud Run all in **`us-central1`** (Storage free quotas apply only in us-central1/us-east1/us-west1; Hosting→Cloud Run rewrites are fastest there). The Firestore location cannot be changed later. This matches PRD F-ACC-03 ("Firebase, US region"); the Law 25 PIA covers the transfer.
+**Region:** Firestore (Native mode, Standard edition) and Cloud Run in **`us-central1`** (Hosting→Cloud Run rewrites are fastest there). R2 buckets use the **ENAM** (eastern North America) location hint. The Firestore location cannot be changed later. This matches PRD F-ACC-03 ("Firebase, US region"); the Law 25 PIA covers the transfer.
 
 ### API shape (contract: `backend/openapi/v1.yaml`, spec-first; A17 writes it, A11 supplies entity schemas)
 
@@ -101,7 +101,7 @@ Everything that reads or writes **user data** (account record, synced entities, 
 | blob registry | `dp.blobs(key, account_id, trip_id, sha256, size_bytes, state, …)` |
 | `waitlist/{id}`, deletion requests | same-named tables |
 
-8. **Blob layout** (identical in Cloud Storage and any S3-compatible store; [data-model.md §3.4, §3.7](../data-model.md)): `u/{accountId}/t/{tripId}/r1.v{formatVersion}.{sha256[0:16]}.pb.gz`, content-addressed and immutable. Keys contain opaque IDs and hashes only (no names, dates or places). Uploads are a single presigned `PUT` (an R1 file is ≈ 0.6 MB per driving hour), so GCS V4 signed URLs and S3 presigned URLs are interchangeable; the API returns the URL **and** the exact headers to send. On a VPS use a managed S3-compatible bucket (or Garage/SeaweedFS); MinIO's community edition stopped publishing binaries in Dec 2025 (A11 [MINIO]).
+8. **Blob layout** (identical in R2 and any other S3-compatible store; [data-model.md §3.4, §3.7](../data-model.md)): `u/{accountId}/t/{tripId}/r1.v{formatVersion}.{sha256[0:16]}.pb.gz`, content-addressed and immutable. Keys contain opaque IDs and hashes only (no names, dates or places). Uploads are a single presigned `PUT` (an R1 file is ≈ 0.6 MB per driving hour), S3 presigned URLs (SigV4) work the same on R2, B2 or a self-hosted store; the API returns the URL **and** the exact headers to send. On a VPS use a managed S3-compatible bucket (or Garage/SeaweedFS); MinIO's community edition stopped publishing binaries in Dec 2025 (A11 [MINIO]).
 9. **Auth portability:** sign-in is Apple, Google and email link only, so **no password hashes exist to migrate** (if a password provider is ever added, record the project's scrypt parameters from the console at that time). Apple and Google identities are re-linkable on any OIDC server by provider subject (`providerUserInfo.rawId` in `firebase auth:export`); email-link users re-verify by email. Details and the token-exchange cut-over are in [ADR-010](ADR-010-firebase-now-vs-vps.md).
 
 ### Cost model on Firebase (month 12 at a steady DAU; [Estimate])
@@ -111,15 +111,25 @@ Assumptions (aligned with [data-model.md](../data-model.md) §2.6 and §7): MAU 
 | Line item (per month) | 1k DAU | 5k DAU | 20k DAU |
 |---|---|---|---|
 | Backup users / trips uploaded per month | 250 / 15,000 | 1,250 / 75,000 | 5,000 / 300,000 |
-| Cloud Storage stock after 12 months (US$0.020/GB-mo, 5 GB free) | 45 GB → **$0.8** | 225 GB → **$4.4** | 900 GB → **$17.9** |
+| Cloudflare R2 stock after 12 months (US$0.015/GB-mo, 10 GB, 1M writes and 10M reads a month free, no egress fees) | 45 GB → **$0.5** | 225 GB → **$3.2** | 900 GB → **$13.4** |
 | Firestore (20K writes / 50K reads per day free, then $0.09 / $0.03 per 100K; storage 1 GiB free, then ≈ $0.15–0.18/GiB-mo) | 2K writes/day, 1.8 GB → **$0.2** | 10K/day, 9 GB → **$1.4** | 40K/day, 36 GB → **≈ $7** |
 | Cloud Run (2M requests, 180K vCPU-s, 360K GiB-s free per month) | 65K req → $0 | 320K req → $0 | 1.3M req, ≈ 260K vCPU-s → **$2–10** |
 | Hosting transfer, website + API proxy (360 MB/day free, then $0.15/GB) | $0.2 | $3.8 | $16.4 |
 | Auth (50K MAU free), Analytics, Crashlytics, App Check, Remote Config (100K fetches/day free), Scheduler (3 jobs free) | $0 | $0 | $0 |
 | Artifact Registry, Secret Manager, logging | $0.5 | $0.5 | $1 |
-| **Total** | **≈ $2** | **≈ $10** | **≈ $45–55** |
+| **Total** | **≈ $2** | **≈ $9** | **≈ $40–50** |
 
-Sensitivity: trip-file storage grows every month (retention is "until the user deletes"); if A12 needs R1 at 50 Hz (≈ 1.2 MB/h) the Storage line doubles. The website, not the app, is the largest line at 20k DAU. A11's backend-only figure (US$25–30/mo at 20k DAU) excludes website hosting and Cloud Run. RevenueCat (free under US$2,500 monthly tracked revenue, then 1 %) and the email provider are the same on any backend and excluded. Quota watch-points: Play Integrity Standard is 10,000 calls/day by default (request an increase before ~10k Android DAU); a Remote Config minimum fetch interval of 12 h keeps fetches under 100K/day.
+Sensitivity: trip-file storage grows every month (retention is "until the user deletes"); if A12 needs R1 at 50 Hz (≈ 1.2 MB/h) the R2 line doubles. The website, not the app, is the largest line at 20k DAU. A11's backend-only figure (US$25–30/mo at 20k DAU) excludes website hosting and Cloud Run. RevenueCat (free under US$2,500 monthly tracked revenue, then 1 %) and the email provider are the same on any backend and excluded. Quota watch-points: Play Integrity Standard is 10,000 calls/day by default (request an increase before ~10k Android DAU); a Remote Config minimum fetch interval of 12 h keeps fetches under 100K/day.
+
+### Trip-file storage: Cloudflare R2 (Gate 4, 6 Nov 2026)
+
+Keval asked whether R2 is free and easy to migrate; it is the better fit, so trip files go to **Cloudflare R2 from day one** and everything else stays on Firebase.
+
+- **Why:** 10 GB a month free, then US$0.015/GB-month; **no egress fees** (restores and any later move are free; leaving Cloud Storage would cost ≈ US$0.12/GB); S3-compatible, so the VPS migration (ADR-010) keeps trip files where they are and needs no blob copy.
+- **How:** buckets `driveperf-trips-prod` and `driveperf-trips-dev`, ENAM location hint, public access off. The API holds a bucket-scoped R2 API token (Object Read & Write) in Secret Manager and mints **S3 SigV4 presigned** `PUT`/`GET` URLs (15 minutes) after its ownership, entitlement and size checks. Devices never hold Cloudflare credentials. Local and CI tests use an S3-compatible emulator; the contract suite runs against it.
+- **Deletion:** R2 has no bucket soft delete we rely on, so the purge job removes an object 7 days after its tombstone (same safety window as before).
+- **Costs:** Cloudflare asks for a payment method to enable R2, even inside the free tier. Blaze is still needed at Phase 6 for Cloud Run and Cloud Scheduler.
+- **Privacy:** Cloudflare becomes a second processor for backup data; the privacy policy and the Law 25 PIA name it.
 
 ### Consequences
 

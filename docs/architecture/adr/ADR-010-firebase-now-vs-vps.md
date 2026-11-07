@@ -23,7 +23,7 @@ Launch in January 2027 with one developer · ops burden and security risk · cos
 
 ## Decision outcome
 
-**Recommendation: option 1. Do not buy the VPS now.** At launch-scale traffic Firebase costs ≈ US$2–10/month and almost no operations time, while a VPS costs about the same or more in money and 6–10 hours a month of patching, backups, monitoring and on-call — time that should go into capture reliability and the January launch. Because clients only know `https://api.driveperf.com/v1` (ADR-004), moving later is a **server-side project of about 2–4 weeks** with no app release, so waiting costs us nothing in lock-in.
+**Recommendation: option 1, with option 3's storage part (trip files on Cloudflare R2 from day one, decided at Gate 4 on 6 Nov 2026). Do not buy the VPS now.** At launch-scale traffic Firebase costs ≈ US$2–10/month and almost no operations time, while a VPS costs about the same or more in money and 6–10 hours a month of patching, backups, monitoring and on-call — time that should go into capture reliability and the January launch. Because clients only know `https://api.driveperf.com/v1` (ADR-004), moving later is a **server-side project of about 2–4 weeks** with no app release, so waiting costs us nothing in lock-in.
 
 What would change this recommendation: v1 needing SQL across users, long-running jobs or stateful connections (it does not), or a Firebase limit blocking the launch (none found).
 
@@ -31,14 +31,14 @@ What would change this recommendation: v1 needing SQL across users, long-running
 
 | | 1k DAU | 5k DAU | 20k DAU |
 |---|---|---|---|
-| **Firebase (option 1)** — see ADR-004 breakdown (≈ US$16 of the 20k figure is website traffic) | **≈ 2** | **≈ 10** | **≈ 45–55** |
+| **Firebase (option 1)** — see ADR-004 breakdown (≈ US$16 of the 20k figure is website traffic) | **≈ 2** | **≈ 9** | **≈ 40–50** |
 | VPS server | KVM 2: 8.79 intro / 14.99 renewal | KVM 2: 8.79 / 14.99 | KVM 4 for headroom: 12.99 / 28.99 |
 | Object storage for R1 trip files (Backblaze B2 ≈ US$6.95/TB-mo; 45 / 225 / 900 GB) | ≈ 0.3 | ≈ 1.6 | ≈ 6.3 |
 | Off-box DB backups, uptime monitor (free tiers), domain TLS (Caddy) | ≈ 0.5 | ≈ 0.5 | ≈ 1 |
 | Firebase pieces kept (Analytics, Crashlytics, Remote Config, App Check, Auth ≤ 50K MAU) | 0 | 0 | 0 |
 | **VPS total (option 2)** | **≈ 10–16** | **≈ 11–17** | **≈ 20–36** |
 | Ops time, Firebase vs VPS | ~1 h vs 6–10 h | ~1 h vs 6–10 h | ~2 h vs 8–12 h |
-| One-off exit egress from Cloud Storage if migrating at this size (≈ US$0.12/GB after 100 GB/month free) | ≈ 0 | ≈ 15 | ≈ 95 |
+| One-off exit egress for trip files when migrating | 0 | 0 | 0 (R2 has no egress fees and the files stay on R2) |
 
 Reading: a VPS is **more expensive** at 1k–5k DAU. At 20k DAU it saves ≈ US$10–30/month (mostly website traffic, which can move on its own), far less than the value of the extra 6–10 hours. Trip-file storage (retained until the user deletes it) is the line that grows without bound; it can also be moved on its own (trigger T2 below).
 
@@ -61,7 +61,7 @@ Reading: a VPS is **more expensive** at 1k–5k DAU. At 20k DAU it saves ≈ US$
 Review quarterly (first review at the v1.1 release). Start when **any one** holds for **two consecutive months**:
 
 - **T1 Cost:** the Firebase/GCP invoice exceeds **US$150/month**, or the 6-month forecast exceeds **US$250/month**, **and** the modelled VPS total (including object storage and 8 h/month of ops at a rate Keval sets) is ≥ 40 % cheaper.
-- **T2 Trip-file storage (partial move first):** the Cloud Storage line exceeds **US$40/month** or holds more than **1.5 TB**. Move only the blob backend to S3-compatible storage (B2 or R2) by swapping the server's `BlobSigner` adapter; nothing else changes. Doing this early keeps the one-off egress bill small.
+- **T2 Trip-file storage:** retired at Gate 4, because trip files are on R2 from day one. Review R2 against Backblaze B2 if the R2 line passes **US$40/month**; switching is a `BlobSigner` change plus a free copy.
 - **T3 Scale:** sustained **> 25k DAU**; Firestore writes above **5×** the free daily quota; or Cloud Run needing `min-instances > 0` to meet latency targets.
 - **T4 Features:** a planned feature needs cross-user SQL aggregates (for example v1.1 club recaps), a web dashboard with complex queries, server-side spatial work (PostGIS route matching), jobs longer than 60 minutes, or WebSockets/live features.
 - **T5 Compliance or contract:** counsel, a Law 25 PIA or a partner contract requires a processor other than Google, or Canadian residency that GCP's Montréal/Toronto regions cannot satisfy. (Residency alone is **not** a VPS trigger.)
@@ -71,26 +71,26 @@ Review quarterly (first review at the v1.1 release). Start when **any one** hold
 
 ### Target VPS architecture (when triggered)
 
-Ubuntu LTS, SSH keys only, `ufw`, `fail2ban`, unattended security upgrades; Docker Compose with **Caddy** (TLS, reverse proxy, rate limits), the **same `backend/api` image** that runs on Cloud Run (configured with Postgres and S3 adapters), **Postgres** (current major; native `uuid`, `timestamptz`, `jsonb`); trip files on **external S3-compatible storage** (B2 or R2), not a self-hosted store on the 100 GB local disk, which the 5k-DAU stock outgrows in about five months (and MinIO's community edition stopped publishing binaries in Dec 2025, data-model.md §3.7); scheduled jobs as systemd timers calling the same `/v1/jobs/*` endpoints; WAL-G to off-box storage plus Hostinger weekly backups; external uptime checks. **Firebase Auth, Analytics, Crashlytics, Remote Config, App Check and FCM stay** (free, device-side or identity-critical); moving Auth is a separate, optional step (M6).
+Ubuntu LTS, SSH keys only, `ufw`, `fail2ban`, unattended security upgrades; Docker Compose with **Caddy** (TLS, reverse proxy, rate limits), the **same `backend/api` image** that runs on Cloud Run (configured with Postgres and S3 adapters), **Postgres** (current major; native `uuid`, `timestamptz`, `jsonb`); trip files stay on **Cloudflare R2** (already in use), not a self-hosted store on the 100 GB local disk, which the 5k-DAU stock outgrows in about five months (and MinIO's community edition stopped publishing binaries in Dec 2025, data-model.md §3.7); scheduled jobs as systemd timers calling the same `/v1/jobs/*` endpoints; WAL-G to off-box storage plus Hostinger weekly backups; external uptime checks. **Firebase Auth, Analytics, Crashlytics, Remote Config, App Check and FCM stay** (free, device-side or identity-critical); moving Auth is a separate, optional step (M6).
 
 ### Migration runbook outline (zero-downtime)
 
-- **M0 Prepare (1–2 weeks):** write Postgres adapters (`UserStore`, `SyncStore`, `EntitlementStore`) and the S3 `BlobSigner`; run the contract suite on both; provision the VPS from code; lower the `api.driveperf.com` DNS TTL to 60 s 48 h ahead; rehearse M1–M5 on staging.
-- **M1 Dual-write (Firebase primary):** the Cloud Run API writes Firestore in the request and appends each change to an outbox; a relay applies it to Postgres idempotently by `(id, rev)`. New trip files are copied to S3 after commit, and each `blobs` record stores its backend.
-- **M2 Backfill:** page through Firestore by ID (or a managed export), transform with the A11 mapping, upsert into Postgres only where the incoming `rev` is newer (re-runnable). Copy existing objects GCS → S3 with checksum verification (rclone).
+- **M0 Prepare (1–2 weeks):** write Postgres adapters (`UserStore`, `SyncStore`, `EntitlementStore`) (the R2 `BlobSigner` already exists); run the contract suite on both; provision the VPS from code; lower the `api.driveperf.com` DNS TTL to 60 s 48 h ahead; rehearse M1–M5 on staging.
+- **M1 Dual-write (Firebase primary):** the Cloud Run API writes Firestore in the request and appends each change to an outbox; a relay applies it to Postgres idempotently by `(id, rev)`. Trip files need no copy: they are already on R2.
+- **M2 Backfill:** page through Firestore by ID (or a managed export), transform with the A11 mapping, upsert into Postgres only where the incoming `rev` is newer (re-runnable).
 - **M3 Verify:** per-user counts and a hash over sorted `(id, rev)` pairs must match; shadow reads compare both stores for 7 days with zero unexplained differences.
 - **M4 Cut-over (canary, no DNS change yet):** deploy a Cloud Run revision in *proxy mode* that forwards to the VPS origin; shift traffic 5 % → 25 % → 100 % with Cloud Run traffic splitting. The VPS is now primary and reverse-writes changes to Firestore through its own outbox, keeping Firestore warm for rollback. After 7 stable days, point `api.driveperf.com` DNS at the VPS (Caddy certificate pre-issued with a DNS-01 challenge); stale DNS answers still reach the proxy, so nothing breaks.
 - **M5 Rollback (any time in the 30-day window):** shift Cloud Run traffic back to the native revision (seconds) or restore DNS; Firestore is current thanks to the reverse writes; blob records know where each object lives.
 - **M6 Auth (optional, separate, last):** recommended to keep Firebase Auth. If moving: stand up an OIDC IdP federating Apple and Google with the **same** Apple Services ID/Team and Google OAuth clients so provider subjects match; import `firebase auth:export` users into it, mapping `(issuer, subject)` to existing account IDs (no password hashes exist: sign-in is Apple, Google and email link only); the API trusts both issuers; ship an app version whose `AuthGateway` does a one-time silent exchange of a Firebase ID token for an IdP session; keep the Firebase issuer trusted until `min_supported_build` retires old versions (≥ 6 months).
 - **M7 Everything else:** RevenueCat webhook URL is unchanged (same domain); Cloud Scheduler → systemd timers; the static website can move to Caddy by changing two A records, with Firebase Hosting kept as a hot standby.
-- **M8 Decommission (after 30 stable days):** stop reverse writes, run a final diff, delete the Firestore data and Cloud Storage objects (privacy: no stray copies), keep the Firebase project for the SDK-direct services, and record the change in `decisions.md`.
+- **M8 Decommission (after 30 stable days):** stop reverse writes, run a final diff, delete the Firestore data (privacy: no stray copies), keep the Firebase project for the SDK-direct services, and record the change in `decisions.md`.
 
 ### Consequences
 
 - Good: no ops work before launch; launch-scale cost near zero; a clear, measurable point at which to move.
 - Good: the seam (ADR-004) keeps the move server-only and reversible.
 - Bad: the API layer is extra code we would not need if we stayed on Firebase forever; it is also what makes the VPS option cheap.
-- Bad: Cloud Storage exit egress grows with time; trigger T2 limits it.
+- Bad: R2 is a second vendor and processor from day one (one more account, token and policy line). Accepted for the free egress and the simpler migration.
 
 ### Confirmation
 
@@ -99,7 +99,7 @@ A quarterly cost/trigger review is added to the operations checklist (A17); the 
 ## Pros and cons of the other options
 
 - **VPS from day one:** predictable bill and full control; costs more than Firebase until well past 5k DAU, adds 6–10 h/month of ops and a single point of failure during the launch window, and still needs Firebase for analytics, crashes, config and App Check.
-- **Hybrid with R2/B2 for trip files from day one:** removes the future blob migration and its egress bill (R2 has no egress fees); adds a second vendor, account and privacy-policy processor before launch, against the "all on Firebase for now" direction. Kept as an open question for Keval; trigger T2 achieves most of the benefit later.
+- **Hybrid with R2/B2 for trip files from day one:** removes the future blob migration and its egress bill (R2 has no egress fees); adds a second vendor, account and privacy-policy processor before launch, against the "all on Firebase for now" direction. **Adopted for trip files at Gate 4 (6 Nov 2026)**; the rest of the server stays on Firebase.
 
 ## More information
 

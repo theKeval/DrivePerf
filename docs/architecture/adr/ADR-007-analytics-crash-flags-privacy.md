@@ -19,9 +19,33 @@ Privacy baseline and Law 25 privacy-by-default · cost ($0) · Spark-compatible 
 2. PostHog / Amplitude / TelemetryDeck + Sentry + a flags service.
 3. Self-hosted analytics (Umami/PostHog) — needs a server we don't run yet.
 
+## Gate 4 research update (6 Nov 2026): proposed revision, pending Keval's choice
+
+Keval asked for research into analytics that collect the minimum and work for publishing in almost every country. The result is [research/analytics-crash-privacy.md](../research/analytics-crash-privacy.md). It recommends changing the chosen option. **Option 1 below stays the decision of record until Keval picks one.** The consent rules, event dictionary, logging rules and website analytics apply to either option.
+
+| | Option 1 (current) | Proposed revision ("counts, not people") |
+|---|---|---|
+| Usage analytics | Firebase Analytics SDK on the device | No analytics SDK. The app sends ~23 typed events to our own `POST /v1/events` (one Ktor adapter in `commonMain`). The API strips the IP and User-Agent, rounds timestamps to the day and forwards to **PostHog Cloud EU** (anonymous events, no person profiles, GeoIP off) |
+| Identifier | Persistent app-instance ID ("Reset analytics ID" in Settings) | **None.** WDD, activation and retention are computed on the device and sent as summary events (`week_summary`, `activation_reached`) |
+| Location from IP | Google Analytics always derives a coarse location from the IP | None (the relay drops the IP before forwarding) |
+| Crash reporting | Crashlytics. iOS Kotlin/Native crashes need a community hook; no official KMP support | **Sentry, EU region**, official KMP SDK, `sendDefaultPii = false`, no user set, allow-listed tags. Crashlytics is the fallback |
+| Users who decline | Nothing | Xcode Organizer/MetricKit and Play Console Android vitals (aggregate, from the OS) |
+| Cost at ~25k DAU | $0 | PostHog free to 1M events/month, then about US$60/month at 25k DAU with 50% opt-in; Sentry free to start, then about US$26–29/month (estimates in the research) |
+| VPS exit | Stays on Firebase | The relay writes to Postgres instead of PostHog (no app release); GlitchTip, which accepts Sentry events, replaces Sentry. Self-hosted Sentry needs 16 GB RAM and doesn't fit KVM 2 |
+| Store forms | Declares the Firebase IDs and diagnostics | Smaller: no identifiers, "not linked to you" usage and diagnostics |
+
+The revision also proposes:
+- one global opt-in, nothing pre-selected, the same in every country. Opt-in is required anyway in the EU, all of Canada (Quebec users can't be told apart) and India from May 2027;
+- feature flags served from `/v1/config`, or else declaring the Firebase installation ID on both store forms if Remote Config stays;
+- no launch in China mainland or Russia, and holding South Korea until counsel confirms its location-information law rules (see the research's country notes).
+
+Items the research could not verify: whether Korea's location-law notice applies to foreign apps; TelemetryDeck prices since July 2026; whether GlitchTip can symbolicate iOS crashes; the Apple required-reason API codes (confirm in Xcode).
+
+**Recommendation (A10):** adopt the revision. It fits the "no location in analytics" rule better and keeps analytics behind our API like everything else. It costs nothing at launch, and the paid tiers start only well above launch scale. If Keval prefers $0 at every scale and the industry default, keep option 1 with its consent rules.
+
 ## Decision outcome
 
-**Chosen option: 1.** Free on Spark, first-party with App Check and Crashlytics symbolication, and isolated behind the `Analytics`, `CrashReporter` and `FeatureFlags` ports so it can be swapped later without touching domain code.
+**Chosen option: 1** (decision of record; see the Gate 4 research update above for the proposed revision). Free on Spark, first-party with App Check and Crashlytics symbolication, and isolated behind the `Analytics`, `CrashReporter` and `FeatureFlags` ports so it can be swapped later without touching domain code.
 
 ### Consent and defaults (resolves PRD OQ-02 for architecture; counsel confirms)
 

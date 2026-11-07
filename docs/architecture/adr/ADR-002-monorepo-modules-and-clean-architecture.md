@@ -49,7 +49,7 @@ Clean dependency direction (domain knows nothing about Firebase, SQLite, HTTP or
 ├── backend/
 │   ├── api/                   Kotlin/Ktor server (Docker image), its own clean layers (§6)
 │   ├── openapi/v1.yaml        the HTTP contract (spec-first, ADR-004)
-│   ├── firebase/              firebase.json, firestore.rules, storage.rules, indexes, emulator config
+│   ├── firebase/              firebase.json, firestore.rules, indexes, emulator config (no storage.rules: trip files are on R2)
 │   └── ops/                   (later) VPS compose files and runbooks (ADR-010)
 ├── web/                       Astro site (ADR-009)
 ├── prototypes/  docs/  legacy/android-prototype/

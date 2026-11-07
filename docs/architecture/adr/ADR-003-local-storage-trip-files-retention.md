@@ -43,11 +43,12 @@ Stability on Kotlin/Native today · SQL-first schema that maps cleanly to Postgr
 |---|---|---|---|
 | Trips, summaries, routes, cars, scores (all tiers) | device | the user deletes them | no automatic deletion; F-PRV-04 deletes trip/range/all within 30 s |
 | R1 analysis files | device | the user deletes them | F-SET-04 lets the user remove detailed data while keeping summaries |
-| R0 capture logs | device | the user deletes them (binding rule) | A11 recommends a **30-day default** with a "Forever" setting (data-model.md §2.6). That is automatic pruning, so it needs Keval's approval and a decisions-log entry before it ships |
-| Pro cloud backup (incl. Preview and Ride-along) | Firestore + Cloud Storage via the API | the user deletes them or the account | device deletion propagates as a tombstone; cloud delete within 24 h |
+| R0 capture logs | device | the user deletes them | **No automatic pruning (Gate 4, 6 Nov 2026).** Removed with the trip or by F-SET-04; Settings shows the R0 size; under 100 MB free space EC-STO stops new R0 capture but keeps GNSS and summaries |
+| Pro cloud backup (incl. Preview and Ride-along) | Firestore + Cloudflare R2 (trip files) via the API | the user deletes them or the account | device deletion propagates as a tombstone; cloud delete within 24 h |
 | Cloud copy after Pro ends | cloud | **30 days**, then deleted | server stores `backupRetentionUntil = proEndedAt + 30 d`; reminders at 30, 7 and 1 days left; daily retention sweep deletes ([ADR-006](ADR-006-payments-and-entitlements.md)); re-subscribing cancels deletion; local data untouched |
 | Free signed-in user | cloud | until account deletion | only the account record (user ID, auth identities, consents, entitlement mirror); **no trip data** |
-| Deleted cloud objects | Cloud Storage soft delete | purged ≤ 7 days after deletion | bucket soft-delete window set to 7 days (protects against our own bugs); disclosed in the privacy policy |
+| Deleted cloud objects | R2, delayed delete | purged ≤ 7 days after deletion | the purge job deletes an object 7 days after its tombstone (protects against our own bugs; R2 has no bucket soft delete we rely on); disclosed in the privacy policy |
+| Privacy zones | device; Pro backup | the user deletes them | backed up with places since Gate 4 (6 Nov 2026); never in analytics |
 
 ### Consequences
 

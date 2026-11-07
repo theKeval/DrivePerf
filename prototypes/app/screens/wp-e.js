@@ -1117,7 +1117,7 @@
           ui.section('Start from a recent parking spot', `<div class="prv-chips">${places.map((x) => ui.chip(x.name, { kind: 'filter', icon: x.kind === 'home' ? 'garage' : 'pin', selected: x.name === p.name, action: 'place', arg: x.name })).join('')}</div>`, { style: 'caption' }),
           ui.section('Radius', ui.pad(ui.segmented([200, 400, 800].map((m) => ({ id: String(m), label: `${m} m` })), { selected: String(r), action: 'radius' })), { style: 'caption', footer: 'Any part of a shared route inside the circle is removed, on top of the usual 400–800 m trimming.' }),
           ui.pad(ui.textField({ label: 'Name', value: p.name, helper: 'Only you see this name.' })),
-          ui.pad(`<div class="e-sheetacts">${ui.button('Save zone', { kind: 'filled', size: 'l', block: true, action: 'save', haptic: 'success' })}</div><p class="e-foot">Zones stay on this phone. They’re never uploaded or included in analytics.</p>`),
+          ui.pad(`<div class="e-sheetacts">${ui.button('Save zone', { kind: 'filled', size: 'l', block: true, action: 'save', haptic: 'success' })}</div><p class="e-foot">Zones are saved on this phone and, if backup is on, in your backup. They’re never included in analytics.</p>`),
         ];
       } else if (state === 'withZones') {
         const z = zones[0];
@@ -1149,12 +1149,12 @@
       save: (ctx) => { ctx.toast(`Zone saved · ${ctx.store.r || 400} m`, { icon: 'check' }); ctx.setState('withZones'); return false; },
     },
     spec: {
-      purpose: 'Mark home, work or other places as private, so any part of a shared route inside them is removed in addition to the random 400–800 m trimming (F-PRV-07, F-SHR-02). Zones stay on the device.',
+      purpose: 'Mark home, work or other places as private, so any part of a shared route inside them is removed in addition to the random 400–800 m trimming (F-PRV-07, F-SHR-02). Zones are kept on the device and in Pro backup (Gate 4), never in analytics.',
       layout: [
         'Push, title “Privacy zones” (adding: “Add a zone”, subtitle “Shared cards skip this area”).',
         'Empty: card with a pin illustration, “No privacy zones yet”, one sentence, filled “Add a zone”; then “Recent parking spots” (Home · Work · Gym from places) with an “+ Add” trailing.',
         'With zones: zone map (370 × 230, radius = card): plain-canvas roads, the zone as a dashed Glide circle with a 45° hatch fill, the pin at its centre, a glass chip “Home · 400 m”, “© OpenStreetMap contributors”; “Your zones” list (name, radius) + “Add a zone”; info banner “Less exposure, not invisibility”.',
-        'Adding: map 260 tall with “Drag the map to move the pin” glass hint; “Start from a recent parking spot” filter chips; Radius segmented 200 · 400 · 800 m (live circle); Name field; filled “Save zone”; footnote “Zones stay on this phone…”.',
+        'Adding: map 260 tall with “Drag the map to move the pin” glass hint; “Start from a recent parking spot” filter chips; Radius segmented 200 · 400 · 800 m (live circle); Name field; filled “Save zone”; footnote “Zones are saved on this phone and, if backup is on, in your backup…”.',
       ],
       components: ['navBar', 'card', 'empty', 'list', 'row', 'chip', 'segmented', 'textField', 'banner', 'button', 'map'],
       interactions: ['Add / parking spot / zone row → adding (prefilled). Chip → moves the pin to that spot. Radius → resizes the circle (haptic selection). Drag the map → moves the pin (native). Save zone → with zones + toast (haptic success).', 'Swipe a zone row (iOS) / long-press (Android) → Delete zone.'],
@@ -1162,7 +1162,7 @@
       a11y: ['Map label: “Map of the Home privacy zone, 400 metres around the pin”. The pin is adjustable with the rotor / custom actions “Move north/south/east/west 50 metres”.', 'Radius is a segmented control with “200 metres” etc. XL: chips wrap; the map keeps 230/260 height.'],
       platformDiffs: { ios: 'MapKit with labels muted, overlay MKCircle with hatch renderer; glass chips; segmented Picker.', android: 'Map SDK with a custom style, Circle overlay; connected button group for radius; OutlinedTextField.' },
       analytics: ['privacy_zone_added {radius} (no location)', 'privacy_zone_removed'],
-      copy: { Empty: 'No privacy zones yet. Add a zone around home or work, and share cards will never show that area, on top of the usual trimming.', Radius: 'Any part of a shared route inside the circle is removed, on top of the usual 400–800 m trimming.', Footnote: 'Zones stay on this phone. They’re never uploaded or included in analytics.', Banner: 'Less exposure, not invisibility. Zones and trimming hide where your drives start and end. A distinctive route shape can still be recognised. The Ring card shares no route at all.' },
+      copy: { Empty: 'No privacy zones yet. Add a zone around home or work, and share cards will never show that area, on top of the usual trimming.', Radius: 'Any part of a shared route inside the circle is removed, on top of the usual 400–800 m trimming.', Footnote: 'Zones are saved on this phone and, if backup is on, in your backup. They’re never included in analytics.', Banner: 'Less exposure, not invisibility. Zones and trimming hide where your drives start and end. A distinctive route shape can still be recognised. The Ring card shares no route at all.' },
       freePro: 'Free.',
       data: 'Zones from user.privacyZones (Home, 400 m); recent spots from user.places (Home, Work, Gym). The empty state ignores the fixture zone to show the first-run case. Roads drawn from every fixture trip’s track.',
       icons: ['pin', 'garage', 'plus', 'shield'],

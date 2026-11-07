@@ -52,7 +52,7 @@ DrivePerf v1 ships on iOS and Android on the same day (target January 2027, buil
 - Bad: two UI codebases (SwiftUI and Compose). Mitigated by shared presenters (UiState and intents live in Kotlin, [ADR-002](ADR-002-monorepo-modules-and-clean-architecture.md)) so each native screen is a thin view.
 - Bad: Swift interop friction. Swift export is Alpha in Kotlin 2.4 (A3 §7.2). We use Objective-C export plus **SKIE** and pin Kotlin to a SKIE-supported version ([ADR-002](ADR-002-monorepo-modules-and-clean-architecture.md)).
 - Bad: Kotlin/Native link times and macOS CI runners ([ADR-008](ADR-008-ci-cd-and-environments.md)).
-- **Minimum OS (resolves PRD OQ-21):** iOS **26.0+** (Liquid Glass, `CLServiceSession`, `BGContinuedProcessingTask`); Android **10+ (minSdk 29)**, targetSdk 36, moving to 37 when Play requires it. Kotlin/Native's own iOS floor (15.0) is below ours.
+- **Minimum OS (resolves PRD OQ-21):** iOS **26.0+** (Liquid Glass, `CLServiceSession`, `BGContinuedProcessingTask`); Android **10+ (minSdk 29)**, targetSdk 36, moving to 37 when Play requires it. Kotlin/Native's own iOS floor (15.0) is below ours. **Confirmed by Keval at Gate 4 (6 Nov 2026).**
 - Fallback: if Swift interop blocks the iOS shell for more than one week in A15, the shared core stays and iOS calls it through a thinner, hand-written Swift facade. Switching away from native UI is not a fallback.
 
 ### Confirmation

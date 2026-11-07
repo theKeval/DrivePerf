@@ -69,7 +69,7 @@
         <thead><tr><th scope="col">Data</th><th scope="col">Where it lives</th><th scope="col">Leaves your phone only when</th></tr></thead>
         <tbody>
           <tr><td>Trips: route (precise location), time, speed, motion sensor readings, events, scores</td><td>Your phone</td><td>You turn on <strong>Pro cloud backup</strong> and agree on the consent screen</td></tr>
-          <tr><td>Routes, cars, settings, privacy zones</td><td>Your phone</td><td>Cloud backup is on (privacy zones never leave your phone)</td></tr>
+          <tr><td>Routes, cars, settings, privacy zones</td><td>Your phone</td><td>Cloud backup is on (privacy zones are included so a new phone keeps them)</td></tr>
           <tr><td>Email, name (optional), account ID</td><td>Our account service</td><td>You sign in with Apple, Google or an email link. Signing in is only needed for backup or a second device</td></tr>
           <tr><td>Purchase history</td><td>App Store or Google Play, and RevenueCat</td><td>You buy Pro or restore a purchase</td></tr>
           <tr><td>Usage statistics (for example, "a Story was opened")</td><td>Our analytics service, not linked to you</td><td>You say yes to usage statistics. Never coordinates, addresses, routes, car names, speeds or G-forces</td></tr>
@@ -111,7 +111,8 @@
       <div class="table-scroll"><table>
         <thead><tr><th scope="col">Provider</th><th scope="col">What for</th><th scope="col">When</th></tr></thead>
         <tbody>
-          <tr><td>Google Firebase (Authentication, Firestore, Cloud Storage, Crashlytics, Analytics, Hosting)</td><td>Sign-in, cloud backup, crash reports, usage statistics, this website and the waitlist</td><td>Only for the features above that you use or allow</td></tr>
+          <tr><td>Google Firebase (Authentication, Firestore, Crashlytics, Analytics, Hosting)</td><td>Sign-in, cloud backup, crash reports, usage statistics, this website and the waitlist</td><td>Only for the features above that you use or allow</td></tr>
+          <tr><td>Cloudflare (R2 storage, Web Analytics)</td><td>Storing backed-up trip files; counting visits to this website without cookies</td><td>Cloud backup is on; you visit this website</td></tr>
           <tr><td>RevenueCat</td><td>Managing Pro subscriptions and Ride-along passes</td><td>When you buy, restore or redeem</td></tr>
           <tr><td>Apple App Store and Google Play</td><td>Payments. They process your payment details; we never see them</td><td>When you buy Pro</td></tr>
           <tr><td>Map providers: Apple MapKit on iPhone; <span class="placeholder">Google Maps SDK or MapLibre</span> on Android</td><td>Showing map tiles under your routes</td><td>When a map is on screen. Only tile requests are sent, never your trip</td></tr>
@@ -120,7 +121,7 @@
       </table></div>
 
       <h2 id="transfers">Where your data is stored</h2>
-      <p>Data on your phone stays on your phone. Data in cloud backup, accounts and the waitlist is stored with Google Firebase in the <strong>United States</strong>, which means it is transferred outside Quebec and outside Canada. Before we launch cloud backup we complete a privacy impact assessment covering this transfer, as Quebec's Law 25 requires. Data stored in another country may be accessible to that country's authorities under its laws.</p>
+      <p>Data on your phone stays on your phone. Accounts, backup records and the waitlist are stored with Google Firebase in the <strong>United States</strong>, and backed-up trip files with Cloudflare R2 in <strong>North America</strong>, which means it is transferred outside Quebec and outside Canada. Before we launch cloud backup we complete a privacy impact assessment covering this transfer, as Quebec's Law 25 requires. Data stored in another country may be accessible to that country's authorities under its laws.</p>
 
       <h2 id="retention">How long we keep it</h2>
       <ul>
