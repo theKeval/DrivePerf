@@ -32,8 +32,8 @@ Cost · one pipeline for agents to read and fix · secrets safety in a public re
 | `ios.yml` | PR touching `apps/ios/**` or `shared/**` | macos | build framework, `xcodebuild test` (unit + snapshot) on simulator |
 | `backend.yml` | PR touching `backend/**` or `shared/api-contract/**` | ubuntu | server tests with Firebase emulators, rules tests, OpenAPI lint + contract tests; on `main`: build image → Artifact Registry → deploy Cloud Run `dev`; on tag `api-v*`: deploy `prod` |
 | `web.yml` | PR touching `web/**` | ubuntu | build, Lighthouse CI (≥ 95 budgets, F-WEB-01), deploy a **Hosting preview channel** per PR with a comment link; on `main`: deploy live |
-| `release-android.yml` | tag `v*` | ubuntu | `bundleProdRelease`, upload R8 mapping to Crashlytics, Fastlane `supply` to the **internal** track; promotion to production is manual with staged rollout |
-| `release-ios.yml` | tag `v*` | macos | Fastlane `match` (read-only) + `gym` + `pilot` to TestFlight; dSYMs to Crashlytics; App Store release is manual with phased release |
+| `release-android.yml` | tag `v*` | ubuntu | `bundleProdRelease`, upload R8 mapping to Sentry (Gradle plugin), Fastlane `supply` to the **internal** track; promotion to production is manual with staged rollout |
+| `release-ios.yml` | tag `v*` | macos | Fastlane `match` (read-only) + `gym` + `pilot` to TestFlight; dSYMs (app and shared framework) to Sentry with `sentry-cli`; App Store release is manual with phased release |
 | `nightly.yml` | schedule | macos + ubuntu | Maestro smoke flows on simulator/emulator; dependency audit |
 
 Rules: Jira key in every PR title and commit (AGENTS.md); `dorny/paths-filter` to skip unaffected jobs; Gradle configuration and build caches plus Konan cache; Renovate for dependencies, with Kotlin bumps held until SKIE supports them.
@@ -41,7 +41,7 @@ Rules: Jira key in every PR title and commit (AGENTS.md); `dorny/paths-filter` t
 ### Signing and secrets (public repo)
 
 - **No long-lived cloud keys in GitHub.** Deploys to Google Cloud/Firebase use **Workload Identity Federation** (OIDC) bound to `theKeval/DrivePerf` and protected branches/tags.
-- Secrets live in GitHub **Environments** `dev` and `prod`; `prod` requires Keval's approval. Workflows never use `pull_request_target`; fork PRs get no secrets.
+- Secrets live in GitHub **Environments** `dev` and `prod` (including `SENTRY_AUTH_TOKEN` for symbol uploads); `prod` requires Keval's approval. Workflows never use `pull_request_target`; fork PRs get no secrets.
 - iOS: Fastlane `match` storing encrypted certificates/profiles in a **private** repo; App Store Connect API key in the `prod` environment. Android: upload key in the `prod` environment; Play App Signing holds the app signing key.
 - `GoogleService-Info.plist` / `google-services.json` for **prod** are injected at build time, not committed (not secret, but keeps abuse surface down). All Google API keys are restricted by bundle ID / package + SHA-1; App Check enforced on the API.
 - **No real location data in the repo.** Recorded-drive fixtures (A12, A19) are synthetic or privacy-trimmed (start/end removed, coordinates shifted) before commit; a CI check rejects GPX/CSV fixtures without a `# privacy-trimmed` header.

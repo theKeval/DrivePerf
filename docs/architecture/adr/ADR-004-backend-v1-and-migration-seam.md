@@ -46,7 +46,7 @@ Migration cost to a VPS (client releases, old app versions in the field) · buil
 | Sign-in | Firebase Auth (Apple, Google, email link) behind `AuthGateway` | sign-in needs native SDK flows; only the **ID token** crosses to our API | optional: Auth may stay on Firebase indefinitely ([ADR-010](ADR-010-firebase-now-vs-vps.md)); a swap is one adapter per platform |
 | Device integrity | Firebase App Check (App Attest, Play Integrity) behind `AppIntegrity` | attestation is a device API; our API verifies the token via JWKS | none; can keep working after migration |
 | Purchases | RevenueCat SDK behind `EntitlementRepository` | purchases happen in the store sheet | none ([ADR-006](ADR-006-payments-and-entitlements.md)) |
-| Analytics, crashes, flags | Firebase Analytics, Crashlytics, Remote Config behind `Analytics`, `CrashReporter`, `FeatureFlags` | device telemetry and config, no user records in our DB, free at any scale we expect | none required ([ADR-007](ADR-007-analytics-crash-flags-privacy.md)) |
+| Analytics, crashes, flags | Firebase Analytics and Remote Config behind `Analytics` and `FeatureFlags`; Sentry (EU) behind `CrashReporter` | device telemetry and config, no user records in our DB; Firebase free at any scale, Sentry free at launch | none required ([ADR-007](ADR-007-analytics-crash-flags-privacy.md)) |
 | Push (later) | FCM behind `PushMessaging` | needs device tokens from the OS SDK | the API stores tokens; sending moves with the server |
 | Website waitlist | Firestore Web SDK, create-only rules (Spark) | the site goes live in Phase 5 before Blaze/API exist | move to `POST /v1/waitlist` once the API is live (optional) |
 
@@ -56,7 +56,7 @@ Everything that reads or writes **user data** (account record, synced entities, 
 
 | Phase | Plan | Services |
 |---|---|---|
-| Phase 5 (foundations, website) | **Spark** | Auth (configured; SIWA needs the paid Apple account), Firestore (waitlist only), Hosting (website), Analytics, Crashlytics, Remote Config, App Check (debug provider until the paid Apple account) |
+| Phase 5 (foundations, website) | **Spark** | Auth (configured; SIWA needs the paid Apple account), Firestore (waitlist only), Hosting (website), Analytics, Remote Config, App Check (debug provider until the paid Apple account) |
 | Phase 6 start (first account/backup feature) | **Blaze** with budget alerts at US$5, 25 and 50 | + **Cloud Run** service `api` (Kotlin/Ktor container), **Cloudflare R2** bucket for trip files (outside Firebase, see below), **Cloud Scheduler** (2 jobs, inside the 3 free: `daily` = 30-day purge, lapse reminders, RevenueCat reconcile, orphan-blob sweep; `deletion` = hourly account-deletion cascade), Secret Manager, Artifact Registry |
 | Later, optional | Blaze | BigQuery export for dashboards (F-ANA-04), FCM sending |
 
@@ -115,7 +115,7 @@ Assumptions (aligned with [data-model.md](../data-model.md) §2.6 and §7): MAU 
 | Firestore (20K writes / 50K reads per day free, then $0.09 / $0.03 per 100K; storage 1 GiB free, then ≈ $0.15–0.18/GiB-mo) | 2K writes/day, 1.8 GB → **$0.2** | 10K/day, 9 GB → **$1.4** | 40K/day, 36 GB → **≈ $7** |
 | Cloud Run (2M requests, 180K vCPU-s, 360K GiB-s free per month) | 65K req → $0 | 320K req → $0 | 1.3M req, ≈ 260K vCPU-s → **$2–10** |
 | Hosting transfer, website + API proxy (360 MB/day free, then $0.15/GB) | $0.2 | $3.8 | $16.4 |
-| Auth (50K MAU free), Analytics, Crashlytics, App Check, Remote Config (100K fetches/day free), Scheduler (3 jobs free) | $0 | $0 | $0 |
+| Auth (50K MAU free), Analytics, App Check, Remote Config (100K fetches/day free), Scheduler (3 jobs free) | $0 | $0 | $0 |
 | Artifact Registry, Secret Manager, logging | $0.5 | $0.5 | $1 |
 | **Total** | **≈ $2** | **≈ $9** | **≈ $40–50** |
 

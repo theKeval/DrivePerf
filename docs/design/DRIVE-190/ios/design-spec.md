@@ -142,7 +142,7 @@ Every state also renders in light/dark (`theme=light`), XL text (`text=xl`) and 
 ### Platform notes
 
 - **iOS (this spec):** Inset-grouped toggle rows (Glide tint). No ATT prompt and no IDFA (no AdSupport linked).
-- *Android (for reference):* M3 Switch with thumb icons inside surfaceContainer cards. Firebase Analytics setAnalyticsCollectionEnabled / Crashlytics setCrashlyticsCollectionEnabled; advertising ID collection off.
+- *Android (for reference):* M3 Switch with thumb icons inside surfaceContainer cards. Firebase Analytics setAnalyticsCollectionEnabled / Sentry init or close() for crash reports; advertising ID collection off.
 
 ### Analytics
 
@@ -232,7 +232,7 @@ Every state also renders in light/dark (`theme=light`), XL text (`text=xl`) and 
 
 ### Interactions & navigation
 
-- Switches → setAnalyticsCollectionEnabled / setCrashlyticsCollectionEnabled within the session (haptic toggleOn/Off). Reset analytics ID → deletes the ID (resetAnalyticsData) → reset ID done (haptic success).
+- Switches → setAnalyticsCollectionEnabled / Sentry init or close() within the session (haptic toggleOn/Off). Reset analytics ID → deletes the ID (resetAnalyticsData) → reset ID done (haptic success).
 
 ### Motion
 

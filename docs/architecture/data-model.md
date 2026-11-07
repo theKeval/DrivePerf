@@ -2004,7 +2004,7 @@ Decided by the product owner on 6 Nov 2026 (resolves PRD OQ-09); this section im
 | Deletion requests | Account ID kept 15 days (so a backup restore can re-apply deletions, §5.6), then salted hash; record deleted after 90 days | Purge job |
 | Job runs | 180 days (counts only) | Purge job |
 | Firebase Analytics (opt-in) | Data retention set to **2 months** (the minimum) for user-level data | Console setting (ADR-007) |
-| Crashlytics (opt-in) | Crashlytics' own retention (≈ 90 days); no user ID set | Vendor |
+| Sentry crash reports (opt-in) | 30 days on the free Developer plan, 90 days on Team; no user set, IP storage off | Vendor plan (ADR-007) |
 | Server request logs | GCP Cloud Logging default bucket 30 days; VPS 14 days; never request bodies | Logging config |
 | Waitlist | Until unsubscribe, or 12 months after launch (proposal, OQ-A11-10); a hashed suppression entry after unsubscribe | Manual export + job |
 | Ride-along passes | 12 months after creation, or the sender's account deletion | Purge job |
@@ -2059,7 +2059,7 @@ One job, run daily at 03:17 UTC, made of idempotent steps. Each step selects due
 | 1 | Request (synchronous, `POST /v1/account:delete`) | Create `deletionRequests/{id}`; `accounts.status = deleting` (from this moment the API refuses every write and read for the account); revoke refresh tokens; return a receipt. Web requests (S-WEB-07) sign in on the website and call the same endpoint; requests from people who cannot sign in go to privacy@driveperf.com for manual verification |
 | 2 | Next hourly `deletion` job | Delete objects `u/{a}/`, `x/{a}/`; recursively delete `users/{a}` (all subcollections, consents included) |
 | 3 | Same run | RevenueCat: delete the subscriber (purchase identity link). Ride-along: delete passes the user sent; replace their app user ID in other people's redemption records with `deleted` |
-| 4 | Same run | Analytics and Crashlytics: nothing is linked to the account (no user ID is ever set); the app calls `resetAnalyticsData` locally |
+| 4 | Same run | Analytics and Sentry: nothing is linked to the account (no user ID is ever set); the app calls `resetAnalyticsData` locally |
 | 5 | Same run | Verification sweep: list the account's prefixes and collections again and confirm they are empty (a push that was mid-flight when step 1 ran is rejected by the `status` check, so this should find nothing) |
 | 6 | Same run | Delete the Firebase Auth user and `accounts/{a}` |
 | 7 | Close | Mark the request complete; count `account_deleted` (anonymous). Optional confirmation email to the address captured at request time (held only in the task payload) |
@@ -2101,7 +2101,7 @@ Policy wording: "Deleted data is removed from our live systems within 24 hours a
 | Purchases, entitlement | App Store / Google Play | RevenueCat (service provider) → `accounts` mirror | Until account deletion | Manage in store; delete account |
 | Usage statistics (opt-in) | App | Firebase Analytics; no coordinates, names, speeds, G, fine timestamps or free text (PRD §3.0.4) | 2-month user-level retention | Toggle; reset analytics ID (F-PRV-06) |
 | Capture-quality telemetry (opt-in) | App | Firebase Analytics, bucketed, no location (F-ANA-02) | Same | Same toggle |
-| Crash reports (opt-in choice) | App | Crashlytics; no locations in logs or keys | ≈ 90 days | Toggle |
+| Crash reports (opt-in choice) | App | Sentry (EU); no locations in tags, breadcrumbs or logs | 30–90 days | Toggle |
 | Firebase installation ID, app instance ID | SDKs | Google, only when analytics or crash reports are on | With the above | Toggles |
 | App Check attestation | Platform (App Attest, Play Integrity) | Apple/Google + Firebase; not stored by DrivePerf | Transient | — |
 | Device record (platform, OS, model class, app version) | App | Pro backup only | Until purge/deletion | Delete account / cloud copy |
@@ -2226,7 +2226,8 @@ Against Pro revenue of ≥ US$2.50/month per paying user (founding annual), back
 | R2 Class A ops | 30K (free) | 150K (free) | 600K (free) |
 | R2 Class B, egress | free | free | free |
 | Cloud Run API, Scheduler | free | free | ≈ US$2–10 (ADR-004) |
-| Auth, Analytics, Crashlytics, Remote Config | free | free | free (≈ 27K signed-in MAU; ≈ 50K RC fetches/day) |
+| Auth, Analytics, Remote Config | free | free | free (≈ 27K signed-in MAU; ≈ 50K RC fetches/day) |
+| Sentry crash reports (ADR-007) | free | free (Developer plan, 5K errors/month) | ≈ $26–29 (Team plan, if the quota or seats run out) |
 | Firestore PITR overhead | < US$0.10 | ≈ US$0.20 | ≈ US$0.70 |
 | **Total (data and API)** | **≈ US$1** | **≈ US$4–6** | **≈ US$20–32** |
 | Sensitivity: 100 % of DAU backing up | ≈ US$5 | ≈ US$27 | ≈ US$110–120 |
@@ -2263,7 +2264,7 @@ UUIDv7 IDs and an account ID that never changes; content-addressed object keys o
 | 6 | **Cut over by cohort** | Internal → 5 % → 25 % → 100 % (ADR-010 M4: Cloud Run traffic split to a proxy revision, then DNS). Per account: set `migrating` (the API answers that account's pushes with a retryable `503 Retry-After: 30`; the device outbox simply waits, typically seconds) → drain the relay → final digest check → `backend = vps` → clear `migrating`. Pulls continue throughout (cursors are store-independent revs). The RevenueCat webhook moves to the VPS and writes entitlements to both stores until 100 % | Sync success rate, error budget, support tickets per cohort |
 | 7 | **Jobs** | The Firebase-side job skips `backend = vps` accounts and the VPS job acts only on them, so no account is reminded, purged or deleted twice; account deletions run against both stores while both hold data | Job reports reconcile |
 | 8 | **Rollback (≤ 30 days)** | The VPS API reverse-writes migrated accounts' changes to Firestore through its own outbox (ADR-010 M4–M5). Rollback = route the cohort back (`backend = firebase`, traffic split or DNS); both sides are current, and blob records say where each object lives | Rehearsed on the internal cohort |
-| 9 | **Decommission** | After 30 stable days: stop reverse writes, run a final diff, **delete** Firestore sync data and the bucket's objects (no stray copies beyond §5 retention), keep the Firebase project for Auth, Analytics, Crashlytics, Remote Config, App Check and FCM; record the change in `decisions.md` | Deletion confirmed |
+| 9 | **Decommission** | After 30 stable days: stop reverse writes, run a final diff, **delete** Firestore sync data and the bucket's objects (no stray copies beyond §5 retention), keep the Firebase project for Auth, Analytics, Remote Config, App Check and FCM (Sentry is unaffected); record the change in `decisions.md` | Deletion confirmed |
 | 10 | **Optional: auth** | ADR-010 M6: keep the same account IDs via `auth_identities (issuer, subject) → accountId`; Apple, Google and email link only, so no password hashes to move | All sessions on the new issuer |
 
 ## 9. Open questions

@@ -14,7 +14,7 @@
 3. **Clean architecture, enforced by CI:** presentation → domain ← data; the domain imports no SDK ([ADR-002](adr/ADR-002-monorepo-modules-and-clean-architecture.md)).
 4. **Sensors and background execution are native** and feed the shared pipeline in ~1 s batches.
 5. **Apps talk to our own API, `api.driveperf.com/v1`, for all user data**: sync, trip-file tickets, account, deletion, grants ([ADR-004](adr/ADR-004-backend-v1-and-migration-seam.md)).
-6. **SDK-direct only where it must be:** Firebase Auth, App Check, Analytics, Crashlytics, Remote Config, (later) FCM, and RevenueCat.
+6. **SDK-direct only where it must be:** Firebase Auth, App Check, Analytics, Remote Config, (later) FCM, Sentry (crash reports) and RevenueCat.
 7. **Backend v1 = Firebase project "DrivePerf"**: Spark first; Blaze at the start of Phase 6 for Cloud Run (Kotlin/Ktor API) and Cloud Scheduler. Firestore holds server records; trip files are portable gzip-protobuf blobs on **Cloudflare R2** (S3-compatible, no egress fees; Gate 4).
 8. **Portable by construction:** UUIDv7 keys, UTC timestamps, versioned schemas, issuer-agnostic JWT checks, presigned-URL blobs, no Firestore triggers.
 9. **Stay on Firebase until a trigger fires** (cost, storage, scale, features, compliance, vendor risk), then move the server side to a VPS without an app release ([ADR-010](adr/ADR-010-firebase-now-vs-vps.md)).
@@ -32,7 +32,7 @@ flowchart TB
 
     apple["Apple platform<br/>[External]<br/>App Store, StoreKit, Sign in with Apple,<br/>App Attest, DeviceCheck, MapKit"]
     google["Google Play & Maps<br/>[External]<br/>Play Billing, Play Integrity, Maps SDK"]
-    firebase["Google Firebase / Cloud<br/>[External]<br/>Auth, Firestore, Storage, Cloud Run, Hosting,<br/>Analytics, Crashlytics, Remote Config, App Check"]
+    firebase["Google Firebase / Cloud<br/>[External]<br/>Auth, Firestore, Storage, Cloud Run, Hosting,<br/>Analytics, Remote Config, App Check"]
     rc["RevenueCat<br/>[External]<br/>Subscriptions & entitlements"]
     email["Email provider<br/>[External, PRD OQ-14]<br/>Waitlist & launch emails"]
     namecheap["Namecheap<br/>[External]<br/>Registrar + DNS only"]
@@ -76,7 +76,7 @@ flowchart LR
         sched["Cloud Scheduler<br/>daily maintenance · hourly deletion"]
         auth["Firebase Auth<br/>Apple · Google · email link"]
         appcheck["App Check"]
-        telem["Analytics · Crashlytics · Remote Config"]
+        telem["Analytics · Remote Config · Sentry"]
     end
     rc["RevenueCat"]
 
@@ -102,7 +102,7 @@ flowchart LR
     hostweb -.->|"waitlist create-only (Spark)"| fs
 ```
 
-**Phase notes.** Phase 5 (Spark): Hosting web, waitlist in Firestore, Auth, App Check (debug provider until the paid Apple account), Analytics, Crashlytics, Remote Config. Phase 6 (Blaze): API, Storage, Scheduler. Free users who never sign in talk only to RevenueCat (anonymous ID), Remote Config, and, if they opt in, Analytics/Crashlytics. No trip, route, car or score data leaves the device.
+**Phase notes.** Phase 5 (Spark): Hosting web, waitlist in Firestore, Auth, App Check (debug provider until the paid Apple account), Analytics, Remote Config; Sentry for crash reports. Phase 6 (Blaze): API, Storage, Scheduler. Free users who never sign in talk only to RevenueCat (anonymous ID), Remote Config, and, if they opt in, Analytics and Sentry. No trip, route, car or score data leaves the device.
 
 ### After migration (when ADR-010 triggers fire)
 
@@ -116,7 +116,7 @@ flowchart LR
     end
     api2 -->|"presigned URLs"| s3[("S3-compatible storage<br/>B2 or R2")]
     apps -.->|"PUT/GET"| s3
-    apps -->|"SDK (kept)"| fbkeep["Firebase Auth, App Check,<br/>Analytics, Crashlytics, Remote Config"]
+    apps -->|"SDK (kept)"| fbkeep["Firebase Auth, App Check,<br/>Analytics, Remote Config"]
     pg -.->|"WAL-G backups"| s3
 ```
 
