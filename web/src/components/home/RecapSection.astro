@@ -1,0 +1,37 @@
+---
+// RecapSection — weekly recap (WeekDots: scripts/home/recap.ts) + ShareCard.
+import ShareCard from './ShareCard.astro';
+import { RECAP } from '../../lib/mockups';
+const rc = RECAP();
+const strip = (rc.days as { dow: string; drives: { km: number }[] }[]).map((d) => {
+  const dots = d.drives.length ? d.drives.map((x) => { const s = Math.round(Math.min(34, 10 + Math.sqrt(x.km) * 4)); return `<span style="width:${s}px;height:${s}px"></span>`; }).join('') : '<span class="empty"></span>';
+  return `<div>${dots}<em style="font-style:normal">${d.dow}</em></div>`;
+}).join('');
+---
+<section class="section" aria-labelledby="recap-title" data-component="RecapSection">
+  <div class="wrap split split--flip">
+    <div class="grid-2" style="align-items:end" data-reveal>
+      <div class="panel"><div class="panel__body">
+        <p class="small muted" style="margin:0 0 2px">Week of 26 Oct</p>
+        <h3 class="h3" style="margin-bottom:12px">Your week, decoded.</h3>
+        <div class="recap-strip" id="recap-strip" role="img" aria-label="Five drives this week: two on Tuesday, two on Thursday and one on Sunday." set:html={strip}></div>
+        <div class="recap-big" style="margin-top:16px">
+          <div class="stat"><b class="num">87</b><span>Average Smoothness · ▲ +2</span></div>
+          <div class="stat"><b class="num">5</b><span>drives</span></div>
+        </div>
+        <p class="small" style="margin:16px 0 0"><b>Drive of the week:</b> <span class="muted">Sunday morning, Home → Port Credit, 90.</span></p>
+      </div></div>
+      <ShareCard />
+    </div>
+    <div>
+      <p class="eyebrow">Weekly recap and Drive Wrapped</p>
+      <h2 class="h2" id="recap-title">Your week, decoded.</h2>
+      <p class="lede" style="margin-top:20px">Every Sunday evening: your drives, your average, your drive of the week and one habit to focus on. Each month brings a mini Wrapped, and your year gets the full one.</p>
+      <p class="small muted">Share cards show the shape of a route and its score, with the ends trimmed. Never a map unless you choose it, never where you start or stop, never speed.</p>
+    </div>
+  </div>
+</section>
+
+<script>
+  import '../../scripts/home/recap';
+</script>

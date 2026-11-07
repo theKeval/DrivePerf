@@ -1,0 +1,66 @@
+---
+// ReplaySection — evidence panel for the needed brake at Spadina & King (map + trace rendered at build time).
+import IconSlot from './IconSlot.astro';
+import { NEEDED_TRIP } from '../../lib/mockups';
+import { route, smoothPath, type XY } from '../../lib/geo';
+import { trip } from '../../lib/data';
+
+const t = NEEDED_TRIP(), ev = t.events!.find((e) => e.needed);
+const w = 640, h = 400;
+const r = route(t.rows, w, h, { pad: 40, rotate: 42 });
+const roads = ['t20261105-1745', 't20261013-1742', 't20261101-1020'].map((id) => route(trip(id).rows, w, h, { P: r.P }).d).join(' ');
+const pins = t.events!.map((e) => {
+  const [x, y] = r.at(e.t);
+  if (e.needed) return `<g><circle cx="${x}" cy="${y}" r="18" fill="none" stroke="#C9CED6" stroke-width="1.5" opacity=".5" class="pulse"/><rect x="${x - 10}" y="${y - 10}" width="20" height="20" rx="6" fill="#05070A" stroke="#C9CED6" stroke-width="2.4"/></g>`;
+  const col = ({ brake: 'var(--data-brake)', accel: 'var(--data-accel)', corner: 'var(--data-corner)' } as Record<string, string>)[e.type];
+  if (e.type === 'brake') return `<rect x="${x - 9}" y="${y - 9}" width="18" height="18" rx="5" fill="${col}" stroke="#fff" stroke-width="2.4"/>`;
+  if (e.type === 'accel') return `<circle cx="${x}" cy="${y}" r="9.5" fill="${col}" stroke="#fff" stroke-width="2.4"/>`;
+  return `<rect x="${x - 8}" y="${y - 8}" width="16" height="16" transform="rotate(45 ${x} ${y})" fill="${col}" stroke="#fff" stroke-width="2.4"/>`;
+}).join('');
+const mapHtml = `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="xMidYMid slice" role="img" aria-label="Map of a Tuesday morning commute with three event pins. The stop at Spadina and King is marked as needed.">
+  <rect width="${w}" height="${h}" fill="var(--map-land)"/>
+  <path d="${roads}" fill="none" stroke="var(--map-road)" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="${r.d}" fill="none" stroke="#04241D" stroke-width="10" stroke-linecap="round"/>
+  <path d="${r.d}" fill="none" stroke="#5BE7C4" stroke-width="5" stroke-linecap="round"/>
+  ${pins}
+  <text x="${w - 12}" y="${h - 12}" text-anchor="end" font-size="11" fill="#A3AAB6">© OpenStreetMap contributors</text>
+</svg>`;
+const E = ev.evidence, n = E.lonG.length;
+const X = (i: number) => (i / (n - 1)) * 600, Y = (g: number) => 60 - g * 110;
+const line = (arr: number[]) => smoothPath(arr.map((g, i): XY => [X(i), Y(g)]));
+const i0 = (ev.tStart - ev.t + 10) * E.hz, i1 = (ev.tEnd - ev.t + 10) * E.hz;
+const traceHtml = `<rect x="${X(i0)}" y="0" width="${X(i1) - X(i0)}" height="120" fill="var(--fill)"/>
+  <path d="M0 60H600" stroke="var(--line-strong)" stroke-width="1"/>
+  <path d="M300 0V120" stroke="var(--text-2)" stroke-width="1" stroke-dasharray="3 4"/>
+  <path d="${line(E.latG)}" fill="none" stroke="var(--data-lat-g)" stroke-width="2.2" stroke-dasharray="7 4" vector-effect="non-scaling-stroke"/>
+  <path class="tr-lon" d="${line(E.lonG)}" fill="none" stroke="var(--data-long-g)" stroke-width="2.6" vector-effect="non-scaling-stroke"/>`;
+---
+<section class="section" aria-labelledby="replay-title" data-component="ReplaySection">
+  <div class="wrap split split--flip">
+    <div class="panel" data-reveal id="evidence-panel">
+      <div class="panel__map" id="evidence-map" set:html={mapHtml}></div>
+      <div class="panel__body evidence-card">
+        <div class="evidence-head"><span class="pin pin--needed" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 6.5l5.5 6 5.5-6"/><path d="M6 17.5h12"/></svg></span><div><b class="h4" style="display:block">Hard stop at Spadina &amp; King</b><span class="small muted">Tuesday morning · The Commute</span></div></div>
+        <svg class="trace" id="evidence-trace" viewBox="0 0 600 120" preserveAspectRatio="none" role="img" aria-label="Braking and turning trace for the 10 seconds either side of the stop. Braking rises sharply, then settles." set:html={traceHtml}></svg>
+        <div class="trace-legend"><span><i></i>Braking and acceleration</span><span><i class="dash"></i>Turning</span></div>
+        <p class="small" style="margin:4px 0 0">Was it needed?</p>
+        <div class="answer-row" role="group" aria-label="Was it needed?"><button class="chip" type="button" aria-pressed="true">Yes, it was needed</button><button class="chip" type="button" aria-pressed="false">Not quite</button></div>
+        <p class="tiny" style="margin:0">Left out of your score. Map © OpenStreetMap contributors.</p>
+      </div>
+    </div>
+    <div>
+      <p class="eyebrow">Trip Replay</p>
+      <h2 class="h2" id="replay-title">Every brake, with evidence.</h2>
+      <p class="lede" style="margin-top:20px">Scrub through any drive. Pins mark hard braking, acceleration and cornering, and each one opens the trace around the moment and the tip it led to.</p>
+      <ul class="never-list" style="margin-top:28px">
+        <li><IconSlot name="check" /><div><b>Someone ran the light?</b><span>Mark the stop as needed. It comes out of your score, no questions asked.</span></div></li>
+        <li><IconSlot name="info" /><div><b>Honest data, always labelled</b><span>Estimated stretches are dashed, GPS gaps are gaps, and a phone that moved around is left out.</span></div></li>
+        <li><IconSlot name="eye" /><div><b>Yours alone</b><span>Speed appears plainly in your own replay. Never on share cards, records or recaps.</span></div></li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<script>
+  import '../../scripts/home/evidence';
+</script>

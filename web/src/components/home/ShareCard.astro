@@ -1,0 +1,18 @@
+---
+// ShareCard — route-glyph style: no map, no place names, no speed.
+import { ring, HERO_TRIP } from '../../lib/mockups';
+import { glyphPath } from '../../lib/geo';
+import { icon } from '../../lib/icons';
+import { loop } from '../../lib/loop';
+const t = HERO_TRIP();
+const html = `<div class="share-card" data-component="ShareCard" style="aspect-ratio:4/5;border-radius:24px;overflow:hidden;position:relative;background:radial-gradient(90% 60% at 50% 0%, #E5484D24, transparent 70%),linear-gradient(180deg,#0A1420,#05070A);color:#F2F4F7;padding:22px;display:flex;flex-direction:column;box-shadow:var(--shadow-lg);border:1px solid #FFFFFF14">
+  <div style="font-size:13px;color:#A3AAB6;font-weight:600">Thursday morning · GTI</div>
+  <svg viewBox="0 0 200 160" style="flex:1;width:100%;min-height:0" aria-hidden="true"><path d="${glyphPath(t.glyph!, 200, 160, 14)}" fill="none" stroke="#5BE7C4" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+  <div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
+    <div style="width:64px;height:64px;font-size:22px">${ring({ score: 91, recordPrev: null, strokeW: 9, label: '' })}</div>
+    <span class="chip chip--record" style="height:26px;font-size:12px">${icon('rosette')}Route record</span>
+  </div>
+  <div style="display:flex;align-items:center;gap:6px;justify-content:center;margin-top:14px;font:650 13px/1 var(--f-display);font-stretch:112%">${loop({ size: 18, dot: '#F2F4F7', color: '#5BE7C4' })}DrivePerf</div>
+</div>`;
+---
+<div id="share-card" aria-label="Share card: the shape of a Thursday morning drive in a GTI, Smoothness 91. No map, no start or end points." role="img" set:html={html}></div>

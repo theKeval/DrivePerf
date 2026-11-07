@@ -1,0 +1,29 @@
+---
+// ScoreSection — Smoothness ring (spring reveal at 35 % in view: scripts/home/score.ts) + contributors.
+import { ring, HERO_TRIP } from '../../lib/mockups';
+const sm = HERO_TRIP().smoothness;
+const ringHtml = `<div style="width:min(420px,78vw);aspect-ratio:1;font-size:min(140px,27vw)">${ring({ score: sm.score, baseline: sm.baseline, recordPrev: sm.record.previous.score, isNewRecord: true, strokeW: 7 })}</div>`;
+const contrib = sm.contributors as { label: string; reason: string; band: string }[];
+---
+<section class="section section--alt" aria-labelledby="score-title" data-component="ScoreSection">
+  <div class="wrap split">
+    <div class="score-visual" data-reveal>
+      <div class="score-glow"></div>
+      <div id="score-ring" set:html={ringHtml}></div>
+      <div class="legend" style="position:absolute;bottom:-12px"><span><i></i>Your usual</span><span><i class="gold"></i>Route record</span></div>
+    </div>
+    <div>
+      <p class="eyebrow">Smoothness</p>
+      <h2 class="h2" id="score-title">Scored against you. Not against anyone else.</h2>
+      <p class="lede" style="margin-top:20px">Smoothness measures how gently you brake, accelerate and turn, compared with your own usual on the same route. Your first three drives set the baseline. After that, every number comes with a reason.</p>
+      <ul class="contrib" id="contrib">
+        {contrib.map((c) => <li><b>{c.label}</b><span>{c.reason}</span><em class={c.band === 'smoother' ? 'better' : ''}>{c.band === 'smoother' ? '▲ Smoother' : c.band === 'rougher' ? '▼ Rougher' : '● Usual'}</em></li>)}
+      </ul>
+      <p class="small muted" style="margin-top:20px">A full, gentle stop scores as well as not stopping, so rolling stops are never rewarded. There are no leaderboards and no streaks.</p>
+    </div>
+  </div>
+</section>
+
+<script>
+  import '../../scripts/home/score';
+</script>

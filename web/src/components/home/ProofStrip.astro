@@ -1,0 +1,13 @@
+---
+import IconSlot from './IconSlot.astro';
+import type { IconName } from '../../lib/icons';
+const items: [IconName, string][] = [
+  ['car', 'Records automatically'], ['ring', 'Scored against you'], ['replay', 'Replay with evidence'],
+  ['calendar', 'Recaps worth sharing'], ['shield', 'Private by design'],
+];
+---
+<section class="proof" aria-label="What DrivePerf does" data-component="ProofStrip">
+  <div class="wrap"><ul>
+    {items.map(([i, t]) => <li><IconSlot name={i} />{t}</li>)}
+  </ul></div>
+</section>
