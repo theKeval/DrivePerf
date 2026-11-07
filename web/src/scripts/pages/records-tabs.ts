@@ -1,5 +1,6 @@
-// S-WEB-06: platform tabs (WAI-ARIA tablist: arrows move, aria-selected, hidden panels). Every [data-pl-text]
-// sentence switches with the tab. Default: Android for Android user agents, else iPhone.
+// S-WEB-06: platform tabs (WAI-ARIA tablist: arrows move, aria-selected, hidden panels). Every PlatformText
+// sentence follows html[data-pl], which the inline boot script set before first paint (Android user agents →
+// android, else ios); selecting a tab updates it.
 type Pl = 'ios' | 'android';
 const tabs = [...document.querySelectorAll<HTMLButtonElement>('[role="tab"][data-pl]')];
 function select(pl: Pl, focus = false): void {
@@ -10,7 +11,7 @@ function select(pl: Pl, focus = false): void {
     if (sel && focus) t.focus();
   });
   document.querySelectorAll<HTMLElement>('[role="tabpanel"][data-pl]').forEach((p) => (p.hidden = p.dataset.pl !== pl));
-  document.querySelectorAll<HTMLElement>('[data-pl-text]').forEach((el) => { const t = el.dataset[pl]; if (t != null) el.textContent = t; });
+  document.documentElement.dataset.pl = pl;
 }
 tabs.forEach((t, i) => {
   t.addEventListener('click', () => select(t.dataset.pl as Pl));
@@ -22,4 +23,4 @@ tabs.forEach((t, i) => {
     if (n) { e.preventDefault(); select(n.dataset.pl as Pl, true); }
   });
 });
-if (tabs.length) select(/android/i.test(navigator.userAgent) ? 'android' : 'ios');
+if (tabs.length) select(document.documentElement.dataset.pl === 'android' ? 'android' : 'ios');

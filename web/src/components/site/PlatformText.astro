@@ -1,0 +1,8 @@
+---
+// Platform-specific wording without a layout shift: every variant is in the HTML and CSS shows the one matching
+// html[data-pl], which the inline boot script sets before first paint (?platform=, else the user agent).
+// Without JS the iOS text shows. `both` falls back to the iOS text when not given.
+interface Props { ios: string; android: string; both?: string }
+const { ios, android, both = ios } = Astro.props;
+---
+<span data-pl-only="ios">{ios}</span><span data-pl-only="android">{android}</span><span data-pl-only="both">{both}</span>

@@ -743,3 +743,8 @@ html[data-rm="true"] *, html[data-rm="true"] *::before, html[data-rm="true"] *::
 .recap-strip span { transform: none; transition: none; }
 .device { will-change: auto; }
 [data-partial="header"] { display: block; height: var(--header-h); } /* reserve the header slot before JS injects it (no CLS) */
+
+/* PlatformText: html[data-pl] is set by the inline boot script before first paint; without JS the iOS text shows. */
+[data-pl-only] { display: none; }
+:root:not([data-pl]) [data-pl-only="ios"], :root[data-pl="ios"] [data-pl-only="ios"],
+:root[data-pl="android"] [data-pl-only="android"], :root[data-pl="both"] [data-pl-only="both"] { display: inline; }

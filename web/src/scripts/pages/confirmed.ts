@@ -1,10 +1,6 @@
-// S-WEB-02: platform-specific sentences from ?platform= (ios | android | both), and "Copy link to driveperf.com"
-// (plain link, no referral tracking).
+// S-WEB-02: "Copy link to driveperf.com" (plain link, no referral tracking). The platform-specific sentences
+// follow ?platform= through PlatformText and html[data-pl], set by the inline boot script before first paint.
 import { track } from '../analytics';
-
-const pl = new URLSearchParams(location.search).get('platform');
-const key = pl === 'android' ? 'android' : pl === 'both' ? 'both' : 'ios';
-document.querySelectorAll<HTMLElement>('[data-pl]').forEach((el) => { const t = el.dataset[key]; if (t) el.textContent = t; });
 
 const btn = document.getElementById('copy-link') as HTMLButtonElement | null;
 const status = document.getElementById('copy-status');

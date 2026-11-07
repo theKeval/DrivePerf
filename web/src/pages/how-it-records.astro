@@ -1,6 +1,8 @@
 ---
 // S-WEB-06 · How DrivePerf records (DRIVE-179). The binding capture promise; platform tabs switch every
-// platform-specific sentence (src/scripts/pages/records-tabs.ts). Android is preselected for Android user agents.
+// platform-specific sentence (PlatformText via html[data-pl]; src/scripts/pages/records-tabs.ts). Android is
+// preselected for Android user agents by the inline boot script, before first paint.
+import PlatformText from '../components/site/PlatformText.astro';
 import Base from '../layouts/Base.astro';
 import IconSlot from '../components/pages/IconSlot.astro';
 ---
@@ -10,7 +12,7 @@ import IconSlot from '../components/pages/IconSlot.astro';
       <nav class="crumbs" aria-label="Breadcrumb"><a href="/">Home</a><span aria-hidden="true">/</span><a href="/support">Support</a><span aria-hidden="true">/</span><span>How DrivePerf records</span></nav>
       <p class="eyebrow">The honest capture promise</p>
       <h1 class="h1">How DrivePerf records.</h1>
-      <p class="lede">Auto-detects most drives. The first few hundred metres may be estimated. <span data-pl-text data-ios="Force-quitting" data-android="Force-stopping the app">Force-quitting</span> pauses auto-detect. Here's what that means, and how to get the most reliable recording on your phone.</p>
+      <p class="lede">Auto-detects most drives. The first few hundred metres may be estimated. <PlatformText ios="Force-quitting" android="Force-stopping the app" /> pauses auto-detect. Here's what that means, and how to get the most reliable recording on your phone.</p>
     </div>
   </header>
 
@@ -22,12 +24,12 @@ import IconSlot from '../components/pages/IconSlot.astro';
           <IconSlot name="sparkle" class="icon-tile" />
           <h3 class="h3">Automatic trips</h3>
           <p class="muted">Off until you turn them on. DrivePerf notices you're driving, records the route and ends the drive a few minutes after you park. Your Story is waiting when you stop.</p>
-          <p class="small muted" style="margin:0">Needs <span data-pl-text data-ios="Always location and Motion &amp; Fitness" data-android="“Allow all the time” location and Physical activity">Always location and Motion &amp; Fitness</span>. Used only to record your drives.</p>
+          <p class="small muted" style="margin:0">Needs <PlatformText ios="Always location and Motion & Fitness" android="“Allow all the time” location and Physical activity" />. Used only to record your drives.</p>
         </article>
         <article class="card" data-reveal style="--d:80ms">
           <IconSlot name="play" class="icon-tile" />
           <h3 class="h3">Manual trips</h3>
-          <p class="muted">Tap Start before you pull away, from the app, <span data-pl-text data-ios="the Control Center control or a widget" data-android="the Quick Settings tile or a widget">the Control Center control or a widget</span>. Stop it when you park, or it ends on its own after 15 minutes parked.</p>
+          <p class="muted">Tap Start before you pull away, from the app, <PlatformText ios="the Control Center control or a widget" android="the Quick Settings tile or a widget" />. Stop it when you park, or it ends on its own after 15 minutes parked.</p>
           <p class="small muted" style="margin:0">Needs location only while in use. Every feature, Pro included, works in manual mode.</p>
         </article>
       </div>
@@ -43,7 +45,7 @@ import IconSlot from '../components/pages/IconSlot.astro';
       <ol class="steps">
         <li><div><b>You park</b><span>DrivePerf remembers roughly where, so it can notice when you leave. GPS goes off.</span></div></li>
         <li><div><b>You pull away</b><span>Your phone wakes DrivePerf when it senses you're moving. It confirms you're driving, not walking or cycling, before recording.</span></div></li>
-        <li><div><b>It records</b><span>Route, speed and motion sensors, about once a second. <span data-pl-text data-ios="A notification tells you a drive is being recorded; for manual drives a Live Activity shows it on the Lock Screen." data-android="An ongoing notification shows that a drive is being recorded, as Android requires.">A notification tells you a drive is being recorded; for manual drives a Live Activity shows it on the Lock Screen.</span></span></div></li>
+        <li><div><b>It records</b><span>Route, speed and motion sensors, about once a second. <PlatformText ios="A notification tells you a drive is being recorded; for manual drives a Live Activity shows it on the Lock Screen." android="An ongoing notification shows that a drive is being recorded, as Android requires." /></span></div></li>
         <li><div><b>You park again</b><span>After a few minutes stationary the drive ends. Traffic lights and jams don't end it.</span></div></li>
         <li><div><b>Drive decoded</b><span>Scoring, events and your Story are worked out on your phone in seconds. One notification, held until you're parked.</span></div></li>
       </ol>
