@@ -1,0 +1,59 @@
+---
+// S-WEB-01 · Home: landing with the A/B positioning test and the waitlist (DRIVE-169, DRIVE-171; DRIVE-79 port).
+import Base from '../layouts/Base.astro';
+import Hero from '../components/home/Hero.astro';
+import ProofStrip from '../components/home/ProofStrip.astro';
+import StoryStack from '../components/home/StoryStack.astro';
+import ScoreSection from '../components/home/ScoreSection.astro';
+import ReplaySection from '../components/home/ReplaySection.astro';
+import RouteRecordSection from '../components/home/RouteRecordSection.astro';
+import RecapSection from '../components/home/RecapSection.astro';
+import CapturePromise from '../components/home/CapturePromise.astro';
+import PrivacyPromise from '../components/home/PrivacyPromise.astro';
+import Pricing from '../components/home/Pricing.astro';
+import FaqTeaser from '../components/home/FaqTeaser.astro';
+import CtaBand from '../components/home/CtaBand.astro';
+import { faqJsonLd } from '../components/home/faq';
+import { DATA } from '../lib/data';
+import { SITE } from '../config/site';
+
+const num = (s: string) => s.replace(/[^0-9.]/g, '');
+const { US, CA } = DATA.prices;
+const app = {
+  '@context': 'https://schema.org', '@type': 'SoftwareApplication', name: 'DrivePerf: Drive Tracker',
+  operatingSystem: 'iOS, Android', applicationCategory: 'LifestyleApplication',
+  description: 'Automatic drive recording, a Smoothness score against your own baseline, Trip Replay with evidence and weekly recaps. Private by design.',
+  url: SITE.origin + '/',
+  offers: [
+    { '@type': 'Offer', price: '0', priceCurrency: 'USD', name: 'Free' },
+    { '@type': 'Offer', price: num(US.annual), priceCurrency: 'USD', name: 'Pro annual' },
+    { '@type': 'Offer', price: num(US.monthly), priceCurrency: 'USD', name: 'Pro monthly' },
+    { '@type': 'Offer', price: num(CA.annual), priceCurrency: 'CAD', name: 'Pro annual (Canada)' },
+    { '@type': 'Offer', price: num(CA.monthly), priceCurrency: 'CAD', name: 'Pro monthly (Canada)' },
+  ],
+};
+---
+<Base
+  title="DrivePerf: Smooth is a skill."
+  description="DrivePerf records your drives automatically and turns each one into a short Story, a replay with evidence and a Smoothness score against your own baseline. Private by design. Coming to iPhone and Android."
+  ogDescription="Every drive, decoded: automatic recording, a Smoothness score you can improve, and recaps worth sharing. Private by design."
+  path="/"
+  screen="S-WEB-01"
+  abTest
+  jsonLd={[app, faqJsonLd()]}
+  renderUntil="above-fold-end"
+>
+  <Hero />
+  <ProofStrip />
+  <div id="above-fold-end" hidden></div>
+  <StoryStack />
+  <ScoreSection />
+  <ReplaySection />
+  <RouteRecordSection />
+  <RecapSection />
+  <CapturePromise />
+  <PrivacyPromise />
+  <Pricing />
+  <FaqTeaser />
+  <CtaBand />
+</Base>

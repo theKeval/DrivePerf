@@ -1,0 +1,7 @@
+---
+// DraftBanner: warning-coloured note on draft documents (legal pages pending counsel review).
+import IconSlot from './IconSlot.astro';
+interface Props { title: string; text: string }
+const { title, text } = Astro.props;
+---
+<div class="draft-banner" role="note"><IconSlot name="alert" /><div><b>{title}</b> <Fragment set:html={text} /></div></div>

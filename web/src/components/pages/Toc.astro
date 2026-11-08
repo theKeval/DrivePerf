@@ -1,0 +1,12 @@
+---
+// Toc: sticky on desktop, a card on mobile; highlights the section in view (src/scripts/pages/toc.ts).
+interface Props { items: { id: string; label: string }[]; label?: string }
+const { items, label = 'On this page' } = Astro.props;
+---
+<nav class="toc" aria-label={label} data-component="Toc">
+  <h2>{label}</h2>
+  <ol>
+    {items.map((i) => <li><a href={`#${i.id}`}>{i.label}</a></li>)}
+  </ol>
+</nav>
+<script>import '../../scripts/pages/toc';</script>

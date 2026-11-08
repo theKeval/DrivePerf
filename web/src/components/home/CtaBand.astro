@@ -1,0 +1,15 @@
+---
+import LoopMark from '../site/LoopMark.astro';
+import StoreBadges from '../site/StoreBadges.astro';
+---
+<section class="section section--tight" aria-labelledby="cta-title" data-component="CtaBand">
+  <div class="wrap">
+    <div class="cta-band" data-reveal>
+      <span class="cta-band__loop" data-loop="88" data-glow><LoopMark size={88} glow /></span>
+      <h2 class="h2" id="cta-title">Be a Founding Driver.</h2>
+      <p class="lede">Join the waitlist for the beta this winter, and a founding first year of Pro when we launch.</p>
+      <a class="btn btn--lg" href="#waitlist">Join the waitlist</a>
+      <StoreBadges />
+    </div>
+  </div>
+</section>

@@ -1,0 +1,51 @@
+---
+// S-WEB-07 · Account deletion request (DRIVE-177). Canonical /delete-account (Play Console Data Safety URL).
+import Base from '../layouts/Base.astro';
+import DocHero from '../components/pages/DocHero.astro';
+import IconSlot from '../components/pages/IconSlot.astro';
+import DeletionRequestForm from '../components/pages/DeletionRequestForm.astro';
+import { SITE } from '../config/site';
+---
+<Base title="Delete your DrivePerf account · DrivePerf" description="Request deletion of your DrivePerf account and cloud data, with or without the app. What is deleted, what is kept and why, and how long it takes." path="/delete-account" screen="S-WEB-07" solidHeader>
+  <DocHero crumbs={[{ label: 'Home', href: '/' }, { label: 'Support', href: '/support' }, { label: 'Delete your account' }]} title="Delete your DrivePerf account.">
+    <p class="lede">DrivePerf is made by Keval Langalia, an individual developer in Ontario, Canada. On request, we delete your account and everything in cloud backup, whether or not you still have the app.</p>
+  </DocHero>
+
+  <div class="wrap" style="padding:56px var(--gutter) 96px">
+    <div class="split" style="align-items:start;gap:48px">
+      <div>
+        <DeletionRequestForm />
+
+        <section style="margin-top:56px" aria-labelledby="in-app">
+          <h2 class="h3" id="in-app" style="margin-bottom:16px">Or delete it in the app</h2>
+          <ol class="steps">
+            <li><div><b>Open Profile</b><span>Tap your avatar at the top of any tab.</span></div></li>
+            <li><div><b>Privacy Centre → Delete account</b><span>Sign in again to confirm it's you, and review what will be deleted.</span></div></li>
+            <li><div><b>Choose what happens on this phone</b><span>Keep your local trips, or delete them too.</span></div></li>
+          </ol>
+          <p class="small muted" style="margin-top:16px">Never signed in? Then there's no account: everything is on your phone. Delete it in Privacy Centre → Delete all trips, or remove the app.</p>
+        </section>
+      </div>
+
+      <aside aria-labelledby="what-del">
+        <div class="card" style="padding:28px">
+          <h2 class="h3" id="what-del" style="margin-bottom:16px">What is deleted</h2>
+          <ul class="never-list">
+            <li><IconSlot name="trash" /><div><b>Your account</b><span>Sign-in, email, name and account ID.</span></div></li>
+            <li><IconSlot name="trash" /><div><b>Everything in cloud backup</b><span>Trips with their routes, sensor data, scores, routes, cars and settings.</span></div></li>
+            <li><IconSlot name="trash" /><div><b>Ride-along pass records</b><span>Passes you sent or redeemed.</span></div></li>
+            <li><IconSlot name="trash" /><div><b>Subscription link</b><span>Your customer record at RevenueCat.</span></div></li>
+          </ul>
+          <h2 class="h3" style="margin:28px 0 16px">What is kept, and why</h2>
+          <ul class="never-list">
+            <li><IconSlot name="info" /><div><b>Purchase records at Apple or Google</b><span>They keep their own records of what you bought. We can't delete them; contact them directly.</span></div></li>
+            <li><IconSlot name="info" /><div><b>A record of your request</b><span>The date and outcome of the deletion, without your trip data, for <span class="placeholder">[12 months]</span>, so we can show we honoured it.</span></div></li>
+            <li><IconSlot name="info" /><div><b>Anonymous totals</b><span>Counts such as "drives decoded this week" that can't identify you.</span></div></li>
+          </ul>
+          <p class="small muted" style="margin:20px 0 0">Questions: <a href={`mailto:${SITE.emails.privacy}`}>{SITE.emails.privacy}</a>. More in the <a href="/privacy#rights">privacy policy</a>.</p>
+        </div>
+      </aside>
+    </div>
+  </div>
+  <script>import '../scripts/pages/delete-account';</script>
+</Base>

@@ -1,0 +1,7 @@
+---
+// <span data-icon="name"> with the icon rendered at build time (site.css sizes [data-icon] > svg).
+import { icon, type IconName } from '../../lib/icons';
+interface Props { name: IconName; class?: string }
+const { name, class: cls } = Astro.props;
+---
+<span class={cls} data-icon={name} set:html={icon(name)} />

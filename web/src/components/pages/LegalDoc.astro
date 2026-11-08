@@ -1,0 +1,36 @@
+---
+// Legal document page body (S-WEB-03/04): DocHero with version chips and DraftBanner, Toc, Prose.
+// Content is Markdown in src/content/legal/*.md with version/date front matter (F-WEB-03.3: version and date
+// shown at the top and bottom).
+import DocHero from './DocHero.astro';
+import DraftBanner from './DraftBanner.astro';
+import Toc from './Toc.astro';
+import { fillIconSlots } from './icon-slots';
+
+interface Props {
+  doc: {
+    frontmatter: Record<string, string>;
+    compiledContent: () => string | Promise<string>;
+  };
+}
+const { doc } = Astro.props;
+const fm = doc.frontmatter;
+const html = fillIconSlots(await doc.compiledContent());
+// Headings are raw <h2 id> in the Markdown (stable anchors such as #rights, #website), so the TOC is read from the HTML.
+const toc = [...html.matchAll(/<h2 id="([^"]+)">([^<]+)<\/h2>/g)].map((m) => ({ id: m[1], label: m[2].replace(/&#39;|&apos;/g, "'") }));
+---
+<DocHero crumbs={[{ label: 'Home', href: '/' }, { label: fm.title }]} title={fm.title}>
+  <p class="lede">{fm.lede}</p>
+  <div class="doc-meta">
+    <span class="chip">Version {fm.version}</span><span class="chip">Draft · {fm.dateLabel}</span>
+    {fm.scope && <span class="chip">{fm.scope}</span>}
+  </div>
+  <DraftBanner title={fm.banner} text={fm.bannerText} />
+</DocHero>
+<div class="wrap doc">
+  <Toc items={toc} />
+  <article class="prose">
+    <Fragment set:html={html} />
+    <div class="callout"><strong>Version {fm.version}, draft of {fm.dateLong}.</strong> Not yet in force. To be reviewed by counsel before launch.</div>
+  </article>
+</div>

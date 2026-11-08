@@ -1,0 +1,25 @@
+---
+// PrivacyPromise — data map + never list.
+import IconSlot from './IconSlot.astro';
+---
+<section class="section" id="privacy" aria-labelledby="privacy-title" data-component="PrivacyPromise">
+  <div class="wrap split">
+    <div>
+      <p class="eyebrow">Private by design</p>
+      <h2 class="h2" id="privacy-title">Your drives stay on your phone.</h2>
+      <p class="lede" style="margin-top:20px">DrivePerf is local-first. You don't need an account, there are no ad or tracking SDKs, and nothing about your trips leaves the phone unless you turn on Pro backup.</p>
+      <ul class="never-list" style="margin-top:28px">
+        <li><IconSlot name="download" /><div><b>Download all your data, free</b><span>Every trip, route and score in an open format. It's yours, and you can leave with it.</span></div></li>
+        <li><IconSlot name="trash" /><div><b>Delete anything, any time</b><span>A trip, a range, or everything, on the phone and in the cloud.</span></div></li>
+        <li><IconSlot name="shield" /><div><b>Not an insurance app</b><span>Your data is never sold, and never shared with insurers.</span></div></li>
+      </ul>
+      <p style="margin:24px 0 0"><a class="link-arrow" href="/privacy">Read the privacy policy</a></p>
+    </div>
+    <div class="data-map" data-reveal aria-label="Where your data lives">
+      <div class="row"><IconSlot class="ico" name="phone" /><div><b>On your phone</b><span>Trips, routes, cars and scores. Everything works without an account.</span></div></div>
+      <div class="row"><IconSlot class="ico" name="cloud" /><div><b>In the cloud</b><span>Only if you turn on Pro backup, with your consent first. Delete it any time.</span></div></div>
+      <div class="row"><IconSlot class="ico" name="info" /><div><b>Crash reports and usage statistics</b><span>Only if you say yes. Never your locations, routes or speeds.</span></div></div>
+      <div class="row row--never"><IconSlot class="ico" name="noentry" /><div><b>Never</b><span>Sold. Shared with insurers. Used for ads.</span></div></div>
+    </div>
+  </div>
+</section>

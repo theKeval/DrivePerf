@@ -1,0 +1,10 @@
+---
+// S-WEB-04 · Terms of use (DRIVE-174). Draft for counsel review.
+import Base from '../layouts/Base.astro';
+import LegalDoc from '../components/pages/LegalDoc.astro';
+import * as doc from '../content/legal/terms.md';
+const fm = doc.frontmatter;
+---
+<Base title={fm.metaTitle} description={fm.description} path="/terms" screen="S-WEB-04" solidHeader>
+  <LegalDoc doc={doc as any} />
+</Base>

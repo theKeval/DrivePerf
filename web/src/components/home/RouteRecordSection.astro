@@ -1,0 +1,45 @@
+---
+// RouteRecordSection — route glyph + dot strip (DotStripFill: scripts/home/routes.ts) for The Commute.
+import IconSlot from './IconSlot.astro';
+import { DATA, fmtDate } from '../../lib/data';
+import { glyphPath } from '../../lib/geo';
+
+const rt = DATA.routeCommute;
+const runs = rt.runs as { date: string; score: number; tripId: string }[];
+const t0 = +new Date(runs[0].date), t1 = +new Date(runs[runs.length - 1].date);
+const pos = runs.map((x) => 2 + ((+new Date(x.date) - t0) / (t1 - t0)) * 96);
+const recIdx = runs.findIndex((x) => x.tripId === rt.record.tripId);
+const strip = `<b class="fill" style="width:${pos[pos.length - 1]}%"></b>` + runs.map((x, i) =>
+  `<i class="${x.tripId === rt.record.tripId ? 'rec' : ''}" style="left:${pos[i]}%" title="${fmtDate(x.date)} · ${x.score}"></i>`).join('') +
+  `<span class="rec-pulse" style="left:${pos[recIdx]}%"></span>`;
+const glyph = `<path d="${glyphPath(rt.glyph, 120, 96, 8)}" fill="none" stroke="var(--accent)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>`;
+---
+<section class="section section--alt" aria-labelledby="routes-title" data-component="RouteRecordSection">
+  <div class="wrap split">
+    <div class="panel" data-reveal>
+      <div class="panel__body">
+        <div style="display:grid;grid-template-columns:1fr auto;gap:20px;align-items:start">
+          <div><p class="small muted" style="margin:0 0 4px">Home → Work · 10 drives</p><h3 class="h3">The Commute</h3></div>
+          <svg id="route-glyph" width="120" height="96" viewBox="0 0 120 96" aria-hidden="true" set:html={glyph}></svg>
+        </div>
+        <div class="dotstrip" id="dotstrip" role="img" aria-label="Ten runs of The Commute from 29 September to 5 November. Smoothness climbed from 76 to 91. The most recent run is the route record." data-pos={JSON.stringify(pos)} set:html={strip}></div>
+        <div class="dotstrip-axis"><span>29 Sep</span><span>5 Nov</span></div>
+        <div class="record-line" style="margin-top:22px">
+          <IconSlot class="rosette" name="rosette" />
+          <span><b>Route record 91</b> <span class="muted">· 5 Nov · beating 89 from 14 Oct</span></span>
+        </div>
+        <div class="gained"><IconSlot name="sparkle" /><div><b style="display:block">Where you gained most: the Gardiner.</b><span class="muted small">You braked earlier and lighter than on the other run. (Ghost comparison, Pro.)</span></div></div>
+      </div>
+    </div>
+    <div>
+      <p class="eyebrow">Routes and records</p>
+      <h2 class="h2" id="routes-title">Your commute, as a craft.</h2>
+      <p class="lede" style="margin-top:20px">Drive the same trip twice and it becomes a route. Every run lands on the strip, and your smoothest is the route record. Overlay today's run on your best to see exactly where you gained.</p>
+      <p class="small muted">Records are Smoothness only, never time. Run durations are listed plainly, with no deltas and no "beat your time".</p>
+    </div>
+  </div>
+</section>
+
+<script>
+  import '../../scripts/home/routes';
+</script>

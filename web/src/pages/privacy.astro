@@ -1,0 +1,10 @@
+---
+// S-WEB-03 · Privacy policy (DRIVE-174). Draft for counsel review.
+import Base from '../layouts/Base.astro';
+import LegalDoc from '../components/pages/LegalDoc.astro';
+import * as doc from '../content/legal/privacy.md';
+const fm = doc.frontmatter;
+---
+<Base title={fm.metaTitle} description={fm.description} ogDescription={fm.ogDescription} path="/privacy" screen="S-WEB-03" solidHeader>
+  <LegalDoc doc={doc as any} />
+</Base>

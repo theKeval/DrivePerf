@@ -1,0 +1,9 @@
+---
+// FaqList — <details> works without JS. JSON-LD for these questions is emitted by the page (faq.ts).
+import { HOME_FAQ } from './faq';
+interface Props { items?: { q: string; a: string }[] }
+const { items = HOME_FAQ } = Astro.props;
+---
+<div class="faq">
+  {items.map(({ q, a }) => <details><summary>{q}</summary><div class="answer"><p>{a}</p></div></details>)}
+</div>

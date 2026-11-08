@@ -1,0 +1,76 @@
+---
+// Pricing — Free and Pro plans, region toggle (scripts/home/pricing.ts). US prices render at build time;
+// the island switches to CA for ?region=CA or an en-CA browser. Prices come from one constants file (fixtures).
+import IconSlot from './IconSlot.astro';
+import FreeProTable from './FreeProTable.astro';
+import { DATA } from '../../lib/data';
+const US = DATA.prices.US, CA = DATA.prices.CA;
+---
+<section class="section section--alt" id="pricing" aria-labelledby="pricing-title" data-component="Pricing" data-prices={JSON.stringify(DATA.prices)}>
+  <div class="wrap">
+    <div class="section__head">
+      <p class="eyebrow">Free and Pro</p>
+      <h2 class="h2" id="pricing-title">Generous Free. Pro for the long game.</h2>
+      <p class="lede">Free covers every drive, every Story and every score, forever. Pro adds depth over time.</p>
+    </div>
+    <div class="pricing-top">
+      <div class="region" role="group" aria-label="Show prices for">
+        <button type="button" data-region="US" aria-pressed="true">United States</button>
+        <button type="button" data-region="CA" aria-pressed="false">Canada</button>
+      </div>
+      <p class="small muted" style="margin:0">Two plans. No weekly plan, no lifetime plan, no ads.</p>
+    </div>
+    <div class="preview-banner" data-reveal>
+      <span class="num">14</span>
+      <div><b>Every new driver starts with a 14-day Pro Preview. No card.</b><span>When it ends you keep everything in Free, and every trip stays yours.</span></div>
+    </div>
+    <div class="plans">
+      <article class="plan" aria-labelledby="plan-free">
+        <div class="plan__name"><span id="plan-free">Free</span></div>
+        <div class="plan__price"><span class="num" data-price="free">US$0</span><small>forever</small></div>
+        <p class="plan__sub">Everything you need after every drive.</p>
+        <ul>
+          <li><IconSlot name="check" />Automatic and manual recording</li>
+          <li><IconSlot name="check" />Drive Story, Smoothness and one tip per drive</li>
+          <li><IconSlot name="check" />Replay and Analysis for the last 30 days</li>
+          <li><IconSlot name="check" />Weekly recap and Drive Wrapped</li>
+          <li><IconSlot name="check" />2 routes, 1 car, full data download</li>
+        </ul>
+        <a class="btn btn--ghost" href="#waitlist">Join the waitlist</a>
+      </article>
+      <article class="plan plan--feature" aria-labelledby="plan-annual">
+        <div class="plan__name"><span id="plan-annual">Pro · Annual</span><span class="chip chip--accent">Best value</span></div>
+        <div class="plan__price"><span class="num" data-price="annual">{US.annual}</span><small>/ year</small></div>
+        <p class="plan__sub"><span data-price="annualPerMonth">{US.annualPerMonth}</span> a month, billed yearly</p>
+        <div class="founding"><b><IconSlot name="rosette" />Founding Drivers: <span data-price="founding">{US.founding}</span> first year</b><span>For the waitlist, the beta and the first 30 days after launch.</span></div>
+        <ul>
+          <li><IconSlot name="check" />Replay and Analysis for every drive</li>
+          <li><IconSlot name="check" />Unlimited routes and ghost comparison</li>
+          <li><IconSlot name="check" />Month, year, car and route trends</li>
+          <li><IconSlot name="check" />Cloud backup, GPX/CSV export, unlimited cars</li>
+        </ul>
+        <a class="btn" href="#waitlist">Join for the founding price</a>
+      </article>
+      <article class="plan" aria-labelledby="plan-monthly">
+        <div class="plan__name"><span id="plan-monthly">Pro · Monthly</span></div>
+        <div class="plan__price"><span class="num" data-price="monthly">{US.monthly}</span><small>/ month</small></div>
+        <p class="plan__sub">Everything in Pro, month to month.</p>
+        <ul>
+          <li><IconSlot name="check" />All Pro features</li>
+          <li><IconSlot name="check" />Cancel any time in the App Store or Google Play</li>
+          <li><IconSlot name="check" />Your trips stay yours if you stop</li>
+        </ul>
+        <a class="btn btn--ghost" href="#waitlist">Join the waitlist</a>
+      </article>
+    </div>
+    <FreeProTable />
+    <div class="price-notes">
+      <p style="margin:0" id="price-alt">In Canada: {CA.monthly} a month or {CA.annual} a year, with a founding first year at {CA.founding}.</p>
+      <p style="margin:0">Prices are set by the App Store and Google Play in your country, and taxes may apply. Subscriptions renew until you cancel in your store account. The Pro Preview never charges you.</p>
+    </div>
+  </div>
+</section>
+
+<script>
+  import '../../scripts/home/pricing';
+</script>

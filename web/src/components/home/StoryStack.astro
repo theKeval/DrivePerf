@@ -1,0 +1,94 @@
+---
+// StoryStack — the Drive Story card stack (S-WEB-01 #how). Auto-cycles (scripts/home/story-stack.ts); without JS
+// or with reduced motion it is a static row of all six frames, decided in CSS before first paint.
+import { storyFrames, ggSamples, HERO_TRIP, type StoryFrame } from '../../lib/mockups';
+
+// The G-G cloud is 420 <circle>s per copy; draw it as one <path> of circles instead (same pixels, ~840 fewer
+// DOM nodes; the group's opacity already prevents overlap doubling).
+const compactCloud = (f: StoryFrame): StoryFrame => ({
+  ...f,
+  html: f.html.replace(/(<g fill="[^"]*" opacity="[^"]*")>((?:<circle cx="[\d.-]+" cy="[\d.-]+" r="1\.5"\/>)+)<\/g>/, (_, open: string, circles: string) => {
+    const d = [...circles.matchAll(/cx="([\d.-]+)" cy="([\d.-]+)"/g)].map(([, x, y]) => `M${(+x - 1.5).toFixed(1)} ${y}a1.5 1.5 0 1 0 3 0a1.5 1.5 0 1 0-3 0`).join('');
+    return `${open}><path d="${d}"/></g>`;
+  }),
+});
+const frames = storyFrames().map(compactCloud);
+const framesStatic = storyFrames().map(compactCloud); // separate render: SVG gradient ids must be unique
+const n = frames.length;
+// Initial positions = the island's place() for frame 0, so the stack looks right before JS runs.
+const pose = (i: number) => {
+  const d = i;
+  if (d === 0) return { tf: 'none', op: 1, f: '' };
+  if (d === n - 1) return { tf: 'translate3d(-6%, -112%, 0) rotate(-8deg)', op: 0, f: '' };
+  if (d <= 3) return { tf: `translate3d(${d * 26}px, ${d * 14}px, ${-d * 70}px) rotate(${(d * 3.2).toFixed(1)}deg)`, op: +(1 - d * 0.2).toFixed(2), f: `brightness(${(1 - d * 0.18).toFixed(2)})` };
+  return { tf: 'translate3d(104px, 56px, -280px) rotate(12.8deg)', op: 0, f: '' };
+};
+const card = (f: StoryFrame, style = '') => `<div class="stack__card" data-frame="${f.n}" role="listitem" aria-label="Story frame ${f.n}: ${f.label}"${style ? ` style="${style}"` : ''}>${f.html}</div>`;
+const stackHtml = frames.map((f, i) => { const p = pose(i); return card(f, `transform:${p.tf};opacity:${p.op};z-index:${20 - i};${p.f ? `filter:${p.f};` : ''}`); }).join('');
+const staticHtml = framesStatic.map((f) => card(f)).join('');
+const steps: [string, string][] = [
+  ['The drive', 'Part of day and car. No timestamps, no addresses.'],
+  ['The route draws on', 'Start to finish, with the first and last stretch trimmed.'],
+  ['Your inputs, replayed', 'Every brake and turn as a dot gliding around the friction circle.'],
+  ['Smoothness', 'Compared with your usual on this route. Records glow gold.'],
+  ['Cleanest stretch', 'We always lead with what went well.'],
+  ['One thing for next time', 'Exactly one tip, with the evidence one tap away.'],
+];
+---
+<section class="story-scroll" id="how" aria-labelledby="story-title" data-component="StoryStack">
+  <div class="story-scroll__track" id="story-track">
+    <div class="story-scroll__sticky">
+      <div class="wrap story-scroll__grid">
+        <div>
+          <p class="eyebrow">The Drive Story</p>
+          <h2 class="h2" id="story-title">Park. Your drive is already decoded.</h2>
+          <p class="lede" style="margin-top:20px">Seconds after you park, each drive becomes a short Story. It plays only once you've stopped, never while you drive.</p>
+          <ol class="story-steps" id="story-steps">
+            {steps.map(([b, s], i) => (
+              <li data-n={i + 1} class={i === 0 ? 'is-active' : undefined}><button type="button" class="step-btn" aria-current={i === 0 ? 'step' : 'false'}><b>{b}</b><span>{s}</span></button></li>
+            ))}
+          </ol>
+          <button class="btn btn--quiet btn--sm story-toggle" type="button" id="story-toggle" aria-pressed="false" aria-controls="stack"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="6.5" y="5" width="3.5" height="14" rx="1"/><rect x="14" y="5" width="3.5" height="14" rx="1"/></svg><span>Pause</span></button>
+        </div>
+        <div class="stack" id="stack" aria-hidden="true" set:html={stackHtml}></div>
+        <div class="stack-static" id="stack-static" role="list" aria-label="Drive Story frames" set:html={staticHtml}></div>
+      </div>
+    </div>
+  </div>
+  <script type="application/json" id="story-gg" set:html={JSON.stringify(ggSamples(HERO_TRIP()))}></script>
+</section>
+
+<style is:global>
+  /* Static row (= .story-scroll[data-static] in site.css) without JS, or with ?rm=1 / OS reduced motion,
+     decided before first paint so the island never shifts the layout. */
+  :root:not([data-js]) .story-scroll .stack, :root[data-rm="true"] .story-scroll .stack { display: none; }
+  :root:not([data-js]) .story-scroll .story-scroll__sticky, :root[data-rm="true"] .story-scroll .story-scroll__sticky { position: relative; height: auto; min-height: 0; padding: 120px 0; }
+  :root:not([data-js]) .story-scroll .stack-static, :root[data-rm="true"] .story-scroll .stack-static { display: flex; gap: 16px; overflow-x: auto; padding: 8px 4px 24px; scroll-snap-type: x mandatory; }
+  :root:not([data-js]) .story-scroll .stack-static .stack__card, :root[data-rm="true"] .story-scroll .stack-static .stack__card { position: relative; left: auto; top: auto; margin: 0; flex: none; scroll-snap-align: start; --w: 220px; transform: none !important; opacity: 1 !important; }
+  :root:not([data-js]) .story-scroll .story-steps li, :root[data-rm="true"] .story-scroll .story-steps li { display: grid; }
+  :root:not([data-js]) .story-scroll .story-toggle, :root[data-rm="true"] .story-scroll .story-toggle { display: none; }
+  @media (max-width: 959px) { :root:not([data-js]) .story-scroll .story-scroll__grid, :root[data-rm="true"] .story-scroll .story-scroll__grid { gap: 48px; } }
+  @media (min-width: 960px) {
+    :root:not([data-js]) .story-scroll .story-scroll__grid, :root[data-rm="true"] .story-scroll .story-scroll__grid { grid-template-columns: 1fr; }
+    :root:not([data-js]) .story-scroll .stack-static, :root[data-rm="true"] .story-scroll .stack-static { display: grid; grid-template-columns: repeat(6, 1fr); overflow: visible; }
+    :root:not([data-js]) .story-scroll .stack-static .stack__card, :root[data-rm="true"] .story-scroll .stack-static .stack__card { --w: 100%; height: auto; aspect-ratio: 9 / 16; font-size: 10.5px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    :root:root .story-scroll .stack { display: none; }
+    :root:root .story-scroll .story-scroll__sticky { position: relative; height: auto; min-height: 0; padding: 120px 0; }
+    :root:root .story-scroll .stack-static { display: flex; gap: 16px; overflow-x: auto; padding: 8px 4px 24px; scroll-snap-type: x mandatory; }
+    :root:root .story-scroll .stack-static .stack__card { position: relative; left: auto; top: auto; margin: 0; flex: none; scroll-snap-align: start; --w: 220px; transform: none !important; opacity: 1 !important; }
+    :root:root .story-scroll .story-steps li { display: grid; }
+    :root:root .story-scroll .story-toggle { display: none; }
+  }
+  @media (prefers-reduced-motion: reduce) and (max-width: 959px) { :root:root .story-scroll .story-scroll__grid { gap: 48px; } }
+  @media (prefers-reduced-motion: reduce) and (min-width: 960px) {
+    :root:root .story-scroll .story-scroll__grid { grid-template-columns: 1fr; }
+    :root:root .story-scroll .stack-static { display: grid; grid-template-columns: repeat(6, 1fr); overflow: visible; }
+    :root:root .story-scroll .stack-static .stack__card { --w: 100%; height: auto; aspect-ratio: 9 / 16; font-size: 10.5px; }
+  }
+</style>
+
+<script>
+  import '../../scripts/home/story-stack';
+</script>

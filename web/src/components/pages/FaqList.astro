@@ -1,0 +1,13 @@
+---
+// FaqList: native <details> groups (works without JS); filter behaviour in src/scripts/pages/faq-filter.ts.
+import type { FaqGroup } from './faq-data';
+interface Props { groups: FaqGroup[] }
+const { groups } = Astro.props;
+---
+{groups.map((g) => (
+  <section class="faq-group" aria-labelledby={g.id}><h2 class="h3" id={g.id}>{g.title}</h2><div class="faq">
+    {g.items.map((it) => (
+      <details open={it.open}><summary set:html={it.q} /><div class="answer"><p set:html={it.a} /></div></details>
+    ))}
+  </div></section>
+))}

@@ -1,0 +1,8 @@
+---
+// QrCode: a real QR (generated at build time) inside the white rounded tile from site.css (.qr).
+import { qrSvg } from './qr';
+interface Props { text: string; id?: string }
+const { text, id } = Astro.props;
+const svg = await qrSvg(text);
+---
+<div class="qr" id={id} set:html={svg} />

@@ -1,0 +1,80 @@
+---
+// Base layout: <head> (meta, OG, icons, manifest, JSON-LD), skip link, header, footer, shared runtime.
+// The one inline script (THEME_BOOT) runs before paint: JS flag, theme, ?rm=1 and the A/B variant pick.
+// Its SHA-256 is pinned in the CSP (backend/firebase/firebase.json); scripts/check-dist.mjs fails the build
+// if any other inline script appears or the hash drifts.
+import '../styles/site.css';
+import SiteHeader from '../components/site/SiteHeader.astro';
+import SiteFooter from '../components/site/SiteFooter.astro';
+import { SITE } from '../config/site';
+import { THEME_BOOT } from '../lib/boot';
+
+export interface Props {
+  title: string;
+  description: string;
+  /** Path without trailing slash, e.g. "/privacy" ("/" for home). Used for canonical and og:url. */
+  path: string;
+  screen: string;
+  noindex?: boolean;
+  solidHeader?: boolean;
+  /** Home only: enables the A/B variant pick (F-WEB-01). */
+  abTest?: boolean;
+  ogImage?: string;
+  ogImageAlt?: string;
+  ogDescription?: string;
+  jsonLd?: object | object[];
+  /** Id of an element that must be parsed before first paint (render-blocking <link rel="expect">). For long
+   *  pages whose above-the-fold content would otherwise paint half-parsed on slow devices and then shift. */
+  renderUntil?: string;
+}
+const {
+  title, description, path, screen, noindex = false, solidHeader = false, abTest = false,
+  ogImage = '/og/home-1200x630.png',
+  ogImageAlt = 'The DrivePerf Loop mark beside a route line drawn in mint on a night-blue background.',
+  ogDescription = description, jsonLd, renderUntil,
+} = Astro.props;
+const canonical = SITE.origin + (path === '/' ? '/' : path);
+const ld = jsonLd ? (Array.isArray(jsonLd) ? jsonLd : [jsonLd]) : [];
+// Preview channels and local builds are never indexed (only the prod build may be).
+const robots = noindex || SITE.env !== 'prod' ? 'noindex' : null;
+---
+<!doctype html>
+<html lang="en-CA" data-theme="dark" data-variant={abTest ? 'A' : undefined}>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>{title}</title>
+<meta name="description" content={description}>
+{robots && <meta name="robots" content={robots}>}
+<link rel="canonical" href={canonical}>
+<meta name="theme-color" content="#05070A">
+<meta name="color-scheme" content="dark light">
+<link rel="icon" href="/favicon.ico" sizes="32x32">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="manifest" href="/manifest.webmanifest">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="DrivePerf">
+<meta property="og:locale" content="en_CA">
+<meta property="og:title" content={title}>
+<meta property="og:description" content={ogDescription}>
+<meta property="og:url" content={canonical}>
+<meta property="og:image" content={SITE.origin + ogImage}>
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content={ogImageAlt}>
+<meta name="twitter:card" content="summary_large_image">
+{renderUntil && <link rel="expect" href={`#${renderUntil}`} blocking="render">}
+<script is:inline set:html={THEME_BOOT} />
+{ld.map((o) => <script type="application/ld+json" set:html={JSON.stringify(o)} />)}
+</head>
+<body data-screen={screen}>
+<a class="skip-link" href="#main">Skip to content</a>
+<SiteHeader solid={solidHeader} />
+<main id="main">
+  <slot />
+</main>
+<SiteFooter />
+<script>import '../scripts/site';</script>
+</body>
+</html>

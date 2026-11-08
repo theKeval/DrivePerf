@@ -1,0 +1,33 @@
+---
+// S-WEB-11 · 404 (DRIVE-169). Firebase Hosting serves /404.html for unknown paths. Background: the twisty
+// Belfountain drive (t20261010-1015) draws on and stops at a G-dot, the rest of the road dotted ("unmapped").
+// The route is rotated and normalised at build time; src/scripts/pages/lost.ts fits it to the measured section.
+import Base from '../layouts/Base.astro';
+import { trip } from '../lib/data';
+import { trackPoints } from '../lib/geo';
+
+const { pts } = trackPoints(trip('t20261010-1015').rows);
+const ROT = 64, c = Math.cos((ROT * Math.PI) / 180), s = Math.sin((ROT * Math.PI) / 180);
+const lat0 = pts.reduce((a, p) => a + p.lat, 0) / pts.length, k = Math.cos((lat0 * Math.PI) / 180);
+const raw = pts.map((p) => { const x = p.lng * k, y = -p.lat; return [x * c - y * s, x * s + y * c]; });
+const x0 = Math.min(...raw.map((p) => p[0])), y0 = Math.min(...raw.map((p) => p[1]));
+const span = Math.max(Math.max(...raw.map((p) => p[0])) - x0, Math.max(...raw.map((p) => p[1])) - y0);
+const norm = raw.map(([x, y]) => [+((x - x0) / span).toFixed(4), +((y - y0) / span).toFixed(4)]);
+const route = JSON.stringify(norm);
+---
+<Base title="Page not found · DrivePerf" description="This page doesn't exist. Head back to driveperf.com or Support and FAQ." path="/404" screen="S-WEB-11" noindex solidHeader>
+  <section class="lost" aria-labelledby="lost-title" data-component="NotFound">
+    <div class="lost__route" id="lost-route" aria-hidden="true" data-route={route}></div>
+    <div class="wrap" style="padding-top:72px;padding-bottom:96px">
+      <span class="num big" aria-hidden="true">404</span>
+      <h1 class="h1" id="lost-title">Wrong turn.</h1>
+      <p class="lede" style="margin:20px 0 36px">This page took a road we haven't mapped. Let's get you back on route.</p>
+      <div class="btn-row">
+        <a class="btn btn--lg" href="/">Back to driveperf.com</a>
+        <a class="btn btn--lg btn--ghost" href="/support">Support and FAQ</a>
+      </div>
+      <p class="small muted" style="margin-top:28px">Looking for something specific? <a href="/how-it-records">How DrivePerf records</a> · <a href="/privacy">Privacy policy</a> · <a href="/delete-account">Delete your account</a></p>
+    </div>
+  </section>
+  <script>import '../scripts/pages/lost';</script>
+</Base>

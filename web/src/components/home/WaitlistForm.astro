@@ -1,0 +1,46 @@
+---
+// WaitlistForm — F-WEB-02 (DRIVE-171). Behaviour: scripts/home/waitlist.ts → lib/backend (the only backend seam).
+// Without JS the submit button stays disabled (nothing is posted anywhere) and a noscript line offers email.
+import { SITE } from '../../config/site';
+---
+<form class="waitlist" id="waitlist" novalidate data-component="WaitlistForm" aria-labelledby="wl-title">
+  <div class="waitlist__title"><h2 id="wl-title">Join the waitlist</h2><span class="chip chip--record" title="Founding Drivers price">Founding price</span></div>
+  <div class="form-banner" id="wl-banner" role="status" aria-live="polite"></div>
+  <noscript><p class="small" style="margin:0">JavaScript is needed to join here — or email us at <a href={`mailto:${SITE.emails.hello}?subject=${encodeURIComponent('DrivePerf waitlist')}`}>{SITE.emails.hello}</a> and we'll add you.</p></noscript>
+  <div class="field" id="f-email">
+    <label for="wl-email">Email</label>
+    <div class="waitlist__email">
+      <input class="input" id="wl-email" name="email" type="email" inputmode="email" autocomplete="email" maxlength="254" placeholder="you@example.com" aria-describedby="wl-email-err" required>
+    </div>
+    <p class="field-error" id="wl-email-err"></p>
+  </div>
+  <div class="waitlist__row waitlist__row--2">
+    <fieldset class="field" id="f-platform" aria-describedby="wl-platform-err">
+      <legend class="label">Your phone</legend>
+      <div class="seg"><label><input type="radio" name="platform" value="ios"><span>iPhone</span></label><label><input type="radio" name="platform" value="android"><span>Android</span></label></div>
+      <p class="field-error" id="wl-platform-err"></p>
+    </fieldset>
+    <fieldset class="field" id="f-country" aria-describedby="wl-country-err">
+      <legend class="label">Country</legend>
+      <div class="seg"><label><input type="radio" name="country" value="CA"><span>Canada</span></label><label><input type="radio" name="country" value="US"><span>US</span></label><label><input type="radio" name="country" value="other"><span>Other</span></label></div>
+      <p class="field-error" id="wl-country-err"></p>
+    </fieldset>
+  </div>
+  <div class="field" id="f-consent">
+    <label class="check"><input type="checkbox" name="consent" id="wl-consent" aria-describedby="wl-consent-err"><span>Email me about the DrivePerf beta and launch, including the founding price. Unsubscribe in one click from any email.</span></label>
+    <p class="field-error" id="wl-consent-err"></p>
+  </div>
+  <div class="hp" aria-hidden="true"><label for="wl-company">Company</label><input id="wl-company" name="company" tabindex="-1" autocomplete="off"></div>
+  <input type="hidden" name="variant" id="wl-variant" value="A">
+  <button class="btn btn--lg" type="submit" id="wl-submit" disabled>Join the waitlist</button>
+  <p class="tiny" style="margin:0">We use your email only for DrivePerf beta and launch news. <a href="/privacy#website">Privacy policy</a>.</p>
+</form>
+
+<style is:global>
+  /* The button is enabled by the island; without JS it stays disabled and reads as unavailable. */
+  :root:not([data-js]) #wl-submit:disabled { opacity: .5; cursor: not-allowed; }
+</style>
+
+<script>
+  import '../../scripts/home/waitlist';
+</script>

@@ -1,0 +1,28 @@
+---
+// FreeProTable — Free vs Pro, line by line.
+import { icon } from '../../lib/icons';
+const yes = `<span class="yes" data-yes>${icon('check')}<span class="sr-only">Included</span></span>`;
+const no = `<span class="no">—</span><span class="sr-only">Not included</span>`;
+const rows: [string, string, string][] = [
+  ['Recording (auto and manual), Drive Story, Smoothness, events, efficiency habits, coaching tip', yes, yes],
+  ['Trip summaries', 'Forever ("locked, not lost")', 'Forever'],
+  ['Trip Replay and Analysis', 'Last 30 days', 'Full history, plus range stats and advanced channels'],
+  ['Routes and route records', '2 active routes', 'Unlimited, plus ghost comparison and "where you gained"'],
+  ['Trends', 'Weekly, plus a 4-week line', 'Month, year, per car, per route'],
+  ['Weekly recap · Drive Wrapped', `${yes} · core chapters`, `${yes} · extra chapters and card styles`],
+  ['Share cards · Ride-along pass', yes, `${yes} · extra styles, minimal mark`],
+  ['Garage', '1 car', 'Unlimited'],
+  ['Download all my data · delete anything', yes, yes],
+  ['Per-trip GPX/CSV export', no, yes],
+  ['Cloud backup and restore', no, yes],
+];
+---
+<div class="table-scroll">
+  <table class="compare" data-component="FreeProTable">
+    <caption>Free vs Pro, line by line</caption>
+    <thead><tr><th scope="col">What you get</th><th scope="col">Free</th><th scope="col">Pro</th></tr></thead>
+    <tbody>
+      {rows.map(([h, f, p]) => <tr><th scope="row">{h}</th><td set:html={f} /><td class="pro" set:html={p} /></tr>)}
+    </tbody>
+  </table>
+</div>
