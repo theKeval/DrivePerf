@@ -23,12 +23,15 @@ export interface Props {
   ogImageAlt?: string;
   ogDescription?: string;
   jsonLd?: object | object[];
+  /** Id of an element that must be parsed before first paint (render-blocking <link rel="expect">). For long
+   *  pages whose above-the-fold content would otherwise paint half-parsed on slow devices and then shift. */
+  renderUntil?: string;
 }
 const {
   title, description, path, screen, noindex = false, solidHeader = false, abTest = false,
   ogImage = '/og/home-1200x630.png',
   ogImageAlt = 'The DrivePerf Loop mark beside a route line drawn in mint on a night-blue background.',
-  ogDescription = description, jsonLd,
+  ogDescription = description, jsonLd, renderUntil,
 } = Astro.props;
 const canonical = SITE.origin + (path === '/' ? '/' : path);
 const ld = jsonLd ? (Array.isArray(jsonLd) ? jsonLd : [jsonLd]) : [];
@@ -61,6 +64,7 @@ const robots = noindex || SITE.env !== 'prod' ? 'noindex' : null;
 <meta property="og:image:height" content="630">
 <meta property="og:image:alt" content={ogImageAlt}>
 <meta name="twitter:card" content="summary_large_image">
+{renderUntil && <link rel="expect" href={`#${renderUntil}`} blocking="render">}
 <script is:inline set:html={THEME_BOOT} />
 {ld.map((o) => <script type="application/ld+json" set:html={JSON.stringify(o)} />)}
 </head>

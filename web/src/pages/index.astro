@@ -41,9 +41,11 @@ const app = {
   screen="S-WEB-01"
   abTest
   jsonLd={[app, faqJsonLd()]}
+  renderUntil="above-fold-end"
 >
   <Hero />
   <ProofStrip />
+  <div id="above-fold-end" hidden></div>
   <StoryStack />
   <ScoreSection />
   <ReplaySection />
