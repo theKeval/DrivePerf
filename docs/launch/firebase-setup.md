@@ -7,7 +7,7 @@
 | Display name | **DrivePerf** | **DrivePerf Dev** |
 | Project ID (permanent) | `driveperf-prod` (or the nearest free ID) | `driveperf-dev` |
 | Plan | Spark (free) | Spark (free) |
-| Google Analytics | Off for now: the website never loads it (cookie-less Cloudflare Web Analytics, ADR-007). Linked when the apps are registered (ADR-007 keeps Firebase Analytics for the apps) | same |
+| Google Analytics | Linked for the apps (ADR-007): property 563240554. The website never loads it; it uses cookie-less Cloudflare Web Analytics | Linked: property 563096294 |
 | Firestore | Native mode, Standard edition, **`us-central1`** (ADR-004; permanent) | same |
 | Hosting | `driveperf.com` + `www` (live channel) | PR preview channels |
 
@@ -24,7 +24,8 @@ The repo already holds the config: `backend/firebase/firebase.json` (Hosting + h
 §2–§4 are done in both projects, verified with `firebase projects:list` and `firestore:databases:get`.
 - **Prod:** Keval created `driveperf-prod` ("DrivePerf") in the console. At Keval's request, the agent then unlinked Google Analytics (property 563092806 still exists in the GA account; delete it there if unused), created Firestore and registered "DrivePerf Web".
 - **Dev:** the agent created `driveperf-dev` ("DrivePerf Dev") with `firebase projects:create`, which adds no Analytics. It registered "DrivePerf Web" with `firebase apps:create` and created Firestore in the console.
-- **Both:** Spark plan, no Analytics, Firestore Native / Standard / `us-central1`. The web configs are in `web/src/config/site.ts`.
+- **Both:** Spark plan, Firestore Native / Standard / `us-central1`. The web configs are in `web/src/config/site.ts`.
+- **Analytics (8 Nov 2026):** after DRIVE-46 kept Firebase Analytics for the apps, Keval linked Google Analytics in both projects (account 415340648): prod property 563240554, dev property 563096294. At Keval's request the agent moved the old, unlinked prod property 563092806, which had no data streams, to the GA trash. It can be restored until 13 Dec 2026, when it is deleted for good. Linking created a web data stream for each "DrivePerf Web" app (`G-7KTG6RRXG7` prod, `G-LHG8R4LCGG` dev). The website deliberately doesn't use them: `site.ts` has no `measurementId` and the site never loads `firebase/analytics`.
 - **§5 is also done.** At Keval's request, the agent ran it with Keval's signed-in `gcloud` and `gh`:
   - Each project has a `github` pool, a `driveperf-repo` provider and a `github-web-deploy` account with the four roles. Each account is bound to its own GitHub Environment.
   - GitHub Environment `dev` has its two variables.
