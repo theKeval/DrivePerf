@@ -7,9 +7,11 @@
 | Display name | **DrivePerf** | **DrivePerf Dev** |
 | Project ID (permanent) | `driveperf-prod` (or the nearest free ID) | `driveperf-dev` |
 | Plan | Spark (free) | Spark (free) |
-| Google Analytics | **Off** (the site uses cookie-less Cloudflare Web Analytics, ADR-007) | Off |
+| Google Analytics | Off for now: the website never loads it (cookie-less Cloudflare Web Analytics, ADR-007). Linked when the apps are registered (ADR-007 keeps Firebase Analytics for the apps) | same |
 | Firestore | Native mode, Standard edition, **`us-central1`** (ADR-004; permanent) | same |
 | Hosting | `driveperf.com` + `www` (live channel) | PR preview channels |
+
+**Firebase products (ADR-007, DRIVE-46):** Authentication, Firestore, Hosting, App Check, Analytics and Remote Config. **Never enable Crashlytics**: the apps send crash reports to Sentry (EU data region) instead. Hosting only needs Firestore, Hosting and App Check; Auth, Analytics and Remote Config are switched on with app development, and so is the Sentry account. The website never loads Sentry, so the Content-Security-Policy has no Sentry entry.
 
 The repo already holds the config: `backend/firebase/firebase.json` (Hosting + headers + Firestore), `.firebaserc` (aliases `prod` and `dev`), `firestore.rules` and the web config module `web/src/config/site.ts`.
 

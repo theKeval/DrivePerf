@@ -79,7 +79,8 @@ We use a small number of providers that process data on our behalf, under contra
 <div class="table-scroll"><table>
   <thead><tr><th scope="col">Provider</th><th scope="col">What for</th><th scope="col">When</th></tr></thead>
   <tbody>
-    <tr><td>Google Firebase (Authentication, Cloud Firestore, Crashlytics, Analytics, Hosting)</td><td>Sign-in, cloud backup records, crash reports, usage statistics, serving this website, and storing the waitlist</td><td>Only for the features above that you use or allow; Hosting whenever you visit this website</td></tr>
+    <tr><td>Google Firebase (Authentication, Cloud Firestore, Analytics, Remote Config, Hosting)</td><td>Sign-in, cloud backup records, usage statistics, turning app features on or off, serving this website, and storing the waitlist</td><td>Only for the features above that you use or allow; Hosting whenever you visit this website</td></tr>
+    <tr><td>Sentry (EU data region)</td><td>Crash and error reports, without your IP address or account</td><td>You say yes to crash reports</td></tr>
     <tr><td>Cloudflare (R2 storage, Web Analytics)</td><td>Storing backed-up trip files; counting visits to this website without cookies</td><td>Cloud backup is on; you visit this website and your browser doesn't send Global Privacy Control or Do Not Track</td></tr>
     <tr><td>RevenueCat</td><td>Managing Pro subscriptions and Ride-along passes</td><td>When you buy, restore or redeem</td></tr>
     <tr><td>Apple App Store and Google Play</td><td>Payments. They process your payment details; we never see them</td><td>When you buy Pro</td></tr>
@@ -98,7 +99,8 @@ Data on your phone stays on your phone. Accounts, backup records and the waitlis
 - **Pro cloud backup** (including during the Pro Preview or a Ride-along pass): until you delete it or delete your account. A trip you delete on your phone is deleted from backup at the next sync, within 24 hours.
 - **When Pro ends:** backup stops and the cloud copy is kept for 30 days, with reminders when 30, 7 and 1 days are left, then deleted. During those 30 days you can still restore it to a new phone or download it (read-only, no new uploads). The data on your phone is untouched.
 - **Your account:** Free users who sign in upload no trip data. The account record is kept until you delete your account, in the app or on our <a href="/delete-account">account deletion page</a>. Deletion is completed within 30 days, usually within 7.
-- **Crash reports and usage statistics:** <span class="placeholder">[provider retention period]</span>, not linked to you.
+- **Usage statistics:** 2 months at Google Firebase, not linked to you.
+- **Crash reports:** up to 90 days at Sentry, not linked to you.
 - **Waitlist email:** until you unsubscribe, or <span class="placeholder">12 months after launch</span>, whichever comes first (proposed; to be confirmed by counsel).
 
 <h2 id="rights">Your rights</h2>
