@@ -16,7 +16,9 @@ const base = {
 
 module.exports = {
   ci: {
-    collect: { staticDistDir: './dist', url: [...indexed, ...noindex].flatMap(url), numberOfRuns: 1 },
+    // 3 runs per URL (the LHCI default; assertions use the best run). With 1 run, the first URL took the CI
+    // runner's cold-Chrome start as ~1 s of unattributable main-thread work (TBT 765 ms vs 111 ms on the next URL).
+    collect: { staticDistDir: './dist', url: [...indexed, ...noindex].flatMap(url), numberOfRuns: 3 },
     assert: {
       assertMatrix: [
         { matchingUrlPattern: '^(?!.*(waitlist/confirmed|email-preferences|ride-along|404)).*$', assertions: { ...base, 'categories:seo': ['error', { minScore: 1 }] } },
