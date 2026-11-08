@@ -142,7 +142,7 @@ Every state also renders in light/dark (`theme=light`), XL text (`text=xl`) and 
 
 - Continue with Apple/Google → re-auth (prototype: toast) → summary. Use another way → S-ACC-02 (reauth = 1) → back to the summary.
 - Manage → StoreKit showManageSubscriptions / Play subscriptions deep link.
-- Delete account (haptic warning) → Auth user, Firestore docs and Storage files deleted within 24 h (Cloud Functions cascade, incl. RevenueCat customer and Crashlytics by installation ID where possible) → done (local mode). Offline → Off (queued, retried).
+- Delete account (haptic warning) → Auth user, Firestore docs and Storage files deleted within 24 h (Cloud Functions cascade, incl. RevenueCat customer; Sentry crash reports are never linked to the account) → done (local mode). Offline → Off (queued, retried).
 
 ### Motion
 
