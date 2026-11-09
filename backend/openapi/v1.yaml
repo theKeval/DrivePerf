@@ -1,0 +1,36 @@
+openapi: 3.1.0
+info:
+  title: DrivePerf API
+  version: 1.0.0
+  description: >
+    The HTTP contract between the apps and backend/api (ADR-004, spec-first). The DTOs in
+    shared/api-contract must match it. Endpoints beyond /healthz arrive with DRIVE-76.
+  license:
+    name: Proprietary
+    identifier: LicenseRef-Proprietary
+servers:
+  - url: https://api.driveperf.com
+    description: Production
+paths:
+  /healthz:
+    get:
+      operationId: getHealth
+      summary: Liveness check
+      security: []
+      responses:
+        '200':
+          description: The server is running.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+              example:
+                status: ok
+components:
+  schemas:
+    HealthResponse:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
