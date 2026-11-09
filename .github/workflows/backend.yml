@@ -1,0 +1,112 @@
+name: backend
+
+# Ktor server checks (ADR-008): tests, OpenAPI lint, and a Docker image build that is never pushed from a pull request.
+# Firestore rules tests for backend/firebase/ stay in web.yml, which owns that folder.
+#
+# INERT UNTIL PHASE 6: the Cloud Run deploy jobs below need the Blaze upgrade, Artifact Registry and Workload
+# Identity Federation (DRIVE-76, docs/launch/firebase-setup.md). They run only when the repository variable
+# CLOUD_RUN_DEPLOY_ENABLED is 'true' (it is not set). The deploy steps are a sketch, untested until DRIVE-76
+# proves WIF against driveperf-dev. See docs/architecture/ci-cd.md.
+
+on:
+  pull_request:
+    paths: &paths
+      - 'backend/api/**'
+      - 'backend/openapi/**'
+      - 'backend/ops/**'
+      - 'shared/api-contract/**'
+      - 'build-logic/**'
+      - 'gradle/**'
+      - 'config/**'
+      - 'settings.gradle.kts'
+      - 'build.gradle.kts'
+      - 'gradle.properties'
+      - '.github/actions/setup-build/**'
+      - '.github/workflows/backend.yml'
+  push:
+    branches: [main]
+    paths: *paths
+    tags: ['api-v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: backend-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Server tests, OpenAPI lint, image build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup-build
+        with: { android: 'true' }   # the root build configures the Android modules too
+      - name: Detekt and tests (server and API contract)
+        run: ./gradlew --console=plain :backend:api:detekt :backend:api:test :shared:api-contract:jvmTest
+      - uses: actions/setup-node@v7
+        with: { node-version: 24 }
+      - name: OpenAPI lint
+        run: npx --yes @redocly/cli@2.77.0 lint backend/openapi/v1.yaml
+      - name: Build the Docker image (not pushed)
+        run: |
+          ./gradlew --console=plain :backend:api:installDist
+          docker build --tag driveperf-api:ci backend/api
+
+  deploy-dev:
+    name: Deploy to Cloud Run (dev)
+    needs: test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.CLOUD_RUN_DEPLOY_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    environment: dev
+    permissions:
+      contents: read
+      id-token: write   # Workload Identity Federation, no long-lived keys (ADR-008)
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup-build
+        with: { android: 'true' }
+      - run: ./gradlew --console=plain :backend:api:installDist
+      - uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
+          service_account: ${{ vars.GCP_DEPLOY_SA }}
+      - uses: google-github-actions/setup-gcloud@v3
+      - name: Build, push and deploy
+        env:
+          IMAGE: ${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/api/api:${{ github.sha }}
+        run: |
+          gcloud auth configure-docker "${{ vars.GCP_REGION }}-docker.pkg.dev" --quiet
+          docker build --tag "$IMAGE" backend/api
+          docker push "$IMAGE"
+          gcloud run deploy api --image "$IMAGE" --region "${{ vars.GCP_REGION }}" --project "${{ vars.GCP_PROJECT_ID }}"
+
+  deploy-prod:
+    name: Deploy to Cloud Run (prod)
+    needs: test
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/api-v') && vars.CLOUD_RUN_DEPLOY_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    environment: prod   # requires Keval's approval (ADR-008)
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup-build
+        with: { android: 'true' }
+      - run: ./gradlew --console=plain :backend:api:installDist
+      - uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
+          service_account: ${{ vars.GCP_DEPLOY_SA }}
+      - uses: google-github-actions/setup-gcloud@v3
+      - name: Build, push and deploy
+        env:
+          IMAGE: ${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/api/api:${{ github.ref_name }}
+        run: |
+          gcloud auth configure-docker "${{ vars.GCP_REGION }}-docker.pkg.dev" --quiet
+          docker build --tag "$IMAGE" backend/api
+          docker push "$IMAGE"
+          gcloud run deploy api --image "$IMAGE" --region "${{ vars.GCP_REGION }}" --project "${{ vars.GCP_PROJECT_ID }}"

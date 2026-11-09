@@ -1,0 +1,70 @@
+name: ios
+
+# iOS app checks (ADR-008): builds the Kotlin framework through the Xcode Run Script phase, runs the unit tests on
+# a simulator, then installs and launches the app and keeps a screenshot as evidence. Simulator only, no code
+# signing: no Apple account, certificate or profile is involved.
+
+on:
+  pull_request:
+    paths: &paths
+      - 'apps/ios/**'
+      - 'shared/**'
+      - 'build-logic/**'
+      - 'gradle/**'
+      - 'settings.gradle.kts'
+      - 'build.gradle.kts'
+      - 'gradle.properties'
+      - '.github/actions/setup-build/**'
+      - '.github/workflows/ios.yml'
+  push:
+    branches: [main]
+    paths: *paths
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ios-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    name: Build, test and launch on a simulator
+    runs-on: macos-26
+    env:
+      DERIVED_DATA: ${{ github.workspace }}/build/DerivedData
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup-build
+
+      - name: Pick and boot an iPhone simulator
+        run: |
+          udid="$(xcrun simctl list devices available iPhone -j | jq -r '[.devices[][] | select(.name | startswith("iPhone"))][0].udid')"
+          echo "SIM_UDID=$udid" >> "$GITHUB_ENV"
+          xcrun simctl boot "$udid"
+          xcrun simctl bootstatus "$udid" -b
+
+      - name: Unit tests
+        working-directory: apps/ios
+        run: |
+          xcodebuild test \
+            -project DrivePerf.xcodeproj -scheme DrivePerf \
+            -destination "id=$SIM_UDID" -derivedDataPath "$DERIVED_DATA" \
+            CODE_SIGNING_ALLOWED=NO
+
+      - name: Launch the app and take a screenshot
+        run: |
+          app="$DERIVED_DATA/Build/Products/Debug-iphonesimulator/DrivePerf.app"
+          xcrun simctl install "$SIM_UDID" "$app"
+          xcrun simctl launch "$SIM_UDID" com.driveperf.app.dev
+          sleep 5
+          mkdir -p build/evidence
+          xcrun simctl io "$SIM_UDID" screenshot build/evidence/ios-hello.png
+
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: ios-hello-screenshot
+          path: build/evidence/ios-hello.png
+          if-no-files-found: ignore

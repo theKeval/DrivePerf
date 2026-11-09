@@ -1,0 +1,69 @@
+name: shared
+
+# KMP core checks (ADR-008, ADR-002 section 2). Runs the architecture guardrails (module graph, detekt, Konsist),
+# unit tests on the JVM, Android host and iOS simulator, the coverage gate and the proof that each guardrail fires.
+# SQLDelight `verifyMigrations` joins when :shared:data:local gets its database (DRIVE-62).
+
+on:
+  pull_request:
+    paths: &paths
+      - 'shared/**'
+      - 'build-logic/**'
+      - 'gradle/**'
+      - 'config/**'
+      - 'tools/verify-guardrails.sh'
+      - 'settings.gradle.kts'
+      - 'build.gradle.kts'
+      - 'gradle.properties'
+      - '.github/actions/setup-build/**'
+      - '.github/workflows/shared.yml'
+  push:
+    branches: [main]
+    paths: *paths
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: shared-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  jvm:
+    name: Guardrails, JVM and Android host tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup-build
+        with: { android: 'true' }
+      - name: Module graph, detekt, Konsist
+        run: ./gradlew --console=plain assertModuleGraph detekt :shared:testing:jvmTest
+      - name: Unit tests (JVM and Android host)
+        run: ./gradlew --console=plain jvmTest testAndroidHostTest
+      - name: Coverage gate (at least 90 % on :shared:domain; :shared:pipeline joins in DRIVE-62)
+        run: ./gradlew --console=plain koverVerify
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: shared-test-reports
+          path: shared/**/build/reports/tests
+          if-no-files-found: ignore
+
+  guardrails-fire:
+    name: Guardrails fire on violations
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup-build
+        with: { android: 'true' }
+      - run: tools/verify-guardrails.sh
+
+  ios:
+    name: iOS simulator tests
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup-build
+      - name: Kotlin/Native tests on the iOS simulator
+        run: ./gradlew --console=plain iosSimulatorArm64Test

@@ -1,0 +1,27 @@
+name: repo-checks
+
+# Cheap checks on every pull request, whatever the paths: no real location data in the repo (ADR-008).
+# GPX and CSV files must carry a `privacy-trimmed` header (synthetic, or start and end removed and coordinates
+# shifted). tools/ci/test-check-fixture-headers.sh proves the check accepts good files and rejects bad ones.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: repo-checks-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  fixtures:
+    name: GPX/CSV privacy header
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - run: tools/ci/test-check-fixture-headers.sh
+      - run: tools/ci/check-fixture-headers.sh
