@@ -27,6 +27,8 @@ Drives during an expired-profile period are not counted as missed trips.
 |---|---|---|
 | 1 | 2026-11-09 16:09 | 2026-11-16 16:06 |
 
+The crash fix below was reinstalled at 16:17 UTC on 2026-11-09 under the same profile, so the expiry did not move.
+
 ## Findings so far
 
 ### Personal Team signing works for everything the spike needs
@@ -36,7 +38,7 @@ Drives during an expired-profile period are not counted as missed trips.
 - The spike needs no paid capability. Background location is an Info.plist mode and Live Activities are an
   Info.plist key, so the signed entitlements contain only the development defaults. The spike avoids App
   Groups because a `LiveActivityIntent` runs in the app process.
-- It uses 2 of the Personal Team's 10 App IDs and 1 of its 3 app slots on the device.
+- It uses 2 of the Personal Team's 10 App IDs (the app and the extension).
 - Signing proves only that these parts install. Whether the control starts a recording and whether the
   Live Activity appears are still untested.
 
@@ -48,6 +50,26 @@ Drives during an expired-profile period are not counted as missed trips.
    trusted it in Settings > General > VPN & Device Management.
 
 Both steps are one-time per Apple ID and device, apart from the weekly re-sign.
+
+### `CLMonitor` names must be alphanumeric, or the app crashes
+
+The first build crashed on every launch once location was granted: six crash reports on 2026-11-09, all
+an `NSAssertionHandler` failure inside `CLMonitor.init`. The monitor was named `parked-spot`. The
+`CLMonitorConfiguration` header says a name "should contain only alpha-numeric characters". Renaming it
+to `parkedSpot` stopped the crash. A hyphen is enough to take the app down at launch, before any capture
+starts, so the product code should use a fixed, tested alphanumeric name.
+
+This path runs only after location is granted, so a launch check before permissions cannot catch it.
+
+### A launch can deliver a stale significant-change fix
+
+On three launches the Spike received a significant-change event right away, with a location 516, 637 and
+859 seconds old. Treated as a wake, each would have opened a false trip candidate. The product code needs
+an age check on the event, as the Spike has (300 s).
+
+Also, `applicationState` read in `didFinishLaunching` was `background` on launches that opened the app in
+the foreground, so it can't separate background wakes from user launches. The `.location` launch option
+is the signal to use.
 
 ## Results (pending field runs)
 

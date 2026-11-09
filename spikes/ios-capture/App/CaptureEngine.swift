@@ -30,6 +30,8 @@ final class CaptureEngine: NSObject {
 
     private enum Tuning {
         static let parkedRegionRadius: CLLocationDistance = 120
+        /// Alphanumeric only: any other character makes CLMonitor.init raise an assertion.
+        static let monitorName = "parkedSpot"
         static let parkedIdentifier = "parked"
         static let watchdogIdentifier = "watchdog"
         static let watchdogInterval: TimeInterval = 18 * 3600
@@ -301,7 +303,7 @@ final class CaptureEngine: NSObject {
     private func restoreMonitor() {
         guard monitorTask == nil else { return }
         monitorTask = Task { [weak self] in
-            let monitor = await CLMonitor("parked-spot")
+            let monitor = await CLMonitor(Tuning.monitorName)
             self?.monitor = monitor
             let identifiers = await monitor.identifiers
             self?.parkedRegionArmed = identifiers.contains(Tuning.parkedIdentifier)
