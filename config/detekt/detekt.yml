@@ -1,0 +1,49 @@
+# Repo-wide detekt rules on top of the detekt defaults. Architecture rules from ADR-002 section 2:
+# the domain, pipeline, presentation and foundation layers must not import I/O, SDK or platform packages.
+# Konsist (shared/testing) enforces the same boundaries by module; this is the second line of defence.
+style:
+  ForbiddenImport:
+    active: true
+    imports:
+      - 'io.ktor.*'
+      - 'app.cash.sqldelight.*'
+      - 'com.squareup.wire.*'
+      - 'com.google.firebase.*'
+      - 'com.revenuecat.*'
+      - 'io.sentry.*'
+      - 'android.*'
+      - 'androidx.*'
+      - 'platform.*'
+    # Applied to the pure layers only; adapters, apps and platform code legitimately import these.
+    excludes:
+      - '**/data/**'
+      - '**/api-contract/**'
+      - '**/di/**'
+      - '**/ios-export/**'
+      - '**/testing/**'
+      - '**/apps/**'
+      - '**/backend/**'
+      - '**/*Main/**/actual*'
+      - '**/androidMain/**'
+      - '**/iosMain/**'
+      - '**/jvmMain/**'
+      - '**/jvmTest/**'
+      - '**/violations/**'
+  MagicNumber:
+    active: false
+  UnusedPrivateMember:
+    ignoreAnnotated: ['Preview']
+  WildcardImport:
+    active: true
+  MaxLineLength:
+    maxLineLength: 140
+exceptions:
+  TooGenericExceptionCaught:
+    # No bare `catch (e: Exception)` in shared code (ADR-002 section 7): catch narrow types or use
+    # catchingCancellable {} so CancellationException is always rethrown.
+    active: true
+  SwallowedException:
+    active: true
+naming:
+  FunctionNaming:
+    ignoreAnnotated: ['Composable']

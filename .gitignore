@@ -39,3 +39,10 @@ google-services.json
 # Unpacked prototype exports (run prototypes/tools/pack.mjs; only the WebP gallery is committed)
 docs/design/DRIVE-*/*/screens/
 docs/design/DRIVE-*/*/mockup.png
+
+# Kotlin / Xcode / SwiftPM build state
+.kotlin/
+.build/
+DerivedData/
+xcuserdata/
+*.xcuserstate
