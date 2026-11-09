@@ -31,7 +31,8 @@ export const SITE = {
   /** Firestore emulator for local builds (`firebase emulators:start` in backend/firebase). */
   firestoreEmulator: env === 'local' ? { host: '127.0.0.1', port: 8080 } : null,
   /** Cloudflare Web Analytics (ADR-007, Gate 4): public beacon token; prod only, and never under GPC/DNT. */
-  cloudflareBeaconToken: env === 'prod' ? '' : '',
+  // Site "driveperf.com" in Keval's Cloudflare account (Web Analytics, manual JS snippet setup, 8 Nov 2026).
+  cloudflareBeaconToken: env === 'prod' ? 'a0a5407b247e421ab57136f725150a5e' : '',
   emails: { privacy: 'privacy@driveperf.com', support: 'support@driveperf.com', hello: 'hello@driveperf.com' },
   /** Waitlist consent text version (DRIVE-171 spec §4); bump when the consent copy changes. */
   waitlistConsentVersion: 'wl-consent-v1 (6 Nov 2026)',
