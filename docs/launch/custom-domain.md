@@ -75,10 +75,10 @@ The console status for both domains must read **Connected**. Results:
 
 | Check | Result | When |
 |---|---|---|
-| `driveperf.com` A / TXT | | |
-| `www` → 301 → apex | | |
-| HTTPS certificate (issuer, expiry) | | |
-| HSTS header | | |
-| Console status | | |
+| `driveperf.com` A / TXT | A `199.36.158.100`, TXT `hosting-site=driveperf-prod`; `www` CNAME `driveperf-prod.web.app` (dig, Namecheap and public resolvers) | 8 Nov 2026 |
+| `www` → 301 → apex | `https://www.driveperf.com/privacy` → 301 `https://driveperf.com/privacy`; `http://` → 301 `https://` | 8 Nov 2026 |
+| HTTPS certificate (issuer, expiry) | Google Trust Services WR3, `CN=driveperf.com` and `CN=www.driveperf.com`, valid to 6 Feb 2027 (auto-renewed) | 8 Nov 2026 |
+| HSTS header | `max-age=31536000; includeSubDomains`, with the rest of the `firebase.json` headers | 8 Nov 2026 |
+| Console status | Hosting API: both domains `HOST_ACTIVE`, `OWNERSHIP_ACTIVE`, `CERT_ACTIVE`; `www` redirects to the apex | 8 Nov 2026 |
 
 HSTS is sent without `preload` for now. Adding the domain to the browser preload list is a separate, hard-to-undo decision for after launch.

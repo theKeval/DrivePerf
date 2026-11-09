@@ -85,7 +85,7 @@ We use a small number of providers that process data on our behalf, under contra
     <tr><td>RevenueCat</td><td>Managing Pro subscriptions and Ride-along passes</td><td>When you buy, restore or redeem</td></tr>
     <tr><td>Apple App Store and Google Play</td><td>Payments. They process your payment details; we never see them</td><td>When you buy Pro</td></tr>
     <tr><td>Map providers: Apple MapKit on iPhone; <span class="placeholder">Google Maps SDK or MapLibre</span> on Android</td><td>Showing map tiles under your routes</td><td>When a map is on screen. Only tile requests are sent, never your trip</td></tr>
-    <tr><td><span class="placeholder">[email provider]</span></td><td>Sending waitlist, beta and launch emails, and receiving mail at our @driveperf.com addresses</td><td>Waitlist members who agreed to emails; anyone who writes to us</td></tr>
+    <tr><td>Email provider</td><td>Sending waitlist, beta and launch emails, and receiving mail at our @driveperf.com addresses</td><td>Waitlist members who agreed to emails; anyone who writes to us</td></tr>
   </tbody>
 </table></div>
 
