@@ -3,25 +3,25 @@
 | | |
 |---|---|
 | **Jira** | [DRIVE-56](https://thekeval.atlassian.net/browse/DRIVE-56) (prompt A12). Sole input for DRIVE-62 (shared KMP core) |
-| **Status** | Draft for Keval's review, 9 Nov 2026 |
+| **Status** | Decisions D1–D8 accepted by Keval, 9 Nov 2026. The document itself is awaiting Keval's merge approval |
 | **Algorithm IDs** | `pipe-1.0.0` (trip pipeline), `smooth-1.0.0` (scoring). Both stay provisional until A19 |
 | **Spike 1 status** | The test app is built (DRIVE-36, commit `6faf180`) but no drive results exist yet (`spike-1-ios-capture-results.md` is absent as of 9 Nov 2026). §1.5 and §1.6 deliberately use the same rules the app is testing. Every capture number is provisional, §9 |
 | **Binding inputs** | [decisions.md](../product/decisions.md), [ADRs](adr/README.md), [PRD v1](../product/PRD-v1.md), [data-model.md](data-model.md). Where they disagree with prompt A12, they win |
 
-## Decisions needed from Keval
+## Decisions
 
-Nothing below is recorded in `decisions.md` yet. The spec is written as if each recommendation is accepted.
+Keval accepted all eight on 9 Nov 2026, as recorded in [decisions.md](../product/decisions.md) (`Keval, DRIVE-56`). The spec below applies them.
 
-| # | Decision | Recommendation | What changes if you choose otherwise |
+| # | Topic | Decision | Alternative not taken |
 |---|---|---|---|
-| D1 | **What "baseline-relative" means.** Is the 0–100 number itself relative to the driver, or an absolute number that is always shown against the driver's own baseline? | **Absolute number, always shown as "±n vs your usual".** A score normalised to each driver would hover around the same value forever, so route records and "you're improving" could not exist. F-STY-03 and PRD §5 ("trip score − baseline") already assume this. | A fully relative score needs a redesign of records, trends and recaps. |
-| D2 | **R1 rate.** | **25 Hz.** ADR-004's R2 line stays as costed (≈ 0.6 MB per driving hour). Jerk is computed after a 1.5 Hz filter, so 50 Hz carries no extra signal. In 40 synthetic drives, 25 Hz and 50 Hz scores differed by at most 0.12 points and detected the same events. A19 confirms on real drives. Resolves OQ-A11-04. | 50 Hz roughly doubles the R2 line (≈ 1.2 MB/h) and changes nothing in the score. |
-| D3 | **Limited trips.** F-SCO-02 lets A12 decide. | **Scored and shown ("based on x of y min"), but kept out of baselines and route records.** A partial trip should not move the driver's "usual". | Allowing them in makes baselines noisier for people with loose phones. |
-| D4 | **"Was it needed?" scope and cap (OQ-22).** | **All three event types, as F-SCO-05 is written. A run with more than 2 "needed" marks cannot set a route record.** The trip score still updates. | Braking-only is simpler but penalises a swerve around a hazard. |
-| D5 | **Route-record pace band (F-SCO-07).** | **Moving time between 0.75× and 1.50× of the route's median**, so unusually fast runs are ineligible as well as unusually slow ones. Fast runs falling outside the band is what keeps records from rewarding speed. | A slow-only band leaves a route record reachable at excessive pace. |
-| D6 | **Accelerometer-only scoring of the estimated start (F-CAP-05 AC3).** | **Never scored in v1.** `CMSensorRecorder` has no gyro or attitude, so the segment cannot be put into the vehicle frame. | Would need an orientation estimate that nothing can validate. |
-| D7 | **Suspected bus, train or bike trips nobody has answered.** | **Scored and shown, but held out of baselines and records until the user answers "No".** A wrong guess then costs nothing. | Counting them lets a bus ride move the driver's baseline. |
-| D8 | **Barometer for elevation (F-RPL-02).** | **Not in v1.** GNSS altitude with a dead-band is enough for a neutral profile, and the barometer adds a channel for no scoring benefit. Revisit after A19. | Adds a sensor stream, a fusion step and battery cost. |
+| D1 | **What "baseline-relative" means** | **The 0–100 number is absolute and always shown as "±n vs your usual".** A score normalised to each driver would hover around the same value forever, so route records and "you're improving" could not exist. F-STY-03 and PRD §5 ("trip score − baseline") already assume this. | A fully relative score, which would need a redesign of records, trends and recaps. |
+| D2 | **R1 rate** | **25 Hz.** ADR-004's R2 line stays as costed (≈ 0.6 MB per driving hour). Jerk is computed after a 1.5 Hz filter, so 50 Hz carries no extra signal. In 40 synthetic drives, 25 Hz and 50 Hz scores differed by at most 0.12 points and detected the same events. A19 confirms on real drives. Resolves OQ-A11-04. | 50 Hz, which roughly doubles the R2 line (≈ 1.2 MB/h) and changes nothing in the score. |
+| D3 | **Limited trips** (F-SCO-02) | **Scored and shown ("based on x of y min"), but kept out of baselines and route records.** A partial trip should not move the driver's "usual". | Allowing them in, which makes baselines noisier for people with loose phones. |
+| D4 | **"Was it needed?" scope and cap** (resolves OQ-22) | **All three event types, as F-SCO-05 is written. A run with more than 2 "needed" marks cannot set a route record.** The trip score still updates. | Braking-only, which is simpler but penalises a swerve around a hazard. |
+| D5 | **Route-record pace band** (F-SCO-07) | **Moving time between 0.75× and 1.50× of the route's median**, so unusually fast runs are ineligible as well as unusually slow ones. Fast runs falling outside the band is what keeps records from rewarding speed. | A slow-only band, which leaves a route record reachable at excessive pace. |
+| D6 | **Accelerometer-only scoring of the estimated start** (F-CAP-05 AC3) | **Never scored in v1.** `CMSensorRecorder` has no gyro or attitude, so the segment cannot be put into the vehicle frame. | Scoring it, which would need an orientation estimate that nothing can validate. |
+| D7 | **Suspected bus, train or bike trips nobody has answered** | **Scored and shown, but held out of baselines and records until the user answers "No".** A wrong guess then costs nothing. | Counting them, which lets a bus ride move the driver's baseline. |
+| D8 | **Barometer for elevation** (F-RPL-02) | **Not in v1.** GNSS altitude with a dead-band is enough for a neutral profile, and the barometer adds a channel for no scoring benefit. Revisit after A19. | Using it, which adds a sensor stream, a fusion step and battery cost. |
 
 ---
 
