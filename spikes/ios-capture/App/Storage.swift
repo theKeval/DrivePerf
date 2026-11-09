@@ -48,6 +48,7 @@ enum TripStore {
     static let summaryURL = documents.appendingPathComponent("summary.json")
     private static let parkedURL = documents.appendingPathComponent("parked.json")
     private static let installsURL = documents.appendingPathComponent("installs.json")
+    private static let unlockSentinelURL = documents.appendingPathComponent("unlock.sentinel")
 
     private static let encoder: JSONEncoder = {
         let encoder = JSONEncoder()
@@ -60,6 +61,18 @@ enum TripStore {
         decoder.dateDecodingStrategy = .millisecondsSince1970
         return decoder
     }()
+
+    /// The sentinel is unreadable only before the first unlock after a reboot, unlike
+    /// UIApplication.isProtectedDataAvailable, which is false every time the phone locks.
+    static func hasBeenUnlockedSinceBoot() -> Bool {
+        let manager = FileManager.default
+        if manager.fileExists(atPath: unlockSentinelURL.path) {
+            return (try? Data(contentsOf: unlockSentinelURL)) != nil
+        }
+        return manager.createFile(
+            atPath: unlockSentinelURL.path, contents: Data([1]),
+            attributes: [.protectionKey: FileProtectionType.completeUntilFirstUserAuthentication])
+    }
 
     static func directory(for id: UUID) -> URL {
         tripsRoot.appendingPathComponent(id.uuidString, isDirectory: true)

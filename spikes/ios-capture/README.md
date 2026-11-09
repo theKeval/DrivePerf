@@ -57,6 +57,15 @@ above. A period with an expired profile is not a missed trip.
 xcrun devicectl device copy from --device "$UDID" --domain-type appDataContainer --domain-identifier com.thekeval.spike.capture --source Documents/summary.json --destination pulled/summary.json
 ```
 
+## Self-test without a drive
+
+Launch with `-selfTest` to run a real automatic trip with confirmation and end forced. It exercises the
+sensors, backfill and trip end, and the row carries a `self-test` note. The phone must be unlocked.
+
+```bash
+xcrun devicectl device process launch --device "$UDID" --terminate-existing com.thekeval.spike.capture -- -selfTest
+```
+
 ## Field-tuning switch
 
 Status > Experiment > "Legacy GPS keep-alive" (default on) also runs `startUpdatingLocation` beside

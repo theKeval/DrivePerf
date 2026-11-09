@@ -1,6 +1,7 @@
 # Spike 1: iOS capture results (DRIVE-36)
 
-**Status: partial, in progress.** Setup, signing and crash findings exist so far. The trips have not been driven yet.
+**Status: partial, in progress.** Setup, signing and crash findings exist so far. Two trips were driven on
+2026-11-09, but a bug in the spike lost both (below), so no usable trip data exists yet.
 
 **Scope (changed by Keval, 9 Nov 2026):** two or three trips, to confirm location and motion data reach the
 app completely and accurately, and to list what the product capture code needs. The side-by-side benchmark and
@@ -85,6 +86,37 @@ to `parkedSpot` stopped the crash.
 
 This path runs only after location is granted, so a launch check before permissions cannot catch it.
 
+### The first two trips were lost to a spike bug, and iOS did wake the app
+
+Both trips on 2026-11-09 showed "process died while confirming". The app woke correctly, once from a Visit
+departure and once from a significant-change event with a 0-second-old location, each while suspended in the
+background. It then crashed on its first motion sample, 0 seconds into the trip, with two identical crash
+reports (`EXC_BREAKPOINT` in `_dispatch_assert_queue_fail`).
+
+The closure passed to `startDeviceMotionUpdates` was written inside a `@MainActor` method and Core Motion's
+handler type is not `@Sendable`, so Swift 6 made the closure main-actor isolated. Core Motion called it on the
+writer queue and the runtime's isolation check aborted the app. Marking the closure `@Sendable` fixed it.
+
+A self-test from the Mac then ran the full path on the phone without a crash, over 61 stationary seconds: 50.03 Hz
+motion at 100% delivery with no gaps, 1.00 Hz GPS with no gaps, and 29,854 backfilled accelerometer samples over
+600 s (49.8 Hz). This shows the pipeline runs. It says nothing about accuracy on a moving car.
+
+### A locked phone blocked capture on a background launch
+
+`UIApplication.isProtectedDataAvailable` is false every time the phone locks, not only before the first unlock
+after a reboot. The spike used it to decide whether to start, so a background launch on a locked phone did nothing.
+This happened at 19:49:47 UTC, and the app stayed idle until the next unlock about 11 minutes later. The spike now
+reads a sentinel file with `completeUntilFirstUserAuthentication` protection instead. The fix is not yet proven
+on a real locked-phone launch.
+
+That same launch had no `.location` launch option, even though it happened on a locked phone mid-drive, shortly
+after the crash. So the option does not identify every location-driven background launch.
+
+### A Visit can deliver the parking spot before `CLMonitor` is ready
+
+On a cold launch the Visit callback arrived before the asynchronous `CLMonitor` setup finished, so the spot was saved
+but the parked region was never armed. The spike now arms the region as soon as the monitor exists.
+
 ### A launch can deliver a stale significant-change fix
 
 On three launches the Spike received a significant-change event right away, with a location 516, 637 and
@@ -93,11 +125,24 @@ On three launches the Spike received a significant-change event right away, with
 `applicationState` read in `didFinishLaunching` was also `background` on launches that opened the app in
 the foreground, so it can't separate background wakes from user launches.
 
+The self-test's first fix also predated the wake by 0.29 s, showing that a stream's first fix can be cached. An older
+cached fix would be taken while still parked and make the start distance look perfect, so the spike now drops
+fixes older than 5 s before the wake.
+
 ## Changes the product capture code needs
 
 Added to as the trips are analysed.
 
 1. Use a fixed, unit-tested alphanumeric `CLMonitor` name.
 2. Check the age of significant-change events before treating one as a wake. The spike ignores events older than 300 s.
-3. Use the `.location` launch option, not `applicationState`, to identify a background location launch.
+3. Don't rely on `applicationState` or the `.location` launch option to identify a background location launch.
+   Start capture on the location event itself.
 4. Test launch with permissions granted. The capture path only starts once location is authorised.
+5. Mark sensor callbacks that run off the main actor as `@Sendable`, or set them up from non-isolated code. KMP
+   or Swift 6 wrappers around Core Motion hit the same trap.
+6. Decide whether to start from file access, not `isProtectedDataAvailable`. Start capture on a locked phone once
+   it has been unlocked since boot.
+7. Arm the parked region once the monitor exists, whichever order launch events arrive in.
+8. Drop location fixes older than the wake before using them for the start point.
+9. Resume a candidate trip after a process death, instead of rejecting it, if iOS relaunches the app mid-confirmation.
+10. Include a self-test that runs the full trip path on a device. Each of these bugs was invisible to unit tests.

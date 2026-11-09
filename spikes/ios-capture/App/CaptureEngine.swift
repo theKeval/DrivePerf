@@ -44,6 +44,7 @@ final class CaptureEngine: NSObject {
         static let historyWindow: TimeInterval = 900
         static let imuHz: Double = 50
         static let checkpointInterval: TimeInterval = 10
+        static let cachedFixTolerance: TimeInterval = 5
     }
 
     // MARK: Observable state for the debug UI
@@ -107,15 +108,15 @@ final class CaptureEngine: NSObject {
     func launch(launchedForLocation: Bool) {
         guard !bootstrapped else { return }
         let application = UIApplication.shared
+        let unlockedSinceBoot = TripStore.hasBeenUnlockedSinceBoot()
         WakeLog.append(
             kind: "launch",
             detail: "location=\(launchedForLocation) state=\(Self.name(application.applicationState)) "
-                + "protectedData=\(application.isProtectedDataAvailable) lowPower=\(lowPowerMode) "
-                + "bgRefresh=\(application.backgroundRefreshStatus.rawValue)")
-        guard application.isProtectedDataAvailable else {
-            // Before first unlock after a reboot: only the wake log is writable.
-            return
-        }
+                + "protectedData=\(application.isProtectedDataAvailable) unlockedSinceBoot=\(unlockedSinceBoot) "
+                + "lowPower=\(lowPowerMode) bgRefresh=\(application.backgroundRefreshStatus.rawValue)")
+        // Not isProtectedDataAvailable: that is false on every lock, and a background wake on a
+        // locked phone is the normal case for a drive. Only a pre-first-unlock launch must wait.
+        guard unlockedSinceBoot else { return }
         bootstrap()
     }
 
@@ -147,6 +148,28 @@ final class CaptureEngine: NSObject {
         armTriggers()
         recoverInterruptedTrips()
         TripStore.writeSummary(trips: trips, installs: installs)
+        runSelfTestIfRequested()
+    }
+
+    /// Runs a real automatic trip from a Mac launch (`-selfTest`), with confirmation and end forced,
+    /// so the sensor, backfill and trip-end paths are exercised before a drive depends on them.
+    private func runSelfTestIfRequested() {
+        guard ProcessInfo.processInfo.arguments.contains("-selfTest") else { return }
+        WakeLog.append(kind: "selfTest", detail: "start")
+        Task {
+            try? await Task.sleep(for: .seconds(3))
+            let start = Date()
+            if active == nil { beginCandidate(trigger: .significantChange, at: start) }
+            active?.addNote("self-test")
+            try? await Task.sleep(for: .seconds(25))
+            confirmCandidate(reason: "self-test", now: Date())
+            try? await Task.sleep(for: .seconds(35))
+            // Ten minutes back, because CMSensorRecorder data can lag by a few minutes.
+            active?.motionStartAt = start.addingTimeInterval(-600)
+            await finishTrip(reason: "self-test")
+            WakeLog.append(kind: "selfTest", detail: "done")
+            TripStore.writeSummary(trips: trips, installs: installs)
+        }
     }
 
     /// Called when the UI appears or returns to the foreground.
@@ -307,6 +330,10 @@ final class CaptureEngine: NSObject {
             self?.monitor = monitor
             let identifiers = await monitor.identifiers
             self?.parkedRegionArmed = identifiers.contains(Tuning.parkedIdentifier)
+            // A Visit can deliver the spot before this monitor exists, so arm it here too.
+            if !identifiers.contains(Tuning.parkedIdentifier), let spot = TripStore.loadParkedSpot() {
+                self?.armParkedRegion(at: spot)
+            }
             do {
                 for try await event in await monitor.events {
                     self?.handle(monitorEvent: event)
@@ -511,7 +538,9 @@ final class CaptureEngine: NSObject {
         guard motionManager.isDeviceMotionAvailable else { return }
         motionManager.deviceMotionUpdateInterval = 1 / Tuning.imuHz
         let reference: CMAttitudeReferenceFrame = .xArbitraryCorrectedZVertical
-        motionManager.startDeviceMotionUpdates(using: reference, to: writer.motionQueue) { motion, _ in
+        // @Sendable matters: without it the closure inherits @MainActor from this method, and
+        // Swift traps as soon as Core Motion calls it on the writer queue.
+        motionManager.startDeviceMotionUpdates(using: reference, to: writer.motionQueue) { @Sendable motion, _ in
             if let motion { writer.append(motion: motion) }
         }
     }
@@ -538,6 +567,13 @@ final class CaptureEngine: NSObject {
 
     private func ingest(_ location: CLLocation, source: FixSource) {
         guard var trip = active, let writer else { return }
+        // A stream's first fix can be cached from before the wake. Counting it would make the
+        // start distance look perfect, because it was taken while still parked.
+        if location.timestamp < trip.wakeAt.addingTimeInterval(-Tuning.cachedFixTolerance) {
+            trip.addNote("dropped cached fix from before wake")
+            active = trip
+            return
+        }
         switch source {
         case .legacy: trip.fixesLegacy += 1
         case .liveUpdates: trip.fixesLiveUpdates += 1
@@ -653,18 +689,22 @@ final class CaptureEngine: NSObject {
         case .pending:
             break
         case .confirmed(let reason):
-            active?.status = .recording
-            active?.confirmedAt = now
-            active?.confirmation = reason
-            phase = .recording
-            confirmation = nil
-            WakeLog.append(kind: "confirmed", detail: reason)
-            notifyRecording()
-            attemptBackgroundLiveActivity(startedAt: active?.wakeAt ?? now)
-            checkpoint(now: now)
+            confirmCandidate(reason: reason, now: now)
         case .rejected(let reason):
             rejectCandidate(reason: reason, now: now)
         }
+    }
+
+    private func confirmCandidate(reason: String, now: Date) {
+        active?.status = .recording
+        active?.confirmedAt = now
+        active?.confirmation = reason
+        phase = .recording
+        confirmation = nil
+        WakeLog.append(kind: "confirmed", detail: reason)
+        notifyRecording()
+        attemptBackgroundLiveActivity(startedAt: active?.wakeAt ?? now)
+        checkpoint(now: now)
     }
 
     private func evaluateRecording(now: Date) {
