@@ -1,8 +1,9 @@
 # iOS capture spike (DRIVE-36, Spike 1)
 
-Throwaway SwiftUI app that tests iOS background auto-trip capture on a real iPhone, side by side
-with Mileon. It is not product code. Design source: `docs/research/2026-11/A3-platform-feasibility.md`
-§1.3–1.6. Targets being tested: `docs/product/PRD-v1.md` §2.4.
+Throwaway SwiftUI app that tests iOS background auto-trip capture on a real iPhone. It is not product
+code. Design source: `docs/research/2026-11/A3-platform-feasibility.md` §1.3–1.6. The spike runs two or
+three trips to check that location and motion data arrive completely and accurately; the
+`docs/product/PRD-v1.md` §2.4 targets stay provisional until the A19 field test.
 
 ## Layout
 

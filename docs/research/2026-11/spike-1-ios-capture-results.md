@@ -1,7 +1,11 @@
 # Spike 1: iOS capture results (DRIVE-36)
 
-**Status: partial, in progress.** Only setup and signing findings exist so far. No drives have been
-recorded, so no PRD capture target is confirmed or changed yet.
+**Status: partial, in progress.** Setup, signing and crash findings exist so far. The trips have not been driven yet.
+
+**Scope (changed by Keval, 9 Nov 2026):** two or three trips, to confirm location and motion data reach the
+app completely and accurately, and to list what the product capture code needs. The side-by-side benchmark and
+the walk, run, force-quit, reboot and Low Power Mode runs are no longer part of this spike. The PRD §2.4 capture
+targets stay provisional until the A19 field test.
 
 This document reports distances, latencies, counts and battery only. Under ADR-008 it holds no addresses
 or coordinates.
@@ -13,21 +17,42 @@ or coordinates.
 | App | `spikes/ios-capture/`, SwiftUI, deployment target iOS 26 |
 | Device | iPhone 17 (iPhone18,3), **iOS 27.0** |
 | Toolchain | Xcode 27.2 |
-| Benchmark | Mileon 1.7 on the same phone |
 | Signing | Free Personal Team, bundle IDs `com.thekeval.spike.capture` and `.widgets` |
 
-**Coverage limit:** A3 §1.5 asks for force-quit behaviour on iOS 26.x and 27.x. Only iOS 27.0 is available
-on this phone, so iOS 26.x results will need another device or the beta (A19).
+These results cover iOS 27.0 only. A19 covers iOS 26.x and other devices.
 
 ## Install log
 
-Drives during an expired-profile period are not counted as missed trips.
+Trips during an expired-profile period would not count as missed.
 
 | Install | First launch (UTC) | Profile expires (UTC) |
 |---|---|---|
 | 1 | 2026-11-09 16:09 | 2026-11-16 16:06 |
 
 The crash fix below was reinstalled at 16:17 UTC on 2026-11-09 under the same profile, so the expiry did not move.
+
+## Trip results (pending)
+
+| Trip | Started by | Trigger | Odometer (km) | App distance (km) | Difference | Parking spot to first point (m) | First fix after trigger (s) | Trip end after last movement (s) |
+|---|---|---|---|---|---|---|---|---|
+| 1 | automatic | pending | pending | pending | pending | pending | pending | pending |
+| 2 | automatic | pending | pending | pending | pending | pending | pending | pending |
+| 3 | Control Center | pending | pending | pending | pending | pending | pending | pending |
+
+## Is the data complete and accurate? (pending)
+
+| Check | Good result | Result |
+|---|---|---|
+| GPS delivery | ≥ 95% of 1 Hz fixes outside tunnels (Q13) | pending |
+| GPS horizontal accuracy | median ≤ 20 m | pending |
+| App distance against odometer | within about 3%, after allowing for the uncaptured start | pending |
+| GPS speed against speed derived from positions | agree, apart from short noise | pending |
+| IMU delivery | ≥ 98% of 50 Hz samples (Q13), measured without the debugger | pending |
+| IMU sample interval | about 20 ms, timestamps always increasing | pending |
+| Gravity vector magnitude | about 1 g | pending |
+| Attitude quaternion | unit length | pending |
+| Backfill | about 50 Hz accelerometer data across the start window | pending |
+| Control Center start and Live Activity | recording starts, first fix ≤ 10 s (Q3) | pending |
 
 ## Findings so far
 
@@ -56,32 +81,23 @@ Both steps are one-time per Apple ID and device, apart from the weekly re-sign.
 The first build crashed on every launch once location was granted: six crash reports on 2026-11-09, all
 an `NSAssertionHandler` failure inside `CLMonitor.init`. The monitor was named `parked-spot`. The
 `CLMonitorConfiguration` header says a name "should contain only alpha-numeric characters". Renaming it
-to `parkedSpot` stopped the crash. A hyphen is enough to take the app down at launch, before any capture
-starts, so the product code should use a fixed, tested alphanumeric name.
+to `parkedSpot` stopped the crash.
 
 This path runs only after location is granted, so a launch check before permissions cannot catch it.
 
 ### A launch can deliver a stale significant-change fix
 
 On three launches the Spike received a significant-change event right away, with a location 516, 637 and
-859 seconds old. Treated as a wake, each would have opened a false trip candidate. The product code needs
-an age check on the event, as the Spike has (300 s).
+859 seconds old. Treated as a wake, each would have opened a false trip candidate.
 
-Also, `applicationState` read in `didFinishLaunching` was `background` on launches that opened the app in
-the foreground, so it can't separate background wakes from user launches. The `.location` launch option
-is the signal to use.
+`applicationState` read in `didFinishLaunching` was also `background` on launches that opened the app in
+the foreground, so it can't separate background wakes from user launches.
 
-## Results (pending field runs)
+## Changes the product capture code needs
 
-| PRD target | Spike 1 pass bar | DrivePerf spike | Mileon | Verdict |
-|---|---|---|---|---|
-| Q1 capture success | ≥ 9 of 10 drives, not fewer than Mileon | pending | pending | pending |
-| Q2 start latency | median ≤ 800 m and ≤ Mileon + 150 m | pending | pending | pending |
-| Q3 manual start | ≤ 10 s | pending | n/a | pending |
-| Q4 missed trips | ≤ 1 of 10 | pending | pending | pending |
-| Q5 walking and running | 0 from ≥ 10 sessions | pending | pending | pending |
-| Q6 cycling | ≤ 1 of 10 rides | pending | pending | pending |
-| Q10 trip end | measured | pending | n/a | pending |
-| Q11 battery, recording | ≥ 60 min, compared with Mileon | pending | pending | pending |
-| Q12 battery, armed idle | 24 h armed run | pending | pending | pending |
-| Q13 sensor delivery | ≥ 98% IMU, ≥ 95% GPS | pending | n/a | pending |
+Added to as the trips are analysed.
+
+1. Use a fixed, unit-tested alphanumeric `CLMonitor` name.
+2. Check the age of significant-change events before treating one as a wake. The spike ignores events older than 300 s.
+3. Use the `.location` launch option, not `applicationState`, to identify a background location launch.
+4. Test launch with permissions granted. The capture path only starts once location is authorised.

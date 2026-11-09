@@ -1,53 +1,35 @@
-# Spike 1 drive log
+# Spike 1 trip log
 
-The app records its own side automatically. This log is only for what it can't see: Mileon, and whether
-a trip was real. **No addresses, place names or street names.** Use "home", "work" or nothing.
+Two or three short trips, to confirm location and motion data reach the app completely and accurately.
+The app records its own numbers. This log only holds what it can't know.
 
-You can paste a row into the chat after each drive, in any rough format.
+**No addresses, place names or street names.** Paste a row into the chat after each trip, in any rough format.
 
-## Drives
-
-| # | Date | Pulled away (time) | ≥ 1 km? | Condition | Spike recorded? | Mileon recorded? | Mileon route starts how far from where you parked (m, by eye) | Mileon start time shown | Notes |
-|---|---|---|---|---|---|---|---|---|---|
-| 1 |  |  |  |  |  |  |  |  |  |
-
-**Condition** is one of: `normal`, `low-power`, `force-quit` (swiped the Spike away before driving),
-`reboot` (restarted the phone before driving), `keep-alive-off`, `manual`.
-
-## Walks, runs, rides, transit
-
-Anything that isn't you driving a car.
-
-| # | Date | Type (walk, run, cycle, bus, train, passenger) | Minutes | Spike created a trip? | Mileon created a trip? | Notes |
+| Trip | Date | Pulled away (time) | Parked (time) | Odometer distance (km) | Started by | Anything odd |
 |---|---|---|---|---|---|---|
-| 1 |  |  |  |  |  |  |
+| 1 |  |  |  |  | automatic |  |
+| 2 |  |  |  |  | automatic |  |
+| 3 |  |  |  |  | Control Center |  |
 
-## Battery runs
+## How to run a trip
 
-Run one app at a time for the recording test, because battery drain on a shared phone can't be split
-by eye. The per-app share comes from Settings > Battery.
+1. While parked, reset the car's trip odometer.
+2. Drive at least 5 km with the phone anywhere it won't slide around. Don't touch it while driving.
+3. Park, then wait about 5 minutes before opening the app. A trip ends after 4 minutes without vehicle movement.
+4. Note the odometer distance.
 
-| Test | Date | Start % | End % | Hours | Spike share (Settings > Battery) | Mileon share | Notes |
-|---|---|---|---|---|---|---|---|
-| Recording, screen off, ≥ 60 min, not charging |  |  |  |  |  |  |  |
-| Armed idle, 24 h, no drives if possible |  |  |  |  |  |  |  |
+For trip 3, tap the **Spike drive** control in Control Center while still parked, and tap it again after you park.
+Don't swipe the app away between trips, and don't launch it from Xcode.
 
-## What the benchmark needs
+## What to look for in the app (Trips tab, tap the trip)
 
-| Test | Count | PRD target it checks |
-|---|---|---|
-| Normal drives, both apps running | at least 10 | Q1, Q2, Q4, Q10 |
-| Walks and runs | at least 10 in total | Q5 (pass bar: 0 trips) |
-| Bike rides, if you ride | up to 10 | Q6 (pass bar: at most 1) |
-| Bus, train or streetcar, if convenient | a few | Q7 (baseline only) |
-| Manual start from Control Center | 2 or 3 | Q3 |
-| Force-quit the Spike, then drive | 2 | A3 §1.5 |
-| Reboot, unlock, then drive | 2 | A3 §1.5 |
-| Low Power Mode on, then drive | 2 | A3 §1.5 |
-| "Legacy GPS keep-alive" off, then drive | 3 | A3 §1.1 |
-| Recording battery run | 1 | Q11 |
-| Armed idle battery run | 1 | Q12 |
-
-Keep the phone off the charger when you can, and don't launch the Spike from Xcode, because the debugger
-stops iOS from suspending it. Force-quit, reboot, Low Power Mode and keep-alive-off drives count separately
-and aren't part of the 10 normal drives.
+| Field | Good result |
+|---|---|
+| Status | **Finished**, one row per trip |
+| Distance | Close to the odometer. The app starts counting when it wakes, so automatic trips read a little short |
+| Parking spot → first point | A few hundred metres at most on trips 2 and 3. It may be blank on trip 1 |
+| IMU delivery | At least 98% |
+| GPS delivery | At least 95%, unless you drove through a tunnel |
+| IMU and GPS gaps | Few, and short |
+| Backfill samples | Above 0 on automatic trips, if the window has a value |
+| Notes | Tell me about anything here that mentions an error or `insufficientlyInUse` |
