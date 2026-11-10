@@ -1,0 +1,27 @@
+name: release-ios
+
+# INERT: there is no Apple Developer account, App Store Connect API key, signing repository or Fastlane lane yet
+# (DRIVE-67). The job runs only when the repository variable RELEASE_IOS_ENABLED is 'true' (it is not set), and
+# even then it fails on purpose until DRIVE-67 replaces the step below with Fastlane `match` (read-only), `gym`,
+# `pilot` and the dSYM upload to Sentry (ADR-007, ADR-008). Nothing here creates tags or publishes.
+# See docs/architecture/ci-cd.md.
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+jobs:
+  testflight:
+    name: Build and upload to TestFlight
+    if: vars.RELEASE_IOS_ENABLED == 'true'
+    runs-on: macos-26
+    environment: prod   # requires Keval's approval (ADR-008)
+    steps:
+      - uses: actions/checkout@v7
+      - name: Not configured yet
+        run: |
+          echo "::error::release-ios is not configured: the Apple account, signing and Fastlane lanes arrive with DRIVE-67."
+          exit 1

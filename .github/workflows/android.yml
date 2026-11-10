@@ -1,0 +1,56 @@
+name: android
+
+# Android app checks (ADR-008): lint, unit tests and assemble devDebug. Roborazzi screenshot tests join when the
+# first feature screens exist (DRIVE-72); the emulator smoke run is nightly (nightly.yml).
+
+on:
+  pull_request:
+    paths: &paths
+      - 'apps/android/**'
+      - 'shared/**'
+      - 'build-logic/**'
+      - 'gradle/**'
+      - 'config/**'
+      - 'settings.gradle.kts'
+      - 'build.gradle.kts'
+      - 'gradle.properties'
+      - '.github/actions/setup-build/**'
+      - '.github/workflows/android.yml'
+  push:
+    branches: [main]
+    paths: *paths
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Lint, unit tests, assemble devDebug
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup-build
+        with: { android: 'true' }
+      - name: Detekt (Android modules)
+        run: ./gradlew --console=plain :apps:android:app:detekt :apps:android:designsystem:detekt :apps:android:platform:detekt
+      - name: Lint
+        run: ./gradlew --console=plain :apps:android:app:lintDevDebug
+      - name: Unit tests
+        run: ./gradlew --console=plain :apps:android:app:testDevDebugUnitTest
+      - name: Assemble devDebug
+        run: ./gradlew --console=plain :apps:android:app:assembleDevDebug
+      - uses: actions/upload-artifact@v7
+        with:
+          name: app-dev-debug
+          path: apps/android/app/build/outputs/apk/dev/debug/app-dev-debug.apk
+      - uses: actions/upload-artifact@v7
+        if: failure()
+        with:
+          name: android-lint-report
+          path: apps/android/app/build/reports
+          if-no-files-found: ignore

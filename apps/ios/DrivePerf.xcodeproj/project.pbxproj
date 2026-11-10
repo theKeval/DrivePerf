@@ -1,0 +1,470 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		FEB70EF8BA0C217C495F4BCC /* DPFeatures in Frameworks */ = {isa = PBXBuildFile; productRef = EC8B5A20E069754FAEC2A2D5 /* DPFeatures */; };
+		E60FCF481FDE03861756D195 /* DPPlatform in Frameworks */ = {isa = PBXBuildFile; productRef = 2384D057D281CC940F7D4E1E /* DPPlatform */; };
+		7EC52976499B5B81A0D425A8 /* DPFeatures in Frameworks */ = {isa = PBXBuildFile; productRef = 410609BA9023FE19A593C6B5 /* DPFeatures */; };
+		0DEA1F96D69B5306EF587649 /* DPSharedBridge in Frameworks */ = {isa = PBXBuildFile; productRef = 8F233B94BDFE4B12F89DEAE6 /* DPSharedBridge */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		431387EB7262E1CFC79B125E /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 46F86FAA6BBF9AC94A7E4595 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 778130C49534A4D32801D13D;
+			remoteInfo = DrivePerf;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXFileReference section */
+		7BCCADA3021C07D12E775CB5 /* DrivePerf.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = DrivePerf.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		195F9293022CEE80C9E8D0C0 /* DrivePerfTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = DrivePerfTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedRootGroup section */
+		B0E0396B5B7A7E19948EF0FB /* DrivePerf */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = DrivePerf;
+			sourceTree = "<group>";
+		};
+		6DE8CF09256CB1114261B4F1 /* DrivePerfTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = DrivePerfTests;
+			sourceTree = "<group>";
+		};
+/* End PBXFileSystemSynchronizedRootGroup section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		23D4D8A1A691152DF04FD401 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				FEB70EF8BA0C217C495F4BCC /* DPFeatures in Frameworks */,
+				E60FCF481FDE03861756D195 /* DPPlatform in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		CE07565EAF154A46CCA4E24F /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				7EC52976499B5B81A0D425A8 /* DPFeatures in Frameworks */,
+				0DEA1F96D69B5306EF587649 /* DPSharedBridge in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		2B731CEFC6751AAE0EC69B98 = {
+			isa = PBXGroup;
+			children = (
+				B0E0396B5B7A7E19948EF0FB /* DrivePerf */,
+				6DE8CF09256CB1114261B4F1 /* DrivePerfTests */,
+				86024CAD1E83101D97359D73 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		86024CAD1E83101D97359D73 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				7BCCADA3021C07D12E775CB5 /* DrivePerf.app */,
+				195F9293022CEE80C9E8D0C0 /* DrivePerfTests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		778130C49534A4D32801D13D /* DrivePerf */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = AC573CC2B6EF8ABF3A944EA0 /* Build configuration list for PBXNativeTarget "DrivePerf" */;
+			buildPhases = (
+				8A00AF813696CD083E7C39D7 /* Build Kotlin framework */,
+				84E2FD34901EE2948D11C7BA /* Sources */,
+				23D4D8A1A691152DF04FD401 /* Frameworks */,
+				A95D68C222F00292802D0988 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				B0E0396B5B7A7E19948EF0FB /* DrivePerf */,
+			);
+			name = DrivePerf;
+			packageProductDependencies = (
+				EC8B5A20E069754FAEC2A2D5 /* DPFeatures */,
+				2384D057D281CC940F7D4E1E /* DPPlatform */,
+			);
+			productName = DrivePerf;
+			productReference = 7BCCADA3021C07D12E775CB5 /* DrivePerf.app */;
+			productType = "com.apple.product-type.application";
+		};
+		27C2F5CD118605258B779913 /* DrivePerfTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 6D3563AFDFE7869597E19302 /* Build configuration list for PBXNativeTarget "DrivePerfTests" */;
+			buildPhases = (
+				357BE28F36942121A810A886 /* Sources */,
+				CE07565EAF154A46CCA4E24F /* Frameworks */,
+				89DF208E15B13AD51CE7CB45 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				A752CD51616FEF8E8554B5CD /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				6DE8CF09256CB1114261B4F1 /* DrivePerfTests */,
+			);
+			name = DrivePerfTests;
+			packageProductDependencies = (
+				410609BA9023FE19A593C6B5 /* DPFeatures */,
+				8F233B94BDFE4B12F89DEAE6 /* DPSharedBridge */,
+			);
+			productName = DrivePerfTests;
+			productReference = 195F9293022CEE80C9E8D0C0 /* DrivePerfTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		46F86FAA6BBF9AC94A7E4595 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 2620;
+				LastUpgradeCheck = 2620;
+				TargetAttributes = {
+					778130C49534A4D32801D13D = {
+						CreatedOnToolsVersion = 26.2;
+					};
+					27C2F5CD118605258B779913 = {
+						CreatedOnToolsVersion = 26.2;
+						TestTargetID = 778130C49534A4D32801D13D;
+					};
+				};
+			};
+			buildConfigurationList = A7492CCDE30BE8F54F16B52E /* Build configuration list for PBXProject "DrivePerf" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = 2B731CEFC6751AAE0EC69B98;
+			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				BA28F577521DFD6A44095C61 /* XCLocalSwiftPackageReference "Packages/DPDesignSystem" */,
+				5A808F7C62E4B24828FC32B3 /* XCLocalSwiftPackageReference "Packages/DPFeatures" */,
+				9D45327FEBD5309F46CE4E18 /* XCLocalSwiftPackageReference "Packages/DPPlatform" */,
+				7015D458296ACD554F6808F0 /* XCLocalSwiftPackageReference "Packages/DPSharedBridge" */,
+			);
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 86024CAD1E83101D97359D73 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				778130C49534A4D32801D13D /* DrivePerf */,
+				27C2F5CD118605258B779913 /* DrivePerfTests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		A95D68C222F00292802D0988 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		89DF208E15B13AD51CE7CB45 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		8A00AF813696CD083E7C39D7 /* Build Kotlin framework */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Build Kotlin framework";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "\"$SRCROOT/Scripts/build-shared-framework.sh\"\n";
+		};
+/* End PBXShellScriptBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		84E2FD34901EE2948D11C7BA /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		357BE28F36942121A810A886 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		A752CD51616FEF8E8554B5CD /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 778130C49534A4D32801D13D /* DrivePerf */;
+			targetProxy = 431387EB7262E1CFC79B125E /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		EDF2539783D433988A316B18 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_STYLE = Manual;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = "";
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
+				"EXCLUDED_ARCHS[sdk=iphonesimulator*]" = x86_64;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Debug;
+		};
+		20E4CE03CB913D0E9181E6D4 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_STYLE = Manual;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = "";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
+				"EXCLUDED_ARCHS[sdk=iphonesimulator*]" = x86_64;
+				GCC_NO_COMMON_BLOCKS = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = 1;
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		A1CFBB66A86B7730D411A17C /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_PREVIEWS = YES;
+				FRAMEWORK_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(SRCROOT)/../../shared/ios-export/build/xcode-frameworks/$(CONFIGURATION)/$(SDK_NAME)",
+				);
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = "DrivePerf Dev";
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 0.1.0;
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"-framework",
+					DrivePerfShared,
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.driveperf.app.dev;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_STRICT_CONCURRENCY = complete;
+			};
+			name = Debug;
+		};
+		9E4CE29EBD7E6E2434449A41 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_PREVIEWS = YES;
+				FRAMEWORK_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(SRCROOT)/../../shared/ios-export/build/xcode-frameworks/$(CONFIGURATION)/$(SDK_NAME)",
+				);
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = DrivePerf;
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 0.1.0;
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"-framework",
+					DrivePerfShared,
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.driveperf.app;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_STRICT_CONCURRENCY = complete;
+			};
+			name = Release;
+		};
+		6B296AAC189B779359784EFD /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CURRENT_PROJECT_VERSION = 1;
+				FRAMEWORK_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(SRCROOT)/../../shared/ios-export/build/xcode-frameworks/$(CONFIGURATION)/$(SDK_NAME)",
+				);
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.driveperf.app.tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_STRICT_CONCURRENCY = complete;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/DrivePerf.app/DrivePerf";
+			};
+			name = Debug;
+		};
+		D0C8FA6F2BB7A6ECBD3DAAE1 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CURRENT_PROJECT_VERSION = 1;
+				FRAMEWORK_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(SRCROOT)/../../shared/ios-export/build/xcode-frameworks/$(CONFIGURATION)/$(SDK_NAME)",
+				);
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.driveperf.app.tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_STRICT_CONCURRENCY = complete;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/DrivePerf.app/DrivePerf";
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		A7492CCDE30BE8F54F16B52E /* Build configuration list for PBXProject "DrivePerf" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				EDF2539783D433988A316B18 /* Debug */,
+				20E4CE03CB913D0E9181E6D4 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		AC573CC2B6EF8ABF3A944EA0 /* Build configuration list for PBXNativeTarget "DrivePerf" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A1CFBB66A86B7730D411A17C /* Debug */,
+				9E4CE29EBD7E6E2434449A41 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		6D3563AFDFE7869597E19302 /* Build configuration list for PBXNativeTarget "DrivePerfTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				6B296AAC189B779359784EFD /* Debug */,
+				D0C8FA6F2BB7A6ECBD3DAAE1 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		BA28F577521DFD6A44095C61 /* XCLocalSwiftPackageReference "Packages/DPDesignSystem" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/DPDesignSystem;
+		};
+		5A808F7C62E4B24828FC32B3 /* XCLocalSwiftPackageReference "Packages/DPFeatures" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/DPFeatures;
+		};
+		9D45327FEBD5309F46CE4E18 /* XCLocalSwiftPackageReference "Packages/DPPlatform" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/DPPlatform;
+		};
+		7015D458296ACD554F6808F0 /* XCLocalSwiftPackageReference "Packages/DPSharedBridge" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/DPSharedBridge;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		EC8B5A20E069754FAEC2A2D5 /* DPFeatures */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = DPFeatures;
+		};
+		2384D057D281CC940F7D4E1E /* DPPlatform */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = DPPlatform;
+		};
+		410609BA9023FE19A593C6B5 /* DPFeatures */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = DPFeatures;
+		};
+		8F233B94BDFE4B12F89DEAE6 /* DPSharedBridge */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = DPSharedBridge;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = 46F86FAA6BBF9AC94A7E4595 /* Project object */;
+}

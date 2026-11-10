@@ -1,0 +1,37 @@
+name: Set up build
+description: JDK 21, Gradle with build cache, Kotlin/Native cache and (optionally) the Android SDK platform.
+
+inputs:
+  android:
+    description: Accept the Android SDK licences and install the compile platform ('true' or 'false').
+    default: 'false'
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-java@v6
+      with:
+        distribution: temurin
+        java-version: 21
+
+    - uses: gradle/actions/setup-gradle@v6
+      with:
+        # Pull requests read the cache that main wrote; only main writes it.
+        cache-read-only: ${{ github.ref != 'refs/heads/main' }}
+
+    - uses: actions/cache@v6
+      with:
+        path: ~/.konan
+        key: konan-${{ runner.os }}-${{ hashFiles('gradle/libs.versions.toml') }}
+        restore-keys: konan-${{ runner.os }}-
+
+    - name: Android SDK platform
+      if: inputs.android == 'true'
+      shell: bash
+      run: |
+        yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
+        sdkmanager="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+        # compileSdk 37 is published as "platforms;android-37.0" (the exact id is looked up, not guessed).
+        platform="$("$sdkmanager" --list 2>/dev/null | grep -oE 'platforms;android-37[0-9.]*' | sort -u | head -n 1)"
+        test -n "$platform" || { echo "::error::No Android 37 platform package found in sdkmanager"; exit 1; }
+        "$sdkmanager" --install "$platform"

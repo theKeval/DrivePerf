@@ -1,0 +1,31 @@
+name: release-android
+
+# INERT: there is no upload key, Play service account or Fastlane lane yet (DRIVE-72). The job runs only when the
+# repository variable RELEASE_ANDROID_ENABLED is 'true' (it is not set), so pushing a tag today starts a run that
+# is skipped. It builds the release bundle and stops: signing, the Sentry mapping upload (ADR-007) and the Fastlane
+# `supply` push to the internal track are added with DRIVE-72, using secrets in the `prod` environment.
+# Nothing here creates tags or publishes. See docs/architecture/ci-cd.md.
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+jobs:
+  bundle:
+    name: Build prod release bundle
+    if: vars.RELEASE_ANDROID_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    environment: prod   # requires Keval's approval (ADR-008)
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup-build
+        with: { android: 'true' }
+      - name: Bundle (unsigned until DRIVE-72 adds the upload key)
+        run: ./gradlew --console=plain :apps:android:app:bundleProdRelease
+      - uses: actions/upload-artifact@v7
+        with:
+          name: app-prod-release-bundle
+          path: apps/android/app/build/outputs/bundle/prodRelease/*.aab

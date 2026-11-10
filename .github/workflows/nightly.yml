@@ -1,0 +1,46 @@
+name: nightly
+
+# Nightly checks (ADR-008): dependency audit and Maestro smoke flows. Maestro runs only once flows exist in
+# `.maestro/` (the first ones land with the onboarding and capture features); until then that job reports
+# "no flows yet" and passes, so the nightly never fails for lack of flows.
+
+on:
+  schedule:
+    - cron: '17 6 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    name: Dependency audit (npm)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with: { node-version: 24 }
+      # Runtime dependencies only; fails on high or critical advisories. Gradle dependency auditing joins when
+      # dependency locking is enabled (DRIVE-62).
+      - run: npm audit --omit=dev --audit-level=high --prefix web
+      - run: npm audit --omit=dev --audit-level=high --prefix backend/firebase
+
+  maestro:
+    name: Maestro smoke flows
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Look for flows
+        id: flows
+        run: |
+          if compgen -G ".maestro/*.yaml" > /dev/null || compgen -G ".maestro/*.yml" > /dev/null; then
+            echo "found=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "found=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::No Maestro flows in .maestro/ yet; nothing to run."
+          fi
+      - name: Run flows
+        if: steps.flows.outputs.found == 'true'
+        run: |
+          echo "::error::Maestro flows exist but the nightly runner is not wired up. Add the emulator and simulator jobs for them here."
+          exit 1

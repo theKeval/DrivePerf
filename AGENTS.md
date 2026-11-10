@@ -14,8 +14,9 @@ agentic engineering team. Agent-specific rules live in the sibling files.
 - **Jira statuses (only these four):** `To Do` (transition id 11) → `In Progress` (21) →
   `In Review` (31) → `Done` (41). Transitions are any-to-any.
 - **Design flag:** the Jira label **`design-needed`** marks tickets requiring design work.
-- **Pilot product repo:** `theKeval/DrivePerf` (GitHub) — Android app, Kotlin, Jetpack
-  Compose. Default branch: `main`.
+- **Pilot product repo:** `theKeval/DrivePerf` (GitHub, public) — monorepo: Kotlin
+  Multiplatform core, SwiftUI iOS app, Jetpack Compose Android app, Ktor backend and Astro
+  website. Default branch: `main`.
 - **Product identity:** **DrivePerf**, domain **`driveperf.com`**, app ID
   **`com.driveperf.app`** on both stores (dev builds `com.driveperf.app.dev`); Kotlin packages `com.driveperf.*`.
 - **Slack:** workspace `AgenticWorkflow`, channel **#agentic-team**. Bot handles:
@@ -38,6 +39,44 @@ agentic engineering team. Agent-specific rules live in the sibling files.
    to the human in Slack instead of retrying indefinitely.
 6. **Stay in scope.** Only work on the ticket you were triggered for. Never start unrelated
    work, refactors, or "improvements" outside the ticket's scope.
+
+## DrivePerf monorepo (this repository)
+
+One repository holds the shared core, both apps, the server and the website. Layout and dependency rules are
+fixed by `docs/architecture/adr/ADR-002-monorepo-modules-and-clean-architecture.md`; read it before adding a
+module or a dependency edge. Path-specific instruction files in `.github/instructions/` add the per-area rules.
+
+| Path | What | Stack | Extra rules |
+|---|---|---|---|
+| `shared/` | KMP core: foundation, domain, pipeline, presentation, data/*, api-contract, di, ios-export, testing | Kotlin Multiplatform | `shared.instructions.md` |
+| `apps/ios/` | iOS app (Xcode project, local SPM packages) | SwiftUI | `ios.instructions.md` |
+| `apps/android/` | Android app (app, designsystem, platform, one `feature-*` per epic) | Jetpack Compose | `android.instructions.md` |
+| `backend/api/`, `backend/openapi/` | Server and its HTTP contract | Kotlin / Ktor | `backend.instructions.md` |
+| `backend/firebase/` | Firebase config and Firestore rules | npm | |
+| `web/` | driveperf.com | Astro | `web.instructions.md` |
+| `docs/`, `prototypes/` | Specs, ADRs, design artifacts, HTML prototypes | | |
+| `legacy/android-prototype/` | Frozen Android-only prototype: reference only, never edit | | |
+| `spikes/` | Throw-away experiments: not part of the Gradle build or CI | | |
+
+- **One root Gradle build** (`./gradlew`, JDK 21 toolchain) covers `shared/`, `apps/android/` and `backend/api/`.
+  iOS is an Xcode project that builds the Kotlin framework through its Run Script phase. Versions live in
+  `gradle/libs.versions.toml`; Kotlin moves only together with SKIE.
+- **Boundaries are enforced in CI**, not by review alone: `./gradlew assertModuleGraph detekt :shared:testing:jvmTest`
+  (module graph, forbidden imports, Konsist). Never weaken a rule to get a change through; a new module edge needs an
+  ADR-002 amendment first. See `docs/architecture/guardrails.md`.
+- **Platform targets:** minimum iOS 26 and Android 10 (minSdk 29); app ID `com.driveperf.app` (dev
+  `com.driveperf.app.dev`); Kotlin packages `com.driveperf.*`. Crash reports go to Sentry (EU); Crashlytics is never
+  linked. Trip files go to Cloudflare R2, so there are no Firebase Storage rules.
+- **The website deploys from `main`:** a push touching `web/**`, `backend/firebase/**` or
+  `.github/workflows/web.yml` deploys driveperf.com to production. Leave those paths alone unless the ticket is about
+  the website or Firebase config.
+- **iOS builds are simulator-only for now.** Never pick a Personal Team for `com.driveperf.app` or
+  `com.driveperf.app.dev`: it can block those IDs for the paid account.
+- **No secrets and no real location data in the repo.** GPX/CSV fixtures must be synthetic or privacy-trimmed and carry
+  a `# privacy-trimmed` header (CI rejects them otherwise). Release workflows are inert until their accounts exist
+  (`docs/architecture/ci-cd.md`).
+- **npm on Keval's Mac** is not on the PATH: run `node /opt/homebrew/lib/node_modules/npm/bin/npm-cli.js <args>`
+  (`npx-cli.js` for npx) and install each project's own dependencies.
 
 ---
 
@@ -121,9 +160,10 @@ domain boundaries; Swift concurrency (`async/await`, actors — no completion-ha
 pyramids); value types (structs) by default; follow Apple HIG for UX behavior; XCTest for
 domain/ViewModel logic.
 
-**Kotlin Multiplatform** — share **domain + data** in the shared module (`expect/actual`
-for platform code); keep UI native (Compose / SwiftUI) and thin; Ktor/SQLDelight-style
-multiplatform libs in shared code; Koin for DI; unit tests live in the shared module.
+**Kotlin Multiplatform** — share **domain, pipeline, presentation and data** in `shared/`
+(`expect/actual` for platform code); keep UI native (Compose / SwiftUI) and thin; Ktor/SQLDelight-style
+multiplatform libs in shared code; Koin for DI; unit tests live in the shared module. DrivePerf's module
+layers and allowed dependencies are in ADR-002 (see "DrivePerf monorepo" above).
 
 **Cross-platform JS (React Native)** — TypeScript strict; function components + hooks;
 business logic in plain TS modules (testable without the renderer); navigation and platform
