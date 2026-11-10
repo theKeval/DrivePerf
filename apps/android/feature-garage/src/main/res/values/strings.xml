@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="garage_empty_title">Your garage is empty</string>
+    <string name="garage_empty_body">Add the car you drive to see per-car stats and tint your stories with its colour. That arrives in a later update.</string>
+</resources>

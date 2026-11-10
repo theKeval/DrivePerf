@@ -23,7 +23,8 @@ class CaptureNotifications(private val context: Context) {
     private val manager = context.getSystemService(NotificationManager::class.java)
 
     fun ensureChannel() {
-        val channel = NotificationChannel(CHANNEL_ID, context.getString(R.string.capture_channel_name), NotificationManager.IMPORTANCE_DEFAULT)
+        val name = context.getString(R.string.capture_channel_name)
+        val channel = NotificationChannel(CHANNEL_ID, name, NotificationManager.IMPORTANCE_DEFAULT)
             .apply {
                 description = context.getString(R.string.capture_channel_description)
                 setShowBadge(false)

@@ -19,13 +19,12 @@ class SentryCrashReporter(private val context: Context, private val dsn: String,
     @Volatile
     private var cacheDir: String? = null
 
-    /** True when a DSN is configured, so the Settings screen can say whether crash reports can be sent at all. */
-    val isConfigured: Boolean get() = dsn.isNotBlank()
+    override val isAvailable: Boolean get() = dsn.isNotBlank()
 
     @Synchronized
     @Suppress("DEPRECATION") // sendDefaultPii is deprecated but stays set explicitly: ADR-007 requires it to be false.
     override fun setEnabled(enabled: Boolean) {
-        if (!isConfigured) return
+        if (!isAvailable) return
         if (enabled) {
             if (Sentry.isEnabled()) return
             SentryAndroid.init(context) { options ->

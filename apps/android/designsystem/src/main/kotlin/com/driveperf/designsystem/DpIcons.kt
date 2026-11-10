@@ -11,4 +11,5 @@ public object DpIcons {
     @DrawableRes public val Profile: Int = R.drawable.ic_profile
     @DrawableRes public val Record: Int = R.drawable.ic_record
     @DrawableRes public val Stop: Int = R.drawable.ic_stop
+    @DrawableRes public val Back: Int = R.drawable.ic_back
 }

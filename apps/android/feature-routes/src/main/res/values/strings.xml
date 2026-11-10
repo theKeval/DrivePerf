@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="routes_empty_title">Routes are on the way</string>
+    <string name="routes_empty_body">DrivePerf will spot the drives you repeat, like your commute, and compare each run with your usual. That arrives in a later update.</string>
+</resources>

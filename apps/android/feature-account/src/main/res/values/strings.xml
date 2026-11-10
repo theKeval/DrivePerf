@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="account_mode_local">Local mode</string>
+    <string name="account_mode_body">Your drives stay on this phone. Accounts and backup arrive in a later update.</string>
+    <string name="account_privacy_title">Privacy</string>
+    <string name="account_stats_title">Share usage statistics</string>
+    <string name="account_stats_body">Counts of which features are used. Never your location, routes or car.</string>
+    <string name="account_crash_title">Send crash reports</string>
+    <string name="account_crash_body">Helps us fix crashes. Reports never include your location.</string>
+    <string name="account_crash_unavailable">Crash reporting is not set up in this build.</string>
+    <string name="account_version">Version %1$s</string>
+</resources>

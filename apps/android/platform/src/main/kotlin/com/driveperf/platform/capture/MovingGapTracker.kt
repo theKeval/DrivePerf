@@ -21,13 +21,16 @@ class MovingGapTracker(
     fun onFix(sample: LocationSample) {
         val prev = previous
         previous = sample
-        if (prev == null) return
+        if (prev != null) addInterval(prev, sample)
+    }
+
+    private fun addInterval(prev: LocationSample, sample: LocationSample) {
         val dtS = (sample.tMonoNs - prev.tMonoNs) / NS_PER_S
-        if (dtS <= 0.0) return
         val moving = (prev.speedMps ?: 0.0) >= movingSpeedMps || (sample.speedMps ?: 0.0) >= movingSpeedMps
-        if (!moving) return
-        movingS += dtS
-        if (dtS > gapAfterS) gapS += dtS
+        if (dtS > 0.0 && moving) {
+            movingS += dtS
+            if (dtS > gapAfterS) gapS += dtS
+        }
     }
 
     /** Seconds spent moving between fixes. */

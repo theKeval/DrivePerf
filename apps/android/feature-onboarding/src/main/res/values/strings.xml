@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="onb_continue">Continue</string>
+    <string name="onb_back">Back</string>
+    <string name="onb_not_now">Not now</string>
+    <string name="onb_open_settings">Open settings</string>
+    <string name="onb_allow">Allow</string>
+
+    <string name="onb_welcome_title">Smooth is a skill.</string>
+    <string name="onb_welcome_body">DrivePerf turns every drive into a story of how smoothly you drove, and helps you get better at it. Every drive, decoded.</string>
+    <string name="onb_welcome_cta">Get started</string>
+
+    <string name="onb_how_title">How recording works</string>
+    <string name="onb_how_body">DrivePerf uses your phone\'s location and motion sensors while you drive. Everything stays on your phone unless you choose to back it up.</string>
+    <string name="onb_how_honest">Phone sensors can miss things: a tunnel, a weak GPS signal, or a phone that moved in its mount. When that happens DrivePerf says so instead of guessing.</string>
+    <string name="onb_how_passenger">It cannot tell whether you are the driver or a passenger, so you can mark a drive as a passenger trip.</string>
+
+    <string name="onb_location_title">Allow location while you use the app</string>
+    <string name="onb_location_body">DrivePerf needs your precise location to record the route and measure each drive. It is used only while a drive is recording.</string>
+    <string name="onb_location_denied">Without location DrivePerf cannot record a drive. You can allow it later in Settings.</string>
+    <string name="onb_location_approximate">You chose approximate location. Recording needs precise location to measure a drive accurately.</string>
+
+    <string name="onb_background_title">Record automatically</string>
+    <string name="onb_background_body">To start recording on its own when you drive off, DrivePerf needs location access all the time, even when the app is closed. On the next screen choose \"Allow all the time\".</string>
+    <string name="onb_background_disclosure">DrivePerf only uses background location to detect and record drives. It never sells or shares your location.</string>
+    <string name="onb_background_denied">Automatic recording is off. You can still start every drive yourself with the Start button.</string>
+
+    <string name="onb_activity_title">Tell driving from walking</string>
+    <string name="onb_activity_body">Physical activity access lets your phone tell when you are in a vehicle, which helps start and end drives at the right time.</string>
+    <string name="onb_activity_denied">Without it DrivePerf will rely on location alone and may start or end drives less precisely.</string>
+
+    <string name="onb_notifications_title">Show when a drive is recording</string>
+    <string name="onb_notifications_body">A notification tells you a drive is being recorded and lets you stop it. Android also needs it to keep recording reliably in the background.</string>
+    <string name="onb_notifications_denied">Without notifications you will not see when a drive is recording.</string>
+
+    <string name="onb_battery_title">Keep recording reliable</string>
+    <string name="onb_battery_body">Some phones stop apps in the background to save battery, which can cut a drive short. If you see that happen, set DrivePerf to \"Unrestricted\" in the battery settings.</string>
+    <string name="onb_battery_open">Open battery settings</string>
+    <string name="onb_battery_later">Remind me later</string>
+
+    <string name="onb_help_title">Help improve DrivePerf</string>
+    <string name="onb_help_body">Both are off unless you turn them on, and you can change them any time.</string>
+    <string name="onb_help_stats_title">Share usage statistics</string>
+    <string name="onb_help_stats_body">Counts of which features are used. Never your location, routes or car.</string>
+    <string name="onb_help_crash_title">Send crash reports</string>
+    <string name="onb_help_crash_body">Helps us fix crashes. Reports never include your location.</string>
+
+    <string name="onb_ready_title">You are ready</string>
+    <string name="onb_ready_body">Tap Start on the Drives tab to record a drive.</string>
+    <string name="onb_ready_location_on">Location: on</string>
+    <string name="onb_ready_location_off">Location: off, recording is unavailable</string>
+    <string name="onb_ready_auto_on">Automatic recording: on</string>
+    <string name="onb_ready_auto_off">Automatic recording: off, start drives with the Start button</string>
+    <string name="onb_ready_cta">Start using DrivePerf</string>
+</resources>

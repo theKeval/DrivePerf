@@ -2,6 +2,7 @@ package com.driveperf.platform.location
 
 import android.annotation.SuppressLint
 import android.content.Context
+import com.driveperf.platform.FreshnessFilter
 import com.driveperf.platform.ports.CaptureFailure
 import com.driveperf.platform.ports.Clock
 import com.driveperf.platform.ports.LocationSample
@@ -24,7 +25,7 @@ import java.util.concurrent.Executor
  *
  * Fixes are delivered on [callbackExecutor], never on the main thread. `getLastLocation` is deliberately not used:
  * it returns cached fixes, which is the stale-fix trap spike 1 hit. Stale and out-of-order fixes are dropped with
- * [FixFreshnessFilter]. Collection fails with [CaptureFailure.PermissionDenied] when fine location is not granted.
+ * [FreshnessFilter]. Collection fails with [CaptureFailure.PermissionDenied] when fine location is not granted.
  */
 class FusedLocationSource(
     context: Context,
@@ -60,7 +61,7 @@ class FusedLocationSource(
     }
 
     private class FreshnessGate(private val clock: Clock) {
-        private val filter = FixFreshnessFilter(notBeforeNs = clock.monotonicNs() - START_ALLOWANCE_NS)
+        private val filter = FreshnessFilter(notBeforeNs = clock.monotonicNs() - START_ALLOWANCE_NS)
         fun accept(sample: LocationSample): Boolean = filter.accept(sample.tMonoNs, clock.monotonicNs())
     }
 

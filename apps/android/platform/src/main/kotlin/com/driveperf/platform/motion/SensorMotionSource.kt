@@ -7,7 +7,9 @@ import android.hardware.SensorEventListener
 import android.hardware.SensorManager
 import android.os.Handler
 import android.os.HandlerThread
+import com.driveperf.platform.FreshnessFilter
 import com.driveperf.platform.ports.CaptureFailure
+import com.driveperf.platform.ports.Clock
 import com.driveperf.platform.ports.MotionCapabilities
 import com.driveperf.platform.ports.MotionSample
 import com.driveperf.platform.ports.MotionSource
@@ -15,6 +17,9 @@ import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.buffer
 import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.flow.emitAll
+import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.flow
 import java.util.concurrent.atomic.AtomicLong
 
 /**
@@ -25,10 +30,12 @@ import java.util.concurrent.atomic.AtomicLong
  * cross to the collector through a bounded channel with `trySend`, so a slow collector never blocks the sensor
  * thread; dropped samples are counted in [droppedSamples] (the capture-quality figure, never silent loss).
  *
+ * Samples that are stale, in the future or out of order are dropped ([FreshnessFilter]).
+ *
  * Without a gyroscope the source reads the raw accelerometer and splits out gravity with a 0.3 Hz low-pass,
  * reporting [MotionCapabilities.hasGyro] = false (`NO_GYRO`): cornering events are off for such trips.
  */
-class SensorMotionSource(context: Context) : MotionSource {
+class SensorMotionSource(context: Context, private val clock: Clock) : MotionSource {
     private val sensorManager = context.applicationContext.getSystemService(Context.SENSOR_SERVICE) as SensorManager
     private val dropped = AtomicLong(0)
 
@@ -38,7 +45,13 @@ class SensorMotionSource(context: Context) : MotionSource {
     override val capabilities: MotionCapabilities =
         MotionCapabilities(hasGyro = sensorManager.getDefaultSensor(Sensor.TYPE_GYROSCOPE) != null)
 
-    override fun samples(): Flow<MotionSample> = callbackFlow {
+    override fun samples(): Flow<MotionSample> = flow {
+        // Some devices (and the emulator) deliver cached or mistimed samples right after registering: drop them.
+        val gate = FreshnessFilter(maxAgeNs = FreshnessFilter.MOTION_MAX_AGE_NS)
+        emitAll(updates().filter { gate.accept(it.tMonoNs, clock.monotonicNs()) })
+    }
+
+    private fun updates(): Flow<MotionSample> = callbackFlow {
         val linear = sensorManager.getDefaultSensor(Sensor.TYPE_LINEAR_ACCELERATION)
         val accel = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
         val primary = if (capabilities.hasGyro) linear else accel

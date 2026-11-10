@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="capture_toolbar_ready">Ready to record</string>
+    <string name="capture_toolbar_needs_location">Location needed to record</string>
+    <string name="capture_toolbar_recording">Recording · %1$s</string>
+    <string name="capture_toolbar_failed">Recording stopped</string>
+    <string name="capture_start_description">Start recording a drive</string>
+    <string name="capture_open_drive_description">Open the recording screen</string>
+    <string name="capture_fix_location_description">Allow location to record</string>
+
+    <string name="drive_title">Recording your drive</string>
+    <string name="drive_distance">%1$s km</string>
+    <string name="drive_gps_searching">Looking for GPS</string>
+    <string name="drive_gps_good">GPS signal good</string>
+    <string name="drive_gps_lost">GPS signal lost</string>
+    <string name="drive_stop">Stop</string>
+    <string name="drive_stop_title">End this drive?</string>
+    <string name="drive_stop_body">The drive is saved on your phone and added to your list.</string>
+    <string name="drive_stop_confirm">End drive</string>
+    <string name="drive_stop_keep">Keep recording</string>
+    <string name="drive_locked_hint">Other screens are locked while you drive.</string>
+</resources>

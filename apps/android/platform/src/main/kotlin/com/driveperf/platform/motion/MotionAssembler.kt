@@ -44,15 +44,19 @@ internal class MotionAssembler {
 
     /** Returns the finished sample, or null while gravity or gyro has not arrived yet. */
     fun onLinearAcceleration(tNs: Long, xMs2: Double, yMs2: Double, zMs2: Double): MotionSample? {
-        val up = gravity ?: return null
-        val rot = gyroDps ?: return null
-        return MotionSample(
-            tMonoNs = tNs,
-            userAccelG = Vec3(xMs2 / STANDARD_GRAVITY, yMs2 / STANDARD_GRAVITY, zMs2 / STANDARD_GRAVITY),
-            gravityUp = up,
-            rotRateDps = rot,
-            attitude = attitude,
-        )
+        val up = gravity
+        val rot = gyroDps
+        return if (up == null || rot == null) {
+            null
+        } else {
+            MotionSample(
+                tMonoNs = tNs,
+                userAccelG = Vec3(xMs2 / STANDARD_GRAVITY, yMs2 / STANDARD_GRAVITY, zMs2 / STANDARD_GRAVITY),
+                gravityUp = up,
+                rotRateDps = rot,
+                attitude = attitude,
+            )
+        }
     }
 
     companion object {

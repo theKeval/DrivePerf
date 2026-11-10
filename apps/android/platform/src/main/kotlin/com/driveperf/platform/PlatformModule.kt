@@ -2,6 +2,7 @@ package com.driveperf.platform
 
 import com.driveperf.platform.activity.ActivityTransitionSource
 import com.driveperf.platform.capture.CaptureNotifications
+import com.driveperf.platform.capture.CaptureSources
 import com.driveperf.platform.capture.FileTripFileStore
 import com.driveperf.platform.capture.InterimTripRecorder
 import com.driveperf.platform.capture.TripIndex
@@ -25,21 +26,18 @@ import java.util.concurrent.Executors
 val platformModule = module {
     single<Clock> { AndroidClock }
     single<LocationSource> { FusedLocationSource(androidContext(), get(), Executors.newSingleThreadExecutor()) }
-    single<MotionSource> { SensorMotionSource(androidContext()) }
+    single<MotionSource> { SensorMotionSource(androidContext(), get()) }
     single<ActivitySource> { ActivityTransitionSource(androidContext()) }
     single<TripFileStore> { FileTripFileStore(File(androidContext().filesDir, "trips")) }
     single { TripIndex(File(androidContext().filesDir, "trips/index.tsv")) }
     single { CaptureNotifications(androidContext()) }
     single {
         InterimTripRecorder(
-            location = get(),
-            motion = get(),
-            activity = get(),
+            sources = CaptureSources(get(), get(), get()),
             clock = get(),
             store = get(),
             index = get(),
             scope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
-            dispatcher = Dispatchers.IO,
         )
     }
 }

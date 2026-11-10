@@ -13,11 +13,13 @@ class ActivityTransitionReceiver : BroadcastReceiver() {
         if (!ActivityTransitionResult.hasResult(intent)) return
         val result = ActivityTransitionResult.extractResult(intent) ?: return
         val now = AndroidClock.monotonicNs()
-        for (event in result.transitionEvents) {
-            if (now - event.elapsedRealTimeNanos > MAX_TRANSITION_AGE_NS) continue // stale: not a wake signal
-            val kind = activityKindOf(event.activityType) ?: continue
-            val transition = transitionKindOf(event.transitionType) ?: continue
-            ActivityEventBus.publish(ActivityEvent(event.elapsedRealTimeNanos, kind, transition))
-        }
+        result.transitionEvents
+            .filter { now - it.elapsedRealTimeNanos <= MAX_TRANSITION_AGE_NS } // stale: not a wake signal
+            .mapNotNull { event ->
+                val kind = activityKindOf(event.activityType)
+                val transition = transitionKindOf(event.transitionType)
+                if (kind != null && transition != null) ActivityEvent(event.elapsedRealTimeNanos, kind, transition) else null
+            }
+            .forEach(ActivityEventBus::publish)
     }
 }

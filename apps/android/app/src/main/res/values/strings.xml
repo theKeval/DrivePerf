@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="tab_drives">Drives</string>
+    <string name="tab_routes">Routes</string>
+    <string name="tab_insights">Insights</string>
+    <string name="tab_garage">Garage</string>
+    <string name="profile_title">Profile</string>
+    <string name="profile_button_description">Profile</string>
+    <string name="all_drives_title">All drives</string>
+    <string name="back">Back</string>
+    <string name="core_line">Shared core: %1$s</string>
+</resources>

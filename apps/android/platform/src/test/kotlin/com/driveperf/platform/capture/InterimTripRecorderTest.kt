@@ -7,7 +7,6 @@ import com.driveperf.platform.ports.ActivityKind
 import com.driveperf.platform.ports.CaptureFailure
 import com.driveperf.platform.ports.TransitionKind
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
@@ -32,11 +31,10 @@ class InterimTripRecorderTest {
     private val store = FakeStore()
 
     private fun TestScope.recorder(): InterimTripRecorder {
-        val dispatcher = StandardTestDispatcher(testScheduler)
         return InterimTripRecorder(
-            location, motion, activity, clock, store,
+            CaptureSources(location, motion, activity), clock, store,
             TripIndex(tmp.newFile("index.tsv").also { it.delete() }),
-            scope = this, dispatcher = dispatcher,
+            scope = this,
         )
     }
 
@@ -124,9 +122,7 @@ class InterimTripRecorderTest {
     @Test
     fun `stop returns to idle and records the trip in the index`() = runTest {
         val index = TripIndex(tmp.newFile("idx.tsv").also { it.delete() })
-        val recorder = InterimTripRecorder(
-            location, motion, activity, clock, store, index, this, StandardTestDispatcher(testScheduler),
-        )
+        val recorder = InterimTripRecorder(CaptureSources(location, motion, activity), clock, store, index, this)
         recorder.start()
         runCurrent()
         location.flow.emit(fix(1.0))

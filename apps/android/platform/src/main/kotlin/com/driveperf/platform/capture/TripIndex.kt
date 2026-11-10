@@ -42,14 +42,9 @@ class TripIndex(private val file: File) {
     private fun String.decode(): TripEntry? {
         val f = split("\t")
         if (f.size < FIELD_COUNT) return null
-        return TripEntry(
-            tripId = f[0],
-            startedWallMs = f[1].toLongOrNull() ?: return null,
-            durationS = f[2].toLongOrNull() ?: return null,
-            distanceM = f[3].toDoubleOrNull() ?: return null,
-            fixCount = f[4].toIntOrNull() ?: return null,
-            gpsDeliveryWhileMovingPercent = f[5].toIntOrNull(),
-        )
+        // A damaged line is skipped rather than failing the whole list.
+        return runCatching { TripEntry(f[0], f[1].toLong(), f[2].toLong(), f[3].toDouble(), f[4].toInt(), f[5].toIntOrNull()) }
+            .getOrNull()
     }
 
     private companion object {

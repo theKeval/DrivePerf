@@ -8,8 +8,6 @@ import com.driveperf.platform.ports.LocationSource
 import com.driveperf.platform.ports.MotionSource
 import com.driveperf.platform.ports.TripFileStore
 import com.driveperf.platform.ports.TripFileWriter
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancelAndJoin
@@ -22,9 +20,15 @@ import kotlinx.coroutines.launch
 import java.util.UUID
 import java.util.concurrent.TimeUnit
 
+/** The three sensor streams a trip records. */
+class CaptureSources(val location: LocationSource, val motion: MotionSource, val activity: ActivitySource)
+
+/** How often the file is flushed and how long without a fix before GPS is reported lost. */
+class RecorderTimings(val flushEveryMs: Long = 5_000L, val gpsLostAfterMs: Long = 10_000L)
+
 /**
  * Runs one manually started trip: collects the three sources, appends every sample to the trip file (flushed at least
- * every [flushEveryMs]) and records the trip in the [TripIndex] when it stops.
+ * every [RecorderTimings.flushEveryMs]) and records the trip in the [TripIndex] when it stops.
  *
  * INTERIM (DRIVE-72): this stands in for DRIVE-62's `TripRecorder` state machine. It starts recording the moment
  * [start] is called (nothing is lost to a confirmation step) and filters nothing for scoring. When the core's recorder
@@ -34,17 +38,17 @@ import java.util.concurrent.TimeUnit
  * thread of [dispatcher].
  */
 class InterimTripRecorder(
-    private val location: LocationSource,
-    private val motion: MotionSource,
-    private val activity: ActivitySource,
+    sources: CaptureSources,
     private val clock: Clock,
     private val store: TripFileStore,
     private val index: TripIndex,
     private val scope: CoroutineScope,
-    private val dispatcher: CoroutineDispatcher,
-    private val flushEveryMs: Long = DEFAULT_FLUSH_MS,
-    private val gpsLostAfterMs: Long = DEFAULT_GPS_LOST_MS,
+    private val timings: RecorderTimings = RecorderTimings(),
 ) {
+    private val location = sources.location
+    private val motion = sources.motion
+    private val activity = sources.activity
+
     private val mutableState = MutableStateFlow<CaptureState>(CaptureState.Idle)
     val state: StateFlow<CaptureState> get() = mutableState
 
@@ -61,23 +65,26 @@ class InterimTripRecorder(
         val current = Session(tripId, startedWall, startedMono)
         session = current
         mutableState.value = current.recording(GpsStatus.SEARCHING)
-        job = scope.launch(dispatcher) { run(current) }
+        job = scope.launch { run(current) }
         return true
     }
 
     /** Stops the trip, waits until the file is flushed and closed, and returns the saved entry (null when empty). */
     suspend fun stop(): TripEntry? {
-        val running = synchronized(this) { job.also { job = null } } ?: return null
-        running.cancelAndJoin()
-        val finished = synchronized(this) { session.also { session = null } } ?: return null
-        val entry = finished.entry(clock)
+        val running = synchronized(this) { job.also { job = null } }
+        running?.cancelAndJoin()
+        val finished = synchronized(this) { session.also { session = null } }
+        return if (running == null || finished == null) null else finish(finished)
+    }
+
+    private fun finish(finished: Session): TripEntry? {
         mutableState.value = CaptureState.Idle
-        if (finished.stats.fixCount == 0) {
+        return if (finished.stats.fixCount == 0) {
             store.delete(finished.tripId) // nothing was recorded: leave no empty trip behind
-            return null
+            null
+        } else {
+            finished.entry(clock).also(index::add)
         }
-        index.add(entry)
-        return entry
     }
 
     private suspend fun run(current: Session) {
@@ -89,8 +96,6 @@ class InterimTripRecorder(
                 launch { collectActivity(writer) }
                 launch { tick(current, writer) }
             }
-        } catch (e: CancellationException) {
-            throw e
         } finally {
             writer.flush()
             writer.close()
@@ -121,10 +126,10 @@ class InterimTripRecorder(
 
     private suspend fun tick(current: Session, writer: TripFileWriter) {
         while (true) {
-            delay(flushEveryMs)
+            delay(timings.flushEveryMs)
             writer.flush()
             val sinceFix = TimeUnit.NANOSECONDS.toMillis(clock.monotonicNs() - current.lastFixMonoNs)
-            if (current.stats.fixCount > 0 && sinceFix > gpsLostAfterMs) {
+            if (current.stats.fixCount > 0 && sinceFix > timings.gpsLostAfterMs) {
                 mutableState.value = current.recording(GpsStatus.LOST)
             }
         }
@@ -132,7 +137,7 @@ class InterimTripRecorder(
 
     private fun fail(failure: CaptureFailure) {
         mutableState.value = CaptureState.Failed(failure)
-        scope.launch(dispatcher) { stop() }
+        scope.launch { stop() }
     }
 
     /** Mutable per-trip bookkeeping. Written from the location collector only; read by [stop] after the job ended. */
@@ -166,10 +171,5 @@ class InterimTripRecorder(
             fixCount = stats.fixCount,
             gpsDeliveryWhileMovingPercent = gaps.deliveryPercent,
         )
-    }
-
-    private companion object {
-        const val DEFAULT_FLUSH_MS = 5_000L
-        const val DEFAULT_GPS_LOST_MS = 10_000L
     }
 }

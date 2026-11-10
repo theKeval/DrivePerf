@@ -5,5 +5,8 @@ package com.driveperf.platform.crash
  * with the stored choice and again whenever the user changes it. Mirrors the `CrashReporter` port in `:shared:domain`.
  */
 interface CrashReporter {
+    /** False when the build has no crash-reporting account configured, so the toggle can say so. */
+    val isAvailable: Boolean
+
     fun setEnabled(enabled: Boolean)
 }

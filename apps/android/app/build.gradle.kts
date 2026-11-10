@@ -2,6 +2,12 @@ plugins {
     id("driveperf.android-application")
 }
 
+// Crash reporting DSN (ADR-007): injected at build time, never committed. Pass `-Pdriveperf.sentryDsn=...` or set
+// DRIVEPERF_SENTRY_DSN. Blank means the Sentry account is not set up and crash reporting is a no-op stub.
+val sentryDsn: Provider<String> = providers.gradleProperty("driveperf.sentryDsn")
+    .orElse(providers.environmentVariable("DRIVEPERF_SENTRY_DSN"))
+    .orElse("")
+
 android {
     namespace = "com.driveperf.app"
     compileSdk = 37 // libraries need the newest APIs to compile; targetSdk stays 36 (ADR-001)
@@ -13,6 +19,8 @@ android {
         // Build number = CI run number (ADR-008); the marketing version is set at release time.
         versionCode = (System.getenv("GITHUB_RUN_NUMBER") ?: "1").toInt()
         versionName = "0.1.0"
+        buildConfigField("String", "SENTRY_DSN", "\"${sentryDsn.get()}\"")
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     // Environments (ADR-008): `dev` installs next to `prod` with its own application ID.
@@ -35,11 +43,21 @@ android {
         }
     }
 
-    buildFeatures { compose = true }
+    buildFeatures {
+        compose = true
+        buildConfig = true
+    }
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
+    }
+
+    testOptions {
+        unitTests {
+            isIncludeAndroidResources = true // Robolectric Compose UI tests
+            isReturnDefaultValues = true
+        }
     }
 
     lint {
@@ -78,5 +96,24 @@ dependencies {
     implementation(libs.compose.foundation)
     implementation(libs.compose.material3)
     implementation(libs.compose.ui.tooling.preview)
+    implementation(libs.androidx.lifecycle.runtime.compose)
+    implementation(libs.androidx.lifecycle.viewmodel.compose)
+    implementation(libs.androidx.navigation.compose)
+    implementation(libs.koin.android)
+    implementation(libs.koin.compose)
+    implementation(libs.kotlinx.coroutines.android)
     debugImplementation(libs.compose.ui.tooling)
+    debugImplementation(libs.compose.ui.test.manifest)
+
+    testImplementation(libs.junit)
+    testImplementation(libs.kotlinx.coroutines.test)
+    testImplementation(libs.turbine)
+    testImplementation(libs.robolectric)
+    testImplementation(platform(libs.compose.bom))
+    testImplementation(libs.compose.ui.test.junit4)
+
+    androidTestImplementation(platform(libs.compose.bom))
+    androidTestImplementation(libs.compose.ui.test.junit4)
+    androidTestImplementation(libs.androidx.test.ext.junit)
+    androidTestImplementation(libs.androidx.test.runner)
 }
