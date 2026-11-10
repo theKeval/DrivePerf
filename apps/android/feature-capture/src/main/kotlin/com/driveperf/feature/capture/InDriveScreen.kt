@@ -1,5 +1,6 @@
 package com.driveperf.feature.capture
 
+import android.app.Activity
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -18,12 +19,15 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.core.view.WindowCompat
 import com.driveperf.designsystem.DpIcons
 import com.driveperf.designsystem.DrivePerfTheme
 
@@ -41,6 +45,7 @@ fun InDriveScreen(
     modifier: Modifier = Modifier,
 ) {
     // The drive screen is always dark on pure black (tokens.json `driveBg`), whatever the system theme: less glare at night.
+    LightSystemBarIcons()
     DrivePerfTheme(darkTheme = true) {
         Surface(
             modifier = modifier.fillMaxSize(),
@@ -132,6 +137,28 @@ private fun StopControl(onStopRequested: () -> Unit, modifier: Modifier = Modifi
                 contentDescription = stringResource(R.string.drive_stop),
                 modifier = Modifier.size(40.dp),
             )
+        }
+    }
+}
+
+/** Draws the status and navigation bar icons light while this screen shows, then restores the previous look. */
+@Composable
+private fun LightSystemBarIcons() {
+    val view = LocalView.current
+    DisposableEffect(view) {
+        val window = (view.context as? Activity)?.window
+        if (window == null) {
+            onDispose { }
+        } else {
+            val controller = WindowCompat.getInsetsController(window, view)
+            val lightStatus = controller.isAppearanceLightStatusBars
+            val lightNav = controller.isAppearanceLightNavigationBars
+            controller.isAppearanceLightStatusBars = false
+            controller.isAppearanceLightNavigationBars = false
+            onDispose {
+                controller.isAppearanceLightStatusBars = lightStatus
+                controller.isAppearanceLightNavigationBars = lightNav
+            }
         }
     }
 }
