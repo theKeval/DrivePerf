@@ -38,7 +38,10 @@ class RepeatDriveTest {
             history += ScoredTrip(result.trip, result.score, result.routeMatch?.routeId)
             routes.previews[result.trip.id] = result.preview
             result.newRoute?.let { r -> routes.routes.removeAll { it.id == r.id }; routes.routes += r }
-            result.extraMatches.forEach { m -> history.replaceAll { if (it.trip.id == m.tripId) it.copy(routeId = m.routeId) else it } }
+            for (m in result.extraMatches) {
+                val i = history.indexOfFirst { it.trip.id == m.tripId }
+                if (i >= 0) history[i] = history[i].copy(routeId = m.routeId)
+            }
             result.routeMatch?.let { m ->
                 val earlier = history.filter { it.routeId == m.routeId && it.trip.id != result.trip.id }
                 routes.runs[m.routeId] = earlier + ScoredTrip(result.trip, result.score, m.routeId)
