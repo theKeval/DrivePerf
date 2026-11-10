@@ -528,6 +528,8 @@ Include pseudocode and a fixture format the shared module's tests will use.
 
 ### A13a — iOS capture test app (Spike 1) · *Opus 5.5 (Claude Code)* · Phase 5 (very first)
 
+> **Scope changed 9 Nov 2026 (`docs/product/decisions.md`, DRIVE-36):** no Mileon comparison for now. Spike 1 is a short data check of 2–3 trips. The prompt below is kept for the record.
+
 ```
 Jira: <Spike 1 key>. Build a throwaway SwiftUI test app in spikes/ios-capture/ (it is not
 product code, but keep it in the repo for the record) that proves iOS background auto-trip

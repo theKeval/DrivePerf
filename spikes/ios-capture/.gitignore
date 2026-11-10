@@ -1,0 +1,15 @@
+# Signing: the Team ID stays out of the repo
+Config/Local.xcconfig
+
+# Real location data must never be committed (ADR-008)
+exports/
+pulled/
+*.gpx
+RAW-DO-NOT-COMMIT-*
+
+# Build output
+build/
+DerivedData/
+.build/
+.swiftpm/
+xcuserdata/
