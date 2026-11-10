@@ -21,10 +21,10 @@ struct ProfileSheet: View {
                 Section("Analytics and diagnostics") {
                     Toggle(
                         "Share usage statistics",
-                        isOn: Binding(get: { model.shareUsageStatistics }, set: model.setShareUsageStatistics))
+                        isOn: Binding(get: { model.shareUsageStatistics }, set: { model.setShareUsageStatistics($0) }))
                     Toggle(
                         "Send crash reports",
-                        isOn: Binding(get: { model.sendCrashReports }, set: model.setSendCrashReports))
+                        isOn: Binding(get: { model.sendCrashReports }, set: { model.setSendCrashReports($0) }))
                     LabeledContent("Crash reports", value: model.crashStatusText)
                 }
                 Section("Diagnostics") {
