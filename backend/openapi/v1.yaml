@@ -2,19 +2,45 @@ openapi: 3.1.0
 info:
   title: DrivePerf API
   version: 1.0.0
-  description: >
-    The HTTP contract between the apps and backend/api (ADR-004, spec-first). The DTOs in
-    shared/api-contract must match it. Endpoints beyond /healthz arrive with DRIVE-76.
+  description: |
+    The HTTP contract between the apps and backend/api (ADR-004, spec-first). The DTOs in shared/api-contract must
+    match it. Entity bodies are defined by docs/architecture/data-model.md (sections 1 and 4.3); this file defines the
+    envelopes, the endpoints and the trip-file (blob) contract.
+
+    **Trip files.** Apps never hold storage credentials. They ask this API for a short-lived S3 SigV4 presigned URL and
+    move the bytes straight to or from the object store (Cloudflare R2 today; any S3-compatible store later), as
+    decided on 6 Nov 2026 (docs/product/decisions.md, ADR-004). The object layout and the signing rules are in
+    docs/architecture/r2-trip-files.md.
+
+    **Compatibility.** Additive changes only within /v1. Readers ignore unknown fields. A breaking change ships as /v2
+    while /v1 keeps working for at least 6 months.
+
+    **Status.** The contract is complete for Phase 6. The server implements the blob and deletion pieces first
+    (backend/api); no route is deployed until the Blaze upgrade (docs/launch/firebase-backend-setup.md).
   license:
     name: Proprietary
     identifier: LicenseRef-Proprietary
 servers:
   - url: https://api.driveperf.com
-    description: Production
+    description: Production (api.driveperf.com is a Firebase Hosting site that rewrites to Cloud Run, ADR-004)
+tags:
+  - name: Health
+  - name: Sync
+    description: Backup and restore of user records (Pro, Pro Preview and Ride-along only for trip data).
+  - name: Blobs
+    description: Trip files, moved through presigned URLs.
+  - name: Entitlement
+  - name: Account
+  - name: Server
+    description: Called by Cloud Scheduler and RevenueCat, never by the apps.
+security:
+  - bearerAuth: []
+    appCheck: []
 paths:
   /healthz:
     get:
       operationId: getHealth
+      tags: [Health]
       summary: Liveness check
       security: []
       responses:
@@ -26,7 +52,448 @@ paths:
                 $ref: '#/components/schemas/HealthResponse'
               example:
                 status: ok
+
+  /v1/sync/changes:
+    get:
+      operationId: getSyncChanges
+      tags: [Sync]
+      summary: Change marker
+      description: One cheap call that says which resources changed since the device's cursors (data-model.md 4.5).
+      parameters:
+        - $ref: '#/components/parameters/ContractHeader'
+        - $ref: '#/components/parameters/AppHeader'
+      responses:
+        '200':
+          description: The latest cursor per resource.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChangeMarker'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+
+  /v1/sync/{resource}:
+    get:
+      operationId: pullSyncResource
+      tags: [Sync]
+      summary: Pull changes (including tombstones) in server order
+      parameters:
+        - $ref: '#/components/parameters/ContractHeader'
+        - $ref: '#/components/parameters/AppHeader'
+        - name: resource
+          in: path
+          required: true
+          schema: { $ref: '#/components/schemas/SyncResource' }
+        - name: after
+          in: query
+          description: The opaque cursor of the last record the device has seen. Omit for a full pull.
+          schema: { type: string, maxLength: 64 }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 500, default: 500 }
+      responses:
+        '200':
+          description: A page of records.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PullResponse'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '410':
+          description: The cursor is older than the 90-day tombstone window (`cursor_expired`). Run a full reconcile.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiError' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+
+  /v1/sync/push:
+    post:
+      operationId: pushSyncMutations
+      tags: [Sync]
+      summary: Push upserts, patches and tombstones
+      description: |
+        At most 100 mutations or 2 MB per call. Each mutation carries a UUIDv7 `mutationId`, the idempotency key; the
+        server remembers it for 14 days and replays the stored result on a duplicate. Trip mutations that reference
+        blobs are accepted only after the blob was committed (`POST /v1/blobs:commit`).
+      parameters:
+        - $ref: '#/components/parameters/ContractHeader'
+        - $ref: '#/components/parameters/AppHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PushRequest' }
+      responses:
+        '200':
+          description: One result per mutation, in request order.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PushResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409':
+          description: The device's `backupEpoch` is stale (the cloud copy was wiped or purged). Re-read `/v1/entitlement`.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiError' }
+        '413': { $ref: '#/components/responses/TooLarge' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+
+  /v1/blobs:prepare:
+    post:
+      operationId: prepareBlobUpload
+      tags: [Blobs]
+      summary: Ask for a presigned upload URL for a trip file
+      description: |
+        The server checks, in this order: the caller owns the account segment of `key`; the key matches the layout in
+        `BlobKey`; backup is allowed (entitlement and `writeUntil`); `sizeBytes` is within the limit. If the object
+        already exists with the same hash it answers `exists: true` and the device skips the upload. Otherwise it
+        returns a presigned PUT URL valid for 15 minutes together with the **exact headers** the device must send; the
+        headers are part of the signature, so a different content type, length or hash is rejected by the store.
+        The device then calls `POST /v1/blobs:commit`.
+      parameters:
+        - $ref: '#/components/parameters/ContractHeader'
+        - $ref: '#/components/parameters/AppHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PrepareBlobRequest' }
+            example:
+              key: u/Zk3x9QmFhPaCvTt2eBn7Ls0Gy41/t/0193f7a2-5b1e-7c3d-9a10-4f2e8b6c1d20/r1.v1.9f2c41aa07be3d55.pb.gz
+              sha256: 9f2c41aa07be3d55a8a1e2c0b6d47f3c1e9b5a6d7c8e9f001122334455667788
+              sizeBytes: 301230
+              contentType: application/x-protobuf
+      responses:
+        '200':
+          description: Either the object exists, or here is where to put it.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PrepareBlobResponse' }
+              examples:
+                upload:
+                  value:
+                    exists: false
+                    uploadUrl: https://example-account-id.r2.cloudflarestorage.com/driveperf-trips-dev/u/Zk3x9QmFhPaCvTt2eBn7Ls0Gy41/t/0193f7a2-5b1e-7c3d-9a10-4f2e8b6c1d20/r1.v1.9f2c41aa07be3d55.pb.gz?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Expires=900
+                    method: PUT
+                    headers:
+                      Content-Type: application/x-protobuf
+                      Content-Length: '301230'
+                      x-amz-meta-sha256: 9f2c41aa07be3d55a8a1e2c0b6d47f3c1e9b5a6d7c8e9f001122334455667788
+                    expiresAt: 1762347300000
+                exists:
+                  value: { exists: true }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '413': { $ref: '#/components/responses/TooLarge' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+
+  /v1/blobs:commit:
+    post:
+      operationId: commitBlobUpload
+      tags: [Blobs]
+      summary: Confirm that an upload finished
+      description: |
+        The server reads the object's metadata from the store (HEAD) and checks size and the recorded hash. Success
+        registers the blob so a trip mutation may reference it. Unreferenced blobs older than 24 hours are removed by
+        the orphan sweep.
+      parameters:
+        - $ref: '#/components/parameters/ContractHeader'
+        - $ref: '#/components/parameters/AppHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CommitBlobRequest' }
+      responses:
+        '204':
+          description: The blob is registered.
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404':
+          description: The object is not in the store, or its size or hash does not match (`blob_missing`). Upload again.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiError' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+
+  /v1/blobs/{key}:
+    parameters:
+      - $ref: '#/components/parameters/ContractHeader'
+      - $ref: '#/components/parameters/AppHeader'
+      - name: key
+        in: path
+        required: true
+        description: The blob key, URL-encoded (each `/` is `%2F`).
+        schema: { $ref: '#/components/schemas/BlobKey' }
+    get:
+      operationId: getBlobDownload
+      tags: [Blobs]
+      summary: Redirect to a presigned download URL
+      description: |
+        Allowed while the backup window is readable (`readUntil`, which includes the 30 days after Pro ends). The
+        redirect target is valid for 15 minutes. Clients follow it without the Authorization header.
+      responses:
+        '302':
+          description: Redirect to the presigned GET URL.
+          headers:
+            Location:
+              description: The presigned URL.
+              schema: { type: string, format: uri }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+    delete:
+      operationId: deleteBlob
+      tags: [Blobs]
+      summary: Delete a trip file
+      description: Always allowed for the owner, whatever the backup state. Idempotent.
+      responses:
+        '204':
+          description: The blob is deleted (or never existed).
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+
+  /v1/entitlement:
+    get:
+      operationId: getEntitlement
+      tags: [Entitlement]
+      summary: The server's view of Pro and the backup window
+      parameters:
+        - $ref: '#/components/parameters/ContractHeader'
+        - $ref: '#/components/parameters/AppHeader'
+      responses:
+        '200':
+          description: Entitlement and backup window.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EntitlementResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+
+  /v1/entitlement/preview:claim:
+    post:
+      operationId: claimPreview
+      tags: [Entitlement]
+      summary: Claim the Pro Preview for backup (once per account and per device)
+      parameters:
+        - $ref: '#/components/parameters/ContractHeader'
+        - $ref: '#/components/parameters/AppHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PreviewClaimRequest' }
+      responses:
+        '200':
+          description: The resulting entitlement.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EntitlementResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409':
+          description: The Preview was already claimed by this account or device (`preview_already_claimed`).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiError' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+
+  /v1/backup:wipe:
+    post:
+      operationId: wipeBackup
+      tags: [Account]
+      summary: Delete the cloud copy ("Delete cloud copy" and "Delete all trips")
+      description: Moves the backup to PURGING, deletes records and objects, and increments `backupEpoch`. The account stays.
+      parameters:
+        - $ref: '#/components/parameters/ContractHeader'
+        - $ref: '#/components/parameters/AppHeader'
+      responses:
+        '202':
+          description: The wipe is queued; the API refuses reads and writes of the backup from now on.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EntitlementResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+
+  /v1/account:delete:
+    post:
+      operationId: deleteAccount
+      tags: [Account]
+      summary: Delete the account and everything stored for it (F-PRV-05)
+      description: |
+        Requires a recent sign-in (the ID token's `auth_time` is at most 5 minutes old; otherwise `401
+        reauth_required`). The call is synchronous only up to the request: it creates a deletion request, sets the
+        account to `deleting` (the API refuses every other call for it from now on), revokes refresh tokens and
+        returns a receipt. The hourly `deletion` job then removes trip files, records, the RevenueCat subscriber and
+        the Firebase Auth user (data-model.md 5.5). Done within 24 hours.
+      parameters:
+        - $ref: '#/components/parameters/ContractHeader'
+        - $ref: '#/components/parameters/AppHeader'
+      responses:
+        '202':
+          description: The deletion is queued.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DeletionReceipt' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+
+  /v1/account/deletion-requests:
+    post:
+      operationId: requestAccountDeletionByEmail
+      tags: [Account]
+      summary: Ask for account deletion from the website (S-WEB-07, F-WEB-04)
+      description: |
+        For people who cannot sign in to the app. The server emails a confirmation link to the address and creates the
+        deletion request only after the link is followed. It always answers 202, so it never reveals whether an account
+        exists. Needs an App Check token from the website once the website uses App Check; no ID token.
+      security:
+        - appCheck: []
+      parameters:
+        - $ref: '#/components/parameters/ContractHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/EmailDeletionRequest' }
+      responses:
+        '202':
+          description: If an account exists for the address, a confirmation email is on its way.
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+
+  /v1/webhooks/revenuecat:
+    post:
+      operationId: receiveRevenueCatWebhook
+      tags: [Server]
+      summary: RevenueCat event (purchase, renewal, expiration, ...)
+      description: Authenticated by a shared secret in the Authorization header. Events are deduplicated by event ID.
+      security:
+        - revenueCatSecret: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              description: RevenueCat's webhook payload, passed through unchanged.
+              additionalProperties: true
+      responses:
+        '200':
+          description: Processed, or already seen.
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /v1/jobs/{job}:
+    post:
+      operationId: runJob
+      tags: [Server]
+      summary: Run a scheduled job in a time-boxed batch
+      description: |
+        Called by Cloud Scheduler (or a systemd timer on a VPS) with an OIDC token of the scheduler service account.
+        `daily` (03:17 UTC) reconciles entitlements, sends reminders, purges lapsed cloud copies, sweeps orphan blobs
+        and compacts tombstones; `deletion` (hourly) runs the account-deletion cascade. Each call works for about 45
+        seconds and answers `more: true` when work remains, so the scheduler's retry continues it.
+      security:
+        - schedulerOidc: []
+      parameters:
+        - name: job
+          in: path
+          required: true
+          schema: { type: string, enum: [daily, deletion] }
+      responses:
+        '200':
+          description: Progress of this batch.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/JobResult' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
 components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        A Firebase ID token today. Verification is issuer-agnostic (a configured list of trusted issuers and JWKS
+        URLs), so the identity provider can change without touching route handlers (ADR-004).
+    appCheck:
+      type: apiKey
+      in: header
+      name: X-Firebase-AppCheck
+      description: A Firebase App Check token, verified against the App Check JWKS.
+    revenueCatSecret:
+      type: apiKey
+      in: header
+      name: Authorization
+      description: A shared secret configured in the RevenueCat dashboard and in Secret Manager.
+    schedulerOidc:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: An OIDC token minted for the Cloud Scheduler service account; audience is the API URL.
+
+  parameters:
+    ContractHeader:
+      name: DP-Contract
+      in: header
+      required: true
+      description: Contract major version. Always `1` for /v1.
+      schema: { type: string, const: '1' }
+    AppHeader:
+      name: DP-App
+      in: header
+      required: false
+      description: Platform and build, for diagnostics only, for example `ios/1.0.0 (123)`.
+      schema: { type: string, maxLength: 64 }
+
+  responses:
+    BadRequest:
+      description: The request is malformed or breaks a rule (`validation`).
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ApiError' }
+    Unauthorized:
+      description: Missing or invalid token, or a sign-in that is too old (`unauthenticated`, `reauth_required`).
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ApiError' }
+    Forbidden:
+      description: The account may not do this (`backup_not_allowed`, `account_deleting`, `app_check_failed`).
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ApiError' }
+    NotFound:
+      description: No such resource (`not_found`).
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ApiError' }
+    TooLarge:
+      description: The body or file is over the limit (`too_large`).
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ApiError' }
+    RateLimited:
+      description: Too many requests (`rate_limited`). Retry after the `Retry-After` header.
+      headers:
+        Retry-After:
+          schema: { type: integer, minimum: 1 }
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ApiError' }
+
   schemas:
     HealthResponse:
       type: object
@@ -34,3 +501,262 @@ components:
       properties:
         status:
           type: string
+
+    ApiError:
+      type: object
+      required: [code, message, retryable]
+      properties:
+        code:
+          type: string
+          description: Stable machine-readable code, for example `validation`, `backup_not_allowed`, `blob_missing`, `too_large`.
+        message:
+          type: string
+          description: For logs only. Never shown to users and never contains personal data.
+        retryable:
+          type: boolean
+
+    SyncResource:
+      type: string
+      enum: [settings, devices, consents, vehicles, places, privacyZones, routes, trips]
+
+    ChangeMarker:
+      type: object
+      required: [backupEpoch, resources]
+      properties:
+        backupEpoch:
+          type: integer
+          description: Incremented when the cloud copy is wiped or purged.
+        resources:
+          type: object
+          description: The latest opaque cursor per resource.
+          propertyNames: { $ref: '#/components/schemas/SyncResource' }
+          additionalProperties: { type: string }
+      example:
+        backupEpoch: 2
+        resources: { trips: 'v1:4812', routes: 'v1:4790' }
+
+    HybridLogicalClock:
+      type: string
+      description: '`wallMs:counter:deviceTag` (data-model.md 4.4).'
+      pattern: '^[0-9]+:[0-9]+:[0-9a-f]{8}$'
+
+    SyncRecord:
+      type: object
+      required: [id, schemaVersion, createdAt, updatedAt, deletedAt, originDeviceId, fieldClock, cursor, body]
+      properties:
+        id: { type: string, description: UUIDv7 generated on the device. }
+        schemaVersion: { type: integer, minimum: 1 }
+        createdAt: { type: integer, format: int64, description: UTC epoch milliseconds. }
+        updatedAt: { type: integer, format: int64 }
+        deletedAt:
+          type: [integer, 'null']
+          format: int64
+          description: Set on a tombstone. A tombstone has an empty `body`.
+        originDeviceId: { type: string }
+        fieldClock:
+          type: object
+          additionalProperties: { $ref: '#/components/schemas/HybridLogicalClock' }
+        cursor:
+          type: string
+          description: Opaque. Encodes the record's per-account `rev`; clients never parse it.
+        body:
+          type: object
+          additionalProperties: true
+          description: The resource fields of data-model.md section 1 (camelCase, SI units).
+
+    PullResponse:
+      type: object
+      required: [records, next, hasMore]
+      properties:
+        records:
+          type: array
+          items: { $ref: '#/components/schemas/SyncRecord' }
+        next: { type: string, description: The cursor to pass as `after` for the next page. }
+        hasMore: { type: boolean }
+
+    BlobReference:
+      type: object
+      required: [key, sha256]
+      properties:
+        key: { $ref: '#/components/schemas/BlobKey' }
+        sha256: { $ref: '#/components/schemas/Sha256Hex' }
+
+    Mutation:
+      type: object
+      required: [mutationId, resource, id, op, schemaVersion, createdAt]
+      properties:
+        mutationId: { type: string, description: UUIDv7, the idempotency key. }
+        resource: { $ref: '#/components/schemas/SyncResource' }
+        id: { type: string }
+        op: { type: string, enum: [upsert, patch, delete] }
+        schemaVersion: { type: integer, minimum: 1 }
+        createdAt: { type: integer, format: int64 }
+        fields:
+          type: object
+          additionalProperties: true
+          description: Patch carries the changed fields only; upsert the full body; delete is empty.
+        fieldClock:
+          type: object
+          additionalProperties: { $ref: '#/components/schemas/HybridLogicalClock' }
+        deletedAt: { type: [integer, 'null'], format: int64 }
+        blobs:
+          type: array
+          maxItems: 4
+          items: { $ref: '#/components/schemas/BlobReference' }
+
+    PushRequest:
+      type: object
+      required: [deviceId, backupEpoch, mutations]
+      properties:
+        deviceId: { type: string }
+        backupEpoch: { type: integer }
+        mutations:
+          type: array
+          minItems: 1
+          maxItems: 100
+          items: { $ref: '#/components/schemas/Mutation' }
+
+    MutationResult:
+      type: object
+      required: [mutationId, status]
+      properties:
+        mutationId: { type: string }
+        status: { type: string, enum: [applied, merged, noop, rejected] }
+        cursor: { type: string }
+        record:
+          $ref: '#/components/schemas/SyncRecord'
+        error:
+          type: object
+          required: [code, retryable]
+          properties:
+            code: { type: string, enum: [validation, backup_not_allowed, blob_missing, too_large] }
+            retryable: { type: boolean }
+
+    PushResponse:
+      type: object
+      required: [results]
+      properties:
+        results:
+          type: array
+          items: { $ref: '#/components/schemas/MutationResult' }
+
+    Sha256Hex:
+      type: string
+      description: Lowercase hex SHA-256 of the file as uploaded (the gzip bytes).
+      pattern: '^[0-9a-f]{64}$'
+
+    BlobKey:
+      type: string
+      description: |
+        `u/{accountId}/t/{tripId}/r1.v{formatVersion}.{sha256[0:16]}.pb.gz`. Content-addressed and immutable.
+        Contains opaque identifiers and a hash only, never a name, date or place. `accountId` is the opaque account ID
+        (treated as a string of at most 128 URL-safe characters), `tripId` a UUID.
+      pattern: '^u/[A-Za-z0-9_-]{1,128}/t/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/r1\.v[0-9]{1,3}\.[0-9a-f]{16}\.pb\.gz$'
+      maxLength: 256
+
+    PrepareBlobRequest:
+      type: object
+      required: [key, sha256, sizeBytes, contentType]
+      properties:
+        key: { $ref: '#/components/schemas/BlobKey' }
+        sha256: { $ref: '#/components/schemas/Sha256Hex' }
+        sizeBytes:
+          type: integer
+          minimum: 1
+          maximum: 16777216
+          description: Bytes. The limit is 16 MiB; an R1 file is about 0.25 MB per trip.
+        contentType:
+          type: string
+          const: application/x-protobuf
+
+    PrepareBlobResponse:
+      type: object
+      required: [exists]
+      properties:
+        exists:
+          type: boolean
+          description: True when the object is already stored with this hash. Nothing else is returned then.
+        uploadUrl:
+          type: string
+          format: uri
+          description: Presigned (SigV4) URL. Valid for 15 minutes. Never log it.
+        method:
+          type: string
+          const: PUT
+        headers:
+          type: object
+          description: |
+            The exact headers to send with the upload. They are signed: `Content-Type`, `Content-Length`,
+            `x-amz-meta-sha256`, `x-amz-meta-tripid` and `x-amz-meta-formatversion`. Send these and nothing else that
+            is signed; the store rejects any other value.
+          additionalProperties: { type: string }
+        expiresAt:
+          type: integer
+          format: int64
+          description: UTC epoch milliseconds.
+
+    CommitBlobRequest:
+      type: object
+      required: [key]
+      properties:
+        key: { $ref: '#/components/schemas/BlobKey' }
+
+    BackupWindow:
+      type: object
+      required: [state, backupEpoch]
+      properties:
+        state: { type: string, enum: [OFF, ACTIVE, LAPSED, PURGING] }
+        backupEpoch: { type: integer }
+        writeUntil: { type: [integer, 'null'], format: int64 }
+        readUntil: { type: [integer, 'null'], format: int64 }
+        lapsedAt: { type: [integer, 'null'], format: int64 }
+        purgeAt: { type: [integer, 'null'], format: int64 }
+        cloudBytes: { type: integer, format: int64 }
+        cloudTrips: { type: integer }
+        remindersSent:
+          type: array
+          items: { type: string, enum: [D30, D7, D1] }
+
+    EntitlementResponse:
+      type: object
+      required: [entitlement, backup]
+      properties:
+        entitlement:
+          type: object
+          required: [plan, isPro]
+          properties:
+            plan: { type: string, enum: [FREE, PREVIEW, RIDEALONG, PRO_MONTHLY, PRO_ANNUAL, PROMO] }
+            isPro: { type: boolean }
+            expiresAt: { type: [integer, 'null'], format: int64 }
+        backup: { $ref: '#/components/schemas/BackupWindow' }
+
+    PreviewClaimRequest:
+      type: object
+      required: [installAt, deviceId]
+      properties:
+        installAt: { type: integer, format: int64, description: UTC epoch milliseconds of the first open. }
+        deviceId: { type: string }
+
+    DeletionReceipt:
+      type: object
+      required: [requestId, status, completeBy]
+      properties:
+        requestId: { type: string }
+        status: { type: string, enum: [queued] }
+        completeBy: { type: integer, format: int64, description: UTC epoch milliseconds; 24 hours after the request. }
+
+    EmailDeletionRequest:
+      type: object
+      required: [email]
+      properties:
+        email: { type: string, format: email, maxLength: 254 }
+
+    JobResult:
+      type: object
+      required: [more]
+      properties:
+        more: { type: boolean, description: True when work remains. Call again. }
+        processed:
+          type: object
+          description: Counts per step, for the `jobRuns` summary.
+          additionalProperties: { type: integer }
