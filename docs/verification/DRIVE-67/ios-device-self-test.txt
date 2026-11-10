@@ -1,0 +1,11 @@
+DrivePerf self-test 2026-11-10T22:37:08Z
+PASS  Storage after first unlock: Trip files writable (unlocked since boot)
+PASS  CLMonitor name: “parkedSpot” is alphanumeric
+PASS  Permissions: Location always, precise on, motion authorized
+SKIP  Wake triggers: No parking spot yet (armed after the first trip)
+PASS  Stale wake filter: 10-minute-old fix dropped
+PASS  GPS fix: First fix after 0.0 s, accuracy ≤ 20 m
+PASS  Motion at 50 Hz, off the main thread: 53.0 Hz, |gravity| 1.000 g, gravityUp.z 0.20
+PASS  Motion activity history: 32 activity changes in the last 15 min
+PASS  Wake → candidate records → rejected: Recorded 44 KB before confirmation, then rejected and deleted
+PASS  Manual start → record → stop: Saved as “short”: 304 motion, 7 location samples
