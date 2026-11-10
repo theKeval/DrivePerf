@@ -1,0 +1,9 @@
+// Copy to Config/Local.xcconfig (gitignored) to run a Debug build on your own iPhone with a free Personal Team.
+// Temporary: only until the Apple Developer account is bought (DRIVE-42). The launch build is com.driveperf.app.
+//
+// Both lines below are required together. The bundle ID override keeps the Personal Team away from
+// com.driveperf.*; never set DEVELOPMENT_TEAM without it. Release builds ignore this team on purpose.
+DP_APP_ID_DEBUG = com.yourname.driveperf.dev
+DEVELOPMENT_TEAM = YOURTEAMID
+CODE_SIGN_STYLE = Automatic
+CODE_SIGN_IDENTITY = Apple Development

@@ -1,0 +1,9 @@
+# Signing: the Team ID and the local bundle-ID override stay out of the repo
+Config/Local.xcconfig
+
+# Build output
+build/
+DerivedData/
+.build/
+.swiftpm/
+xcuserdata/

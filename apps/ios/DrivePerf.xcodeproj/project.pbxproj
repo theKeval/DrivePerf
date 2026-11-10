@@ -11,6 +11,10 @@
 		E60FCF481FDE03861756D195 /* DPPlatform in Frameworks */ = {isa = PBXBuildFile; productRef = 2384D057D281CC940F7D4E1E /* DPPlatform */; };
 		7EC52976499B5B81A0D425A8 /* DPFeatures in Frameworks */ = {isa = PBXBuildFile; productRef = 410609BA9023FE19A593C6B5 /* DPFeatures */; };
 		0DEA1F96D69B5306EF587649 /* DPSharedBridge in Frameworks */ = {isa = PBXBuildFile; productRef = 8F233B94BDFE4B12F89DEAE6 /* DPSharedBridge */; };
+		CAECE1DE176A9A9AB82BECC5 /* DrivePerfWidgets.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = C78DB3CD1C91C53DDCE261D3 /* DrivePerfWidgets.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		A1636191DAA3D5F8D7710C1F /* DPDesignSystem in Frameworks */ = {isa = PBXBuildFile; productRef = 40B49A89EF6B2EFB1DBAE209 /* DPDesignSystem */; };
+		50C7C76EF68589989FC083FC /* DPPlatform in Frameworks */ = {isa = PBXBuildFile; productRef = E7F90B093A3F389442BDC916 /* DPPlatform */; };
+		7E85C121565F0546BC490205 /* DPSharedBridge in Frameworks */ = {isa = PBXBuildFile; productRef = EE821C4170D02D96DA041C18 /* DPSharedBridge */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -21,11 +25,34 @@
 			remoteGlobalIDString = 778130C49534A4D32801D13D;
 			remoteInfo = DrivePerf;
 		};
+		6CAD0764991D2B807BB930D9 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 46F86FAA6BBF9AC94A7E4595 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = E404C32E54FBF664F0BE6EA7;
+			remoteInfo = DrivePerfWidgets;
+		};
 /* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		86E3BDE2B63F3ACCEF6EA375 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				CAECE1DE176A9A9AB82BECC5 /* DrivePerfWidgets.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		7BCCADA3021C07D12E775CB5 /* DrivePerf.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = DrivePerf.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		195F9293022CEE80C9E8D0C0 /* DrivePerfTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = DrivePerfTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		C78DB3CD1C91C53DDCE261D3 /* DrivePerfWidgets.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = DrivePerfWidgets.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		AA7552F4044EA4EB5BDFEB18 /* DrivePerf.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = DrivePerf.xcconfig; path = Config/DrivePerf.xcconfig; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -39,6 +66,16 @@
 			path = DrivePerfTests;
 			sourceTree = "<group>";
 		};
+		837C0CE8527174CF5E6E4F5B /* Shared */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = Shared;
+			sourceTree = "<group>";
+		};
+		2315202EF18249A247A92E30 /* DrivePerfWidgets */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = DrivePerfWidgets;
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -48,6 +85,7 @@
 			files = (
 				FEB70EF8BA0C217C495F4BCC /* DPFeatures in Frameworks */,
 				E60FCF481FDE03861756D195 /* DPPlatform in Frameworks */,
+				7E85C121565F0546BC490205 /* DPSharedBridge in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -57,6 +95,15 @@
 			files = (
 				7EC52976499B5B81A0D425A8 /* DPFeatures in Frameworks */,
 				0DEA1F96D69B5306EF587649 /* DPSharedBridge in Frameworks */,
+				50C7C76EF68589989FC083FC /* DPPlatform in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		F2A4242EB592F72AD91798B0 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A1636191DAA3D5F8D7710C1F /* DPDesignSystem in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -68,6 +115,9 @@
 			children = (
 				B0E0396B5B7A7E19948EF0FB /* DrivePerf */,
 				6DE8CF09256CB1114261B4F1 /* DrivePerfTests */,
+				837C0CE8527174CF5E6E4F5B /* Shared */,
+				2315202EF18249A247A92E30 /* DrivePerfWidgets */,
+				AA7552F4044EA4EB5BDFEB18 /* DrivePerf.xcconfig */,
 				86024CAD1E83101D97359D73 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -77,6 +127,7 @@
 			children = (
 				7BCCADA3021C07D12E775CB5 /* DrivePerf.app */,
 				195F9293022CEE80C9E8D0C0 /* DrivePerfTests.xctest */,
+				C78DB3CD1C91C53DDCE261D3 /* DrivePerfWidgets.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -92,18 +143,22 @@
 				84E2FD34901EE2948D11C7BA /* Sources */,
 				23D4D8A1A691152DF04FD401 /* Frameworks */,
 				A95D68C222F00292802D0988 /* Resources */,
+				86E3BDE2B63F3ACCEF6EA375 /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				04838CA1052D2E107F36338F /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				B0E0396B5B7A7E19948EF0FB /* DrivePerf */,
+				837C0CE8527174CF5E6E4F5B /* Shared */,
 			);
 			name = DrivePerf;
 			packageProductDependencies = (
 				EC8B5A20E069754FAEC2A2D5 /* DPFeatures */,
 				2384D057D281CC940F7D4E1E /* DPPlatform */,
+				EE821C4170D02D96DA041C18 /* DPSharedBridge */,
 			);
 			productName = DrivePerf;
 			productReference = 7BCCADA3021C07D12E775CB5 /* DrivePerf.app */;
@@ -129,10 +184,35 @@
 			packageProductDependencies = (
 				410609BA9023FE19A593C6B5 /* DPFeatures */,
 				8F233B94BDFE4B12F89DEAE6 /* DPSharedBridge */,
+				E7F90B093A3F389442BDC916 /* DPPlatform */,
 			);
 			productName = DrivePerfTests;
 			productReference = 195F9293022CEE80C9E8D0C0 /* DrivePerfTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		E404C32E54FBF664F0BE6EA7 /* DrivePerfWidgets */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 89464B724879F8E98CCC9966 /* Build configuration list for PBXNativeTarget "DrivePerfWidgets" */;
+			buildPhases = (
+				4C4658359CC4F31DFDFF4503 /* Sources */,
+				F2A4242EB592F72AD91798B0 /* Frameworks */,
+				E4B0627F3737FF8911A1FFA9 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				2315202EF18249A247A92E30 /* DrivePerfWidgets */,
+				837C0CE8527174CF5E6E4F5B /* Shared */,
+			);
+			name = DrivePerfWidgets;
+			packageProductDependencies = (
+				40B49A89EF6B2EFB1DBAE209 /* DPDesignSystem */,
+			);
+			productName = DrivePerfWidgets;
+			productReference = C78DB3CD1C91C53DDCE261D3 /* DrivePerfWidgets.appex */;
+			productType = "com.apple.product-type.app-extension";
 		};
 /* End PBXNativeTarget section */
 
@@ -150,6 +230,9 @@
 					27C2F5CD118605258B779913 = {
 						CreatedOnToolsVersion = 26.2;
 						TestTargetID = 778130C49534A4D32801D13D;
+					};
+					E404C32E54FBF664F0BE6EA7 = {
+						CreatedOnToolsVersion = 27.2;
 					};
 				};
 			};
@@ -175,6 +258,7 @@
 			targets = (
 				778130C49534A4D32801D13D /* DrivePerf */,
 				27C2F5CD118605258B779913 /* DrivePerfTests */,
+				E404C32E54FBF664F0BE6EA7 /* DrivePerfWidgets */,
 			);
 		};
 /* End PBXProject section */
@@ -188,6 +272,13 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		89DF208E15B13AD51CE7CB45 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		E4B0627F3737FF8911A1FFA9 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -233,6 +324,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		4C4658359CC4F31DFDFF4503 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -241,19 +339,22 @@
 			target = 778130C49534A4D32801D13D /* DrivePerf */;
 			targetProxy = 431387EB7262E1CFC79B125E /* PBXContainerItemProxy */;
 		};
+		04838CA1052D2E107F36338F /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = E404C32E54FBF664F0BE6EA7 /* DrivePerfWidgets */;
+			targetProxy = 6CAD0764991D2B807BB930D9 /* PBXContainerItemProxy */;
+		};
 /* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		EDF2539783D433988A316B18 /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = AA7552F4044EA4EB5BDFEB18 /* DrivePerf.xcconfig */;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				CLANG_ENABLE_MODULES = YES;
 				CLANG_ENABLE_OBJC_ARC = YES;
-				CODE_SIGN_IDENTITY = "-";
-				CODE_SIGN_STYLE = Manual;
 				DEBUG_INFORMATION_FORMAT = dwarf;
-				DEVELOPMENT_TEAM = "";
 				ENABLE_TESTABILITY = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				"EXCLUDED_ARCHS[sdk=iphonesimulator*]" = x86_64;
@@ -273,14 +374,12 @@
 		};
 		20E4CE03CB913D0E9181E6D4 /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = AA7552F4044EA4EB5BDFEB18 /* DrivePerf.xcconfig */;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				CLANG_ENABLE_MODULES = YES;
 				CLANG_ENABLE_OBJC_ARC = YES;
-				CODE_SIGN_IDENTITY = "-";
-				CODE_SIGN_STYLE = Manual;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
-				DEVELOPMENT_TEAM = "";
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				"EXCLUDED_ARCHS[sdk=iphonesimulator*]" = x86_64;
@@ -308,6 +407,7 @@
 					"$(SRCROOT)/../../shared/ios-export/build/xcode-frameworks/$(CONFIGURATION)/$(SDK_NAME)",
 				);
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Config/DrivePerf-Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "DrivePerf Dev";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -322,8 +422,9 @@
 					"-framework",
 					DrivePerfShared,
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.driveperf.app.dev;
+				PRODUCT_BUNDLE_IDENTIFIER = "$(DP_APP_ID_DEBUG)";
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DRIVEPERF_APP $(inherited)";
 				SWIFT_STRICT_CONCURRENCY = complete;
 			};
 			name = Debug;
@@ -340,6 +441,7 @@
 					"$(SRCROOT)/../../shared/ios-export/build/xcode-frameworks/$(CONFIGURATION)/$(SDK_NAME)",
 				);
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Config/DrivePerf-Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = DrivePerf;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -354,8 +456,12 @@
 					"-framework",
 					DrivePerfShared,
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.driveperf.app;
+				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_STYLE = Manual;
+				DEVELOPMENT_TEAM = "";
+				PRODUCT_BUNDLE_IDENTIFIER = "$(DP_APP_ID_RELEASE)";
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DRIVEPERF_APP $(inherited)";
 				SWIFT_STRICT_CONCURRENCY = complete;
 			};
 			name = Release;
@@ -371,7 +477,7 @@
 				);
 				GENERATE_INFOPLIST_FILE = YES;
 				MARKETING_VERSION = 0.1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.driveperf.app.tests;
+				PRODUCT_BUNDLE_IDENTIFIER = "$(DP_APP_ID_DEBUG).tests";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_STRICT_CONCURRENCY = complete;
 				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/DrivePerf.app/DrivePerf";
@@ -389,10 +495,55 @@
 				);
 				GENERATE_INFOPLIST_FILE = YES;
 				MARKETING_VERSION = 0.1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.driveperf.app.tests;
+				PRODUCT_BUNDLE_IDENTIFIER = "$(DP_APP_ID_RELEASE).tests";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_STRICT_CONCURRENCY = complete;
 				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/DrivePerf.app/DrivePerf";
+			};
+			name = Release;
+		};
+		4A851F520A969FF7C53CA94F /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Config/Widgets-Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = DrivePerf;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "$(DP_APP_ID_DEBUG).widgets";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_STRICT_CONCURRENCY = complete;
+			};
+			name = Debug;
+		};
+		14F906EE01E24204F1861BD9 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_STYLE = Manual;
+				DEVELOPMENT_TEAM = "";
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Config/Widgets-Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = DrivePerf;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "$(DP_APP_ID_RELEASE).widgets";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_STRICT_CONCURRENCY = complete;
 			};
 			name = Release;
 		};
@@ -422,6 +573,15 @@
 			buildConfigurations = (
 				6B296AAC189B779359784EFD /* Debug */,
 				D0C8FA6F2BB7A6ECBD3DAAE1 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		89464B724879F8E98CCC9966 /* Build configuration list for PBXNativeTarget "DrivePerfWidgets" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				4A851F520A969FF7C53CA94F /* Debug */,
+				14F906EE01E24204F1861BD9 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
@@ -461,6 +621,18 @@
 			productName = DPFeatures;
 		};
 		8F233B94BDFE4B12F89DEAE6 /* DPSharedBridge */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = DPSharedBridge;
+		};
+		40B49A89EF6B2EFB1DBAE209 /* DPDesignSystem */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = DPDesignSystem;
+		};
+		E7F90B093A3F389442BDC916 /* DPPlatform */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = DPPlatform;
+		};
+		EE821C4170D02D96DA041C18 /* DPSharedBridge */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = DPSharedBridge;
 		};

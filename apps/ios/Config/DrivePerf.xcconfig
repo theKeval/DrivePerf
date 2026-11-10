@@ -1,0 +1,22 @@
+// Project-level settings for every target and configuration. Committed values are the shipping identity:
+// com.driveperf.app (Release) and com.driveperf.app.dev (Debug), unsigned. Local overrides go in the gitignored
+// Config/Local.xcconfig (see Local.xcconfig.example and apps/ios/README.md "Run it on your iPhone").
+
+// Bundle IDs. Never sign these with a free Personal Team: it can claim the IDs and block the paid account (DRIVE-42).
+DP_APP_ID_RELEASE = com.driveperf.app
+DP_APP_ID_DEBUG = com.driveperf.app.dev
+
+// Simulator-only signing by default (CI, tools/run-ios.sh).
+CODE_SIGN_STYLE = Manual
+CODE_SIGN_IDENTITY = -
+DEVELOPMENT_TEAM =
+
+// Crash reporting (ADR-007): Sentry EU DSN, injected at build time, never committed. Empty = stub only.
+DP_SENTRY_DSN =
+
+// Features that wait for the Apple Developer account (DRIVE-42). Keep NO until it exists.
+DP_FEATURE_SIGN_IN_WITH_APPLE = NO
+DP_FEATURE_PUSH = NO
+DP_FEATURE_TESTFLIGHT = NO
+
+#include? "Local.xcconfig"
