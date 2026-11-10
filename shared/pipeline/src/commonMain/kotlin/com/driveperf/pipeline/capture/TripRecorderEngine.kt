@@ -13,6 +13,7 @@ import com.driveperf.domain.capture.MotionSource
 import com.driveperf.domain.capture.ParkedRegionMonitor
 import com.driveperf.domain.capture.PowerState
 import com.driveperf.domain.capture.PowerStatus
+import com.driveperf.domain.capture.PreviewStore
 import com.driveperf.domain.capture.RecordedAccelSample
 import com.driveperf.domain.capture.RecorderState
 import com.driveperf.domain.capture.RecorderStatus
@@ -50,8 +51,13 @@ public data class CapturePorts(
     val files: TripFileStore,
 )
 
-/** Where the recorder persists. */
-public data class CapturePersistence(val store: TripStore, val log: CaptureLog, val finaliser: TripFinaliser)
+/** Where the recorder persists. [previews] stores preview tracks; null skips them (tests). */
+public data class CapturePersistence(
+    val store: TripStore,
+    val log: CaptureLog,
+    val finaliser: TripFinaliser,
+    val previews: PreviewStore? = null,
+)
 
 /**
  * The [TripRecorder]: runs [TripMachine] and executes its effects against the ports. Every input goes through one
@@ -311,6 +317,7 @@ public class TripRecorderEngine(
             discard(effect.tripId)
         } else {
             persistence.store.saveFinalised(finished)
+            if (finished.preview.isNotEmpty()) persistence.previews?.write(effect.tripId, finished.preview)
             ports.files.compress(effect.tripId, TripFileKind.R0)
         }
         val parking = result?.parking

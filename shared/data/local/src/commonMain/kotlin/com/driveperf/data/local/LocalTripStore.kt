@@ -60,6 +60,8 @@ public class LocalTripStore(
             result.newRoute?.let { routes.upsertRoute(it.toRow(deviceId)) }
             val match = result.routeMatch
             if (match == null) routes.deleteMatch(trip.id) else routes.upsertMatch(match.toRow())
+            result.extraMatches.forEach { routes.upsertMatch(it.toRow()) }
+            result.personalBest?.let { routes.upsertPersonalBest(it.toRow(trip.updatedAt)) }
         }
     }
 }

@@ -1,9 +1,11 @@
 package com.driveperf.domain.capture
 
+import com.driveperf.domain.route.PersonalBest
 import com.driveperf.domain.route.Route
 import com.driveperf.domain.route.RouteMatch
 import com.driveperf.domain.score.Score
 import com.driveperf.domain.trip.DrivingEvent
+import com.driveperf.domain.trip.PreviewRow
 import com.driveperf.domain.trip.Trip
 
 /** State changes written into the capture log (data-model.md §2.4 `Mark.Type`). */
@@ -106,13 +108,25 @@ public interface TripStore {
     public suspend fun setLastParking(parking: Parking)
 }
 
-/** Everything a finished trip commits. [trip] has status `FINALISED` or `INTERRUPTED`. */
+/**
+ * Everything a finished trip commits. [trip] has status `FINALISED` or `INTERRUPTED`.
+ *
+ * @property newRoute a route to insert or update: a new candidate, or a matched route whose centroids, run count
+ *   state or name changed (§7.4).
+ * @property extraMatches matches for other trips, written in the same transaction: the older trip of a newly paired
+ *   route candidate (§7.4).
+ * @property personalBest the route record after this trip, when it has a route (§7.5).
+ * @property preview the preview track (data-model.md §2.5), stored as a file beside the trip.
+ */
 public data class FinalisedTrip(
     val trip: Trip,
     val events: List<DrivingEvent> = emptyList(),
     val score: Score? = null,
     val routeMatch: RouteMatch? = null,
     val newRoute: Route? = null,
+    val extraMatches: List<RouteMatch> = emptyList(),
+    val personalBest: PersonalBest? = null,
+    val preview: List<PreviewRow> = emptyList(),
 )
 
 /** The device's time zone, for trip start offsets and part of day (data-model.md P4). */
@@ -122,4 +136,11 @@ public interface TimeZoneProvider {
 
     /** UTC offset in minutes at [wallMs], for example −300 for EST. */
     public fun offsetMinAt(wallMs: Long): Int
+}
+
+/** Preview tracks (data-model.md §2.5): at most 400 rows per trip, kept as a file. Implemented in `:shared:data:local`. */
+public interface PreviewStore {
+    public suspend fun write(tripId: String, rows: List<PreviewRow>): Boolean
+
+    public suspend fun read(tripId: String): List<PreviewRow>?
 }

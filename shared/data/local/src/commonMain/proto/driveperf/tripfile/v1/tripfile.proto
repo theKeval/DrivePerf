@@ -10,7 +10,7 @@
 // (INT32_MIN) before delta encoding.
 //
 // Additions to data-model.md §2.4 for DRIVE-62, all additive: Header fields 14-17, Chunk fields 6-7, Mark types
-// 11-13.
+// 11-13, and the PreviewTrack message (data-model.md §2.5).
 syntax = "proto3";
 package driveperf.tripfile.v1;
 
@@ -115,4 +115,17 @@ message Mark {
     PHONE_MOVED = 5; ALIGNMENT_SETTLED = 6; LOW_BATTERY = 7; THERMAL = 8; GNSS_LOST = 9; GNSS_RESTORED = 10;
     CONFIRMED = 11; IMU_RATE = 12; IMU_STOPPED = 13;
   }
+}
+
+// preview.pb (data-model.md §2.5): at most 400 rows, the same quantisation and delta coding as the chunks above.
+message PreviewTrack {
+  uint32 format_version = 1;        // 1
+  repeated sint64 t_ms = 2;         // from started_at_ms
+  repeated sint32 lat = 3;
+  repeated sint32 lng = 4;
+  repeated sint32 speed = 5;
+  repeated sint32 lon_g = 6;
+  repeated sint32 lat_g = 7;
+  repeated sint32 elev = 8;
+  repeated uint32 quality = 9;      // 0 observed, 1 estimated, 2 gap, 3 excluded
 }

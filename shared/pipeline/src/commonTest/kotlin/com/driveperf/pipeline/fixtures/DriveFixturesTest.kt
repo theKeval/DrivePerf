@@ -43,6 +43,11 @@ class DriveFixturesTest {
         assertEquals(92, score.smoothness)
         assertEquals(listOf(EventType.CORNER, EventType.ACCEL, EventType.BRAKE), r.events.map { it.type })
         assertTrue(r.events.all { it.lat != null }, "every event is pinned with GNSS present")
+        val tip = assertNotNull(score.tip)
+        assertEquals(com.driveperf.domain.score.TipCategory.BRAKING, tip.category)
+        assertEquals("brake_light", tip.tipId, "the hard stop is the costliest braking event")
+        assertEquals(r.events.single { it.type == EventType.BRAKE }.id, tip.eventId)
+        assertTrue(r.preview.size in 2..400)
     }
 
     @Test
@@ -54,6 +59,7 @@ class DriveFixturesTest {
         assertEquals(30.0, r.trip.maxSpeedMps!!, 0.05)
         assertEquals(100, r.score?.smoothness)
         assertTrue(r.events.isEmpty())
+        assertNotNull(r.trip.cleanest, "a smooth highway drive has a clean stretch for the Story opener")
     }
 
     @Test
@@ -80,6 +86,7 @@ class DriveFixturesTest {
         assertEquals(a.trip, b.trip)
         assertEquals(a.score?.smoothnessRaw, b.score?.smoothnessRaw)
         assertEquals(a.events.map { it.tPeakS to it.peakG }, b.events.map { it.tPeakS to it.peakG })
-        assertNull(a.score?.tip)
+        assertEquals(a.score?.tip?.tipId, b.score?.tip?.tipId)
+        assertEquals(a.preview, b.preview)
     }
 }

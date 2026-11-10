@@ -5,6 +5,7 @@ import com.driveperf.domain.capture.GeoPoint
 import com.driveperf.domain.capture.Parking
 import com.driveperf.domain.capture.WakeKind
 import com.driveperf.domain.repository.ScoredTrip
+import com.driveperf.domain.repository.RouteHistory
 import com.driveperf.domain.repository.TripHistory
 import com.driveperf.domain.trip.CaptureMeta
 import com.driveperf.domain.trip.Interruption
@@ -17,12 +18,18 @@ import com.driveperf.domain.trip.TripStatus
 import com.driveperf.pipeline.capture.FinaliseRequest
 import com.driveperf.pipeline.capture.FinaliseResult
 import com.driveperf.pipeline.capture.TripFinaliser
+import com.driveperf.pipeline.coach.Stretches
+import com.driveperf.pipeline.coach.TipInputs
+import com.driveperf.pipeline.coach.TipSelector
+import com.driveperf.pipeline.route.PreviewTrack
+import com.driveperf.pipeline.route.RouteEngine
 import com.driveperf.pipeline.score.Baselines
 import com.driveperf.pipeline.score.PriorTrip
 import com.driveperf.pipeline.score.R1Analyser
 import com.driveperf.pipeline.score.ScoringConfig
 import com.driveperf.pipeline.score.ScoringContext
 import com.driveperf.pipeline.score.TripScorer
+import com.driveperf.pipeline.score.eventCost
 import com.driveperf.pipeline.signal.Badge
 import com.driveperf.pipeline.signal.BadgeInputs
 import com.driveperf.pipeline.signal.SignalConfig
@@ -38,9 +45,11 @@ import com.driveperf.pipeline.signal.TripMetrics
  */
 public class PipelineFinaliser(
     private val history: TripHistory,
+    routeHistory: RouteHistory? = null,
     private val signalConfig: SignalConfig = SignalConfig(),
     private val scoringConfig: ScoringConfig = ScoringConfig(),
 ) : TripFinaliser {
+    private val routes = routeHistory?.let { RouteEngine(it) }
     private val signal = SignalPipeline(signalConfig)
     private val analyser = R1Analyser(scoringConfig)
     private val scorer = TripScorer(scoringConfig)
@@ -49,7 +58,7 @@ public class PipelineFinaliser(
     private val badge = Badge(signalConfig)
     private val suspects = SuspectRules()
 
-    @Suppress("LongMethod")
+    @Suppress("LongMethod", "CyclomaticComplexMethod") // the §0.2 sequence, in order
     override suspend fun finalise(request: FinaliseRequest): FinaliseResult {
         val capture = request.capture
         val h = capture.header
@@ -88,9 +97,17 @@ public class PipelineFinaliser(
             totalS = sig.endS,
             spans = allSpans,
         )
-        val draft = trip(request, sig, quality, distance, m, suspect, analysis.context)
+        val cleanest = Stretches.cleanest(analysis)
+        val draft = trip(request, sig, quality, distance, m, suspect, analysis.context).copy(cleanest = cleanest)
         val scorable = request.kind == TripKind.DRIVER && b.badge != QualityBadge.UNSCORABLE && !short
-        val priors = priors(history.finishedBefore(draft.startedAt, HISTORY_LIMIT))
+        val past = history.finishedBefore(draft.startedAt, HISTORY_LIMIT)
+        val preview = PreviewTrack.build(
+            sig.trace.gnss, analysis.a3Lon, analysis.a3Lat, scoringConfig.fs, allSpans,
+            sig.estimate?.let { h.parking?.point?.let { p -> p.lat to p.lng } },
+            analysis.events.map { it.peak.toDouble() / scoringConfig.fs },
+        )
+        val engine = routes
+        val route = engine?.match(draft, preview, past, request.nowWallMs)
         val outcome = scorer.score(
             analysis,
             ScoringContext(
@@ -98,13 +115,47 @@ public class PipelineFinaliser(
                 scorable = scorable,
                 baselineEligible = Baselines.eligible(draft, 0) && m.gnssCoveragePct >= GNSS_ELIGIBLE_PCT,
                 distanceM = distance,
-                routeId = null,
-                priors = priors,
+                routeId = route?.route?.id,
+                priors = priors(past),
                 nowWallMs = request.nowWallMs,
             ),
         )
-        return FinaliseResult(FinalisedTrip(draft, outcome.events, outcome.score), end)
+        val record = if (engine != null && route != null) engine.record(draft, outcome.score?.smoothness, 0, route) else null
+        val paired = if (engine != null && route != null) engine.pairedMatch(route, record?.personalBest) else null
+        val tip = outcome.score?.let { score ->
+            TipSelector.select(
+                TipInputs(
+                    score = score,
+                    events = outcome.events,
+                    feedback = emptyMap(),
+                    context = analysis.context,
+                    stopStartCount = outcome.efficiencyInputs.stopStartCount,
+                    recentTipIds = past.mapNotNull { it.score?.tip?.tipId }.take(RECENT_TIPS),
+                    jerkWindow = Stretches.jerkWindow(analysis),
+                    cleanestMidS = cleanest?.let { (it.t0S + it.t1S) / 2 },
+                    positionAt = { t -> nearestFix(sig, t) },
+                    eventCost = { eventCost(it, scoringConfig) },
+                ),
+            )
+        }
+        val score = outcome.score?.copy(tip = tip, recordState = record?.recordState)
+        return FinaliseResult(
+            FinalisedTrip(
+                trip = draft,
+                events = outcome.events,
+                score = score,
+                routeMatch = record?.match,
+                newRoute = route?.route,
+                extraMatches = listOfNotNull(paired),
+                personalBest = record?.personalBest,
+                preview = preview,
+            ),
+            end,
+        )
     }
+
+    private fun nearestFix(sig: SignalResult, t: Double): Pair<Double, Double>? =
+        sig.fixes.minByOrNull { kotlin.math.abs(it.tS - t) }?.let { it.lat to it.lng }
 
     @Suppress("LongParameterList")
     private fun trip(
@@ -178,5 +229,6 @@ public class PipelineFinaliser(
         const val PERCENT = 100.0
         const val HISTORY_LIMIT = 200
         const val GNSS_ELIGIBLE_PCT = 60.0
+        const val RECENT_TIPS = 2
     }
 }
