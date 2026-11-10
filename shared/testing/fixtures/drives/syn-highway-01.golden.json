@@ -1,0 +1,18 @@
+{
+  "fixture": "syn-highway-01",
+  "pipelineVersion": "pipe-1.0.0",
+  "algorithmVersion": "smooth-1.0.0",
+  "priorTrips": [],
+  "expect": {
+    "badge": "GOOD",
+    "context": "HIGHWAY",
+    "smoothness": 100,
+    "calibrating": { "k": 1, "of": 3 },
+    "distanceM": 8227.4,
+    "ledger": { "T": 305.1, "brake": 0.13, "accel": 0.15, "corner": 0.00 },
+    "events": [],
+    "spans": [],
+    "tip": null
+  },
+  "tolerance": { "ledger": 0.02, "tPeakS": 0.04, "peakG": 0.002, "distanceM": 1.0 }
+}

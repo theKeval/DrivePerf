@@ -74,3 +74,4 @@ internal object StopMetrics {
     private const val ABRUPT_EXIT = 0.12
     private const val ABRUPT_MIN_S = 1.0
 }
+

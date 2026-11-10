@@ -158,6 +158,21 @@ class LocalRepositoriesTest {
     }
 
     @Test
+    fun historyListsFinishedTripsBeforeATimeNewestFirst() = runTest {
+        val store = LocalTripStore(db, "device-1", coroutineContext)
+        store.saveFinalised(FinalisedTrip(finished, listOf(event), score, RouteMatch("t1", "r1", 0.9, MatchSource.AUTO, true, null), route))
+        store.saveFinalised(FinalisedTrip(finished.copy(id = "t2", startedAt = 2_000L)))
+        store.insertRecording(recording.copy(id = "t3", startedAt = 3_000L))
+        val history = LocalTripHistory(db, coroutineContext)
+        val all = history.finishedBefore(10_000L, 10)
+        assertEquals(listOf("t2", "t1"), all.map { it.trip.id })
+        assertEquals("r1", all[1].routeId)
+        assertEquals(84, all[1].score?.smoothness)
+        assertEquals(listOf("t1"), history.finishedBefore(2_000L, 10).map { it.trip.id })
+        assertEquals(1, history.finishedBefore(10_000L, 1).size)
+    }
+
+    @Test
     fun theLastParkingIsRemembered() = runTest {
         val store = LocalTripStore(db, "device-1", coroutineContext)
         assertNull(store.lastParking())

@@ -150,6 +150,12 @@ SELECT * FROM trip
 WHERE status IN ('FINALISED', 'INTERRUPTED') AND deleted_at IS NULL
 ORDER BY started_at DESC, id DESC;
 
+finishedBefore:
+SELECT * FROM trip
+WHERE status IN ('FINALISED', 'INTERRUPTED') AND deleted_at IS NULL AND started_at < ?
+ORDER BY started_at DESC, id DESC
+LIMIT ?;
+
 deleteTrip:
 DELETE FROM trip WHERE id = ?;
 

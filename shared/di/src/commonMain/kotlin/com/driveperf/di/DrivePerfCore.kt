@@ -2,6 +2,7 @@ package com.driveperf.di
 
 import com.driveperf.data.local.DatabaseDriverFactory
 import com.driveperf.data.local.LocalRouteRepository
+import com.driveperf.data.local.LocalTripHistory
 import com.driveperf.data.local.LocalTripRepository
 import com.driveperf.data.local.LocalTripStore
 import com.driveperf.data.local.ProtoCaptureLog
@@ -9,11 +10,11 @@ import com.driveperf.data.local.openDatabase
 import com.driveperf.domain.hello.GetHelloMessage
 import com.driveperf.domain.hello.HelloMessage
 import com.driveperf.foundation.platformDescription
+import com.driveperf.pipeline.PipelineFinaliser
 import com.driveperf.pipeline.capture.CapturePersistence
 import com.driveperf.pipeline.capture.CapturePorts
 import com.driveperf.pipeline.capture.TripFinaliser
 import com.driveperf.pipeline.capture.TripRecorderEngine
-import com.driveperf.pipeline.capture.TripSummariser
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -41,7 +42,7 @@ public object DrivePerfCore {
         platform: PlatformBindings,
         database: DatabaseDriverFactory,
         io: CoroutineContext,
-        finaliser: TripFinaliser = TripSummariser(),
+        finaliser: ((com.driveperf.data.local.db.DrivePerfDatabase) -> TripFinaliser)? = null,
     ): CoreServices = started ?: run {
         val db = openDatabase(database.create())
         val store = LocalTripStore(db, platform.deviceId(), io)
@@ -54,7 +55,11 @@ public object DrivePerfCore {
                 parkedRegion = platform.parkedRegion(),
                 files = platform.tripFiles(),
             ),
-            persistence = CapturePersistence(store, ProtoCaptureLog(platform.tripFiles(), io), finaliser),
+            persistence = CapturePersistence(
+                store,
+                ProtoCaptureLog(platform.tripFiles(), io),
+                finaliser?.invoke(db) ?: PipelineFinaliser(LocalTripHistory(db, io)),
+            ),
             clock = platform.clock(),
             zones = SystemTimeZone(),
             scope = CoroutineScope(SupervisorJob() + Dispatchers.Default.limitedParallelism(1)),
