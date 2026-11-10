@@ -1,0 +1,28 @@
+CREATE TABLE place (
+  id               TEXT NOT NULL PRIMARY KEY,
+  name             TEXT,
+  kind             TEXT,
+  lat              REAL,
+  lng              REAL,
+  radius_m         REAL,
+  schema_version   INTEGER NOT NULL DEFAULT 1,
+  created_at       INTEGER NOT NULL,
+  updated_at       INTEGER NOT NULL,
+  deleted_at       INTEGER,
+  origin_device_id TEXT NOT NULL,
+  field_clock      TEXT NOT NULL DEFAULT '{}'
+);
+
+CREATE TABLE privacy_zone (
+  id               TEXT NOT NULL PRIMARY KEY,
+  name             TEXT NOT NULL,
+  lat              REAL NOT NULL,
+  lng              REAL NOT NULL,
+  radius_m         INTEGER NOT NULL CHECK (radius_m IN (200, 400, 800)),
+  schema_version   INTEGER NOT NULL DEFAULT 1,
+  created_at       INTEGER NOT NULL,
+  updated_at       INTEGER NOT NULL,
+  deleted_at       INTEGER,
+  origin_device_id TEXT NOT NULL,
+  field_clock      TEXT NOT NULL DEFAULT '{}'
+);

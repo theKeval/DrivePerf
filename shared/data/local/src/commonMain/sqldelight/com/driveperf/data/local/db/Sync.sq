@@ -1,0 +1,32 @@
+CREATE TABLE sync_outbox (
+  mutation_id     TEXT NOT NULL PRIMARY KEY,
+  resource        TEXT NOT NULL,
+  record_id       TEXT NOT NULL,
+  op              TEXT NOT NULL,
+  payload_json    TEXT NOT NULL,
+  blob_trip_id    TEXT,
+  created_at      INTEGER NOT NULL,
+  attempts        INTEGER NOT NULL DEFAULT 0,
+  next_attempt_at INTEGER NOT NULL,
+  last_error      TEXT,
+  state           TEXT NOT NULL DEFAULT 'pending'
+);
+CREATE INDEX outbox_due ON sync_outbox(state, next_attempt_at);
+CREATE UNIQUE INDEX outbox_coalesce ON sync_outbox(resource, record_id) WHERE state = 'pending';
+
+CREATE TABLE sync_cursor (
+  resource     TEXT NOT NULL PRIMARY KEY,
+  cursor       TEXT,
+  backup_epoch INTEGER NOT NULL,
+  pulled_at    INTEGER
+);
+
+CREATE TABLE sync_state (
+  id              INTEGER NOT NULL PRIMARY KEY CHECK (id = 1),
+  account_id      TEXT,
+  backup_enabled  INTEGER NOT NULL DEFAULT 0,
+  wifi_only       INTEGER NOT NULL DEFAULT 1,
+  last_success_at INTEGER,
+  last_error      TEXT,
+  hlc_last        TEXT
+);

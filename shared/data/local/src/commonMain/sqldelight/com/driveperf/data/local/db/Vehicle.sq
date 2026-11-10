@@ -1,0 +1,22 @@
+CREATE TABLE vehicle (
+  id               TEXT NOT NULL PRIMARY KEY,
+  nickname         TEXT,
+  make             TEXT,
+  model            TEXT,
+  year             INTEGER,
+  powertrain       TEXT,
+  transmission     TEXT,
+  colour_token     TEXT,
+  colour_name      TEXT,
+  silhouette       TEXT,
+  is_default       INTEGER NOT NULL DEFAULT 0,
+  is_active        INTEGER NOT NULL DEFAULT 1,
+  photo_path       TEXT,
+  added_at         INTEGER NOT NULL,
+  schema_version   INTEGER NOT NULL DEFAULT 1,
+  created_at       INTEGER NOT NULL,
+  updated_at       INTEGER NOT NULL,
+  deleted_at       INTEGER,
+  origin_device_id TEXT NOT NULL,
+  field_clock      TEXT NOT NULL DEFAULT '{}'
+);

@@ -1,0 +1,199 @@
+-- Trips and everything derived from them (data-model.md §2.2, plus pipeline-and-scoring.md §0.8: suspect,
+-- suspect_answer). quality_json holds TripQuality without its spans; the spans live in trip_segment.
+CREATE TABLE trip (
+  id                    TEXT NOT NULL PRIMARY KEY,
+  status                TEXT NOT NULL,
+  kind                  TEXT,
+  source                TEXT,
+  source_detail         TEXT,
+  vehicle_id            TEXT,
+  started_at            INTEGER,
+  start_tz_offset_min   INTEGER,
+  start_estimated       INTEGER NOT NULL DEFAULT 0,
+  ended_at              INTEGER,
+  end_tz_offset_min     INTEGER,
+  tz_id                 TEXT,
+  part_of_day           TEXT,
+  from_label            TEXT,
+  to_label              TEXT,
+  label_override        TEXT,
+  context               TEXT,
+  distance_m            REAL,
+  estimated_distance_m  REAL,
+  duration_s            REAL,
+  moving_s              REAL,
+  stopped_s             REAL,
+  stop_count            INTEGER,
+  avg_moving_speed_mps  REAL,
+  max_speed_mps         REAL,
+  max_speed_at_s        REAL,
+  max_speed_lat         REAL,
+  max_speed_lng         REAL,
+  elev_gain_m           REAL,
+  elev_loss_m           REAL,
+  elev_min_m            REAL,
+  elev_max_m            REAL,
+  bbox_json             TEXT,
+  stops_json            TEXT,
+  cleanest_json         TEXT,
+  quality_json          TEXT,
+  interrupted_json      TEXT,
+  capture_meta_json     TEXT,
+  suspect               TEXT NOT NULL DEFAULT 'NONE',
+  suspect_answer        TEXT,
+  pipeline_version      TEXT,
+  raw_state             TEXT NOT NULL DEFAULT 'FULL',
+  preview_path          TEXT,
+  schema_version        INTEGER NOT NULL DEFAULT 1,
+  created_at            INTEGER NOT NULL,
+  updated_at            INTEGER NOT NULL,
+  deleted_at            INTEGER,
+  origin_device_id      TEXT NOT NULL,
+  field_clock           TEXT NOT NULL DEFAULT '{}'
+);
+CREATE INDEX trip_started ON trip(started_at DESC) WHERE deleted_at IS NULL;
+CREATE INDEX trip_vehicle ON trip(vehicle_id, started_at DESC) WHERE deleted_at IS NULL;
+CREATE INDEX trip_status  ON trip(status);
+
+CREATE TABLE trip_segment (
+  trip_id   TEXT NOT NULL REFERENCES trip(id) ON DELETE CASCADE,
+  seq       INTEGER NOT NULL,
+  kind      TEXT NOT NULL,
+  t0_s      REAL NOT NULL,
+  t1_s      REAL NOT NULL,
+  reason    TEXT,
+  label_key TEXT,
+  PRIMARY KEY (trip_id, seq)
+);
+
+CREATE TABLE driving_event (
+  id                 TEXT NOT NULL PRIMARY KEY,
+  trip_id            TEXT NOT NULL REFERENCES trip(id) ON DELETE CASCADE,
+  type               TEXT NOT NULL,
+  t_peak_s           REAL NOT NULL,
+  t_start_s          REAL NOT NULL,
+  t_end_s            REAL NOT NULL,
+  duration_s         REAL NOT NULL,
+  peak_g             REAL NOT NULL,
+  direction          TEXT,
+  lat                REAL,
+  lng                REAL,
+  road               TEXT,
+  place              TEXT,
+  speed_before_mps   REAL,
+  speed_after_mps    REAL,
+  confidence         TEXT NOT NULL,
+  algorithm_version  TEXT NOT NULL
+);
+CREATE INDEX event_trip ON driving_event(trip_id, t_peak_s);
+CREATE INDEX event_type ON driving_event(type, trip_id);
+
+CREATE TABLE event_feedback (
+  event_id   TEXT NOT NULL PRIMARY KEY,
+  trip_id    TEXT NOT NULL REFERENCES trip(id) ON DELETE CASCADE,
+  needed     INTEGER NOT NULL DEFAULT 0,
+  inaccurate TEXT,
+  at         INTEGER NOT NULL
+);
+
+CREATE TABLE score (
+  trip_id              TEXT NOT NULL PRIMARY KEY REFERENCES trip(id) ON DELETE CASCADE,
+  smoothness           INTEGER,
+  baseline             INTEGER,
+  delta                INTEGER,
+  basis                TEXT,
+  basis_route_id       TEXT,
+  calibrating_k        INTEGER,
+  calibrating_of       INTEGER,
+  contributors_json    TEXT NOT NULL,
+  efficiency_json      TEXT,
+  tip_json             TEXT,
+  record_state_json    TEXT,
+  algorithm_version    TEXT NOT NULL,
+  computed_at          INTEGER NOT NULL
+);
+CREATE INDEX score_smoothness ON score(basis_route_id, smoothness DESC);
+
+CREATE TABLE trip_file (
+  trip_id        TEXT NOT NULL REFERENCES trip(id) ON DELETE CASCADE,
+  kind           TEXT NOT NULL,
+  format_version INTEGER NOT NULL,
+  sha256         TEXT NOT NULL,
+  size_bytes     INTEGER NOT NULL,
+  local_path     TEXT,
+  blob_key       TEXT,
+  uploaded_at    INTEGER,
+  expires_at     INTEGER,
+  PRIMARY KEY (trip_id, kind)
+);
+
+-- Capture bookkeeping (DRIVE-62 addition): the last parking spot arms the parked region and bounds the
+-- motion-start search (Spike 1 changes 1 and 3).
+CREATE TABLE capture_state (
+  id            INTEGER NOT NULL PRIMARY KEY CHECK (id = 1),
+  parked_lat    REAL,
+  parked_lng    REAL,
+  parked_at     INTEGER
+);
+
+upsertTrip:
+INSERT OR REPLACE INTO trip VALUES ?;
+
+tripById:
+SELECT * FROM trip WHERE id = ? AND deleted_at IS NULL;
+
+recordingTrip:
+SELECT * FROM trip WHERE status = 'RECORDING' AND deleted_at IS NULL ORDER BY started_at DESC LIMIT 1;
+
+listedTrips:
+SELECT * FROM trip
+WHERE status IN ('FINALISED', 'INTERRUPTED') AND deleted_at IS NULL
+ORDER BY started_at DESC, id DESC;
+
+deleteTrip:
+DELETE FROM trip WHERE id = ?;
+
+insertSegment:
+INSERT INTO trip_segment VALUES ?;
+
+segmentsForTrip:
+SELECT * FROM trip_segment WHERE trip_id = ? ORDER BY seq;
+
+deleteSegments:
+DELETE FROM trip_segment WHERE trip_id = ?;
+
+insertEvent:
+INSERT OR REPLACE INTO driving_event VALUES ?;
+
+eventsForTrip:
+SELECT * FROM driving_event WHERE trip_id = ? ORDER BY t_peak_s, type;
+
+deleteEvents:
+DELETE FROM driving_event WHERE trip_id = ?;
+
+upsertFeedback:
+INSERT OR REPLACE INTO event_feedback VALUES ?;
+
+feedbackForTrip:
+SELECT * FROM event_feedback WHERE trip_id = ?;
+
+upsertScore:
+INSERT OR REPLACE INTO score VALUES ?;
+
+scoreForTrip:
+SELECT * FROM score WHERE trip_id = ?;
+
+deleteScore:
+DELETE FROM score WHERE trip_id = ?;
+
+upsertTripFile:
+INSERT OR REPLACE INTO trip_file VALUES ?;
+
+filesForTrip:
+SELECT * FROM trip_file WHERE trip_id = ?;
+
+parking:
+SELECT parked_lat, parked_lng, parked_at FROM capture_state WHERE id = 1;
+
+setParking:
+INSERT OR REPLACE INTO capture_state(id, parked_lat, parked_lng, parked_at) VALUES (1, ?, ?, ?);

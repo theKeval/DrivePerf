@@ -12,4 +12,6 @@ dependencies {
     implementation(libs.detekt.gradle.plugin)
     implementation(libs.skie.gradle.plugin)
     implementation(libs.kover.gradle.plugin)
+    implementation(libs.sqldelight.gradle.plugin)
+    implementation(libs.wire.gradle.plugin)
 }
