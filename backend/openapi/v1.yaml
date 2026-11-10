@@ -25,12 +25,15 @@ servers:
     description: Production (api.driveperf.com is a Firebase Hosting site that rewrites to Cloud Run, ADR-004)
 tags:
   - name: Health
+    description: Liveness probe for Cloud Run and uptime checks.
   - name: Sync
     description: Backup and restore of user records (Pro, Pro Preview and Ride-along only for trip data).
   - name: Blobs
     description: Trip files, moved through presigned URLs.
   - name: Entitlement
+    description: The account's Pro state, as decided by RevenueCat webhooks and the Ride-along preview.
   - name: Account
+    description: Backup wipe and account deletion.
   - name: Server
     description: Called by Cloud Scheduler and RevenueCat, never by the apps.
 security:
@@ -585,7 +588,7 @@ components:
       type: object
       required: [mutationId, resource, id, op, schemaVersion, createdAt]
       properties:
-        mutationId: { type: string, description: UUIDv7, the idempotency key. }
+        mutationId: { type: string, description: 'UUIDv7, the idempotency key.' }
         resource: { $ref: '#/components/schemas/SyncResource' }
         id: { type: string }
         op: { type: string, enum: [upsert, patch, delete] }
