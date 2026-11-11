@@ -1,5 +1,7 @@
 package com.driveperf.di
 
+import com.driveperf.domain.analytics.Analytics
+import com.driveperf.domain.analytics.AnalyticsSink
 import com.driveperf.domain.capture.ActivitySource
 import com.driveperf.domain.feedback.MarkEventNeeded
 import com.driveperf.domain.capture.LocationSource
@@ -34,18 +36,27 @@ public interface PlatformBindings {
 
     /** This install's UUIDv7 device ID, kept in the Keychain or encrypted preferences (data-model.md §1.4). */
     public fun deviceId(): String
+
+    /**
+     * The analytics vendor behind the `Analytics` port (Firebase Analytics, ADR-007). Builds with no vendor configured
+     * return `NoOpAnalyticsSink`. The sink does no consent logic: the core wraps it in the consent gate.
+     */
+    public fun analyticsSink(): AnalyticsSink
 }
 
 /**
  * What the apps use after start. [markEventNeeded] is "Was it needed?" / "Count it again" (F-SCO-05); feedback is read
  * through [trips]. [corrections] answers "Was this a bus or train?" and corrects what a trip was (F-CAP-04).
  */
+@Suppress("LongParameterList") // The core's ports for the apps: one property each, built only by DrivePerfCore.
 public class CoreServices internal constructor(
     public val recorder: TripRecorder,
     public val trips: TripRepository,
     public val routes: RouteRepository,
     public val markEventNeeded: MarkEventNeeded,
     public val corrections: TripCorrections,
+    /** Usage statistics behind the user's choice (F-ONB-08): events wait until the choice, and are dropped if declined. */
+    public val analytics: Analytics,
     private val onClose: () -> Unit,
 ) {
     /** Stops the recorder's work and closes the database. Only for a scratch core; the app's core lives as long as the process. */
