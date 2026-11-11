@@ -94,6 +94,8 @@ internal data class MachineState(
     val still: Stillness = Stillness(),
     val distanceM: Double = 0.0,
     val distanceFix: LocationSample? = null,
+    /** The last start was dropped because R0 could not be created. */
+    val startFailed: Boolean = false,
 )
 
 /** Inputs to the reducer. Every event carries the monotonic time it is handled at, so the reducer reads no clock. */
@@ -133,6 +135,9 @@ internal sealed interface MachineEvent {
     data class Passenger(override val nowNs: Long, val keep: Boolean) : MachineEvent
 
     data class AutoDetect(override val nowNs: Long, val enabled: Boolean) : MachineEvent
+
+    /** R0 could not be created for [tripId], so nothing it records would be kept. */
+    data class LogFailed(override val nowNs: Long, val tripId: String) : MachineEvent
 
     /** Finalisation committed. [parking] is the trip's end point, when it has one. */
     data class Finalised(override val nowNs: Long, val parking: Parking?) : MachineEvent

@@ -14,6 +14,8 @@ public enum class RecorderState { IDLE, CANDIDATE, RECORDING, PAUSED, FINISHING 
  * @property elapsedS seconds since the trip start.
  * @property distanceM gated distance so far.
  * @property autoDetectEnabled false while the user has paused automatic detection.
+ * @property startFailed true when the last start was dropped because its trip file could not be created; cleared by
+ *   the next start. The app tells the user that recording could not start.
  */
 public data class RecorderStatus(
     val state: RecorderState,
@@ -22,6 +24,7 @@ public data class RecorderStatus(
     val elapsedS: Double,
     val distanceM: Double,
     val autoDetectEnabled: Boolean,
+    val startFailed: Boolean = false,
 ) {
     public companion object {
         /** Idle, nothing recorded yet. */

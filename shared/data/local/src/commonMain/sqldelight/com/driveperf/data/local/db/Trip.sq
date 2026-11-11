@@ -136,8 +136,62 @@ CREATE TABLE capture_state (
   parked_at     INTEGER
 );
 
-upsertTrip:
-INSERT OR REPLACE INTO trip VALUES ?;
+-- Upsert as insert-if-absent then update: INSERT OR REPLACE would delete the row first and cascade to its feedback
+-- and file rows, and Android 10's SQLite (3.22) has no ON CONFLICT DO UPDATE.
+insertTripIfAbsent:
+INSERT OR IGNORE INTO trip VALUES ?;
+
+updateTrip:
+UPDATE trip SET
+  status = :status,
+  kind = :kind,
+  source = :source,
+  source_detail = :source_detail,
+  vehicle_id = :vehicle_id,
+  started_at = :started_at,
+  start_tz_offset_min = :start_tz_offset_min,
+  start_estimated = :start_estimated,
+  ended_at = :ended_at,
+  end_tz_offset_min = :end_tz_offset_min,
+  tz_id = :tz_id,
+  part_of_day = :part_of_day,
+  from_label = :from_label,
+  to_label = :to_label,
+  label_override = :label_override,
+  context = :context,
+  distance_m = :distance_m,
+  estimated_distance_m = :estimated_distance_m,
+  duration_s = :duration_s,
+  moving_s = :moving_s,
+  stopped_s = :stopped_s,
+  stop_count = :stop_count,
+  avg_moving_speed_mps = :avg_moving_speed_mps,
+  max_speed_mps = :max_speed_mps,
+  max_speed_at_s = :max_speed_at_s,
+  max_speed_lat = :max_speed_lat,
+  max_speed_lng = :max_speed_lng,
+  elev_gain_m = :elev_gain_m,
+  elev_loss_m = :elev_loss_m,
+  elev_min_m = :elev_min_m,
+  elev_max_m = :elev_max_m,
+  bbox_json = :bbox_json,
+  stops_json = :stops_json,
+  cleanest_json = :cleanest_json,
+  quality_json = :quality_json,
+  interrupted_json = :interrupted_json,
+  capture_meta_json = :capture_meta_json,
+  suspect = :suspect,
+  suspect_answer = :suspect_answer,
+  pipeline_version = :pipeline_version,
+  raw_state = :raw_state,
+  preview_path = :preview_path,
+  schema_version = :schema_version,
+  created_at = :created_at,
+  updated_at = :updated_at,
+  deleted_at = :deleted_at,
+  origin_device_id = :origin_device_id,
+  field_clock = :field_clock
+WHERE id = :id;
 
 tripById:
 SELECT * FROM trip WHERE id = ? AND deleted_at IS NULL;

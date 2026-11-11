@@ -84,8 +84,27 @@ internal class TripScorer(private val cfg: ScoringConfig = ScoringConfig()) {
         val cv = score.efficiency?.speedConsistencyCv
         return calculator.score(total, wobble, context)
             ?.let { assemble(ctx, context, it, ledger, activeEvents, costs, inputs, cv) }
-            ?: score.copy(smoothness = null, smoothnessRaw = null)
+            ?: insufficientExposure(score, ctx)
     }
+
+    /**
+     * Feedback left under 120 s of exposure (§5.5): no Smoothness, so nothing derived from it either. The ledger stays,
+     * so undoing the feedback scores the trip again.
+     */
+    private fun insufficientExposure(score: Score, ctx: ScoringContext): Score = score.copy(
+        smoothness = null,
+        smoothnessRaw = null,
+        baseline = null,
+        delta = null,
+        basis = null,
+        basisRouteId = null,
+        calibrating = null,
+        contributors = emptyList(),
+        efficiency = null,
+        tip = null,
+        recordState = null,
+        computedAt = ctx.nowWallMs,
+    )
 
     @Suppress("LongParameterList")
     private fun assemble(

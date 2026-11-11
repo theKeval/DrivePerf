@@ -53,6 +53,7 @@ internal class TripMachine(private val cfg: CaptureConfig = CaptureConfig()) {
         is MachineEvent.Passenger -> onPassenger(s, e)
         is MachineEvent.AutoDetect -> Transition(s.copy(autoDetect = e.enabled))
         is MachineEvent.Finalised -> onFinalised(s, e)
+        is MachineEvent.LogFailed -> onLogFailed(s, e)
         else -> Transition(s)
     }
 
@@ -149,6 +150,14 @@ internal class TripMachine(private val cfg: CaptureConfig = CaptureConfig()) {
                 Mark(trip.id, nowNs, CaptureMarkType.CONFIRMED, WakeKind.MANUAL.name),
             ),
         )
+    }
+
+    /** No R0 means nothing would be kept: drop the trip before it shows as recording, and say so in the status. */
+    private fun onLogFailed(s: MachineState, e: MachineEvent.LogFailed): Transition {
+        val trip = s.trip
+        if (trip == null || trip.id != e.tripId || !s.isActive()) return Transition(s)
+        val fx = sensorsOff() + allTimersOff() + MachineEffect.Discard(trip.id) + armAt(s.parking)
+        return Transition(idle(s, s.parking).copy(startFailed = true), fx)
     }
 
     // ---- fixes ----
