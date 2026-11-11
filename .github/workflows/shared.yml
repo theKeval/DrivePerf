@@ -2,7 +2,7 @@ name: shared
 
 # KMP core checks (ADR-008, ADR-002 section 2). Runs the architecture guardrails (module graph, detekt, Konsist),
 # unit tests on the JVM, Android host and iOS simulator, the coverage gate and the proof that each guardrail fires.
-# SQLDelight `verifyMigrations` joins when :shared:data:local gets its database (DRIVE-62).
+# SQLDelight `verifySqlDelightMigration` checks that the migrations rebuild the committed schema (DRIVE-206).
 
 on:
   pull_request:
@@ -42,6 +42,8 @@ jobs:
         with: { android: 'true' }
       - name: Module graph, detekt, Konsist
         run: ./gradlew --console=plain assertModuleGraph detekt :shared:testing:jvmTest
+      - name: SQLDelight migrations match the schema
+        run: ./gradlew --console=plain verifySqlDelightMigration
       - name: Unit tests (JVM and Android host)
         run: ./gradlew --console=plain jvmTest testAndroidHostTest
       - name: Coverage gate (at least 90 % on :shared:domain; :shared:pipeline joins in DRIVE-62)
