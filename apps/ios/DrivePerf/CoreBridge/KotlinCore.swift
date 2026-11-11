@@ -50,6 +50,7 @@ final class CorePlatformBindings: NSObject, DrivePerfShared.PlatformBindings, @u
         power: KotlinPowerPort, parkedRegion: KotlinParkedRegionPort, tripFiles: KotlinTripFilePort
     )
     private let device: String
+    private let analytics: any DrivePerfShared.AnalyticsSink = StubAnalyticsSink()
 
     @MainActor
     init(ports: CorePorts, deviceId: String) {
@@ -67,4 +68,5 @@ final class CorePlatformBindings: NSObject, DrivePerfShared.PlatformBindings, @u
     func parkedRegion() -> any DrivePerfShared.ParkedRegionMonitor { ports.parkedRegion }
     func tripFiles() -> any DrivePerfShared.TripFileStore { ports.tripFiles }
     func deviceId() -> String { device }
+    func analyticsSink() -> any DrivePerfShared.AnalyticsSink { analytics }
 }

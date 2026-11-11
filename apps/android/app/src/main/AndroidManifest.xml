@@ -20,6 +20,11 @@
         <meta-data android:name="io.sentry.attach-screenshot" android:value="false" />
         <meta-data android:name="io.sentry.attach-view-hierarchy" android:value="false" />
 
+        <!-- ADR-007: Firebase Analytics collection is off at build time; the app enables it only after consent. -->
+        <meta-data android:name="firebase_analytics_collection_enabled" android:value="false" />
+        <meta-data android:name="google_analytics_adid_collection_enabled" android:value="false" />
+        <meta-data android:name="google_analytics_default_allow_ad_personalization_signals" android:value="false" />
+
         <activity
             android:name=".MainActivity"
             android:exported="true"

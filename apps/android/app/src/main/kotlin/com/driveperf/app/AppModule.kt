@@ -9,6 +9,8 @@ import com.driveperf.di.CoreServices
 import com.driveperf.di.DrivePerfCore
 import com.driveperf.di.PlatformBindings
 import com.driveperf.di.start
+import com.driveperf.domain.analytics.Analytics
+import com.driveperf.domain.analytics.AnalyticsSink
 import com.driveperf.domain.capture.ParkedRegionMonitor
 import com.driveperf.domain.capture.TripRecorder
 import com.driveperf.domain.repository.TripRepository
@@ -18,8 +20,11 @@ import com.driveperf.feature.drives.DrivesViewModel
 import com.driveperf.feature.drives.TripListSource
 import com.driveperf.feature.onboarding.OnboardingViewModel
 import com.driveperf.feature.onboarding.PermissionReader
+import com.driveperf.platform.analytics.StubAnalyticsSink
+import com.driveperf.platform.crash.ConsentSettings
 import com.driveperf.platform.crash.ConsentStore
 import com.driveperf.platform.crash.CrashReporter
+import com.driveperf.platform.crash.PrivacyChoices
 import com.driveperf.platform.crash.SentryCrashReporter
 import com.driveperf.platform.location.FixWatch
 import kotlinx.coroutines.CoroutineScope
@@ -36,17 +41,22 @@ import org.koin.dsl.module
  */
 val appModule = module {
     single { CoroutineScope(SupervisorJob() + Dispatchers.Default) }
-    single { ConsentStore(androidContext()) }
+    single { ConsentStore(androidContext()) } bind ConsentSettings::class
     single { PermissionReader(androidContext()) }
     single<CrashReporter> { SentryCrashReporter(androidContext(), BuildConfig.SENTRY_DSN, BuildConfig.VERSION_NAME) }
 
+    // DRIVE-70: analytics port. No Firebase project yet (DRIVE-42), so the sink is a stub until it exists.
+    single<AnalyticsSink> { StubAnalyticsSink() }
+
     single<PlatformBindings> {
         AndroidPlatformBindings(
-            get(), get<FixWatch>(), get(), get(), get(), get<ParkedRegionMonitor>(), get(), DeviceId.of(androidContext()),
+            get(), get<FixWatch>(), get(), get(), get(), get<ParkedRegionMonitor>(), get(), DeviceId.of(androidContext()), get(),
         )
     }
     single<CoreServices> { DrivePerfCore.start(get(), androidContext()) }
     single<TripRecorder> { get<CoreServices>().recorder }
+    single<Analytics> { get<CoreServices>().analytics }
+    single { PrivacyChoices(get(), get(), get()) }
     single<TripRepository> { get<CoreServices>().trips }
     single { WakePath(androidContext(), get(), get(), get()) }
 

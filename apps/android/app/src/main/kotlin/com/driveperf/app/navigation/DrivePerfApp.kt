@@ -43,6 +43,7 @@ import com.driveperf.feature.onboarding.PermissionReader
 import com.driveperf.feature.routes.RoutesScreen
 import com.driveperf.platform.crash.ConsentStore
 import com.driveperf.platform.crash.CrashReporter
+import com.driveperf.platform.crash.PrivacyChoices
 import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
 
@@ -88,6 +89,7 @@ private class AppEnv(
 private class AppServices(
     val consent: ConsentStore,
     val crashReporter: CrashReporter,
+    val privacy: PrivacyChoices,
     val captureController: PlatformCaptureController,
     val permissionReader: PermissionReader,
 )
@@ -103,7 +105,7 @@ private fun AppNavHost(navController: NavHostController, captureViewModel: Captu
         // Refused again (or "don't ask again"): the system dialog will not show, so send the user to Settings.
         if (!permissionReader.read().fineLocation) context.startActivity(appSettingsIntent(context.packageName))
     }
-    val services = AppServices(consent, koinInject(), captureController, permissionReader)
+    val services = AppServices(consent, koinInject(), koinInject(), captureController, permissionReader)
     val env = AppEnv(navController, captureViewModel, capture, services, fixLocation = { requestLocation.launch(LOCATION_PERMISSIONS) })
     val start = if (consent.onboardingCompleted) Tab.Drives.route else Routes.ONBOARDING
     NavHost(navController = navController, startDestination = start) {
@@ -121,11 +123,12 @@ private fun NavGraphBuilder.onboardingDestination(env: AppEnv) {
             viewModel = viewModel,
             permissionReader = env.services.permissionReader,
             onConsentChanged = { crash, stats ->
-                env.services.consent.crashReportsAllowed = crash
+                env.services.privacy.setCrashReports(crash)
+                // Usage statistics are decided at "Continue" (onFinished), not while the switch is toggled.
                 env.services.consent.usageStatisticsAllowed = stats
-                env.services.crashReporter.setEnabled(crash)
             },
             onFinished = {
+                env.services.privacy.setUsageStatistics(env.services.consent.usageStatisticsAllowed)
                 env.services.consent.onboardingCompleted = true
                 env.services.captureController.refreshPermissions()
                 env.navController.navigate(Tab.Drives.route) { popUpTo(Routes.ONBOARDING) { inclusive = true } }
@@ -176,12 +179,11 @@ private fun NavGraphBuilder.profileDestination(env: AppEnv) {
                 ),
                 onUsageStatisticsChanged = {
                     stats = it
-                    env.services.consent.usageStatisticsAllowed = it
+                    env.services.privacy.setUsageStatistics(it)
                 },
                 onCrashReportsChanged = {
                     crash = it
-                    env.services.consent.crashReportsAllowed = it
-                    env.services.crashReporter.setEnabled(it)
+                    env.services.privacy.setCrashReports(it)
                 },
                 modifier = Modifier.padding(padding),
             )

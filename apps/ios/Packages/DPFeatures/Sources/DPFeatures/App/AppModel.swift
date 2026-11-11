@@ -12,6 +12,8 @@ public struct AppDependencies {
     public var permissions: any PermissionRequesting
     public var preferences: any PreferencesStoring
     public var crashReporter: any CrashReporting
+    /// Usage statistics behind the user's choice (F-ONB-08).
+    public var analytics: any UsageAnalytics
     public var selfTest: any SelfTesting
     public var flags: BuildFlags
     public var coreInfo: any HelloProviding
@@ -24,8 +26,9 @@ public struct AppDependencies {
 
     public init(
         recorder: any TripRecording, history: any TripHistory, clock: any ClockBridge,
-        permissions: any PermissionRequesting, preferences: any PreferencesStoring, crashReporter: any CrashReporting, selfTest: any SelfTesting,
-        flags: BuildFlags, coreInfo: any HelloProviding, refreshCapture: @escaping @MainActor () -> Void,
+        permissions: any PermissionRequesting, preferences: any PreferencesStoring, crashReporter: any CrashReporting,
+        analytics: any UsageAnalytics = NoUsageAnalytics(), selfTest: any SelfTesting, flags: BuildFlags,
+        coreInfo: any HelloProviding, refreshCapture: @escaping @MainActor () -> Void,
         runSelfTestOnLaunch: Bool = false, movement: (any MovementMonitoring)? = nil
     ) {
         self.recorder = recorder
@@ -34,6 +37,7 @@ public struct AppDependencies {
         self.permissions = permissions
         self.preferences = preferences
         self.crashReporter = crashReporter
+        self.analytics = analytics
         self.selfTest = selfTest
         self.flags = flags
         self.coreInfo = coreInfo

@@ -11,6 +11,7 @@ import com.driveperf.data.local.ProtoAnalysisFileStore
 import com.driveperf.data.local.ProtoCaptureLog
 import com.driveperf.data.local.ProtoPreviewStore
 import com.driveperf.data.local.openDatabase
+import com.driveperf.domain.analytics.ConsentGatedAnalytics
 import com.driveperf.domain.feedback.MarkEventNeeded
 import com.driveperf.domain.hello.GetHelloMessage
 import com.driveperf.domain.hello.HelloMessage
@@ -109,6 +110,7 @@ public object DrivePerfCore {
             markEventNeeded = MarkEventNeeded(
                 trips, routes, LocalEventFeedbackStore(db, io), FeedbackRescorer(history, previews), clock,
             ),
+            analytics = ConsentGatedAnalytics(platform.analyticsSink()),
             onClose = {
                 scope.cancel()
                 driver.close()
