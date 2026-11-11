@@ -74,8 +74,19 @@ public class FakeMotionSource(
         rateHz = null
     }
 
+    /** When true, [queryRecordedAccelerometer] holds its answer until [releaseRecorded]. */
+    public var holdRecorded: Boolean = false
+
+    private var heldCallback: RecordedAccelCallback? = null
+
     override fun queryRecordedAccelerometer(fromWallMs: Long, toWallMs: Long, callback: RecordedAccelCallback) {
-        callback.onResult(recorded)
+        if (holdRecorded) heldCallback = callback else callback.onResult(recorded)
+    }
+
+    /** Answers a held query with [recorded]. */
+    public fun releaseRecorded() {
+        heldCallback?.onResult(recorded)
+        heldCallback = null
     }
 
     /** Delivers samples. Ignored while stopped. */
