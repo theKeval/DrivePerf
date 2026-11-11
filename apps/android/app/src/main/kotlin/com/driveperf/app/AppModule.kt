@@ -3,6 +3,7 @@ package com.driveperf.app
 import com.driveperf.app.bridge.PlatformCaptureController
 import com.driveperf.app.bridge.PlatformTripListSource
 import com.driveperf.app.core.AndroidPlatformBindings
+import com.driveperf.app.core.ConsentOnboardingSettings
 import com.driveperf.app.core.DeviceId
 import com.driveperf.app.core.WakePath
 import com.driveperf.di.CoreServices
@@ -18,8 +19,11 @@ import com.driveperf.feature.capture.CaptureController
 import com.driveperf.feature.capture.CaptureViewModel
 import com.driveperf.feature.drives.DrivesViewModel
 import com.driveperf.feature.drives.TripListSource
+import com.driveperf.feature.onboarding.ConsentChoices
+import com.driveperf.feature.onboarding.OnboardingSettings
 import com.driveperf.feature.onboarding.OnboardingViewModel
 import com.driveperf.feature.onboarding.PermissionReader
+import com.driveperf.feature.onboarding.currentOemGuide
 import com.driveperf.platform.analytics.StubAnalyticsSink
 import com.driveperf.platform.crash.ConsentSettings
 import com.driveperf.platform.crash.ConsentStore
@@ -58,7 +62,7 @@ val appModule = module {
     single<Analytics> { get<CoreServices>().analytics }
     single { PrivacyChoices(get(), get(), get()) }
     single<TripRepository> { get<CoreServices>().trips }
-    single { WakePath(androidContext(), get(), get(), get()) }
+    single { WakePath(androidContext(), get(), get(), get()) { get<ConsentSettings>().automaticTripsEnabled } }
 
     single {
         PlatformCaptureController(androidContext(), get(), get(), get(), get(), get(), get<WakePath>()::refresh)
@@ -67,8 +71,20 @@ val appModule = module {
 
     viewModel { CaptureViewModel(get(), System::currentTimeMillis) }
     viewModel { DrivesViewModel(get()) }
+    single<OnboardingSettings> { ConsentOnboardingSettings(get()) }
     viewModel {
-        val consent = get<ConsentStore>()
-        OnboardingViewModel(get<PermissionReader>().read(), consent.crashReportsAllowed, consent.usageStatisticsAllowed)
+        val consent = get<ConsentSettings>()
+        val privacy = get<PrivacyChoices>()
+        OnboardingViewModel(
+            initialPermissions = get<PermissionReader>().read(),
+            settings = get(),
+            oemGuide = currentOemGuide(),
+            initialChoices = ConsentChoices(consent.crashReportsAllowed, consent.usageStatisticsAllowed),
+            // "Continue" on S-ONB-13: the one moment the two choices are applied (nothing is sent before it).
+            onConsentCommitted = { choices ->
+                privacy.setCrashReports(choices.crashReports)
+                privacy.setUsageStatistics(choices.usageStatistics)
+            },
+        )
     }
 }

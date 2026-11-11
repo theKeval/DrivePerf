@@ -17,6 +17,7 @@ dependencies {
     implementation(projects.apps.android.designsystem)
 
     implementation(libs.androidx.core.ktx)
+    implementation(libs.androidx.browser)
     implementation(libs.androidx.activity.compose)
     implementation(platform(libs.compose.bom))
     implementation(libs.compose.ui)
