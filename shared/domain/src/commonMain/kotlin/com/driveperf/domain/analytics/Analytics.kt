@@ -16,7 +16,7 @@ public interface AnalyticsEvent {
     public val properties: Map<String, String>
 }
 
-/** What callers use. Every call is safe from any thread and never blocks. */
+/** What callers use. Every call is safe from any thread. */
 public interface Analytics {
     /**
      * Records [event]: held in memory until the user answers S-ONB-13, then sent if they allowed usage statistics or
