@@ -225,4 +225,60 @@ class InterimTripRecorderTest {
         override fun append(tripId: String, kind: TripFileKind, bytes: ByteArray) =
             if (writes++ == 0) FileResult.OK else FileResult.DISK_FULL
     }
+
+    /** Fails syncs and compress as configured, so the durability paths can be driven. */
+    private class FlakyStore(
+        private val syncResult: FileResult = FileResult.OK,
+        private val compressResult: FileResult = FileResult.OK,
+        val inner: InMemoryTripFileStore = InMemoryTripFileStore(),
+    ) : TripFileStore by inner {
+        val compressed = mutableListOf<String>()
+        override fun sync(tripId: String, kind: TripFileKind) = syncResult
+        override fun compress(tripId: String, kind: TripFileKind): FileResult {
+            compressed += tripId
+            return compressResult
+        }
+    }
+
+    @Test
+    fun `finishing closes the R0 stream through compress and lists the trip`() = runTest {
+        val store = FlakyStore()
+        val recorder = recorder(store)
+        recorder.start()
+        location.emit(fix(1.0))
+        assertNotNull(recorder.stop())
+        assertEquals(1, store.compressed.size)
+        assertEquals(1, index.entries.value.size)
+    }
+
+    @Test
+    fun `a failed final write is reported and the trip is not listed as saved`() = runTest {
+        val recorder = recorder(FlakyStore(compressResult = FileResult.DISK_FULL))
+        recorder.start()
+        location.emit(fix(1.0))
+        assertNull(recorder.stop())
+        assertEquals(CaptureState.Failed(DomainError.Storage.DiskFull), recorder.state.value)
+        assertTrue(index.entries.value.isEmpty())
+    }
+
+    @Test
+    fun `a failed periodic sync ends the trip with the storage error`() = runTest {
+        val recorder = recorder(FlakyStore(syncResult = FileResult.DISK_FULL))
+        recorder.start()
+        location.emit(fix(1.0))
+        advanceTimeBy(5_001)
+        runCurrent()
+        assertEquals(CaptureState.Failed(DomainError.Storage.DiskFull), recorder.state.value)
+    }
+
+    @Test
+    fun `a trip whose index cannot be saved is reported, not listed`() = runTest {
+        val recorder = recorder()
+        recorder.start()
+        location.emit(fix(1.0))
+        index.file.delete()
+        index.file.mkdirs() // the index path becomes a directory, so saving fails
+        assertNull(recorder.stop())
+        assertEquals(CaptureState.Failed(DomainError.Unexpected("trip-index")), recorder.state.value)
+    }
 }

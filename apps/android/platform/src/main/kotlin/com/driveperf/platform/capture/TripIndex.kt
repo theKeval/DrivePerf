@@ -3,6 +3,7 @@ package com.driveperf.platform.capture
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import java.io.File
+import java.io.IOException
 
 /** One recorded trip as the trip list needs it. [gpsDeliveryWhileMovingPercent] is null when the trip never moved. */
 data class TripEntry(
@@ -18,18 +19,28 @@ data class TripEntry(
  * The list of recorded trips, persisted as one tab-separated line each. INTERIM (DRIVE-72): DRIVE-62's `TripRepository`
  * (SQLDelight) replaces it, and "processed" trips with scores replace these raw entries.
  */
-class TripIndex(private val file: File) {
+class TripIndex(internal val file: File) {
     private val state = MutableStateFlow(load())
 
     /** Newest first. */
     val entries: StateFlow<List<TripEntry>> get() = state
 
+    /**
+     * Adds [entry] and persists the list by atomic replacement (temporary file, sync, rename), so an interrupted write
+     * leaves the previous index intact. Returns false, and changes nothing, when the list could not be saved.
+     */
     @Synchronized
-    fun add(entry: TripEntry) {
+    fun add(entry: TripEntry): Boolean {
         val updated = (listOf(entry) + state.value).sortedByDescending { it.startedWallMs }
-        file.parentFile?.mkdirs()
-        file.writeText(updated.joinToString("\n") { it.encode() })
-        state.value = updated
+        return try {
+            replaceAtomically(file, updated.joinToString("\n") { it.encode() }.toByteArray())
+            state.value = updated
+            true
+        } catch (_: IOException) {
+            false
+        } catch (_: IllegalStateException) {
+            false
+        }
     }
 
     private fun load(): List<TripEntry> =

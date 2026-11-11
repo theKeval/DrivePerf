@@ -25,12 +25,14 @@ internal class AppendStreams {
         }
     }
 
-    /** Flushes, syncs and closes the stream of [file], if one is open. */
+    /** Flushes, syncs and closes the stream of [file], if one is open. The descriptor is released even if a step throws. */
     fun close(file: File) {
-        open.remove(file)?.let {
-            it.out.flush()
-            it.stream.fd.sync()
-            it.out.close()
+        val target = open.remove(file) ?: return
+        try {
+            target.out.flush()
+            target.stream.fd.sync()
+        } finally {
+            target.stream.close() // release the descriptor even when the flush failed (disk full)
         }
     }
 

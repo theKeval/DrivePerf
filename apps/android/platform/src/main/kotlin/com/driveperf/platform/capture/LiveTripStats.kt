@@ -24,12 +24,24 @@ class LiveTripStats {
     fun onFix(sample: LocationSample) {
         fixCount++
         val accuracy = sample.hAccM
-        if (accuracy == null || accuracy > MAX_ACCURACY_M) return
-        val prev = last
-        last = sample
-        if (prev == null) return
-        val step = haversineM(prev.lat, prev.lng, sample.lat, sample.lng)
-        if (step >= MIN_STEP_M) distanceM += step
+        if (accuracy != null && accuracy <= MAX_ACCURACY_M) anchorTo(sample)
+    }
+
+    /**
+     * The anchor only moves once a step has passed the jitter threshold, so slow movement (under 18 km/h at one fix a
+     * second, every step is below 5 m) still adds up instead of being dropped fix by fix.
+     */
+    private fun anchorTo(sample: LocationSample) {
+        val anchor = last
+        if (anchor == null) {
+            last = sample
+        } else {
+            val step = haversineM(anchor.lat, anchor.lng, sample.lat, sample.lng)
+            if (step >= MIN_STEP_M) {
+                distanceM += step
+                last = sample
+            }
+        }
     }
 
     companion object {

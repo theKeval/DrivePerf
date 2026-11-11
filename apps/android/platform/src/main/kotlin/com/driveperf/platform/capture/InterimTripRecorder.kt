@@ -102,7 +102,7 @@ class InterimTripRecorder(
     private suspend fun syncPeriodically(current: Session) {
         while (true) {
             delay(timings.syncEveryMs)
-            current.syncAndCheckGps()
+            current.syncAndCheckGps()?.let { fail(current, it) }
         }
     }
 
@@ -125,15 +125,31 @@ class InterimTripRecorder(
         sources.motion.stop()
         sources.activity.stop()
         current.close()
-        store.sync(current.tripId, TripFileKind.R0)
-        val entry = if (current.fixCount == 0) {
+        val saved = save(current)
+        mutableState.value = (error ?: saved.error)?.let(CaptureState::Failed) ?: CaptureState.Idle
+        return saved.entry
+    }
+
+    /** What finishing a trip produced: the list entry when it was saved, or the reason it was not. */
+    private class Saved(val entry: TripEntry?, val error: DomainError?)
+
+    /**
+     * Makes the trip durable and lists it. `compress` is how the port ends a file: it closes the append stream (flush and
+     * fsync) and gzips in place, as the core does at finalisation. A trip is listed only when every step succeeded, so
+     * the list never shows samples that did not reach the disk.
+     */
+    private fun save(current: Session): Saved {
+        if (current.fixCount == 0) {
             store.deleteTrip(current.tripId) // nothing was recorded: leave no empty trip behind
-            null
-        } else {
-            current.entry().also(index::add)
+            return Saved(null, null)
         }
-        mutableState.value = error?.let(CaptureState::Failed) ?: CaptureState.Idle
-        return entry
+        val closed = store.compress(current.tripId, TripFileKind.R0)
+        val entry = current.entry()
+        return when {
+            closed != FileResult.OK -> Saved(null, closed.toError())
+            !index.add(entry) -> Saved(null, DomainError.Unexpected("trip-index"))
+            else -> Saved(entry, null)
+        }
     }
 
     private fun FileResult.toError(): DomainError = when (this) {
@@ -169,12 +185,14 @@ class InterimTripRecorder(
             mutableState.value = recording(GpsStatus.GOOD)
         }
 
+        /** Syncs the file and refreshes the GPS status. Returns the storage error when the sync failed, else null. */
         @Synchronized
-        fun syncAndCheckGps() {
-            if (closed) return
-            store.sync(tripId, TripFileKind.R0)
+        fun syncAndCheckGps(): DomainError? {
+            if (closed) return null
+            val synced = store.sync(tripId, TripFileKind.R0)
             val sinceFixMs = TimeUnit.NANOSECONDS.toMillis(clock.monotonicNs() - lastFixMonoNs)
             if (stats.fixCount > 0 && sinceFixMs > timings.gpsLostAfterMs) mutableState.value = recording(GpsStatus.LOST)
+            return if (synced == FileResult.OK) null else synced.toError()
         }
 
         /** True the first time it is called, so one failure ends the trip once. */

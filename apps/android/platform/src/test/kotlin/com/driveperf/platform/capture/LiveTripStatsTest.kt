@@ -34,4 +34,12 @@ class LiveTripStatsTest {
         stats.onFix(fix(1.0, lng = 0.00002)) // about 2 m
         assertEquals(0.0, stats.distanceM, 1e-9)
     }
+
+    @Test
+    fun `slow movement adds up even when every step is under five metres`() {
+        val stats = LiveTripStats()
+        // 10 km/h at one fix a second is about 2.8 m a fix: each step alone is jitter, together they are a drive.
+        (0..20).forEach { stats.onFix(fix(it.toDouble(), lng = it * 0.000025)) }
+        assertEquals(20 * 0.000025 * 111_190, stats.distanceM, 6.0)
+    }
 }

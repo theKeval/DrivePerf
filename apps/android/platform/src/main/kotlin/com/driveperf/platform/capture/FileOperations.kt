@@ -24,23 +24,31 @@ internal inline fun fileResult(action: () -> Unit): FileResult = try {
 internal fun replaceAtomically(target: File, bytes: ByteArray) {
     target.parentFile?.mkdirs()
     val temporary = File(target.parentFile, target.name + TripFileLayout.TEMP_SUFFIX)
-    FileOutputStream(temporary).use {
-        it.write(bytes)
-        it.fd.sync()
+    try {
+        FileOutputStream(temporary).use {
+            it.write(bytes)
+            it.fd.sync()
+        }
+        check(temporary.renameTo(target)) { "rename failed" }
+    } finally {
+        temporary.delete() // gone already after a successful rename; otherwise do not leave it behind
     }
-    check(temporary.renameTo(target)) { "rename failed" }
 }
 
 /** Gzips [source] into [target] (RFC 1952) through a synced temporary file. */
 internal fun gzipAtomically(source: File, target: File) {
     val temporary = File(target.parentFile, target.name + TripFileLayout.TEMP_SUFFIX)
-    FileOutputStream(temporary).use { raw ->
-        val zip = GZIPOutputStream(raw)
-        source.inputStream().use { it.copyTo(zip) }
-        zip.finish() // write the gzip trailer; the file descriptor must stay open for the sync below
-        raw.fd.sync()
+    try {
+        FileOutputStream(temporary).use { raw ->
+            val zip = GZIPOutputStream(raw)
+            source.inputStream().use { it.copyTo(zip) }
+            zip.finish() // write the gzip trailer; the file descriptor must stay open for the sync below
+            raw.fd.sync()
+        }
+        check(temporary.renameTo(target)) { "rename failed" }
+    } finally {
+        temporary.delete()
     }
-    check(temporary.renameTo(target)) { "rename failed" }
 }
 
 /** Lower-case hex SHA-256 of the file's bytes. */
