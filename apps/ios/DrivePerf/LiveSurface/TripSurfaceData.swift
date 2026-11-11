@@ -40,19 +40,25 @@ final class TripSurfaceData {
     }
 
     func updateLatestDrive(_ history: [TripSummary]) async {
-        var latest: DriveWidgetSnapshot.LatestDrive?
         do {
-            for summary in history where summary.status == .finalised {
-                latest = try await Self.readDrive(trips, tripID: summary.id)
-                if latest != nil { break }
+            let latest = try await Self.latestDrive(in: history) { id in
+                try await Self.readDrive(trips, tripID: id)
             }
+            var next = snapshot
+            next.latestDrive = latest
+            publish(next)
         } catch {
             logger.error("Could not read the latest drive for widgets: \(error.localizedDescription, privacy: .private)")
-            return
         }
-        var next = snapshot
-        next.latestDrive = latest
-        publish(next)
+    }
+
+    static func latestDrive(
+        in history: [TripSummary], readDrive: (String) async throws -> DriveWidgetSnapshot.LatestDrive?
+    ) async rethrows -> DriveWidgetSnapshot.LatestDrive? {
+        for summary in history where summary.status == .finalised || summary.status == .short {
+            if let drive = try await readDrive(summary.id) { return drive }
+        }
+        return nil
     }
 
     func decodedTrip(tripID: String) async -> DriveWidgetSnapshot.LatestDrive? {

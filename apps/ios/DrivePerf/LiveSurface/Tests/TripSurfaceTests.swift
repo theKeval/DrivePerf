@@ -26,6 +26,27 @@ final class DriveWidgetSnapshotTests: XCTestCase {
         XCTAssertEqual(DriveWidgetSnapshot.read(from: url), DriveWidgetSnapshot())
     }
 
+    @MainActor
+    func testLatestDriveIncludesFinalizedShortTripWithoutSmoothness() async {
+        let now = Date()
+        let history = [
+            TripSummary(
+                id: "short", source: .manual, status: .short, startedAt: now.addingTimeInterval(-60),
+                endedAt: now, distanceM: 300, samples: SampleCounts()),
+            TripSummary(
+                id: "older", source: .manual, status: .finalised, startedAt: now.addingTimeInterval(-1_800),
+                endedAt: now.addingTimeInterval(-900), distanceM: 5_000, samples: SampleCounts()),
+        ]
+        let short = DriveWidgetSnapshot.LatestDrive(partOfDay: "Evening", distanceM: 300, smoothness: nil, baseline: nil)
+        let older = DriveWidgetSnapshot.LatestDrive(partOfDay: "Evening", distanceM: 5_000, smoothness: 91, baseline: 84)
+
+        let latest = await TripSurfaceData.latestDrive(in: history) { id in
+            id == "short" ? short : older
+        }
+
+        XCTAssertEqual(latest, short)
+    }
+
     func testActionAndMissingBaseline() {
         var snapshot = DriveWidgetSnapshot()
         XCTAssertEqual(snapshot.action, .start)

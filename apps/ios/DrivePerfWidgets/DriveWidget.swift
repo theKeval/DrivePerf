@@ -90,6 +90,10 @@ private struct DriveWidgetView: View {
                     .font(.caption.monospacedDigit().bold())
                     .accessibilityLabel("Smoothness \(score)")
                 if let delta = idleDrive?.delta { comparison(delta, compact: true) }
+            } else if idleDrive != nil {
+                Text("—")
+                    .font(.caption.bold())
+                    .accessibilityLabel("Smoothness unavailable")
             }
             actionButton(iconOnly: true)
         }
@@ -123,6 +127,7 @@ private struct DriveWidgetView: View {
                     Text(LocalizedStringKey(latest.partOfDay)).font(.caption2)
                     if let delta = latest.delta { comparison(delta, compact: true) }
                 }
+                if latest.smoothness == nil { Text("Smoothness unavailable").font(.caption2) }
             } else {
                 Text(snapshot.canRecord == false ? "Location needed" : "No drives yet").font(.caption.bold())
             }
