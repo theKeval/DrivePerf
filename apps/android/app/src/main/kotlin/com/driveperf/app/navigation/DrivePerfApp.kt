@@ -83,6 +83,7 @@ private class AppEnv(
     val capture: CaptureUiState,
     val services: AppServices,
     val fixLocation: () -> Unit,
+    val fixAutoDetect: () -> Unit,
 )
 
 /** The app-level singletons the destinations talk to. */
@@ -106,7 +107,11 @@ private fun AppNavHost(navController: NavHostController, captureViewModel: Captu
         if (!permissionReader.read().fineLocation) context.startActivity(appSettingsIntent(context.packageName))
     }
     val services = AppServices(consent, koinInject(), koinInject(), captureController, permissionReader)
-    val env = AppEnv(navController, captureViewModel, capture, services, fixLocation = { requestLocation.launch(LOCATION_PERMISSIONS) })
+    val env = AppEnv(
+        navController, captureViewModel, capture, services,
+        fixLocation = { requestLocation.launch(LOCATION_PERMISSIONS) },
+        fixAutoDetect = { context.startActivity(appSettingsIntent(context.packageName)) },
+    )
     val start = if (consent.onboardingCompleted) Tab.Drives.route else Routes.ONBOARDING
     NavHost(navController = navController, startDestination = start) {
         onboardingDestination(env)
@@ -122,13 +127,7 @@ private fun NavGraphBuilder.onboardingDestination(env: AppEnv) {
         OnboardingRoute(
             viewModel = viewModel,
             permissionReader = env.services.permissionReader,
-            onConsentChanged = { crash, stats ->
-                env.services.privacy.setCrashReports(crash)
-                // Usage statistics are decided at "Continue" (onFinished), not while the switch is toggled.
-                env.services.consent.usageStatisticsAllowed = stats
-            },
             onFinished = {
-                env.services.privacy.setUsageStatistics(env.services.consent.usageStatisticsAllowed)
                 env.services.consent.onboardingCompleted = true
                 env.services.captureController.refreshPermissions()
                 env.navController.navigate(Tab.Drives.route) { popUpTo(Routes.ONBOARDING) { inclusive = true } }
@@ -144,10 +143,16 @@ private fun NavGraphBuilder.tabDestinations(env: AppEnv) {
         onStart = env.captureViewModel::onStart,
         onOpenDrive = {}, // while recording, the in-drive gate already shows the drive screen
         onFixLocation = env.fixLocation,
+        onFixAutoDetect = env.fixAutoDetect,
     )
     for (tab in Tab.entries) {
         composable(tab.route) {
-            TabScaffold(selected = tab, capture = env.capture, callbacks = callbacks) { padding ->
+            val autoDetectOff = rememberAutoDetectOff(env.services.permissionReader, env.services.consent)
+            TabScaffold(
+                selected = tab,
+                capture = env.capture,
+                callbacks = callbacks.copy(autoDetectOff = autoDetectOff),
+            ) { padding ->
                 TabContent(tab, padding, onSeeAll = { env.navController.navigate(Routes.ALL_DRIVES) })
             }
         }

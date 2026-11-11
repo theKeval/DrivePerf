@@ -1,55 +1,243 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <!-- Shared -->
     <string name="onb_continue">Continue</string>
     <string name="onb_back">Back</string>
+    <string name="onb_next">Next</string>
+    <string name="onb_skip">Skip</string>
     <string name="onb_not_now">Not now</string>
+    <string name="onb_done">Done</string>
     <string name="onb_open_settings">Open settings</string>
-    <string name="onb_allow">Allow</string>
+    <string name="onb_setup_step">Setup, step %1$d of %2$d</string>
+    <string name="onb_setup_step_short">%1$d of %2$d</string>
+    <string name="onb_status_on">On</string>
+    <string name="onb_status_off">Off</string>
 
+    <!-- S-ONB-01 Welcome -->
+    <string name="onb_welcome_wordmark">DrivePerf</string>
     <string name="onb_welcome_title">Smooth is a skill.</string>
-    <string name="onb_welcome_body">DrivePerf turns every drive into a story of how smoothly you drove, and helps you get better at it. Every drive, decoded.</string>
+    <string name="onb_welcome_support">Every drive, decoded.</string>
     <string name="onb_welcome_cta">Get started</string>
 
-    <string name="onb_how_title">How recording works</string>
-    <string name="onb_how_body">DrivePerf uses your phone\'s location and motion sensors while you drive. Everything stays on your phone unless you choose to back it up.</string>
-    <string name="onb_how_honest">Phone sensors can miss things: a tunnel, a weak GPS signal, or a phone that moved in its mount. When that happens DrivePerf says so instead of guessing.</string>
-    <string name="onb_how_passenger">It cannot tell whether you are the driver or a passenger, so you can mark a drive as a passenger trip.</string>
+    <!-- S-ONB-02 Story preview -->
+    <string name="onb_story_kicker">Example drive</string>
+    <string name="onb_story_card_title">Thursday morning · Home → Work</string>
+    <string name="onb_story_delta">▲ +7 vs your usual on The Commute</string>
+    <string name="onb_story_card_description">Example drive: Thursday morning, Home to Work, Smoothness 92, 7 above your usual.</string>
+    <string name="onb_story_title">Every drive, decoded.</string>
+    <string name="onb_story_lead">Park, and each drive becomes a short Story: the route, your inputs and a Smoothness score compared with your own usual. Never with anyone else’s.</string>
 
-    <string name="onb_location_title">Allow location while you use the app</string>
-    <string name="onb_location_body">DrivePerf needs your precise location to record the route and measure each drive. It is used only while a drive is recording.</string>
-    <string name="onb_location_denied">Without location DrivePerf cannot record a drive. You can allow it later in Settings.</string>
-    <string name="onb_location_approximate">You chose approximate location. Recording needs precise location to measure a drive accurately.</string>
+    <!-- S-ONB-03 Private by design -->
+    <string name="onb_privacy_title">Private by design</string>
+    <string name="onb_privacy_lead">No account needed. Your trips stay on your phone unless you turn on backup.</string>
+    <string name="onb_privacy_check_1">Worked out on your phone</string>
+    <string name="onb_privacy_check_2">Never sold, never shared with insurers</string>
+    <string name="onb_privacy_check_3">You choose what’s shared</string>
+    <string name="onb_preview_badge">PRO PREVIEW</string>
+    <string name="onb_preview_title">Pro Preview included for 14 days, no card</string>
+    <string name="onb_preview_line">Replay and Analysis for every drive, unlimited routes and trends. Then choose Pro, or keep Free: recording, Stories and scores stay free.</string>
 
-    <string name="onb_background_title">Record automatically</string>
-    <string name="onb_background_body">To start recording on its own when you drive off, DrivePerf needs location access all the time, even when the app is closed. On the next screen choose \"Allow all the time\".</string>
-    <string name="onb_background_disclosure">DrivePerf only uses background location to detect and record drives. It never sells or shares your location.</string>
-    <string name="onb_background_denied">Automatic recording is off. You can still start every drive yourself with the Start button.</string>
+    <!-- S-ONB-04 Age and terms -->
+    <string name="onb_age_title">One quick check</string>
+    <string name="onb_age_lead">DrivePerf is for drivers 18 and over. No date of birth needed: you just confirm it.</string>
+    <string name="onb_age_checkbox">I’m 18 or older</string>
+    <string name="onb_terms_prefix">By continuing you agree to the </string>
+    <string name="onb_terms_link">Terms of Use</string>
+    <string name="onb_terms_and"> and </string>
+    <string name="onb_privacy_link">Privacy Policy</string>
+    <string name="onb_terms_suffix">. We save the version you accepted, on this phone.</string>
+    <string name="onb_age_under18">I’m under 18</string>
+    <string name="onb_age_blocked_title">DrivePerf is for drivers 18 and over for now</string>
+    <string name="onb_age_blocked_lead">Thanks for checking it out. Nothing about you was saved, apart from a note on this phone so this screen shows next time.</string>
+    <string name="onb_age_blocked_undo">I tapped this by mistake</string>
 
-    <string name="onb_activity_title">Tell driving from walking</string>
-    <string name="onb_activity_body">Physical activity access lets your phone tell when you are in a vehicle, which helps start and end drives at the right time.</string>
-    <string name="onb_activity_denied">Without it DrivePerf will rely on location alone and may start or end drives less precisely.</string>
+    <!-- S-ONB-05 How capture works -->
+    <string name="onb_promise_title">How capture works</string>
+    <string name="onb_promise_lead">What automatic capture can and can’t do, so nothing surprises you later.</string>
+    <string name="onb_promise_detects">Auto-detects most drives.</string>
+    <string name="onb_promise_estimated">The first few hundred metres may be estimated.</string>
+    <string name="onb_promise_force_stop">Force-stopping the app pauses auto-detect.</string>
+    <string name="onb_promise_force_stop_detail">Using Force stop in Android’s app settings stops DrivePerf from noticing drives until you open it again.</string>
+    <string name="onb_promise_oem">Some phone brands put apps to sleep.</string>
+    <string name="onb_promise_oem_detail">We’ll help you check.</string>
+    <string name="onb_promise_battery" formatted="false">About 2–4% battery per hour of driving with the screen off.</string>
+    <string name="onb_promise_how_it_works">How it works</string>
+    <string name="onb_how_sheet_title">How it works</string>
+    <string name="onb_how_sheet_lead">Two ways to record. You can switch between them anytime in Settings.</string>
+    <string name="onb_how_auto_title">Automatic trips</string>
+    <string name="onb_how_auto_body">DrivePerf notices when you set off and decodes each drive when you park.</string>
+    <string name="onb_how_manual_title">Manual trips</string>
+    <string name="onb_how_manual_body">Tap Start when you set off and Stop when you park.</string>
+    <string name="onb_how_more">More on driveperf.com ›</string>
 
-    <string name="onb_notifications_title">Show when a drive is recording</string>
-    <string name="onb_notifications_body">A notification tells you a drive is being recorded and lets you stop it. Android also needs it to keep recording reliably in the background.</string>
-    <string name="onb_notifications_denied">Without notifications you will not see when a drive is recording.</string>
+    <!-- S-ONB-06 Location -->
+    <string name="onb_location_title">Draw the route of every drive</string>
+    <string name="onb_location_lead">DrivePerf uses your location while you use the app to record each drive’s route, and to place braking and cornering on the road.</string>
+    <string name="onb_location_check_1">Route, distance and stops for every drive</string>
+    <string name="onb_location_check_2">Processed on your phone</string>
+    <string name="onb_location_check_3">Never sold, never shared with insurers</string>
+    <string name="onb_location_fine">You choose about automatic trips in two steps.</string>
+    <string name="onb_location_denied_title">Location is off</string>
+    <string name="onb_location_denied_lead">Without location, DrivePerf can’t record drives, automatic or manual. You can turn it on in Settings anytime.</string>
+    <string name="onb_location_denied_status">Location: Don’t allow</string>
+    <string name="onb_location_continue_without">Continue without location</string>
 
-    <string name="onb_battery_title">Keep recording reliable</string>
-    <string name="onb_battery_body">Some phones stop apps in the background to save battery, which can cut a drive short. If you see that happen, set DrivePerf to \"Unrestricted\" in the battery settings.</string>
-    <string name="onb_battery_open">Open battery settings</string>
-    <string name="onb_battery_later">Remind me later</string>
+    <!-- S-ONB-07 Physical activity -->
+    <string name="onb_motion_title">Know when you’re driving</string>
+    <string name="onb_motion_lead">Physical activity lets DrivePerf tell driving from walking, so drives start sooner and false trips stay rare.</string>
+    <string name="onb_motion_check_1">Fewer false trips</string>
+    <string name="onb_motion_check_1_detail">Walks, runs, bikes and transit are left out.</string>
+    <string name="onb_motion_check_2">Activity data stays on your phone</string>
+    <string name="onb_motion_denied_title">Physical activity is off</string>
+    <string name="onb_motion_denied_lead">Automatic trips can still run on location alone, with more false trips and slower starts. You can turn it on in Settings anytime.</string>
 
+    <!-- S-ONB-08 Automatic trips (the Play prominent disclosure) -->
+    <string name="onb_auto_title">Automatic trips</string>
+    <string name="onb_auto_lead">Record every drive without opening the app. Or keep it manual: tap Start when you set off.</string>
+    <string name="onb_auto_kicker">BACKGROUND LOCATION</string>
+    <string name="onb_auto_disclosure">DrivePerf collects location data to enable automatic trip recording, even when the app is closed or not in use.</string>
+    <string name="onb_auto_what_term">What</string>
+    <string name="onb_auto_what">Your location and phone motion, during the drives it detects.</string>
+    <string name="onb_auto_why_term">Why</string>
+    <string name="onb_auto_why">To record each drive’s route and score how smooth it was.</string>
+    <string name="onb_auto_where_term">Where</string>
+    <string name="onb_auto_where">On your phone unless you turn on backup. Never sold, never shared with insurers.</string>
+    <string name="onb_auto_toggle">Record drives automatically</string>
+    <string name="onb_auto_toggle_off">Off until you turn it on</string>
+    <string name="onb_auto_toggle_on">Next, Android will ask you to allow location “all the time”.</string>
+    <string name="onb_auto_toggle_on_dialog">Android will ask to allow location “all the time”.</string>
+    <string name="onb_auto_declined">Manual trips it is. Location stays “While using the app”. Start drives yourself anytime, and switch automatic trips on later in Settings.</string>
+    <string name="onb_auto_fine">You can change this anytime in Settings › Capture.</string>
+    <string name="onb_auto_cta_manual">Continue with manual trips</string>
+    <string name="onb_auto_cta_settings">Continue to settings</string>
+
+    <!-- S-ONB-09 Allow all the time -->
+    <string name="onb_allday_title">One more step in settings</string>
+    <string name="onb_allday_lead">Android asks for background location in settings. Choose “Allow all the time” so DrivePerf can record drives with the app closed.</string>
+    <string name="onb_allday_step_1">Tap Open settings below.</string>
+    <string name="onb_allday_step_2">Choose Allow all the time.</string>
+    <string name="onb_allday_step_3">Come back here. We’ll check right away.</string>
+    <string name="onb_allday_open">Open settings</string>
+    <string name="onb_allday_manual">Continue with manual trips</string>
+    <string name="onb_allday_granted_title">Automatic trips are on</string>
+    <string name="onb_allday_granted_lead">Location is set to “Allow all the time”. DrivePerf will notice your next drive on its own.</string>
+    <string name="onb_allday_not_title">Location is still “While using the app”</string>
+    <string name="onb_allday_not_lead">Automatic trips stay off for now. Manual trips work, and you can try again anytime.</string>
+    <string name="onb_allday_try_again">Try again</string>
+
+    <!-- S-ONB-10 Notifications -->
+    <string name="onb_notifications_title">Know when your drive is decoded</string>
+    <string name="onb_notifications_lead">Three kinds of notification, and nothing else.</string>
+    <string name="onb_notifications_preview_1_title">Drive decoded.</string>
+    <string name="onb_notifications_preview_1_body">Thursday morning · Home → Work</string>
+    <string name="onb_notifications_preview_2_title">Capture needs a fix</string>
+    <string name="onb_notifications_preview_2_body">Location is set to While using the app.</string>
+    <string name="onb_notifications_preview_3_title">Your week, decoded</string>
+    <string name="onb_notifications_preview_3_body">4 drives · 63 km</string>
+    <string name="onb_notifications_now">now</string>
+    <string name="onb_notifications_list_1">Drive decoded</string>
+    <string name="onb_notifications_list_2">Capture problems</string>
+    <string name="onb_notifications_list_3">Weekly recap</string>
+    <string name="onb_notifications_list_4">Never while you drive</string>
+    <string name="onb_notifications_denied_title">Notifications are off</string>
+    <string name="onb_notifications_denied_lead">You won’t hear when a drive is decoded or when capture needs a fix. Your drives still record, and you can turn notifications on in Settings anytime.</string>
+    <string name="onb_notifications_fgs">While a drive records, Android still shows the recording notification. It’s required, and it’s how you stop a trip from the shade.</string>
+
+    <!-- S-ONB-11 Precise location -->
+    <string name="onb_precise_title">Turn on precise location?</string>
+    <string name="onb_precise_lead">Precise location places braking and cornering on the road. Approximate location only knows the area you’re in.</string>
+    <string name="onb_precise_approximate">Approximate</string>
+    <string name="onb_precise_precise">Precise</string>
+    <string name="onb_precise_fine">Used during drives only, and processed on your phone.</string>
+    <string name="onb_precise_use">Use precise location</string>
+    <string name="onb_precise_keep">Keep approximate</string>
+    <string name="onb_precise_refused_title">Route only, for now</string>
+    <string name="onb_precise_refused_card">Drives record as “route only, no event placement”. Braking, acceleration and cornering are still counted, but not placed on the road.</string>
+    <string name="onb_precise_refused_where">You can turn on precise location in Settings › Apps › DrivePerf › Permissions › Location.</string>
+
+    <!-- S-ONB-16 Denied and manual mode -->
+    <string name="onb_denied_title">DrivePerf needs location to record</string>
+    <string name="onb_denied_lead">Without it, DrivePerf can’t draw a route or measure a drive, so nothing records, not even manual trips.</string>
+    <string name="onb_denied_check_1">While using the app is enough for manual trips</string>
+    <string name="onb_denied_check_2">Used only during drives</string>
+    <string name="onb_denied_check_3">Never sold</string>
+    <string name="onb_denied_fine">You can look around and set things up. Recording starts once location is on.</string>
+    <string name="onb_manual_title">Manual trips it is</string>
+    <string name="onb_manual_lead">Location is set to “While using the app”, so DrivePerf won’t start drives on its own. Everything else works.</string>
+    <string name="onb_manual_check_1">Start drives yourself</string>
+    <string name="onb_manual_check_1_detail">From the app, Quick Settings or a widget.</string>
+    <string name="onb_manual_check_2">Stories, Replay and scores</string>
+    <string name="onb_manual_check_3">No automatic trips</string>
+    <string name="onb_manual_check_3_detail">You can switch them on later in Settings.</string>
+    <string name="onb_manual_cta">Continue in manual mode</string>
+
+    <!-- S-ONB-12 Battery and reliability -->
+    <string name="onb_battery_detected">Detected: %1$s</string>
+    <string name="onb_battery_done">Done</string>
+    <string name="onb_battery_remind">Remind me later</string>
+    <string name="onb_battery_remind_title">We’ll remind you</string>
+    <string name="onb_battery_remind_lead">Until DrivePerf is set to stay awake, drives may not start on their own. The Health Check will keep this on your list.</string>
+    <string name="onb_battery_remind_status">Health Check: Keep DrivePerf awake</string>
+    <string name="onb_battery_show_steps">Show me the steps now</string>
+    <string name="onb_oem_open_sleeping_apps">Open sleeping apps ›</string>
+    <string name="onb_oem_open_app_battery">Open app battery ›</string>
+    <string name="onb_oem_open_autostart">Open autostart ›</string>
+    <string name="onb_oem_open_battery_saver">Open battery saver ›</string>
+    <string name="onb_oem_open_battery_optimisation">Open battery optimisation ›</string>
+
+    <string name="onb_oem_samsung_title">Keep DrivePerf awake on your Samsung</string>
+    <string name="onb_oem_samsung_lead">Samsung can put apps to sleep to save battery. When it does, drives don’t start on their own. Two settings fix it.</string>
+    <string name="onb_oem_samsung_step1">Add DrivePerf to “Never sleeping apps”</string>
+    <string name="onb_oem_samsung_step1_path">Settings › Battery › Background usage limits</string>
+    <string name="onb_oem_samsung_step2">Set app battery to “Unrestricted”</string>
+    <string name="onb_oem_samsung_step2_path">Settings › Apps › DrivePerf › Battery</string>
+
+    <string name="onb_oem_xiaomi_title">Keep DrivePerf awake on your Xiaomi</string>
+    <string name="onb_oem_xiaomi_lead">Xiaomi phones stop background apps to save battery. When that happens, drives don’t start on their own. Three settings fix it.</string>
+    <string name="onb_oem_xiaomi_step1">Turn on Autostart</string>
+    <string name="onb_oem_xiaomi_step1_path">Settings › Apps › Manage apps › DrivePerf</string>
+    <string name="onb_oem_xiaomi_step2">Set Battery saver to “No restrictions”</string>
+    <string name="onb_oem_xiaomi_step2_path">Settings › Apps › Manage apps › DrivePerf › Battery saver</string>
+    <string name="onb_oem_xiaomi_step3">Lock DrivePerf in Recents</string>
+    <string name="onb_oem_xiaomi_step3_path">Open Recents, then pull DrivePerf down until the lock shows</string>
+
+    <string name="onb_oem_oneplus_title">Keep DrivePerf running on your OnePlus</string>
+    <string name="onb_oem_oneplus_lead">Some phones pause apps in the background to save battery. When that happens, drives don’t start on their own. Two settings fix it.</string>
+    <string name="onb_oem_oneplus_step1">Allow background activity</string>
+    <string name="onb_oem_oneplus_step1_path">Settings › Apps › DrivePerf › Battery usage</string>
+    <string name="onb_oem_oneplus_step2">Turn off battery optimisation for DrivePerf</string>
+    <string name="onb_oem_oneplus_step2_path">Settings › Battery › Battery optimisation</string>
+
+    <string name="onb_oem_oppo_title">Keep DrivePerf running on your Oppo</string>
+    <string name="onb_oem_vivo_title">Keep DrivePerf running on your Vivo</string>
+    <string name="onb_oem_huawei_title">Keep DrivePerf running on your Huawei</string>
+    <string name="onb_oem_honor_title">Keep DrivePerf running on your Honor</string>
+    <string name="onb_oem_generic_lead">Some phones pause apps in the background to save battery. When that happens, drives don’t start on their own. Two settings fix it.</string>
+    <string name="onb_oem_generic_step1">Allow DrivePerf to start and run in the background</string>
+    <string name="onb_oem_generic_step1_path">Settings › Apps › DrivePerf › Autostart or App launch</string>
+    <string name="onb_oem_generic_step2">Turn off battery optimisation for DrivePerf</string>
+    <string name="onb_oem_generic_step2_path">Settings › Battery › Battery optimisation</string>
+
+    <!-- S-ONB-13 Help improve -->
     <string name="onb_help_title">Help improve DrivePerf</string>
-    <string name="onb_help_body">Both are off unless you turn them on, and you can change them any time.</string>
+    <string name="onb_help_lead">Two separate choices. Usage statistics stay off unless you turn them on.</string>
     <string name="onb_help_stats_title">Share usage statistics</string>
-    <string name="onb_help_stats_body">Counts of which features are used. Never your location, routes or car.</string>
+    <string name="onb_help_stats_body">Which screens and features get used. Never your locations, routes, speeds or car names.</string>
     <string name="onb_help_crash_title">Send crash reports</string>
-    <string name="onb_help_crash_body">Helps us fix crashes. Reports never include your location.</string>
+    <string name="onb_help_crash_body">If DrivePerf crashes, the device, OS and app version help us fix it. Never includes locations.</string>
+    <string name="onb_help_fine">Change these anytime in Privacy Centre › Analytics and diagnostics. Nothing is sent before you continue.</string>
 
-    <string name="onb_ready_title">You are ready</string>
-    <string name="onb_ready_body">Tap Start on the Drives tab to record a drive.</string>
-    <string name="onb_ready_location_on">Location: on</string>
-    <string name="onb_ready_location_off">Location: off, recording is unavailable</string>
-    <string name="onb_ready_auto_on">Automatic recording: on</string>
-    <string name="onb_ready_auto_off">Automatic recording: off, start drives with the Start button</string>
-    <string name="onb_ready_cta">Start using DrivePerf</string>
+    <!-- S-ONB-15 Ready -->
+    <string name="onb_ready_title_auto">You’re set.</string>
+    <string name="onb_ready_title_manual">You’re set for manual trips.</string>
+    <string name="onb_ready_lead_auto">Just drive. Your first Story appears when you park.</string>
+    <string name="onb_ready_lead_manual">Tap Start when you set off and Stop when you park. Your first Story appears right after.</string>
+    <string name="onb_ready_preview">Pro Preview · day 1 of 14 · no card</string>
+    <string name="onb_ready_automatic">Automatic trips</string>
+    <string name="onb_ready_location">Location</string>
+    <string name="onb_ready_activity">Physical activity</string>
+    <string name="onb_ready_notifications">Notifications</string>
+    <string name="onb_ready_location_precise">Precise</string>
+    <string name="onb_ready_location_approximate">Approximate: route only</string>
+    <string name="onb_ready_cta">Go to Drives</string>
 </resources>

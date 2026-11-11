@@ -14,6 +14,11 @@ class PrivacyChoicesTest {
         override var usageStatisticsAllowed = false
         override var usageStatisticsDecided = false
         override var onboardingCompleted = false
+        override var termsAcceptedVersion: String? = null
+        override var termsAcceptedAtMillis = 0L
+        override var under18Blocked = false
+        override var automaticTripsEnabled = false
+        override var reliabilityGuide: String? = null
     }
 
     private class FakeCrashReporter : CrashReporter {

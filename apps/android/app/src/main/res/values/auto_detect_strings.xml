@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- F-ONB-04.6: Home says so when automatic trips are off, and why. -->
+    <string name="auto_detect_off_title">Auto-detect off</string>
+    <string name="auto_detect_off_manual">You’re on manual trips. Tap Start when you set off.</string>
+    <string name="auto_detect_off_location">Allow location all the time so drives can start on their own.</string>
+    <string name="auto_detect_off_activity">Allow physical activity so drives can start on their own.</string>
+    <string name="auto_detect_fix">Fix</string>
+</resources>
