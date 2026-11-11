@@ -46,6 +46,7 @@ import com.driveperf.feature.onboarding.PermissionReader
 import com.driveperf.feature.routes.RoutesScreen
 import com.driveperf.platform.crash.ConsentStore
 import com.driveperf.platform.crash.CrashReporter
+import com.driveperf.platform.crash.PrivacyChoices
 import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
 
@@ -97,12 +98,14 @@ private class AppEnv(
     val capture: CaptureUiState,
     val services: AppServices,
     val fixLocation: () -> Unit,
+    val fixAutoDetect: () -> Unit,
 )
 
 /** The app-level singletons the destinations talk to. */
 private class AppServices(
     val consent: ConsentStore,
     val crashReporter: CrashReporter,
+    val privacy: PrivacyChoices,
     val captureController: PlatformCaptureController,
     val permissionReader: PermissionReader,
 )
@@ -118,8 +121,12 @@ private fun AppNavHost(navController: NavHostController, captureViewModel: Captu
         // Refused again (or "don't ask again"): the system dialog will not show, so send the user to Settings.
         if (!permissionReader.read().fineLocation) context.startActivity(appSettingsIntent(context.packageName))
     }
-    val services = AppServices(consent, koinInject(), captureController, permissionReader)
-    val env = AppEnv(navController, captureViewModel, capture, services, fixLocation = { requestLocation.launch(LOCATION_PERMISSIONS) })
+    val services = AppServices(consent, koinInject(), koinInject(), captureController, permissionReader)
+    val env = AppEnv(
+        navController, captureViewModel, capture, services,
+        fixLocation = { requestLocation.launch(LOCATION_PERMISSIONS) },
+        fixAutoDetect = { context.startActivity(appSettingsIntent(context.packageName)) },
+    )
     val start = if (consent.onboardingCompleted) Tab.Drives.route else Routes.ONBOARDING
     NavHost(navController = navController, startDestination = start) {
         onboardingDestination(env)
@@ -135,11 +142,6 @@ private fun NavGraphBuilder.onboardingDestination(env: AppEnv) {
         OnboardingRoute(
             viewModel = viewModel,
             permissionReader = env.services.permissionReader,
-            onConsentChanged = { crash, stats ->
-                env.services.consent.crashReportsAllowed = crash
-                env.services.consent.usageStatisticsAllowed = stats
-                env.services.crashReporter.setEnabled(crash)
-            },
             onFinished = {
                 env.services.consent.onboardingCompleted = true
                 env.services.captureController.refreshPermissions()
@@ -156,10 +158,16 @@ private fun NavGraphBuilder.tabDestinations(env: AppEnv) {
         onStart = env.captureViewModel::onStart,
         onOpenDrive = {}, // while recording, the in-drive gate already shows the drive screen
         onFixLocation = env.fixLocation,
+        onFixAutoDetect = env.fixAutoDetect,
     )
     for (tab in Tab.entries) {
         composable(tab.route) {
-            TabScaffold(selected = tab, capture = env.capture, callbacks = callbacks) { padding ->
+            val autoDetectOff = rememberAutoDetectOff(env.services.permissionReader, env.services.consent)
+            TabScaffold(
+                selected = tab,
+                capture = env.capture,
+                callbacks = callbacks.copy(autoDetectOff = autoDetectOff),
+            ) { padding ->
                 TabContent(tab, padding, onSeeAll = { env.navController.navigate(Routes.ALL_DRIVES) })
             }
         }
@@ -191,12 +199,11 @@ private fun NavGraphBuilder.profileDestination(env: AppEnv) {
                 ),
                 onUsageStatisticsChanged = {
                     stats = it
-                    env.services.consent.usageStatisticsAllowed = it
+                    env.services.privacy.setUsageStatistics(it)
                 },
                 onCrashReportsChanged = {
                     crash = it
-                    env.services.consent.crashReportsAllowed = it
-                    env.services.crashReporter.setEnabled(it)
+                    env.services.privacy.setCrashReports(it)
                 },
                 modifier = Modifier.padding(padding),
             )

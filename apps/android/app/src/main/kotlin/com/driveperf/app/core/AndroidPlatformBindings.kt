@@ -3,6 +3,7 @@ package com.driveperf.app.core
 import android.content.Context
 import androidx.core.content.edit
 import com.driveperf.di.PlatformBindings
+import com.driveperf.domain.analytics.AnalyticsSink
 import com.driveperf.domain.capture.ActivitySource
 import com.driveperf.domain.capture.LocationSource
 import com.driveperf.domain.capture.MotionSource
@@ -23,6 +24,7 @@ class AndroidPlatformBindings(
     private val parkedRegion: ParkedRegionMonitor,
     private val files: TripFileStore,
     private val deviceId: String,
+    private val analytics: AnalyticsSink,
 ) : PlatformBindings {
     override fun clock(): Clock = clock
 
@@ -39,6 +41,8 @@ class AndroidPlatformBindings(
     override fun tripFiles(): TripFileStore = files
 
     override fun deviceId(): String = deviceId
+
+    override fun analyticsSink(): AnalyticsSink = analytics
 }
 
 /**

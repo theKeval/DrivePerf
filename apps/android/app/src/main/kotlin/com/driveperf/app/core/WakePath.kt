@@ -18,15 +18,16 @@ import kotlinx.coroutines.flow.onEach
  * registered while the permissions allow automatic trips, and puts a trip the core resumed after a kill back into a
  * foreground service.
  *
- * Automatic detection is on when both background location and activity recognition are granted: without background
- * location a wake could not record, and the transitions need activity recognition. The explicit opt-in screen
- * (S-ONB-08) is a later story.
+ * Automatic detection needs **the user's opt-in** (S-ONB-08, F-ONB-04.2: off until they switch it on) and the
+ * permissions behind it: without background location a wake could not record, and the transitions need activity
+ * recognition. [optedIn] is read at every [refresh], so a change takes effect when the app next re-reads state.
  */
 class WakePath(
     private val context: Context,
     private val recorder: TripRecorder,
     private val transitions: ActivityTransitions,
     private val parkedRegion: GeofenceParkedRegionMonitor,
+    private val optedIn: () -> Boolean,
 ) {
     /** Call once from `Application.onCreate`, after the core started and before `onLaunch`. */
     fun install(permissions: PermissionState, scope: CoroutineScope) {
@@ -43,7 +44,7 @@ class WakePath(
      * location was granted in Settings after the last trip ended.
      */
     fun refresh(permissions: PermissionState) {
-        val automatic = automaticAllowed(permissions)
+        val automatic = automaticAllowed(permissions, optedIn())
         recorder.setAutoDetect(automatic)
         if (automatic) {
             transitions.arm()
@@ -63,6 +64,8 @@ class WakePath(
     }
 
     companion object {
-        fun automaticAllowed(p: PermissionState): Boolean = p.fineLocation && p.backgroundLocation && p.activityRecognition
+        /** Automatic trips run only when the user opted in (S-ONB-08) and every permission behind them is granted. */
+        fun automaticAllowed(p: PermissionState, optedIn: Boolean): Boolean =
+            optedIn && p.fineLocation && p.backgroundLocation && p.activityRecognition
     }
 }

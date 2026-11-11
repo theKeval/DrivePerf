@@ -85,11 +85,17 @@ class CoreBridgeTest {
     }
 
     @Test
-    fun `automatic trips need fine and background location and activity recognition`() {
+    fun `automatic trips need the opt-in and fine and background location and activity recognition`() {
         val all = PermissionState(fineLocation = true, backgroundLocation = true, activityRecognition = true)
-        assertTrue(WakePath.automaticAllowed(all))
-        assertFalse(WakePath.automaticAllowed(all.copy(backgroundLocation = false)))
-        assertFalse(WakePath.automaticAllowed(all.copy(activityRecognition = false)))
-        assertFalse(WakePath.automaticAllowed(all.copy(fineLocation = false)))
+        assertTrue(WakePath.automaticAllowed(all, optedIn = true))
+        assertFalse(WakePath.automaticAllowed(all.copy(backgroundLocation = false), optedIn = true))
+        assertFalse(WakePath.automaticAllowed(all.copy(activityRecognition = false), optedIn = true))
+        assertFalse(WakePath.automaticAllowed(all.copy(fineLocation = false), optedIn = true))
+    }
+
+    @Test
+    fun `automatic trips stay off until the user opts in, whatever is granted`() {
+        val all = PermissionState(fineLocation = true, backgroundLocation = true, activityRecognition = true)
+        assertFalse(WakePath.automaticAllowed(all, optedIn = false))
     }
 }

@@ -17,6 +17,7 @@ kotlinxDatetime = "0.8.0"
 composeBom = "2026.09.00"
 activityCompose = "1.13.0"
 coreKtx = "1.19.1"
+browser = "1.9.0"
 # The BOM maps material3 1.4.0, where the Expressive APIs (MaterialExpressiveTheme, floating toolbar, MaterialShapes) are
 # internal. They are public from the 1.5.0 line; pin it until 1.5.0 is stable and the BOM carries it (DRIVE-72).
 material3 = "1.5.0-rc01"
@@ -52,6 +53,7 @@ ktor-server-test-host = { module = "io.ktor:ktor-server-test-host-jvm", version.
 konsist = { module = "com.lemonappdev:konsist", version.ref = "konsist" }
 detekt-cli = { module = "io.gitlab.arturbosch.detekt:detekt-cli", version.ref = "detekt" }
 androidx-core-ktx = { module = "androidx.core:core-ktx", version.ref = "coreKtx" }
+androidx-browser = { module = "androidx.browser:browser", version.ref = "browser" }
 androidx-activity-compose = { module = "androidx.activity:activity-compose", version.ref = "activityCompose" }
 compose-bom = { module = "androidx.compose:compose-bom", version.ref = "composeBom" }
 compose-ui = { module = "androidx.compose.ui:ui" }
