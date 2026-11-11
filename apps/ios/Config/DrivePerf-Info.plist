@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>location</string>
+	</array>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>DrivePerf uses your location to record the route of your drives.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>DrivePerf uses your location in the background only to record the route of drives it detects.</string>
+	<key>NSLocationTemporaryUsageDescriptionDictionary</key>
+	<dict>
+		<key>PreciseDrives</key>
+		<string>Precise location places braking and cornering on the road.</string>
+	</dict>
+	<key>NSMotionUsageDescription</key>
+	<string>DrivePerf uses motion data to tell when you start and stop driving.</string>
+	<key>NSSupportsLiveActivities</key>
+	<true/>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
+	<key>DPSentryDSN</key>
+	<string>$(DP_SENTRY_DSN)</string>
+	<key>DPFeatureSignInWithApple</key>
+	<string>$(DP_FEATURE_SIGN_IN_WITH_APPLE)</string>
+	<key>DPFeaturePush</key>
+	<string>$(DP_FEATURE_PUSH)</string>
+	<key>DPFeatureTestFlight</key>
+	<string>$(DP_FEATURE_TESTFLIGHT)</string>
+</dict>
+</plist>

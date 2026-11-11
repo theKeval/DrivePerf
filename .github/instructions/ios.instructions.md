@@ -18,5 +18,7 @@ Read `apps/ios/README.md` and ADR-002 sections 2 to 5 first. Minimum iOS 26, iPh
   pyramids; value types by default; follow Apple's HIG; real Liquid Glass components, no imitation.
 - **Design:** `docs/design/<JIRA-KEY>/ios/` and `docs/design/screens/ios/` are the source of truth; take colors,
   spacing and type verbatim from `design-spec.md`; use the SVG assets, never recreate icons.
-- **Signing:** simulator builds only, `CODE_SIGNING_ALLOWED=NO`. Never choose a Personal Team for the app IDs.
+- **Signing:** the committed config is unsigned (`CODE_SIGNING_ALLOWED=NO` in CI). Device runs use the gitignored
+  `apps/ios/Config/Local.xcconfig`, which must override the bundle ID and the team together (README "Your iPhone");
+  never sign `com.driveperf.*` with a Personal Team, and never commit a Team ID or DSN.
 - **Tests:** XCTest or Swift Testing for view models and bridges; `tools/run-ios.sh` runs the app on a simulator.
