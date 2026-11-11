@@ -1,4 +1,3 @@
-import DPFeatures
 import SwiftUI
 import UIKit
 import UserNotifications
@@ -10,7 +9,9 @@ struct DrivePerfApp: App {
 
     var body: some Scene {
         WindowGroup {
-            AppRootView(dependencies: AppEnvironment.shared.dependencies)
+            TripSurfacePresentation(
+                router: AppEnvironment.shared.surfaceRouter,
+                dependencies: AppEnvironment.shared.dependencies)
                 .onChange(of: scenePhase) { _, phase in
                     if phase == .active { AppEnvironment.shared.refreshCapture() }
                 }
@@ -38,5 +39,17 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
         _ center: UNUserNotificationCenter, willPresent notification: UNNotification
     ) async -> UNNotificationPresentationOptions {
         [.list]
+    }
+
+    nonisolated func userNotificationCenter(
+        _ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse
+    ) async {
+        let request = response.notification.request
+        guard let route = TripNotificationRoute(
+            actionID: response.actionIdentifier, requestID: request.identifier,
+            category: request.content.categoryIdentifier, tripID: request.content.threadIdentifier
+        ) else { return }
+        let environment = await AppEnvironment.shared
+        await environment.surfaceRouter.open(route, recorder: environment.recorder)
     }
 }

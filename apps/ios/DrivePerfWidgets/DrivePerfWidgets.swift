@@ -4,27 +4,26 @@ import DPDesignSystem
 import SwiftUI
 import WidgetKit
 
-/// Widget extension: the manual-trip Live Activity (S-LIVE-01 Lock Screen, S-LIVE-02 Dynamic Island). It links the
-/// design system only, never the Kotlin framework (extension memory limits, ADR-002 §2). The Control Center control
-/// and widgets (S-LIVE-03/04) arrive with DRIVE-133.
+/// DrivePerf’s Live Activity, Control Center control and glanceable widgets.
 @main
 struct DrivePerfWidgetsBundle: WidgetBundle {
     var body: some Widget {
         RecordingLiveActivity()
+        DriveControl()
+        DriveWidget()
     }
 }
 
 struct RecordingLiveActivity: Widget {
     var body: some WidgetConfiguration {
         ActivityConfiguration(for: RecordingActivityAttributes.self) { context in
-            LockScreenView(state: context.state)
+            LockScreenView(state: context.state, tripID: context.attributes.tripId)
                 .activityBackgroundTint(.black.opacity(0.55))
                 .activitySystemActionForegroundColor(.white)
         } dynamicIsland: { context in
             DynamicIsland {
                 DynamicIslandExpandedRegion(.leading) {
-                    Text(context.state.ended ? "Drive decoded." : "Recording")
-                        .font(.system(size: 15, weight: .semibold))
+                    RecordingTitle(state: context.state)
                 }
                 DynamicIslandExpandedRegion(.trailing) {
                     if !context.state.ended {
@@ -39,7 +38,7 @@ struct RecordingLiveActivity: Widget {
                         HStack {
                             DistanceText(state: context.state, size: 28)
                             Spacer()
-                            StopButton()
+                            StopButton(tripID: context.attributes.tripId)
                         }
                     }
                 }
@@ -65,14 +64,15 @@ struct RecordingLiveActivity: Widget {
 
 private struct LockScreenView: View {
     let state: RecordingActivityAttributes.ContentState
+    let tripID: String
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 8) {
                 LoopGlyph(size: 22).foregroundStyle(DPColor.accent)
-                Text(state.ended ? "Drive decoded." : "Recording").font(.system(size: 15, weight: .semibold))
+                RecordingTitle(state: state)
                 Spacer()
-                if !state.ended { StopButton() }
+                if !state.ended { StopButton(tripID: tripID) }
             }
             if state.ended {
                 Text("Open to see your drive.").font(.subheadline).foregroundStyle(.white.opacity(0.7))
@@ -87,6 +87,21 @@ private struct LockScreenView: View {
         }
         .foregroundStyle(.white)
         .padding(16)
+    }
+}
+
+private struct RecordingTitle: View {
+    let state: RecordingActivityAttributes.ContentState
+
+    var body: some View {
+        HStack(spacing: 4) {
+            Text(state.ended ? "Drive decoded." : "Recording")
+            if !state.ended, let name = state.carName, !name.isEmpty {
+                Text("· \(name)").lineLimit(1).opacity(0.65)
+            }
+        }
+        .font(.system(size: 15, weight: .semibold))
+        .accessibilityElement(children: .combine)
     }
 }
 
@@ -109,8 +124,10 @@ private struct DistanceText: View {
 }
 
 private struct StopButton: View {
+    let tripID: String
+
     var body: some View {
-        Button(intent: StopTripIntent()) {
+        Button(intent: StopTripIntent(tripID: tripID)) {
             Label("Stop", systemImage: "stop.fill")
                 .font(.system(size: 14, weight: .semibold))
                 .padding(.horizontal, 12)
