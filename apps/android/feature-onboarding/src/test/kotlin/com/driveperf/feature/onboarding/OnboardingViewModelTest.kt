@@ -312,6 +312,18 @@ class OnboardingViewModelTest {
         assertEquals(OnboardingStep.HelpImprove, vm.step)
     }
 
+    @Test
+    fun `automatic trips are only effective with the opt-in and every permission behind them`() {
+        val all = fine.copy(activityRecognition = true, backgroundLocation = true)
+        assertTrue(OnboardingUiState(permissions = all, autoTripsOn = true).automaticEffective)
+        assertFalse(OnboardingUiState(permissions = all, autoTripsOn = false).automaticEffective)
+        // Activity denied, then background granted: the toggle is on but the wake path would stay off.
+        val noActivity = OnboardingUiState(permissions = all.copy(activityRecognition = false), autoTripsOn = true)
+        assertFalse(noActivity.automaticEffective)
+        assertTrue(noActivity.automaticWaitingForPermission)
+        assertFalse(OnboardingUiState(permissions = all, autoTripsOn = true).automaticWaitingForPermission)
+    }
+
     // endregion
 
     // region motion and notifications

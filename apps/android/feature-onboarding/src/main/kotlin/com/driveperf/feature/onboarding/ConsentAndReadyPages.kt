@@ -80,7 +80,7 @@ private fun ChoiceCard(title: String, body: String, checked: Boolean, onCheckedC
 /** S-ONB-15: the truth about what is on. "Auto-detect off" is also what Home shows afterwards, with a fix action. */
 @Composable
 fun ReadyPage(state: OnboardingUiState, actions: OnboardingActions) {
-    val manual = !state.autoTripsOn
+    val manual = !state.automaticEffective
     OnboardingPage(
         state = state,
         actions = actions,
@@ -100,6 +100,13 @@ fun ReadyPage(state: OnboardingUiState, actions: OnboardingActions) {
         )
         GroupCard {
             SummaryRow(stringResource(R.string.onb_ready_automatic), on = !manual)
+            if (state.automaticWaitingForPermission) {
+                Text(
+                    stringResource(R.string.onb_ready_auto_waiting),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
             SummaryRow(stringResource(R.string.onb_ready_location), on = state.permissions.hasLocation, valueOn = locationText(state))
             SummaryRow(stringResource(R.string.onb_ready_activity), on = state.permissions.activityRecognition)
             SummaryRow(stringResource(R.string.onb_ready_notifications), on = state.permissions.notifications)

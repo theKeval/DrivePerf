@@ -41,6 +41,16 @@ data class OnboardingUiState(
     val history: List<OnboardingStep> = emptyList(),
 ) {
     val canGoBack: Boolean get() = history.isNotEmpty() && !under18Blocked
+
+    /**
+     * Automatic trips will really run: the opt-in **and** every permission the wake path needs (the same rule as
+     * `WakePath.automaticAllowed`). The Ready page tells the truth from this, not from the toggle alone.
+     */
+    val automaticEffective: Boolean
+        get() = autoTripsOn && permissions.fineLocation && permissions.backgroundLocation && permissions.activityRecognition
+
+    /** The user asked for automatic trips but a permission is still missing, so nothing will start on its own yet. */
+    val automaticWaitingForPermission: Boolean get() = autoTripsOn && !automaticEffective
 }
 
 /**

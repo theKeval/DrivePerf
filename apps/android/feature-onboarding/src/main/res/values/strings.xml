@@ -234,6 +234,7 @@
     <string name="onb_ready_lead_manual">Tap Start when you set off and Stop when you park. Your first Story appears right after.</string>
     <string name="onb_ready_preview">Pro Preview · day 1 of 14 · no card</string>
     <string name="onb_ready_automatic">Automatic trips</string>
+    <string name="onb_ready_auto_waiting">You turned automatic trips on, but they need location “all the time” and Physical activity. They start once both are allowed; Home will say what is missing.</string>
     <string name="onb_ready_location">Location</string>
     <string name="onb_ready_activity">Physical activity</string>
     <string name="onb_ready_notifications">Notifications</string>

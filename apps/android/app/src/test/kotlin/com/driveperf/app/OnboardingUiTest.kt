@@ -374,9 +374,18 @@ class OnboardingUiTest {
     }
 
     @Test
-    fun `the ready page with automatic trips on`() {
-        show(OnboardingUiState(step = OnboardingStep.Ready, permissions = fine, autoTripsOn = true))
+    fun `the ready page with automatic trips on and every permission granted`() {
+        val all = fine.copy(backgroundLocation = true, activityRecognition = true)
+        show(OnboardingUiState(step = OnboardingStep.Ready, permissions = all, autoTripsOn = true))
         compose.onNodeWithText("You’re set.").assertIsDisplayed()
+    }
+
+    @Test
+    fun `the ready page does not promise automatic trips when physical activity is missing`() {
+        val noActivity = fine.copy(backgroundLocation = true)
+        show(OnboardingUiState(step = OnboardingStep.Ready, permissions = noActivity, autoTripsOn = true))
+        compose.onNodeWithText("You’re set for manual trips.").assertIsDisplayed()
+        compose.onNodeWithText("You turned automatic trips on, but they need", substring = true).assertIsDisplayed()
     }
 
     // endregion
