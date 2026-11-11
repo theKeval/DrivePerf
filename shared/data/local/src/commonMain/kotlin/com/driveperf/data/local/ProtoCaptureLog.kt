@@ -42,7 +42,17 @@ public class ProtoCaptureLog(private val files: TripFileStore, private val io: C
         }
     }
 
-    /** After a relaunch the header is read back from the file. */
-    private fun headerOf(tripId: String): CaptureHeader? = headers[tripId]
-        ?: files.read(tripId, TripFileKind.R0)?.let { TripFileCodec.decode(it)?.header }?.also { headers[tripId] = it }
+    private fun headerOf(tripId: String): CaptureHeader? = headers[tripId] ?: recover(tripId)?.also { headers[tripId] = it }
+
+    /**
+     * After a relaunch the header is read back from the file, and a chunk cut off by the kill is removed first, so new
+     * chunks follow the last whole one instead of being read as its missing bytes. Null when that is not possible.
+     */
+    private fun recover(tripId: String): CaptureHeader? {
+        val bytes = files.read(tripId, TripFileKind.R0) ?: return null
+        val scan = TripFileCodec.scan(bytes)
+        val whole = scan != null &&
+            (scan.validBytes == bytes.size || files.write(tripId, TripFileKind.R0, bytes.copyOf(scan.validBytes)) == FileResult.OK)
+        return if (whole) scan.trip.header else null
+    }
 }

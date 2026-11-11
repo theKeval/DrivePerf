@@ -97,6 +97,21 @@ class ProtoCaptureLogTest {
     }
 
     @Test
+    fun aRelaunchedLogCutsAnIncompleteTailBeforeAppending() = runTest {
+        val log = ProtoCaptureLog(files, coroutineContext)
+        log.open(header)
+        log.append("trip-1", CaptureBatch(fixes = listOf(fix)))
+        log.append("trip-1", CaptureBatch(fixes = listOf(bareFix)))
+        val full = files.read("trip-1", TripFileKind.R0)!!
+        files.write("trip-1", TripFileKind.R0, full.copyOfRange(0, full.size - 3))
+
+        val relaunched = ProtoCaptureLog(files, coroutineContext)
+        assertTrue(relaunched.append("trip-1", CaptureBatch(fixes = listOf(fix.copy(tMonoNs = fix.tMonoNs + 2_000_000_000)))))
+        assertTrue(relaunched.append("trip-1", CaptureBatch(fixes = listOf(fix.copy(tMonoNs = fix.tMonoNs + 3_000_000_000)))))
+        assertEquals(3, ProtoCaptureLog(files, coroutineContext).read("trip-1")!!.fixes.size)
+    }
+
+    @Test
     fun aRelaunchedLogReadsItsHeaderBackFromTheFile() = runTest {
         ProtoCaptureLog(files, coroutineContext).open(header)
         val relaunched = ProtoCaptureLog(files, coroutineContext)

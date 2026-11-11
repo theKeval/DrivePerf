@@ -82,22 +82,23 @@ internal object TripFileCodec {
 
     fun encodeChunk(h: CaptureHeader, batch: CaptureBatch): ByteArray = delimited(Chunk.ADAPTER.encode(chunk(h, batch)))
 
-    /**
-     * Decodes a whole file. A truncated or undecodable last chunk ends the read: everything before it is kept (§1.7).
-     * Returns null when the magic or header is unreadable.
-     */
-    fun decode(bytes: ByteArray): CapturedTrip? {
+    /** A decoded file and the length of its valid prefix: everything up to the end of the last whole chunk. */
+    class Scan(val trip: CapturedTrip, val validBytes: Int)
+
+    /** Decodes a file like [decode], also returning where the valid prefix ends, so a cut-off tail can be removed (§1.7). */
+    fun scan(bytes: ByteArray): Scan? {
         val magicOk = bytes.size >= MAGIC.size && bytes.copyOfRange(0, MAGIC.size).contentEquals(MAGIC)
         val reader = FrameReader(bytes, MAGIC.size)
         val header = if (magicOk) reader.next()?.let { decodeOrNull { Header.ADAPTER.decode(it) } } else null
         if (header == null) return null
-        val h = header.toCaptureHeader()
-        val acc = TripFileDecoder(h, header.started_at_ms)
+        val acc = TripFileDecoder(header.toCaptureHeader(), header.started_at_ms)
+        var valid = reader.position
         while (true) {
             val chunk = reader.next()?.let { decodeOrNull { Chunk.ADAPTER.decode(it) } } ?: break
             acc.add(chunk)
+            valid = reader.position
         }
-        return acc.result()
+        return Scan(acc.result(), valid)
     }
 
     private inline fun <T> decodeOrNull(block: () -> T): T? = try {
@@ -196,3 +197,9 @@ internal object TripFileCodec {
     // ---- chunk decoding ----
 
 }
+
+/**
+ * Decodes a whole file. A truncated or undecodable last chunk ends the read: everything before it is kept (§1.7).
+ * Returns null when the magic or header is unreadable.
+ */
+internal fun TripFileCodec.decode(bytes: ByteArray): CapturedTrip? = scan(bytes)?.trip

@@ -12,6 +12,7 @@ import com.driveperf.domain.score.Score
 import com.driveperf.domain.trip.DrivingEvent
 import com.driveperf.domain.trip.EventFeedback
 import com.driveperf.domain.trip.Trip
+import com.driveperf.domain.tripfile.FileResult
 import com.driveperf.domain.tripfile.TripFileStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -45,9 +46,9 @@ public class LocalTripRepository(
         q.scoreForTrip(tripId).executeAsOneOrNull()?.toDomain()
     }
 
-    override suspend fun delete(tripId: String): Unit = withContext(io) {
-        q.deleteTrip(tripId)
-        files.deleteTrip(tripId)
+    /** Files first: a failure keeps the row, so the files are never orphaned. */
+    override suspend fun delete(tripId: String): FileResult = withContext(io) {
+        files.deleteTrip(tripId).also { if (it == FileResult.OK) q.deleteTrip(tripId) }
     }
 
     private fun spans(tripId: String) = q.segmentsForTrip(tripId).executeAsList().map { it.toDomain() }
