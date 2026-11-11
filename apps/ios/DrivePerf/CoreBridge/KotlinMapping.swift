@@ -124,7 +124,7 @@ enum KotlinMapping {
     static func swift(_ s: DrivePerfShared.RecorderStatus) -> DPSharedBridge.RecorderStatus {
         DPSharedBridge.RecorderStatus(
             state: swift(s.state), tripId: s.tripId, isManual: s.isManual, elapsedS: s.elapsedS.rounded(.down),
-            distanceM: s.distanceM, autoDetectEnabled: s.autoDetectEnabled)
+            distanceM: s.distanceM, autoDetectEnabled: s.autoDetectEnabled, startFailed: s.startFailed)
     }
 
     static func swift(_ state: DrivePerfShared.RecorderState) -> DPSharedBridge.RecorderState {

@@ -24,10 +24,22 @@ final class FakeRecorder: TripRecording, TripHistory {
 
     func onLaunch() {}
 
+    /// True: the start is reported after `onWake` returns, as the shared core does.
+    var startsLater = false
+    /// With `startsLater`: the recorder reports `startFailed` instead of a trip.
+    var failsStart = false
+
     func onWake(_ event: WakeEvent) {
         wakes.append(event)
         guard canStart else { return }
-        publish(.recording(isManual: event.kind == .manual))
+        let next: RecorderStatus = failsStart
+            ? { var s = RecorderStatus.idle; s.startFailed = true; return s }()
+            : .recording(isManual: event.kind == .manual)
+        if startsLater {
+            Task { @MainActor in self.publish(next) }
+        } else {
+            publish(next)
+        }
     }
 
     func stop() {

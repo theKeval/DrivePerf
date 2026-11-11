@@ -22,10 +22,13 @@ public struct RecorderStatus: Equatable, Sendable {
     public var distanceM: Double
     /// False while the user has paused automatic detection.
     public var autoDetectEnabled: Bool
+    /// The last start was dropped because its trip file could not be created (before the first unlock, disk full).
+    /// Cleared by the next start.
+    public var startFailed: Bool
 
     public init(
         state: RecorderState, tripId: String?, isManual: Bool, elapsedS: Double, distanceM: Double,
-        autoDetectEnabled: Bool
+        autoDetectEnabled: Bool, startFailed: Bool = false
     ) {
         self.state = state
         self.tripId = tripId
@@ -33,6 +36,7 @@ public struct RecorderStatus: Equatable, Sendable {
         self.elapsedS = elapsedS
         self.distanceM = distanceM
         self.autoDetectEnabled = autoDetectEnabled
+        self.startFailed = startFailed
     }
 
     /// Kotlin `RecorderStatus.IDLE`.

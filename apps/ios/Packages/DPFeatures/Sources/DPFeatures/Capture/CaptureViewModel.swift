@@ -55,10 +55,12 @@ public final class CaptureViewModel {
     private let now: @MainActor () -> Date
     /// How long to wait for a stopped trip to appear in the list before showing the done screen without it.
     private let finishTimeout: Duration
+    private let startTimeout: Duration
 
     public init(
         recorder: any TripRecording, history: any TripHistory, permissions: any PermissionRequesting,
-        clock: any ClockBridge, now: @escaping @MainActor () -> Date = { Date() }, finishTimeout: Duration = .seconds(3)
+        clock: any ClockBridge, now: @escaping @MainActor () -> Date = { Date() }, finishTimeout: Duration = .seconds(3),
+        startTimeout: Duration = .seconds(5)
     ) {
         self.recorder = recorder
         self.history = history
@@ -66,6 +68,7 @@ public final class CaptureViewModel {
         self.clock = clock
         self.now = now
         self.finishTimeout = finishTimeout
+        self.startTimeout = startTimeout
         apply(recorder.status)
     }
 
@@ -120,10 +123,35 @@ public final class CaptureViewModel {
             startProblem = .locationDenied
             return
         }
+        // A failure flag already set belongs to an earlier start; the core only re-reports it if this one fails too.
+        let earlierFailure = recorder.status.startFailed
         recorder.onWake(
             WakeEvent(kind: .manual, tMonoNs: clock.monotonicNs(), wallMs: clock.wallMs(), sourceDetail: "app"))
         // The recorder starts only when the trip file can be written (before the first unlock it cannot).
-        if recorder.status.tripId == nil { startProblem = .storageLocked }
+        if await !started(earlierFailure: earlierFailure) { startProblem = .storageLocked }
+    }
+
+    /// Waits for the manual start's outcome: the shared recorder reports it asynchronously. True once a trip is
+    /// recording; false when the recorder newly reports a failed start, or nothing starts within `startTimeout` (the
+    /// core is not up before the first unlock and drops the wake; a repeated failure leaves the status unchanged).
+    private func started(earlierFailure: Bool) async -> Bool {
+        if recorder.status.tripId != nil { return true }
+        let recorder = recorder
+        let watcher = Task { @MainActor () -> Bool in
+            for await next in recorder.statuses() {
+                if next.tripId != nil { return true }
+                if next.startFailed && !earlierFailure { return false }
+            }
+            return false
+        }
+        let timeout = startTimeout
+        let timer = Task {
+            try? await Task.sleep(for: timeout)
+            watcher.cancel()
+        }
+        let outcome = await watcher.value
+        timer.cancel()
+        return outcome
     }
 
     /// S-DRV-01 Stop → S-DRV-02.
