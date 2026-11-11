@@ -396,7 +396,7 @@ struct DriveFinishedView: View {
     private var title: String {
         switch outcome {
         case .saved(let summary, _): summary == nil ? "Not saved" : summary?.status == .short ? "Short trip saved" : "Drive saved"
-        case .passenger: "Passenger trip saved"
+        case .passenger(let summary): summary == nil ? "Passenger trip" : "Passenger trip saved"
         case .discarded: "Trip not saved"
         }
     }
@@ -412,6 +412,8 @@ struct DriveFinishedView: View {
         case .saved(_, let autoEnded):
             (autoEnded ? "Ended automatically after 15 minutes stationary. " : "")
                 + "Its Story arrives with the scoring update. The recording is safe on this phone."
+        case .passenger(nil):
+            "Marked as a passenger trip, so it isn’t scored. A very short trip isn’t kept at all."
         case .passenger: "Saved without a score. It won’t count toward your baseline, records or recaps."
         case .discarded: "Nothing was kept."
         }

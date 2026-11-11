@@ -329,6 +329,13 @@ public final class CaptureViewModel {
     func setMoving(_ moving: Bool) {
         isMoving = moving
         guard holdActive else { return }
+        // A hold that already ran its calm minute is over, whether or not anything ticked since: a later automotive
+        // reading must not lock the app again.
+        if let calmSince, now().timeIntervalSince(calmSince) >= DriveLock.calmInterval, !status.isDriving {
+            holdActive = false
+            self.calmSince = nil
+            return
+        }
         calmSince = moving ? nil : (calmSince ?? now())
     }
 

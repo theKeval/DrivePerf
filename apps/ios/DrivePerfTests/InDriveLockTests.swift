@@ -202,6 +202,20 @@ final class InDriveLockTests: XCTestCase {
         XCTAssertFalse(model.isContentLocked(now: clock.date))
     }
 
+    func testAHoldThatRanItsMinuteIsNotRevivedByALaterAutomotiveReading() async {
+        let recorder = FakeRecorder()
+        recorder.stopResult = trip()
+        let model = makeModel(recorder)
+        drive(model, recorder)
+        await model.endDrive()
+        model.apply(.idle)
+
+        clock.advance(DriveLock.calmInterval + 5)
+        model.setMoving(true)
+
+        XCTAssertFalse(model.isContentLocked(now: clock.date), "no tick ran, yet the minute had passed")
+    }
+
     func testAPaywallHeldByTheLockIsDroppedNotReopened() async {
         let recorder = FakeRecorder()
         recorder.stopResult = trip()
