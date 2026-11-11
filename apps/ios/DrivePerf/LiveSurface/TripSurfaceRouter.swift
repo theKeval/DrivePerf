@@ -35,7 +35,7 @@ final class TripSurfaceRouter {
     func open(_ route: TripNotificationRoute, recorder: CoreTripRecorder) async {
         switch route {
         case .recording(let tripID):
-            guard await TripIntentHandler.matchesActiveTrip(tripID, recorder: recorder) else { return }
+            guard await TripIntentHandler.waitForActiveTrip(recorder), recorder.status.tripId == tripID else { return }
         case .decoded:
             // The shell opens on Drives. Its existing capture gate takes precedence during another drive.
             break

@@ -175,6 +175,7 @@ final class CoreTripRecorder: TripRecording, TripHistory {
         onWake(wake)
         guard let result = await waitForStatus(where: { $0.isDriving || ($0.startFailed && !previousFailure) }),
             result.isDriving else { return false }
+        guard status.isDriving, status.tripId == result.tripId else { return true }
         if result.isManual { manualActivityAttemptID = result.tripId }
         if !showLiveActivity(), result.isManual, let id = result.tripId { postRecordingNotice(tripID: id, automatic: false) }
         return true

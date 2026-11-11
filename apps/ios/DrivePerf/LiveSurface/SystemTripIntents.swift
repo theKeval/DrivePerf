@@ -14,7 +14,8 @@ extension TripIntentHandler {
         recorder: CoreTripRecorder, clock: any ClockBridge, canRecord: Bool, expectedTripID: String?, source: String
     ) async throws -> Bool {
         if let expectedTripID {
-            guard await matchesActiveTrip(expectedTripID, recorder: recorder), !recorder.status.isManual else { return false }
+            guard await waitForActiveTrip(recorder), recorder.status.tripId == expectedTripID,
+                !recorder.status.isManual else { return false }
             _ = recorder.showLiveActivity()
             return false
         }
@@ -28,16 +29,16 @@ extension TripIntentHandler {
 
     @MainActor
     static func stop(recorder: CoreTripRecorder, expectedTripID: String) async {
-        guard await matchesActiveTrip(expectedTripID, recorder: recorder),
+        guard !expectedTripID.isEmpty, await waitForActiveTrip(recorder), recorder.status.tripId == expectedTripID,
             recorder.status.state != .finishing else { return }
         recorder.stop()
     }
 
     @MainActor
-    static func matchesActiveTrip(_ tripID: String, recorder: CoreTripRecorder) async -> Bool {
-        guard recorder.isAttached, !tripID.isEmpty else { return false }
+    static func waitForActiveTrip(_ recorder: CoreTripRecorder) async -> Bool {
+        guard recorder.isAttached else { return false }
         // A system action can cold-launch the app while the core is recovering its active trip.
         _ = await recorder.waitForStatus { $0.isDriving }
-        return recorder.status.isDriving && recorder.status.tripId == tripID
+        return recorder.status.isDriving
     }
 }
