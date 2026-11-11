@@ -7,8 +7,8 @@ import Foundation
 /// open), R0 is excluded from device backup, the preview is `completeUntilFirstUserAuthentication`. Bytes only: the
 /// file format is the core's job.
 ///
-/// Thread-safe. Append handles stay open until the file is synced for the last time (`compress`, `delete`,
-/// `deleteTrip`), because a `completeUnlessOpen` file cannot be reopened while the phone is locked.
+/// Thread-safe. Append handles are opened read-write and stay open until the file is finished (`compress`, `write`,
+/// `delete`, `deleteTrip`), because a `completeUnlessOpen` file cannot be reopened while the phone is locked.
 public final class FileTripStore: TripFileStoreBridge, @unchecked Sendable {
     public static let defaultRoot: URL = FileManager.default
         .urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
@@ -85,21 +85,33 @@ public final class FileTripStore: TripFileStoreBridge, @unchecked Sendable {
         }
     }
 
+    /// Reads through the open append handle when there is one: a trip that ends while the phone is locked can still
+    /// read its `completeUnlessOpen` R0 that way, but not by reopening it. Without a handle (a relaunch while locked)
+    /// this returns `unavailable` and leaves the plain file, so the caller can compress it after the next unlock.
     public func compress(tripId: String, kind: TripFileKind) -> FileResult {
         lock.withLock {
-            closeHandle(tripId, kind)
+            defer { closeHandle(tripId, kind) }
             let plain = plainURL(tripId, kind)
             guard FileManager.default.fileExists(atPath: plain.path) else {
                 return FileManager.default.fileExists(atPath: compressedURL(tripId, kind).path) ? .ok : .ioError
             }
+            let target = compressedURL(tripId, kind)
             do {
-                let gzipped = try Gzip.compress(try Data(contentsOf: plain))
-                let target = compressedURL(tripId, kind)
-                try gzipped.write(to: target, options: [.atomic, Self.writingProtection(kind)])
+                let bytes: Data
+                if let handle = handles[key(tripId, kind)] {
+                    try handle.synchronize()
+                    try handle.seek(toOffset: 0)
+                    bytes = try handle.readToEnd() ?? Data()
+                } else {
+                    bytes = try Data(contentsOf: plain)
+                }
+                try Gzip.compress(bytes).write(to: target, options: [.atomic, Self.writingProtection(kind)])
                 try Self.applyAttributes(to: target, kind: kind)
                 try FileManager.default.removeItem(at: plain)
                 return .ok
             } catch {
+                // Never leave both copies: `read` prefers the plain file, and a later retry starts again from it.
+                try? FileManager.default.removeItem(at: target)
                 return Self.result(for: error)
             }
         }
@@ -198,7 +210,8 @@ public final class FileTripStore: TripFileStoreBridge, @unchecked Sendable {
             else { throw CocoaError(.fileWriteUnknown) }
             try Self.applyAttributes(to: url, kind: kind)
         }
-        let handle = try FileHandle(forWritingTo: url)
+        // Read and write, so `compress` can read the file through this handle while the phone is locked.
+        let handle = try FileHandle(forUpdating: url)
         try handle.seekToEnd()
         handles[key(tripId, kind)] = handle
         return handle

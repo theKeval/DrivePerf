@@ -124,6 +124,17 @@ final class InterimTripRecorder: TripRecording, TripHistory {
         history = index.loadSummaries()
         lastTripEndedAt = history.first?.endedAt
         recoverInterruptedTrip()
+        compressFinishedTrips()
+    }
+
+    /// Compresses the R0 of kept trips that are still plain: one recovered as interrupted, or one whose compression
+    /// at finish found the file unreadable (the phone locked and no open handle). Runs at launch and on every unlock.
+    func compressFinishedTrips() {
+        for trip in history where trip.id != active?.id {
+            if files.describe(tripId: trip.id, kind: .r0, withSha256: false)?.compressed == false {
+                _ = files.compress(tripId: trip.id, kind: .r0)
+            }
+        }
     }
 
     func onWake(_ event: WakeEvent) {
@@ -356,6 +367,7 @@ final class InterimTripRecorder: TripRecording, TripHistory {
         case .discard:
             _ = files.deleteTrip(tripId: trip.id)
         case .keep(let tripStatus):
+            // `unavailable` leaves the plain R0 for `compressFinishedTrips` after the next unlock.
             _ = files.compress(tripId: trip.id, kind: .r0)
             index.append(
                 TripSummary(

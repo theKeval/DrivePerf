@@ -175,6 +175,43 @@ final class PlatformAdapterTests: XCTestCase {
         XCTAssertEqual(store.read(tripId: "t1", kind: .r0), first + second, "Reads stay uncompressed")
     }
 
+    /// A locked phone refuses to reopen a closed `completeUnlessOpen` file; mode 000 refuses the same way here.
+    private func makeUnopenable(_ url: URL) throws {
+        try FileManager.default.setAttributes([.posixPermissions: 0], ofItemAtPath: url.path)
+        XCTAssertThrowsError(try Data(contentsOf: url), "The test needs a file that cannot be reopened")
+    }
+
+    func testCompressReadsThroughTheOpenHandleWhenTheFileCannotBeReopened() throws {
+        let (store, root) = makeStore()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let bytes = Data(repeating: 3, count: 20_000)
+        XCTAssertEqual(store.append(tripId: "t1", kind: .r0, bytes: bytes), .ok)
+        try makeUnopenable(root.appendingPathComponent("trips/t1/r0.bin"))
+
+        XCTAssertEqual(store.compress(tripId: "t1", kind: .r0), .ok)
+
+        XCTAssertEqual(store.describe(tripId: "t1", kind: .r0, withSha256: false)?.compressed, true)
+        XCTAssertEqual(store.read(tripId: "t1", kind: .r0), bytes)
+    }
+
+    func testCompressWithoutAHandleLeavesThePlainFileForARetry() throws {
+        let (store, root) = makeStore()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let bytes = Data(repeating: 5, count: 1_000)
+        XCTAssertEqual(store.append(tripId: "t1", kind: .r0, bytes: bytes), .ok)
+        let plain = root.appendingPathComponent("trips/t1/r0.bin")
+        let relaunched = FileTripStore(root: root)
+        try makeUnopenable(plain)
+
+        XCTAssertEqual(relaunched.compress(tripId: "t1", kind: .r0), .unavailable)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: plain.path + ".gz"), "No half-written copy")
+        XCTAssertEqual(relaunched.describe(tripId: "t1", kind: .r0, withSha256: false)?.compressed, false)
+
+        try FileManager.default.setAttributes([.posixPermissions: 0o644], ofItemAtPath: plain.path)
+        XCTAssertEqual(relaunched.compress(tripId: "t1", kind: .r0), .ok)
+        XCTAssertEqual(relaunched.read(tripId: "t1", kind: .r0), bytes)
+    }
+
     func testCompressedFileIsGzip() throws {
         let (store, root) = makeStore()
         defer { try? FileManager.default.removeItem(at: root) }

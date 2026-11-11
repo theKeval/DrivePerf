@@ -105,6 +105,26 @@ final class InterimTripRecorderTests: XCTestCase {
         XCTAssertFalse(motion.isRunning)
     }
 
+    func testR0ThatCouldNotBeCompressedAtFinishIsCompressedAfterUnlock() {
+        let recorder = makeRecorder()
+        startManual(recorder)
+        let tripId = recorder.status.tripId ?? ""
+        var position = 0.0
+        drive(seconds: 200, speed: 15, recorder: recorder, from: &position)
+        files.available = false
+
+        recorder.stop()
+
+        XCTAssertEqual(recorder.history.first?.status, .finalised)
+        XCTAssertEqual(files.describe(tripId: tripId, kind: .r0, withSha256: false)?.compressed, false)
+
+        files.available = true
+        recorder.compressFinishedTrips()
+
+        XCTAssertEqual(files.describe(tripId: tripId, kind: .r0, withSha256: false)?.compressed, true)
+        XCTAssertEqual(files.r0Lines(tripId: tripId, prefix: "L"), 200)
+    }
+
     func testShortManualTripIsKeptAsShort() {
         let recorder = makeRecorder()
         startManual(recorder)

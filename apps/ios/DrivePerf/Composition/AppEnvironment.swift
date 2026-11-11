@@ -76,8 +76,13 @@ final class AppEnvironment {
         crashReporter.apply(consent: preferences.preferences.sendCrashReports)
     }
 
+    /// Every unlock: the first one after a reboot launches; later ones finish compressions that the lock blocked.
     func protectedDataBecameAvailable() {
-        launch()
+        if launched {
+            recorder.compressFinishedTrips()
+        } else {
+            launch()
+        }
     }
 
     /// Re-reads the permission and the automatic-trips choice, then holds the right `CLServiceSession` and arms or

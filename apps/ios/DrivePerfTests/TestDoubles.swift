@@ -122,6 +122,7 @@ final class MemoryTripFiles: TripFileStoreBridge, @unchecked Sendable {
 
     func compress(tripId: String, kind: TripFileKind) -> FileResult {
         lock.withLock {
+            guard available else { return .unavailable }
             guard files[key(tripId, kind)] != nil else { return .ioError }
             compressedKeys.insert(key(tripId, kind))
             return .ok
