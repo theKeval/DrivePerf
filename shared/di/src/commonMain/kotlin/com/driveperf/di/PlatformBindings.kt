@@ -44,4 +44,10 @@ public class CoreServices internal constructor(
     public val trips: TripRepository,
     public val routes: RouteRepository,
     public val markEventNeeded: MarkEventNeeded,
-)
+    private val onClose: () -> Unit,
+) {
+    /** Stops the recorder's work and closes the database. Only for a scratch core; the app's core lives as long as the process. */
+    public fun close() {
+        onClose()
+    }
+}

@@ -87,4 +87,19 @@ class DrivePerfCoreStartTest {
         assertTrue(r1.compressed, "R1 is gzip-compressed at finalisation")
         assertTrue(assertNotNull(bindings.files.describe(trip.id, TripFileKind.R0, withSha256 = false)).compressed)
     }
+
+    @Test
+    fun aScratchCoreIsSeparateAndUsesItsOwnTimers() = runBlocking {
+        val scratch = DrivePerfCore.scratch(
+            bindings, com.driveperf.data.local.JvmDatabaseDriverFactory(), kotlinx.coroutines.Dispatchers.IO,
+            com.driveperf.pipeline.capture.CaptureConfig(candidateTimeoutS = 0.2),
+        )
+        assertFailsWith<IllegalStateException>("a scratch core never becomes the app's core") { DrivePerfCore.services }
+        scratch.recorder.onLaunch()
+        scratch.recorder.onWake(WakeEvent(WakeKind.MOVE_SIGNAL, clock.monotonicNs(), clock.wallMs(), null))
+        withTimeout(5_000) { scratch.recorder.status.first { it.state == RecorderState.CANDIDATE } }
+        withTimeout(5_000) { scratch.recorder.status.first { it.state == RecorderState.IDLE } }
+        assertTrue(bindings.files.tripIds().isEmpty(), "the rejected candidate's samples are deleted")
+        scratch.close()
+    }
 }

@@ -17,6 +17,7 @@ import com.driveperf.domain.hello.HelloMessage
 import com.driveperf.foundation.platformDescription
 import com.driveperf.pipeline.PipelineFinaliser
 import com.driveperf.pipeline.capture.CapturePersistence
+import com.driveperf.pipeline.capture.CaptureConfig
 import com.driveperf.pipeline.capture.CapturePorts
 import com.driveperf.pipeline.capture.TripFinaliser
 import com.driveperf.pipeline.capture.TripRecorderEngine
@@ -25,6 +26,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlin.coroutines.CoroutineContext
 
 /**
@@ -43,14 +45,35 @@ public object DrivePerfCore {
     public fun hello(): HelloMessage = GetHelloMessage()(platformDescription())
 
     /** Wires the core on [database]. Calling it again returns the first instance. */
-    @OptIn(ExperimentalCoroutinesApi::class)
     internal fun startWith(
         platform: PlatformBindings,
         database: DatabaseDriverFactory,
         io: CoroutineContext,
         finaliser: ((com.driveperf.data.local.db.DrivePerfDatabase) -> TripFinaliser)? = null,
-    ): CoreServices = started ?: run {
-        val db = openDatabase(database.create())
+    ): CoreServices = started ?: build(platform, database, io, finaliser).also { started = it }
+
+    /**
+     * A separate core on its own [database] that never becomes [services], for the on-device self-test: it must not
+     * touch the user's trips (spike change 10). [capture] shortens its timers. Close it when done.
+     */
+    internal fun scratch(
+        platform: PlatformBindings,
+        database: DatabaseDriverFactory,
+        io: CoroutineContext,
+        capture: CaptureConfig,
+    ): CoreServices = build(platform, database, io, null, capture)
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    private fun build(
+        platform: PlatformBindings,
+        database: DatabaseDriverFactory,
+        io: CoroutineContext,
+        finaliser: ((com.driveperf.data.local.db.DrivePerfDatabase) -> TripFinaliser)?,
+        capture: CaptureConfig = CaptureConfig(),
+    ): CoreServices {
+        val driver = database.create()
+        val db = openDatabase(driver)
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default.limitedParallelism(1))
         val store = LocalTripStore(db, platform.deviceId(), io)
         val files = platform.tripFiles()
         val clock = platform.clock()
@@ -74,18 +97,23 @@ public object DrivePerfCore {
             ),
             clock = clock,
             zones = SystemTimeZone(),
-            scope = CoroutineScope(SupervisorJob() + Dispatchers.Default.limitedParallelism(1)),
+            scope = scope,
+            config = capture,
         )
         val trips = LocalTripRepository(db, files, io)
         val routes = LocalRouteRepository(db, io)
-        CoreServices(
+        return CoreServices(
             recorder = recorder,
             trips = trips,
             routes = routes,
             markEventNeeded = MarkEventNeeded(
                 trips, routes, LocalEventFeedbackStore(db, io), FeedbackRescorer(history, previews), clock,
             ),
-        ).also { started = it }
+            onClose = {
+                scope.cancel()
+                driver.close()
+            },
+        )
     }
 
     /** Forgets the started core. Tests only. */
