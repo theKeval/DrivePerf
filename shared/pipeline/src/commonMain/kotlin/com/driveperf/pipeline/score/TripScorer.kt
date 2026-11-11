@@ -55,6 +55,8 @@ internal class TripScorer(private val cfg: ScoringConfig = ScoringConfig()) {
             a.events.indices.map { EventLedgerRow(events[it].id, events[it].type, a.ledger.perEvent[it]) },
             a.ledger.jxMps3,
             a.ledger.jyMps3,
+            stopStartCount = inputs.stopStartCount,
+            abruptAccelCount = inputs.abruptAccels,
         )
         val costs = events.associate { it.id to eventCost(it, cfg) }
         val score = assemble(ctx, a.context, smooth, ledger, events, costs, inputs, a.speedConsistencyCv)

@@ -114,6 +114,17 @@ class TripRecorderCommitTest {
     }
 
     @Test
+    fun aFailedR0ReplacementKeepsTheOriginalLogAndRecordsNoR0() = runTest {
+        log.replaceable = false
+        val id = record(engine(splitting()))
+        files.write(id, TripFileKind.R0, byteArrayOf(1))
+        assertEquals(listOf(id, "part-2"), store.finalised.map { it.trip.id }, "the analysed parts are still committed")
+        assertEquals(20, assertNotNull(log.read(id)).fixes.size, "the original capture is untouched")
+        assertNull(log.read("part-2"))
+        assertTrue(store.finalised.all { part -> part.files.none { it.kind == TripFileKind.R0 } })
+    }
+
+    @Test
     fun aSplitWhoseFirstPartIsDiscardedDropsTheOriginalTrip() = runTest {
         val id = record(engine(splitting(dropFirst = true)))
         assertEquals(listOf("part-2"), store.finalised.map { it.trip.id })

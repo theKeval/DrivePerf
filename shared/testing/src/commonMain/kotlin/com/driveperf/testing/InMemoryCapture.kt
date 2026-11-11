@@ -50,6 +50,22 @@ public class InMemoryCaptureLog : CaptureLog {
 
     override suspend fun read(tripId: String): CapturedTrip? = logs[tripId]
 
+    /** When false, [replace] fails as on a full disk and leaves the log as it was. */
+    public var replaceable: Boolean = true
+
+    override suspend fun replace(header: CaptureHeader, batches: List<CaptureBatch>): Boolean {
+        if (!replaceable) return false
+        logs[header.tripId] = CapturedTrip(
+            header,
+            batches.flatMap { it.fixes },
+            batches.flatMap { it.motion },
+            batches.flatMap { it.activity },
+            batches.flatMap { it.recordedAccel },
+            batches.flatMap { it.marks },
+        )
+        return true
+    }
+
     override suspend fun delete(tripId: String) {
         logs.remove(tripId)
     }

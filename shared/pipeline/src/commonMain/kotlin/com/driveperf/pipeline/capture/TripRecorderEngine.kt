@@ -371,18 +371,16 @@ public class TripRecorderEngine(
     }
 
     /**
-     * Commits one finished trip (data-model.md §2.3 step 2): rewrites its R0 when it is part of a split, writes and
-     * hashes R1, compresses R0, then commits every row with the file references in one transaction.
+     * Commits one finished trip (data-model.md §2.3 step 2): replaces its R0 when it is part of a split, writes and
+     * hashes R1, compresses R0, then commits every row with the file references in one transaction. A split part whose
+     * R0 could not be replaced keeps the original log untouched and is committed without an R0 reference, so a partial
+     * or unsplit capture is never recorded as that part's R0.
      */
     private suspend fun commit(finished: FinalisedTrip) {
         val id = finished.trip.id
-        finished.splitCapture?.let { part ->
-            persistence.log.open(part.header)
-            part.batches().forEach { persistence.log.append(id, it) }
-            persistence.log.sync(id)
-        }
+        val r0Kept = finished.splitCapture?.let { persistence.log.replace(it.header, it.batches()) } ?: true
         val r1 = finished.analysis?.let { persistence.analysis?.write(finished.trip, it) }
-        val r0 = if (ports.files.compress(id, TripFileKind.R0) == FileResult.OK) r0Ref(id) else null
+        val r0 = if (r0Kept && ports.files.compress(id, TripFileKind.R0) == FileResult.OK) r0Ref(id) else null
         persistence.store.saveFinalised(finished.copy(analysis = null, splitCapture = null, files = listOfNotNull(r0, r1)))
         if (finished.preview.isNotEmpty()) persistence.previews?.write(id, finished.preview)
     }

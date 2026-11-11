@@ -159,9 +159,13 @@ internal data class LedgerJson(
     val perEvent: List<EventLedgerJson>,
     val jxMps3: Double,
     val jyMps3: Double,
+    val stopStarts: Int? = null,
+    val abruptAccels: Int? = null,
 ) {
-    fun toDomain(): Ledger =
-        Ledger(base.toDomain(), perEvent.map { EventLedgerRow(it.eventId, it.type, it.row.toDomain()) }, jxMps3, jyMps3)
+    fun toDomain(): Ledger = Ledger(
+        base.toDomain(), perEvent.map { EventLedgerRow(it.eventId, it.type, it.row.toDomain()) }, jxMps3, jyMps3,
+        stopStarts, abruptAccels,
+    )
 
     companion object {
         fun of(l: Ledger): LedgerJson = LedgerJson(
@@ -169,6 +173,8 @@ internal data class LedgerJson(
             l.perEvent.map { EventLedgerJson(it.eventId, it.type, LedgerRowJson.of(it.row)) },
             l.noiseFloorLonMps3,
             l.noiseFloorLatMps3,
+            l.stopStartCount,
+            l.abruptAccelCount,
         )
     }
 }
