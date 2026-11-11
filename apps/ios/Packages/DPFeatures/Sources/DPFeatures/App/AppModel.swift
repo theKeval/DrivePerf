@@ -79,7 +79,7 @@ public final class AppModel {
     private func makeOnboarding() -> OnboardingViewModel {
         OnboardingViewModel(
             permissions: dependencies.permissions, preferences: dependencies.preferences,
-            crashReporter: dependencies.crashReporter, refreshCapture: dependencies.refreshCapture,
+            crashReporter: dependencies.crashReporter, analytics: dependencies.analytics, refreshCapture: dependencies.refreshCapture,
             onFinished: { [weak self] in self?.finishOnboarding() })
     }
 

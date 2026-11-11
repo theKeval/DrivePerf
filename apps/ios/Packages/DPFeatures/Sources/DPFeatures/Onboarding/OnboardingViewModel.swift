@@ -63,16 +63,19 @@ public final class OnboardingViewModel {
     private let permissionsPort: any PermissionRequesting
     private let preferences: any PreferencesStoring
     private let crashReporter: any CrashReporting
+    private let analytics: any UsageAnalytics
     private let refreshCapture: @MainActor () -> Void
     private let onFinished: @MainActor () -> Void
 
     public init(
         permissions: any PermissionRequesting, preferences: any PreferencesStoring, crashReporter: any CrashReporting,
+        analytics: any UsageAnalytics,
         refreshCapture: @escaping @MainActor () -> Void, onFinished: @escaping @MainActor () -> Void
     ) {
         permissionsPort = permissions
         self.preferences = preferences
         self.crashReporter = crashReporter
+        self.analytics = analytics
         self.refreshCapture = refreshCapture
         self.onFinished = onFinished
         under18Blocked = preferences.preferences.under18Blocked
@@ -261,6 +264,9 @@ public final class OnboardingViewModel {
             $0.sendCrashReports = sendCrashReports
         }
         crashReporter.apply(consent: sendCrashReports)
+        // The shared core's gate sends what it held until now if usage statistics are on, and drops it if they are off
+        // (F-ONB-08.2). Nothing was sent before this line.
+        analytics.setUsageConsent(shareUsageStatistics)
         permissions = await permissionsPort.current()
         go(to: .ready)
     }

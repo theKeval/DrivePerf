@@ -5,6 +5,7 @@ import SwiftUI
 /// WP-A onboarding (S-ONB-01…16). Copy is verbatim from docs/design/DRIVE-33, -38, -43, -49, -54, -57, -70, -80.
 public struct OnboardingFlowView: View {
     @Bindable var model: OnboardingViewModel
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     public init(model: OnboardingViewModel) {
         self.model = model
@@ -27,7 +28,10 @@ public struct OnboardingFlowView: View {
             case .ready: ReadyPage(model: model)
             }
         }
-        .animation(.smooth(duration: 0.22), value: model.step)
+        .id(model.step)
+        .transition(OnboardingMotion.pageTransition)
+        .animation(OnboardingMotion.pageAnimation(reduceMotion: reduceMotion), value: model.step)
+        .opensLinksInApp()
         .sheet(item: $model.sheet, onDismiss: { model.finishPreciseSheet() }) { sheet in
             switch sheet {
             case .precise: PreciseLocationSheet(model: model)
@@ -295,7 +299,7 @@ private struct CapturePromisePage: View {
         } dock: {
             DPPrimaryButton("Continue") { model.next() }
         }
-        .sheet(isPresented: $model.isHowItWorksPresented) { HowItWorksSheet() }
+        .sheet(isPresented: $model.isHowItWorksPresented) { HowItWorksSheet().opensLinksInApp() }
     }
 }
 
@@ -433,6 +437,7 @@ private struct FrictionCircleArt: View {
 
 private struct AutoTripsPage: View {
     @Bindable var model: OnboardingViewModel
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         OnboardingScaffold(step: .autoTrips, canGoBack: model.canGoBack, alignment: .leading, onBack: model.back) {
@@ -477,6 +482,7 @@ private struct AutoTripsPage: View {
             .tint(DPColor.accent)
             .padding(DPSpace.s4)
             .dpCard()
+            .onboardingToggleMotion(model.autoTripsOn, reduceMotion: reduceMotion)
             .sensoryFeedback(.selection, trigger: model.autoTripsOn)
             if model.alwaysDeclined {
                 Text(
@@ -604,6 +610,7 @@ private struct HelpImprovePage: View {
 }
 
 struct ConsentCard: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Binding var isOn: Bool
     let title: String
     let detail: String
@@ -621,6 +628,7 @@ struct ConsentCard: View {
         .overlay(
             RoundedRectangle(cornerRadius: DPRadius.card, style: .continuous)
                 .strokeBorder(isOn ? DPColor.accent : .clear, lineWidth: 1.5))
+        .onboardingToggleMotion(isOn, reduceMotion: reduceMotion)
         .sensoryFeedback(.selection, trigger: isOn)
     }
 }
