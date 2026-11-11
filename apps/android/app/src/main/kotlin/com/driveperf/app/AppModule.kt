@@ -18,6 +18,7 @@ import com.driveperf.domain.repository.TripRepository
 import com.driveperf.feature.capture.CaptureController
 import com.driveperf.feature.capture.CaptureViewModel
 import com.driveperf.feature.drives.DrivesViewModel
+import com.driveperf.feature.drives.TripCorrector
 import com.driveperf.feature.drives.TripListSource
 import com.driveperf.feature.onboarding.ConsentChoices
 import com.driveperf.feature.onboarding.OnboardingSettings
@@ -37,6 +38,7 @@ import kotlinx.coroutines.SupervisorJob
 import org.koin.android.ext.koin.androidContext
 import org.koin.core.module.dsl.viewModel
 import org.koin.dsl.bind
+import org.koin.dsl.binds
 import org.koin.dsl.module
 
 /**
@@ -67,10 +69,11 @@ val appModule = module {
     single {
         PlatformCaptureController(androidContext(), get(), get(), get(), get(), get(), get(), get(), get<WakePath>()::refresh)
     } bind CaptureController::class
-    single<TripListSource> { PlatformTripListSource(get()) }
+    // DRIVE-100 (S2): the trip list also answers and corrects what a trip was.
+    single { PlatformTripListSource(get(), get<CoreServices>().corrections) } binds arrayOf(TripListSource::class, TripCorrector::class)
 
     viewModel { CaptureViewModel(get(), System::currentTimeMillis) }
-    viewModel { DrivesViewModel(get()) }
+    viewModel { DrivesViewModel(get(), corrector = get<TripCorrector>()) }
     single<OnboardingSettings> { ConsentOnboardingSettings(get()) }
     viewModel {
         val consent = get<ConsentSettings>()

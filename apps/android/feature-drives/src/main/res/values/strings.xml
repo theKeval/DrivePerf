@@ -2,8 +2,30 @@
 <resources>
     <string name="drives_latest">Latest drives</string>
     <string name="drives_see_all">See all</string>
+    <string name="drives_see_not_drives">Not drives (%1$d)</string>
     <string name="drives_recorded">Recorded</string>
     <string name="drives_empty_title">No drives yet</string>
     <string name="drives_empty_body">Tap Start below to record your first drive. It will show up here when you stop.</string>
     <string name="drives_notice_analysis">Scores and stories for your drives arrive in a later update.</string>
+    <string name="drives_interrupted">Interrupted</string>
+    <string name="drives_short">Short trip · not scored</string>
+    <string name="drives_what_was_this">What was this?</string>
+    <string name="drives_question_transit">Was this a bus or train?</string>
+    <string name="drives_question_bike">Was this a bike ride?</string>
+    <string name="drives_yes">Yes</string>
+    <string name="drives_no">No</string>
+    <string name="drives_restore">Restore as a drive</string>
+    <string name="drives_filter_drives">Drives</string>
+    <string name="drives_filter_not_drives">Not drives</string>
+    <string name="drives_not_drives_note">Trips you marked as not a drive. They don’t count anywhere and are deleted 30 days after you marked them. Restore one if it was a drive after all.</string>
+    <string name="drives_data_quality">Data quality</string>
+    <string name="drives_provenance_hint">Touch and hold a number to see how it was measured.</string>
+    <string name="drives_show_how_measured">Show how this was measured</string>
+    <string name="dq_this_drive">This drive</string>
+    <string name="dq_details">Details</string>
+    <string name="dq_labels">What the labels mean</string>
+    <string name="dq_legend_measured">Measured</string>
+    <string name="dq_legend_estimated">Estimated</string>
+    <string name="dq_legend_no_gps">No GPS</string>
+    <string name="dq_legend_left_out">Left out</string>
 </resources>

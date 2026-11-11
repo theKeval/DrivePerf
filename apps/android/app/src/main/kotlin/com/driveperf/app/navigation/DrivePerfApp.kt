@@ -179,7 +179,7 @@ private fun NavGraphBuilder.allDrivesDestination(env: AppEnv) {
         val viewModel: DrivesViewModel = koinViewModel()
         val state by viewModel.state.collectAsStateWithLifecycle()
         DetailScaffold(title = stringResource(R.string.all_drives_title), onBack = { env.navController.popBackStack() }) { padding ->
-            AllDrivesScreen(state = state, modifier = Modifier.padding(padding))
+            AllDrivesScreen(state = state, modifier = Modifier.padding(padding), onAction = viewModel::onAction)
         }
     }
 }
@@ -223,6 +223,7 @@ private fun TabContent(tab: Tab, padding: PaddingValues, onSeeAll: () -> Unit) {
                 onSeeAll = onSeeAll,
                 modifier = modifier,
                 bottomPadding = padding.calculateBottomPadding() + ToolbarClearance,
+                onAction = viewModel::onAction,
             )
         }
         Tab.Routes -> RoutesScreen(modifier)
