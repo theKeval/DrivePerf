@@ -11,8 +11,8 @@ data class RecordedTrip(
 )
 
 /**
- * Where the trip list comes from. The app implements it over the interim trip index and, once DRIVE-62's `TripRepository`
- * and Drives presenter land, over processed trips (scores, Story, route). Newest first.
+ * Where the trip list comes from. The app implements it over the shared core's `TripRepository`; the Drives presenter
+ * with scores, Story and route replaces it later. Newest first.
  */
 interface TripListSource {
     val trips: Flow<List<RecordedTrip>>

@@ -13,16 +13,21 @@ Native Compose app on the shared Kotlin core. Minimum Android 10 (minSdk 29), ta
   `ProgressStyle`; a standard ongoing notification below), a locked in-drive screen, a confirmed Stop, and the trip list.
 - Adapters implementing DRIVE-62's shared ports (`LocationSource`, `MotionSource`, `ActivitySource`, `TripFileStore`,
   `Clock`): Fused Location, `SensorManager` (linear acceleration, gravity, gyroscope, game rotation vector, batched to
-  the sink) and Activity Recognition updates with a confidence bucket (the transition API is reserved for the background
-  wake path, not built yet), with the spike 1 capture rules (stale samples dropped, gaps measured only while moving,
-  recording starts at once, sensor callbacks on one thread).
+  the sink) and Activity Recognition updates with a confidence bucket, with the spike 1 capture rules (stale samples
+  dropped, recording starts at once, sensor callbacks on one thread). `BatteryPowerState` and
+  `GeofenceParkedRegionMonitor` complete the ports.
+- **Shared core (DRIVE-206):** `DrivePerfApplication` starts `DrivePerfCore` on these adapters (`app/.../core`) and calls
+  `onLaunch` at every process start. The foreground service hosts the core's `TripRecorder`; the bridges map its status
+  and `TripRepository` to the screens. `FixWatch` adds the GNSS state the core's status does not carry.
+- **Wake path (DRIVE-206):** Activity Recognition transitions (`IN_VEHICLE` enter → `ACTIVITY_VEHICLE`) and the parked
+  region geofence (exit → `PARKED_EXIT`) reach manifest receivers through PendingIntents, also after the app was
+  killed, and start the capture service. Transitions are re-registered at every process start; `BootReceiver` causes
+  one after a reboot, and the core re-arms the geofence in `onLaunch`. Automatic trips are on while fine and background
+  location and activity recognition are granted.
 - Crash reporting is Sentry (EU) behind consent, never Crashlytics (ADR-007). See "Crash reporting" below.
 
-**Interim code (replaced when DRIVE-62's recorder and storage land):** `InterimTripRecorder`, `TripIndex`, `R0Lines` (text
-R0 format), `LiveTripStats`, and `app/.../bridge`. They are marked `INTERIM (DRIVE-72)`. The adapters and `FileTripStore`
-are final: the core's `PlatformBindings` takes them as they are. Failures the callback ports cannot return (missing
-permission or sensor) go to `CaptureFailureBus` as `DomainError.Capture`.
-Scores, Stories, routes and processed trips do not exist yet: trip rows say "Recorded".
+Failures the callback ports cannot return (missing permission or sensor) go to `CaptureFailureBus` as
+`DomainError.Capture`. Trip rows come from the core's `TripRepository`; scores and Stories are not shown yet.
 
 ## Run it
 

@@ -16,7 +16,8 @@ import com.google.android.gms.location.ActivityRecognition
 /**
  * [ActivitySource] on Activity Recognition updates (`requestActivityUpdates`), which carry a confidence for the most
  * probable activity. The core uses it as a hint beside GNSS and motion, never alone (PRD F-CAP-02). Only changes of
- * type or confidence level reach the sink. The transition API is kept for the background wake path, not used here.
+ * type or confidence level reach the sink. History comes from [ActivityLog], which also holds the transitions of the
+ * background wake path (`ActivityTransitions`).
  *
  * A missing `ACTIVITY_RECOGNITION` permission is reported on [failures]; the trip still records from location and
  * motion.
@@ -28,7 +29,6 @@ class ActivityRecognitionSource(
 ) : ActivitySource {
     private val appContext = context.applicationContext
     private val client = ActivityRecognition.getClient(appContext)
-    private val history = ActivityHistory()
     private var pendingIntent: PendingIntent? = null
 
     @Synchronized
@@ -38,7 +38,7 @@ class ActivityRecognitionSource(
         val changes = ActivityChangeFilter()
         ActivityUpdateHub.attach { reading ->
             changes.onReading(reading)?.let { change ->
-                history.add(change)
+                ActivityLog.add(change)
                 sink.onActivity(listOf(change))
             }
         }
@@ -53,7 +53,7 @@ class ActivityRecognitionSource(
     }
 
     override fun queryHistory(fromWallMs: Long, toWallMs: Long, callback: ActivityHistoryCallback) {
-        callback.onResult(history.between(fromWallMs, toWallMs))
+        callback.onResult(ActivityLog.between(fromWallMs, toWallMs))
     }
 
     @SuppressLint("MissingPermission") // A revoked permission means there is nothing left to remove.

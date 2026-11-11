@@ -8,6 +8,7 @@ import android.content.Context
 import android.content.Intent
 import android.os.Build
 import com.driveperf.platform.R
+import com.driveperf.platform.location.GpsStatus
 import java.util.Locale
 import java.util.concurrent.TimeUnit
 
@@ -34,16 +35,16 @@ class CaptureNotifications(private val context: Context) {
         manager.createNotificationChannel(channel)
     }
 
-    fun build(state: CaptureState.Recording, nowWallMs: Long): Notification {
-        val minutes = TimeUnit.MILLISECONDS.toMinutes((nowWallMs - state.startedWallMs).coerceAtLeast(0)).toInt()
-        val text = when (state.gps) {
+    fun build(startedWallMs: Long, distanceM: Double, gps: GpsStatus, nowWallMs: Long): Notification {
+        val minutes = TimeUnit.MILLISECONDS.toMinutes((nowWallMs - startedWallMs).coerceAtLeast(0)).toInt()
+        val text = when (gps) {
             GpsStatus.SEARCHING -> context.getString(R.string.capture_notification_searching)
             GpsStatus.LOST -> context.getString(R.string.capture_notification_gps_lost)
             GpsStatus.GOOD -> context.getString(
-                R.string.capture_notification_progress, minutes, String.format(Locale.US, "%.1f", state.distanceM / METRES_PER_KM),
+                R.string.capture_notification_progress, minutes, String.format(Locale.US, "%.1f", distanceM / METRES_PER_KM),
             )
         }
-        return builder(text, state.startedWallMs, minutes).build()
+        return builder(text, startedWallMs, minutes).build()
     }
 
     /** The notification shown the instant the service starts, before the first state arrives. */
