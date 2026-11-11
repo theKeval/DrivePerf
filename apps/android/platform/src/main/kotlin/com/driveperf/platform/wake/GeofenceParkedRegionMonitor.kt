@@ -20,14 +20,26 @@ import com.google.android.gms.location.LocationServices
  * [ParkedRegionMonitor] as one Play services geofence around the parked car (Spike 1 change 1): leaving it wakes the
  * app with `PARKED_EXIT`, also when the process is dead. Geofences are dropped at reboot; the core re-arms the region
  * from the last parking spot in `onLaunch`, which runs at every process start (`BootReceiver` causes one after boot).
- * Needs fine and background location; without them arming does nothing and the activity wake still works.
+ * Needs fine and background location. Without background location Play services rejects the geofence; the region
+ * is remembered, and [rearmIfNeeded] registers it once the permission is granted later (from `WakePath.refresh`).
  */
 class GeofenceParkedRegionMonitor(context: Context) : ParkedRegionMonitor {
     private val appContext = context.applicationContext
     private val client = LocationServices.getGeofencingClient(appContext)
+    private val memory = ParkedRegionMemory()
+
+    override fun arm(center: GeoPoint, radiusM: Double) {
+        memory.armed(center, radiusM)
+        register(center, radiusM)
+    }
+
+    /** Registers the remembered region again when the last registration did not succeed. */
+    fun rearmIfNeeded() {
+        memory.pending()?.let { (center, radiusM) -> register(center, radiusM) }
+    }
 
     @SuppressLint("MissingPermission") // a missing permission throws SecurityException, caught below
-    override fun arm(center: GeoPoint, radiusM: Double) {
+    private fun register(center: GeoPoint, radiusM: Double) {
         val fence = Geofence.Builder()
             .setRequestId(REQUEST_ID)
             .setCircularRegion(center.lat, center.lng, radiusM.toFloat())
@@ -38,12 +50,16 @@ class GeofenceParkedRegionMonitor(context: Context) : ParkedRegionMonitor {
         try {
             client.removeGeofences(listOf(REQUEST_ID))
             client.addGeofences(request, pendingIntent(appContext))
+                .addOnSuccessListener { memory.registered(center) }
+                .addOnFailureListener { memory.failed(center) }
         } catch (_: SecurityException) {
-            // No background location: automatic trips rely on the activity wake alone.
+            // No location permission: remembered for rearmIfNeeded; the activity wake still works meanwhile.
+            memory.failed(center)
         }
     }
 
     override fun disarm() {
+        memory.disarmed()
         client.removeGeofences(listOf(REQUEST_ID))
     }
 
@@ -98,4 +114,39 @@ class BootReceiver : BroadcastReceiver() {
         val action = intent.action
         if (action == Intent.ACTION_BOOT_COMPLETED || action == Intent.ACTION_MY_PACKAGE_REPLACED) lastHandled = action
     }
+}
+
+/**
+ * The parked region last asked for and whether Play services accepted it. Thread-safe: arming runs on the core's
+ * thread, the registration result arrives on the main thread. A result for an older region is ignored.
+ */
+internal class ParkedRegionMemory {
+    private var region: Pair<GeoPoint, Double>? = null
+    private var registered = false
+
+    @Synchronized
+    fun armed(center: GeoPoint, radiusM: Double) {
+        region = center to radiusM
+        registered = false
+    }
+
+    @Synchronized
+    fun registered(center: GeoPoint) {
+        if (region?.first == center) registered = true
+    }
+
+    @Synchronized
+    fun failed(center: GeoPoint) {
+        if (region?.first == center) registered = false
+    }
+
+    @Synchronized
+    fun disarmed() {
+        region = null
+        registered = false
+    }
+
+    /** The region to register again, or null when there is none or it is registered. */
+    @Synchronized
+    fun pending(): Pair<GeoPoint, Double>? = if (registered) null else region
 }

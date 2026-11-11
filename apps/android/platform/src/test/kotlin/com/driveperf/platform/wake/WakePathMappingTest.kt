@@ -91,4 +91,21 @@ class WakePathMappingTest {
         receiver.onReceive(org.robolectric.RuntimeEnvironment.getApplication(), Intent(Intent.ACTION_BOOT_COMPLETED))
         assertEquals(Intent.ACTION_BOOT_COMPLETED, receiver.lastHandled)
     }
+
+    @Test
+    fun `a parked region Play services rejected is registered again until it succeeds`() {
+        val memory = ParkedRegionMemory()
+        assertNull("nothing armed yet", memory.pending())
+        val spot = com.driveperf.domain.capture.GeoPoint(2.5, -27.5)
+        memory.armed(spot, 120.0)
+        memory.failed(spot) // no background location yet
+        val expected: Any = spot to 120.0
+        assertEquals(expected, memory.pending())
+        memory.registered(com.driveperf.domain.capture.GeoPoint(1.0, -26.0))
+        assertEquals("a result for an older region does not count", expected, memory.pending())
+        memory.registered(spot)
+        assertNull("registered: nothing to redo", memory.pending())
+        memory.disarmed()
+        assertNull(memory.pending())
+    }
 }

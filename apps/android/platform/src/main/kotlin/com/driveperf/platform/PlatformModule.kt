@@ -37,7 +37,7 @@ val platformModule = module {
     single<MotionSource> { SensorMotionSource(androidContext(), get(), get()) }
     single<ActivitySource> { ActivityRecognitionSource(androidContext(), get()) }
     single<PowerState> { BatteryPowerState(androidContext(), Executors.newSingleThreadExecutor()) }
-    single<ParkedRegionMonitor> { GeofenceParkedRegionMonitor(androidContext()) }
+    single { GeofenceParkedRegionMonitor(androidContext()) } bind ParkedRegionMonitor::class
     single { ActivityTransitions(androidContext()) }
     single<TripFileStore> {
         val users = androidContext().getSystemService(UserManager::class.java)

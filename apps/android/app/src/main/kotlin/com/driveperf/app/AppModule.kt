@@ -9,6 +9,7 @@ import com.driveperf.di.CoreServices
 import com.driveperf.di.DrivePerfCore
 import com.driveperf.di.PlatformBindings
 import com.driveperf.di.start
+import com.driveperf.domain.capture.ParkedRegionMonitor
 import com.driveperf.domain.capture.TripRecorder
 import com.driveperf.domain.repository.TripRepository
 import com.driveperf.feature.capture.CaptureController
@@ -40,12 +41,14 @@ val appModule = module {
     single<CrashReporter> { SentryCrashReporter(androidContext(), BuildConfig.SENTRY_DSN, BuildConfig.VERSION_NAME) }
 
     single<PlatformBindings> {
-        AndroidPlatformBindings(get(), get<FixWatch>(), get(), get(), get(), get(), get(), DeviceId.of(androidContext()))
+        AndroidPlatformBindings(
+            get(), get<FixWatch>(), get(), get(), get(), get<ParkedRegionMonitor>(), get(), DeviceId.of(androidContext()),
+        )
     }
     single<CoreServices> { DrivePerfCore.start(get(), androidContext()) }
     single<TripRecorder> { get<CoreServices>().recorder }
     single<TripRepository> { get<CoreServices>().trips }
-    single { WakePath(androidContext(), get(), get()) }
+    single { WakePath(androidContext(), get(), get(), get()) }
 
     single {
         PlatformCaptureController(androidContext(), get(), get(), get(), get(), get(), get<WakePath>()::refresh)
