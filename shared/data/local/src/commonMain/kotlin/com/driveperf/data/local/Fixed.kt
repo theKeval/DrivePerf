@@ -50,6 +50,9 @@ internal object Fixed {
 
     /** Reads `varint length + payload` frames; returns null at the end or on a truncated frame. */
     class FrameReader(private val bytes: ByteArray, private var pos: Int) {
+        /** The offset after the last frame read. */
+        val position: Int get() = pos
+
         fun next(): ByteArray? {
             var len = 0L
             var shift = 0

@@ -7,6 +7,7 @@ import com.driveperf.domain.score.Score
 import com.driveperf.domain.trip.DrivingEvent
 import com.driveperf.domain.trip.EventFeedback
 import com.driveperf.domain.trip.Trip
+import com.driveperf.domain.tripfile.FileResult
 import kotlinx.coroutines.flow.Flow
 
 /**
@@ -29,8 +30,11 @@ public interface TripRepository {
     /** A trip's current score, or null. */
     public suspend fun score(tripId: String): Score?
 
-    /** Deletes a trip, its rows and its files (F-PRV-04). */
-    public suspend fun delete(tripId: String)
+    /**
+     * Deletes a trip's files, then its rows (F-PRV-04). When the files cannot be deleted the trip is kept and the
+     * file failure returned, so no raw location or motion data is left without a trip; the user can try again.
+     */
+    public suspend fun delete(tripId: String): FileResult
 }
 
 /** Read side of routes and records. */
