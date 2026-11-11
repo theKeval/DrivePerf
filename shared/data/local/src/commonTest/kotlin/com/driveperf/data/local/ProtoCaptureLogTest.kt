@@ -20,6 +20,7 @@ import com.driveperf.testing.InMemoryTripFileStore
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -120,6 +121,28 @@ class ProtoCaptureLogTest {
         assertTrue(!relaunched.append("missing", CaptureBatch(fixes = listOf(fix))))
         relaunched.delete("trip-1")
         assertNull(relaunched.read("trip-1"))
+    }
+
+    @Test
+    fun replaceSwapsTheWholeLogAtomicallyOrNotAtAll() = runTest {
+        val log = ProtoCaptureLog(files, coroutineContext)
+        assertTrue(log.open(header))
+        assertTrue(log.append("trip-1", CaptureBatch(fixes = listOf(fix, bareFix))))
+        val part = header.copy(startMonoNs = t(1.5))
+        assertTrue(log.replace(part, listOf(CaptureBatch(fixes = listOf(bareFix)), CaptureBatch(motion = motion))))
+        val back = assertNotNull(log.read("trip-1"))
+        assertEquals(t(1.5), back.header.startMonoNs)
+        assertEquals(listOf(bareFix.tMonoNs), back.fixes.map { it.tMonoNs })
+        assertEquals(2, back.motion.size)
+        assertTrue(log.append("trip-1", CaptureBatch(fixes = listOf(fix))), "appends continue on the new header")
+
+        val full = object : com.driveperf.domain.tripfile.TripFileStore by files {
+            override fun write(tripId: String, kind: TripFileKind, bytes: ByteArray) =
+                com.driveperf.domain.tripfile.FileResult.DISK_FULL
+        }
+        val failing = ProtoCaptureLog(full, coroutineContext)
+        assertFalse(failing.replace(header, listOf(CaptureBatch(fixes = listOf(fix)))))
+        assertEquals(2, assertNotNull(log.read("trip-1")).fixes.size, "a failed replace leaves the previous log")
     }
 
     @Test

@@ -35,6 +35,14 @@ public class ProtoCaptureLog(private val files: TripFileStore, private val io: C
         files.read(tripId, TripFileKind.R0)?.let { TripFileCodec.decode(it) }
     }
 
+    override suspend fun replace(header: CaptureHeader, batches: List<CaptureBatch>): Boolean = withContext(io) {
+        val out = okio.Buffer().write(TripFileCodec.encodeHeader(header))
+        batches.forEach { out.write(TripFileCodec.encodeChunk(header, it)) }
+        val ok = files.write(header.tripId, TripFileKind.R0, out.readByteArray()) == FileResult.OK
+        if (ok) headers[header.tripId] = header
+        ok
+    }
+
     override suspend fun delete(tripId: String) {
         withContext(io) {
             headers.remove(tripId)

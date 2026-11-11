@@ -54,12 +54,19 @@ public data class EventLedgerRow(val eventId: String, val type: EventType, val r
 /**
  * The jerk ledger (§5.4). Totals are [base] plus the rows of every active event, so "Was it needed?" re-scores
  * without R1.
+ *
+ * @property stopStartCount the efficiency stop-start count (§5.9) as measured at finalisation. Like the noise floors it
+ *   never changes with feedback, so every re-score starts from it rather than from the previous re-score's efficiency.
+ *   Null on rows written before it was kept.
+ * @property abruptAccelCount the efficiency abrupt-acceleration count (§5.9) as measured at finalisation; null likewise.
  */
 public data class Ledger(
     val base: LedgerRow,
     val perEvent: List<EventLedgerRow>,
     val noiseFloorLonMps3: Double,
     val noiseFloorLatMps3: Double,
+    val stopStartCount: Int? = null,
+    val abruptAccelCount: Int? = null,
 )
 
 /** Efficiency habits (§5.9). Always labelled Estimated; never energy, fuel or money. */
