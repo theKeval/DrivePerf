@@ -60,7 +60,8 @@ internal class SignalPipeline(private val cfg: SignalConfig = SignalConfig(), pr
         val lastNs = endNs ?: listOfNotNull(capture.fixes.lastOrNull()?.tMonoNs, capture.motion.lastOrNull()?.tMonoNs).maxOrNull() ?: t0
         val endS = maxOf(0.0, (lastNs - t0) / NS)
         val n = floor(endS * cfg.fs).toInt()
-        val fixes = gate.gate(capture.fixes.filter { it.tMonoNs <= lastNs }, t0)
+        // Cached fixes from before t = 0 stay in R0 but are not part of the trip (§1.3).
+        val fixes = gate.gate(capture.fixes.filter { it.tMonoNs in t0..lastNs }, t0)
         val motion = capture.motion.filter { it.tMonoNs in t0..lastNs }
         val sig = DeviceSignal.resample(motion, t0, n, cfg)
         val estimatedEndS = estimate?.let { fixes.firstOrNull()?.tS ?: 0.0 }

@@ -4,6 +4,7 @@ import com.driveperf.domain.capture.ActivityType
 import com.driveperf.domain.capture.CaptureHeader
 import com.driveperf.domain.capture.CapturedTrip
 import com.driveperf.domain.capture.WakeKind
+import com.driveperf.domain.repository.ScoredTrip
 import com.driveperf.domain.trip.InterruptionReason
 import com.driveperf.domain.trip.Placement
 import com.driveperf.domain.trip.QualityBadge
@@ -226,6 +227,33 @@ class SignalScenariosTest {
         val r = harness.trip(DriveFixtures.city.capture(), kind = TripKind.PASSENGER)
         assertNull(r.score)
         assertEquals(TripKind.PASSENGER, r.trip.kind)
+    }
+
+    @Test
+    fun anImuGapDoesNotChangeThePlacement() = runTest {
+        val s = DriveFixtures.highway.streams
+        val gapFrom = SyntheticCapture.START_MONO_NS + 100_000_000_000L
+        val gapped = s.motion.filter { it.tMonoNs !in gapFrom..gapFrom + 1_000_000_000L }
+        val sig = SignalPipeline().process(capture(SyntheticCapture.Streams(s.fixes, gapped, s.activity, s.lonTruthG, s.latTruthG)), null)
+        assertTrue(sig.gravitySpreadDeg.isFinite())
+        val whole = harness.trip(capture(s)).trip.quality?.placement
+        val withGap = harness.trip(capture(SyntheticCapture.Streams(s.fixes, gapped, s.activity, s.lonTruthG, s.latTruthG)))
+        assertEquals(whole, withGap.trip.quality?.placement)
+    }
+
+    @Test
+    fun baselinesLookPastAnyNumberOfIneligibleTrips() = runTest {
+        val city = harness.trip(DriveFixtures.city.capture())
+        val start = city.trip.startedAt
+        val eligible = (1..3).map { i ->
+            ScoredTrip(city.trip.copy(id = "old-$i", startedAt = start - 10_000_000L - i), city.score, null)
+        }
+        val passengers = (1..250).map { i ->
+            ScoredTrip(city.trip.copy(id = "p-$i", startedAt = start - 1_000L - i, kind = TripKind.PASSENGER), null, null)
+        }
+        val score = assertNotNull(PipelineHarness(eligible + passengers).trip(DriveFixtures.city.capture()).score)
+        assertNull(score.calibrating)
+        assertEquals(city.score?.smoothness, score.baseline)
     }
 
     @Test

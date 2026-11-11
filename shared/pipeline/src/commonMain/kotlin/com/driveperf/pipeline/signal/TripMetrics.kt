@@ -94,10 +94,7 @@ internal class TripMetrics(private val cfg: SignalConfig) {
             val w = alt.subList(maxOf(0, i - 2), minOf(alt.size, i + 3)).map { it.altM ?: 0.0 }
             alt[i].tS to (Baselines.median(w) ?: 0.0)
         }
-        val smooth = median.map { (t, _) ->
-            val w = median.filter { abs(it.first - t) <= MEAN_HALF_S }.map { it.second }
-            w.sum() / w.size
-        }
+        val smooth = slidingMean(median)
         var reference = smooth.first()
         var gain = 0.0
         var loss = 0.0
@@ -106,6 +103,20 @@ internal class TripMetrics(private val cfg: SignalConfig) {
             if (reference - h >= cfg.elevDeadBandM) { loss += reference - h; reference = h }
         }
         return Elevation(gain, loss, smooth.min(), smooth.max())
+    }
+
+    /** Mean of the values within ±5 s of each point. Times ascend, so two moving bounds keep it linear. */
+    private fun slidingMean(points: List<Pair<Double, Double>>): List<Double> {
+        val out = ArrayList<Double>(points.size)
+        var lo = 0
+        var hi = 0
+        var sum = 0.0
+        for ((t, _) in points) {
+            while (hi < points.size && points[hi].first - t <= MEAN_HALF_S) sum += points[hi++].second
+            while (t - points[lo].first > MEAN_HALF_S) sum -= points[lo++].second
+            out += sum / (hi - lo)
+        }
+        return out
     }
 
     /** §3 part of day from the local start time. */

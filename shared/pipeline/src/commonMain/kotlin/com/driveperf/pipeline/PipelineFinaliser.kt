@@ -8,6 +8,7 @@ import com.driveperf.domain.repository.ScoredTrip
 import com.driveperf.domain.repository.RouteHistory
 import com.driveperf.domain.repository.TripHistory
 import com.driveperf.domain.trip.CaptureMeta
+import com.driveperf.domain.trip.DriveContext
 import com.driveperf.domain.trip.Interruption
 import com.driveperf.domain.trip.QualityBadge
 import com.driveperf.domain.trip.Trip
@@ -100,7 +101,7 @@ public class PipelineFinaliser(
         val cleanest = Stretches.cleanest(analysis)
         val draft = trip(request, sig, quality, distance, m, suspect, analysis.context).copy(cleanest = cleanest)
         val scorable = request.kind == TripKind.DRIVER && b.badge != QualityBadge.UNSCORABLE && !short
-        val past = history.finishedBefore(draft.startedAt, HISTORY_LIMIT)
+        val past = history.finishedBefore(draft.startedAt, HISTORY_PAGE)
         val preview = PreviewTrack.build(
             sig.trace.gnss, analysis.a3Lon, analysis.a3Lat, scoringConfig.fs, allSpans,
             sig.estimate?.let { h.parking?.point?.let { p -> p.lat to p.lng } },
@@ -108,6 +109,7 @@ public class PipelineFinaliser(
         )
         val engine = routes
         val route = engine?.match(draft, preview, past, request.nowWallMs)
+        val priors = priorsFor(draft.startedAt, analysis.context, route?.route?.id)
         val outcome = scorer.score(
             analysis,
             ScoringContext(
@@ -116,7 +118,7 @@ public class PipelineFinaliser(
                 baselineEligible = Baselines.eligible(draft, 0) && m.gnssCoveragePct >= GNSS_ELIGIBLE_PCT,
                 distanceM = distance,
                 routeId = route?.route?.id,
-                priors = priors(past),
+                priors = priors,
                 nowWallMs = request.nowWallMs,
             ),
         )
@@ -165,7 +167,7 @@ public class PipelineFinaliser(
         distance: Double,
         m: com.driveperf.pipeline.signal.Metrics,
         suspect: com.driveperf.domain.trip.Suspect,
-        context: com.driveperf.domain.trip.DriveContext,
+        context: DriveContext,
     ): Trip {
         val h = r.capture.header
         val estimatedM = (sig.estimate?.distanceM ?: 0.0) + (distance - m.gatedDistanceM - (sig.estimate?.distanceM ?: 0.0))
@@ -208,6 +210,26 @@ public class PipelineFinaliser(
         )
     }
 
+    /**
+     * §5.7 baselines use the last 10 eligible trips of a basis, however many ineligible or other-context trips came
+     * in between, so history is read a page at a time until this trip's context, and its route when it has one, have
+     * 10 each or history ends.
+     */
+    private suspend fun priorsFor(beforeStartedAt: Long, context: DriveContext, routeId: String?): List<PriorTrip> {
+        val seen = mutableSetOf<String>()
+        val out = mutableListOf<PriorTrip>()
+        var cursor = beforeStartedAt
+        do {
+            val page = history.finishedBefore(cursor, HISTORY_PAGE).filter { seen.add(it.trip.id) }
+            out += priors(page)
+            // The next page starts at the last startedAt again, so trips sharing it are not skipped.
+            cursor = (page.lastOrNull()?.trip?.startedAt ?: cursor) + 1
+            val enough = out.count { it.context == context } >= Baselines.DEPTH &&
+                (routeId == null || out.count { it.routeId == routeId } >= Baselines.DEPTH)
+        } while (page.isNotEmpty() && !enough)
+        return out
+    }
+
     private fun priors(history: List<ScoredTrip>): List<PriorTrip> = history.mapNotNull { (trip, score, routeId) ->
         val smoothness = score?.smoothness
         if (smoothness == null || !Baselines.eligible(trip, smoothness)) return@mapNotNull null
@@ -227,7 +249,7 @@ public class PipelineFinaliser(
     private companion object {
         const val MS = 1000.0
         const val PERCENT = 100.0
-        const val HISTORY_LIMIT = 200
+        const val HISTORY_PAGE = 200
         const val GNSS_ELIGIBLE_PCT = 60.0
         const val RECENT_TIPS = 2
     }

@@ -2,6 +2,7 @@ package com.driveperf.pipeline.capture
 
 import com.driveperf.domain.capture.ActivityType
 import com.driveperf.domain.capture.CaptureBatch
+import com.driveperf.domain.capture.CapturedTrip
 import com.driveperf.domain.capture.RecordedAccelSample
 import com.driveperf.domain.capture.RecorderState
 import com.driveperf.domain.capture.Vec3
@@ -51,9 +52,16 @@ class TripRecorderEngineTest {
     private val store = InMemoryTripStore(parking)
     private val log = InMemoryCaptureLog()
 
+    /** Every capture handed to the finaliser. */
+    private val finalised = mutableListOf<CapturedTrip>()
+    private val finaliser = TripFinaliser { request ->
+        finalised += request.capture
+        TripSummariser().finalise(request)
+    }
+
     private fun TestScope.engine(): TripRecorderEngine = TripRecorderEngine(
         CapturePorts(location, motion, activitySource, power, region, files),
-        CapturePersistence(store, log, TripSummariser()),
+        CapturePersistence(store, log, finaliser),
         clock,
         FixedTimeZone("Etc/GMT+5", -300),
         backgroundScope,
@@ -241,6 +249,67 @@ class TripRecorderEngineTest {
         runCurrent()
         assertNull(motion.rateHz)
         assertTrue(location.isRunning)
+    }
+
+    @Test
+    fun aTripFileThatCannotBeCreatedDropsTheStartAndSaysSo() = runTest {
+        log.openable = false
+        val engine = engine()
+        engine.onWake(manualWake())
+        runCurrent()
+        val status = engine.status.value
+        assertEquals(RecorderState.IDLE, status.state)
+        assertTrue(status.startFailed)
+        assertTrue(store.trips.isEmpty())
+        assertFalse(location.isRunning)
+        assertNull(motion.rateHz)
+
+        log.openable = true
+        engine.onWake(manualWake())
+        runCurrent()
+        assertEquals(RecorderState.RECORDING, engine.status.value.state)
+        assertFalse(engine.status.value.startFailed)
+    }
+
+    @Test
+    fun aBackfillStillRunningAtStopIsInR0BeforeFinalisation() = runTest {
+        motion.recorded = listOf(RecordedAccelSample(ns(1.0), Vec3(0.0, 0.0, 1.0)))
+        motion.holdRecorded = true
+        val engine = engine()
+        engine.onLaunch()
+        clock.advanceS(100.0)
+        engine.onWake(WakeEvent(WakeKind.PARKED_EXIT, clock.monotonicNs(), clock.wallMs()))
+        runCurrent()
+        drive(150, 8.0, 0.0)
+        engine.stop()
+        runCurrent()
+        assertTrue(finalised.isEmpty(), "finalisation waits for the running query")
+
+        motion.releaseRecorded()
+        runCurrent()
+        assertEquals(1, finalised.single().recordedAccel.size)
+        assertEquals(TripStatus.FINALISED, store.finalised.single().trip.status)
+    }
+
+    @Test
+    fun aBackfillThatNeverAnswersDelaysFinalisationOnlyBriefly() = runTest {
+        motion.recorded = listOf(RecordedAccelSample(ns(1.0), Vec3(0.0, 0.0, 1.0)))
+        motion.holdRecorded = true
+        val engine = engine()
+        engine.onLaunch()
+        clock.advanceS(100.0)
+        engine.onWake(WakeEvent(WakeKind.PARKED_EXIT, clock.monotonicNs(), clock.wallMs()))
+        runCurrent()
+        drive(150, 8.0, 0.0)
+        engine.stop()
+        advanceTimeBy(10_001)
+        runCurrent()
+        assertTrue(finalised.single().recordedAccel.isEmpty())
+        val tripId = store.finalised.single().trip.id
+
+        motion.releaseRecorded()
+        runCurrent()
+        assertTrue(log.read(tripId)!!.recordedAccel.isEmpty(), "a late answer is not appended to a finalised log")
     }
 
     private fun recordingTrip(id: String, source: TripSource = TripSource.AUTO) = Trip(

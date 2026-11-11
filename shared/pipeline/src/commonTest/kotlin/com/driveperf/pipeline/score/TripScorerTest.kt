@@ -155,6 +155,46 @@ class TripScorerTest {
     }
 
     @Test
+    fun feedbackThatDropsExposureUnder120SecondsClearsEverythingDerived() {
+        val out = scorer.score(analyser.analyse(Goldens.g04), ctx())
+        val score = assertNotNull(out.score)
+        val ledger = score.ledger!!
+        val brake = ledger.perEvent.first()
+        val thin = score.copy(
+            ledger = ledger.copy(
+                base = ledger.base.copy(movingS = 100.0),
+                perEvent = listOf(brake.copy(row = brake.row.copy(movingS = 30.0))) +
+                    ledger.perEvent.drop(1).map { it.copy(row = it.row.copy(movingS = 0.0)) },
+            ),
+        )
+        val dismissed = mapOf(brake.eventId to EventFeedback(brake.eventId, "t1", needed = true, inaccurate = null, at = 2L))
+        val rescored = scorer.rescore(thin, out.events, dismissed, DriveContext.CITY, ctx(), out.efficiencyInputs)
+        assertNull(rescored.smoothness)
+        assertNull(rescored.delta)
+        assertNull(rescored.efficiency)
+        assertTrue(rescored.contributors.isEmpty())
+        assertEquals(thin.ledger, rescored.ledger, "kept, so undoing the feedback scores the trip again")
+        assertNotNull(scorer.rescore(rescored, out.events, emptyMap(), DriveContext.CITY, ctx(), out.efficiencyInputs).smoothness)
+    }
+
+    @Test
+    fun theSpeedCvIsAnOrdinaryMedianWhileWobbleTakesTheUpperMiddle() {
+        val speeds = (0 until 51).map { i -> 15.0 + 0.05 * i * if (i % 2 == 0) 1 else -1 }
+        val (wobble, cv) = SpeedMetrics.wobble(speeds.mapIndexed { i, v -> R1Fix(i.toDouble(), v) })
+        val windows = listOf(0, 10, 20, 30).map { start ->
+            val w = speeds.subList(start, start + 21)
+            val mean = w.average()
+            val std = kotlin.math.sqrt(w.sumOf { (it - mean) * (it - mean) } / w.size)
+            std to std / mean
+        }
+        val stds = windows.map { it.first }.sorted()
+        val cvs = windows.map { it.second }.sorted()
+        assertTrue(cvs[1] < cvs[2])
+        assertEquals(stds[2], wobble!!, 1e-12)
+        assertEquals((cvs[1] + cvs[2]) / 2, cv!!, 1e-12)
+    }
+
+    @Test
     fun aPassengerOrUnscorableTripHasEventsButNoScore() {
         val out = scorer.score(analyser.analyse(Goldens.g04), ctx(scorable = false))
         assertNull(out.score)

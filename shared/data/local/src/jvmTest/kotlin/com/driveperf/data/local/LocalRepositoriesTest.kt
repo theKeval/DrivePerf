@@ -1,5 +1,7 @@
 package com.driveperf.data.local
 
+import com.driveperf.data.local.db.Event_feedback
+import com.driveperf.data.local.db.Trip_file
 import com.driveperf.domain.capture.FinalisedTrip
 import com.driveperf.domain.capture.GeoPoint
 import com.driveperf.domain.capture.Parking
@@ -46,12 +48,14 @@ import com.driveperf.domain.trip.TripSegment
 import com.driveperf.domain.trip.TripSource
 import com.driveperf.domain.trip.TripStatus
 import com.driveperf.domain.trip.TurnDirection
+import com.driveperf.domain.tripfile.FileResult
 import com.driveperf.domain.tripfile.TripFileKind
 import com.driveperf.testing.InMemoryTripFileStore
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -150,7 +154,7 @@ class LocalRepositoriesTest {
         val trips = LocalTripRepository(db, files, coroutineContext)
         store.saveFinalised(FinalisedTrip(finished, listOf(event), score))
         files.write("t1", TripFileKind.R0, byteArrayOf(1))
-        trips.delete("t1")
+        assertEquals(FileResult.OK, trips.delete("t1"))
         assertNull(trips.trip("t1"))
         assertTrue(trips.events("t1").isEmpty())
         assertNull(trips.score("t1"))
@@ -193,6 +197,34 @@ class LocalRepositoriesTest {
         assertEquals(best, history.personalBest("r1"))
         assertEquals(1, history.preview("t0")?.size)
         assertNull(history.preview("t1"))
+    }
+
+    @Test
+    fun aFileDeletionFailureKeepsTheTripAndReportsIt() = runTest {
+        val store = LocalTripStore(db, "device-1", coroutineContext)
+        val trips = LocalTripRepository(db, files, coroutineContext)
+        store.saveFinalised(FinalisedTrip(finished, listOf(event), score))
+        files.write("t1", TripFileKind.R0, byteArrayOf(1))
+        files.deleteTripResult = FileResult.UNAVAILABLE
+        assertEquals(FileResult.UNAVAILABLE, trips.delete("t1"))
+        assertNotNull(trips.trip("t1"))
+        assertEquals(listOf("t1"), files.tripIds())
+
+        files.deleteTripResult = FileResult.OK
+        assertEquals(FileResult.OK, trips.delete("t1"))
+        assertNull(trips.trip("t1"))
+    }
+
+    @Test
+    fun reFinalisingATripKeepsItsFeedbackAndFileRows() = runTest {
+        val store = LocalTripStore(db, "device-1", coroutineContext)
+        val trips = LocalTripRepository(db, files, coroutineContext)
+        store.saveFinalised(FinalisedTrip(finished, listOf(event), score))
+        db.tripQueries.upsertFeedback(Event_feedback(event.id, "t1", 1L, null, 5L))
+        db.tripQueries.upsertTripFile(Trip_file("t1", "R0", 1L, "ab", 10L, null, null, null, null))
+        store.saveFinalised(FinalisedTrip(finished, listOf(event), score))
+        assertEquals(setOf(event.id), trips.feedback("t1").keys)
+        assertEquals(1, db.tripQueries.filesForTrip("t1").executeAsList().size)
     }
 
     @Test

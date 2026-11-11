@@ -42,7 +42,7 @@ public data class BaselineResult(
 
 /** Baseline, delta, calibrating and contributor bands (§5.7). Pure: the caller supplies the eligible history. */
 public object Baselines {
-    private const val DEPTH = 10
+    internal const val DEPTH = 10
     private const val NEEDED = 3
     private const val BAND = 6.0
     private const val HALF = 0.5

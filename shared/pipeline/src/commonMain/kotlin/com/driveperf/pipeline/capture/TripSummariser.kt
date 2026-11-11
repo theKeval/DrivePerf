@@ -26,7 +26,8 @@ public class TripSummariser(private val cfg: SummaryConfig = SummaryConfig()) : 
         val h = c.header
         val endNs = request.endNs ?: lastSampleNs(request) ?: h.startMonoNs
         val durationS = maxOf(0.0, (endNs - h.startMonoNs).toDouble() / Units.NANOS_PER_SECOND)
-        val track = c.fixes.filter { it.tMonoNs <= endNs && (it.hAccM ?: Double.MAX_VALUE) <= cfg.gateHAccM }
+        // Cached fixes from before the wake stay in R0 but are not part of the trip's distance or end (§1.3).
+        val track = c.fixes.filter { it.tMonoNs in h.startMonoNs..endNs && (it.hAccM ?: Double.MAX_VALUE) <= cfg.gateHAccM }
         val distanceM = distance(track)
         val end = track.lastOrNull()?.let { Parking(GeoPoint(it.lat, it.lng), wallAt(request, it.tMonoNs)) }
         val short = distanceM < cfg.shortTripM || durationS < cfg.shortTripS
