@@ -15,7 +15,7 @@ internal object RouteGeometry {
     private const val M_PER_DEG = 111_320.0
     private const val MICRO = 1e6
     private const val DEG_TO_RAD = PI / 180.0
-    private const val ESTIMATED = 1
+    const val ESTIMATED = 1
     private const val GAP = 2
 
     /** Rows usable for path similarity: estimated rows and rows in labelled gaps are dropped (§7.3). */

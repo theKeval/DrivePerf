@@ -93,9 +93,40 @@ class RouteMatchingTest {
         val record = engine.record(trip("new", 100L), 85, 0, outcome)
         assertFalse(record.recordState.isNew, "85 does not beat the older run's 88")
         assertEquals("old", record.personalBest?.tripId)
-        val paired = assertNotNull(engine.pairedMatch(outcome, record.personalBest))
+        val paired = assertNotNull(engine.pairedMatch(outcome))
         assertEquals("old", paired.tripId)
         assertTrue(paired.eligibleForRecord)
+    }
+
+    @Test
+    fun thePairedRunsEligibilityDoesNotDependOnWhoHoldsTheRecord() = runTest {
+        val older = ScoredTrip(trip("old", 1L), score("old", 70), null)
+        val engine = RouteEngine(FakeRouteHistory(previews = mutableMapOf("old" to lPath())))
+        val outcome = assertNotNull(engine.match(trip("new", 100L), lPath(), listOf(older), 100L))
+        val record = engine.record(trip("new", 100L), 85, 0, outcome)
+        assertEquals("new", record.personalBest?.tripId, "85 beats the older run's 70")
+        assertEquals(listOf("old", "new"), record.personalBest?.history?.map { it.tripId })
+        val paired = assertNotNull(engine.pairedMatch(outcome))
+        assertTrue(paired.eligibleForRecord)
+        assertNull(paired.ineligibleReason)
+
+        val suspect = older.copy(trip = older.trip.copy(suspect = Suspect.TRANSIT))
+        val unanswered = RouteOutcome(outcome.route, outcome.similarity, created = true, paired = suspect)
+        val match = assertNotNull(engine.pairedMatch(unanswered))
+        assertFalse(match.eligibleForRecord)
+        assertEquals(IneligibleReason.QUALITY, match.ineligibleReason)
+        assertNull(engine.record(trip("new", 100L), 60, 0, unanswered).personalBest?.history?.firstOrNull { it.tripId == "old" })
+    }
+
+    @Test
+    fun theEndpointIsTheLastGatedFixEvenInsideAnExclusion() {
+        val rows = lPath()
+        val tail = rows.size - 20
+        val excludedEnd = rows.mapIndexed { i, r -> if (i >= tail) r.copy(quality = 3) else r }
+        assertEquals(rows.last().lat, Side.ofTrip(excludedEnd)!!.endLat)
+        val allExcluded = Side.ofTrip(rows.map { it.copy(quality = 3) })
+        assertEquals(rows.last().lng, assertNotNull(allExcluded).endLng)
+        assertEquals(rows[rows.size - 2].lat, Side.ofTrip(rows.dropLast(1) + rows.last().copy(quality = 1))!!.endLat)
     }
 
     @Test

@@ -19,10 +19,13 @@ public data class RouteConfig(
 /** One side of a comparison: a trip's preview, or a route's endpoints with its reference trip's preview. */
 internal data class Side(val startLat: Double, val startLng: Double, val endLat: Double, val endLng: Double, val rows: List<PreviewRow>) {
     companion object {
-        /** Start is the first row (the parking spot when the start was estimated); end is the last gated row. */
+        /**
+         * Start is the first row (the parking spot when the start was estimated); end is the last gated fix (§7.1),
+         * whatever its quality: a fix inside an IMU exclusion is still a valid position.
+         */
         fun ofTrip(rows: List<PreviewRow>): Side? {
             val first = rows.firstOrNull()
-            val last = rows.lastOrNull { it.quality == 0 }
+            val last = rows.lastOrNull { it.quality != RouteGeometry.ESTIMATED }
             return if (first == null || last == null) null else Side(first.lat, first.lng, last.lat, last.lng, rows)
         }
     }

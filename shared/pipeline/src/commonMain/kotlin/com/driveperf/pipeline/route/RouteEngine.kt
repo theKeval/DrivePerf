@@ -108,20 +108,10 @@ internal class RouteEngine(private val history: RouteHistory, private val cfg: R
      * §7.5: eligibility in order (PASSENGER, QUALITY, EXCLUSIONS, PACE_BAND), then a strictly higher Smoothness sets
      * the record. Records hold Smoothness only.
      */
-    @Suppress("CyclomaticComplexMethod") // §7.5 checks, in the order the spec stores the first failure
     suspend fun record(trip: Trip, smoothness: Int?, neededCount: Int, outcome: RouteOutcome): RecordOutcome {
         val routeId = outcome.route.id
         val runs = if (outcome.created) emptyList() else history.runs(routeId, PACE_DEPTH)
-        val badge = trip.quality?.badge
-        val qualityOk = (badge == QualityBadge.GOOD || badge == QualityBadge.USABLE) && smoothness != null &&
-            (trip.suspect == Suspect.NONE || trip.suspectAnswer == SuspectAnswer.NO)
-        val reason = when {
-            trip.kind != TripKind.DRIVER -> IneligibleReason.PASSENGER
-            !qualityOk -> IneligibleReason.QUALITY
-            neededCount > MAX_NEEDED -> IneligibleReason.EXCLUSIONS
-            !paceBandPasses(trip.movingS ?: 0.0, runs) -> IneligibleReason.PACE_BAND
-            else -> null
-        }
+        val reason = ineligibility(trip, smoothness, neededCount, runs)
         val current = if (outcome.created) pairedRecord(outcome) else history.personalBest(routeId)
         val score = smoothness.takeIf { reason == null }
         val isNew = score != null && (current == null || score > current.smoothness)
@@ -138,13 +128,32 @@ internal class RouteEngine(private val history: RouteHistory, private val cfg: R
         )
     }
 
-    /** A new candidate's first record is its older run, when that run was eligible on quality. */
+    /**
+     * §7.5 eligibility, checks in the order the spec stores the first failure; null when eligible. It depends only on
+     * the run itself and the route's earlier runs, never on which run holds the record.
+     */
+    private fun ineligibility(trip: Trip, smoothness: Int?, neededCount: Int, runs: List<ScoredTrip>): IneligibleReason? {
+        val badge = trip.quality?.badge
+        val qualityOk = (badge == QualityBadge.GOOD || badge == QualityBadge.USABLE) && smoothness != null &&
+            (trip.suspect == Suspect.NONE || trip.suspectAnswer == SuspectAnswer.NO)
+        return when {
+            trip.kind != TripKind.DRIVER -> IneligibleReason.PASSENGER
+            !qualityOk -> IneligibleReason.QUALITY
+            neededCount > MAX_NEEDED -> IneligibleReason.EXCLUSIONS
+            !paceBandPasses(trip.movingS ?: 0.0, runs) -> IneligibleReason.PACE_BAND
+            else -> null
+        }
+    }
+
+    /**
+     * A new candidate's first record is its older run, when that run is eligible on its own inputs. It is the route's
+     * first run, so the pace band passes; its feedback is not in history, so it counts no needed events, as a trip
+     * does at finalisation.
+     */
     private fun pairedRecord(outcome: RouteOutcome): PersonalBest? {
         val other = outcome.paired ?: return null
         val smoothness = other.score?.smoothness
-        val badge = other.trip.quality?.badge
-        val ok = other.trip.kind == TripKind.DRIVER && (badge == QualityBadge.GOOD || badge == QualityBadge.USABLE)
-        return if (ok && smoothness != null) {
+        return if (ineligibility(other.trip, smoothness, 0, emptyList()) == null && smoothness != null) {
             val entry = RecordEntry(other.trip.id, smoothness, other.trip.startedAt)
             PersonalBest(outcome.route.id, other.trip.id, smoothness, other.trip.startedAt, listOf(entry))
         } else {
@@ -152,10 +161,10 @@ internal class RouteEngine(private val history: RouteHistory, private val cfg: R
         }
     }
 
-    /** The match written for the paired older trip of a new candidate (§7.4). */
-    fun pairedMatch(outcome: RouteOutcome, best: PersonalBest?): RouteMatch? = outcome.paired?.let { other ->
-        val eligible = best?.tripId == other.trip.id
-        RouteMatch(other.trip.id, outcome.route.id, outcome.similarity, MatchSource.AUTO, eligible, null)
+    /** The match written for the paired older trip of a new candidate (§7.4), judged as in [pairedRecord]. */
+    fun pairedMatch(outcome: RouteOutcome): RouteMatch? = outcome.paired?.let { other ->
+        val reason = ineligibility(other.trip, other.score?.smoothness, 0, emptyList())
+        RouteMatch(other.trip.id, outcome.route.id, outcome.similarity, MatchSource.AUTO, reason == null, reason)
     }
 
     /** §7.5 pace band: moving time within 0.75–1.50× the median of the last 10 prior runs; passes with < 3 runs. */

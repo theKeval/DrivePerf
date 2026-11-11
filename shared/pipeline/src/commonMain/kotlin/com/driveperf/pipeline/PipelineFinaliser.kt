@@ -123,7 +123,7 @@ public class PipelineFinaliser(
             ),
         )
         val record = if (engine != null && route != null) engine.record(draft, outcome.score?.smoothness, 0, route) else null
-        val paired = if (engine != null && route != null) engine.pairedMatch(route, record?.personalBest) else null
+        val paired = if (engine != null && route != null) engine.pairedMatch(route) else null
         val tip = outcome.score?.let { score ->
             TipSelector.select(
                 TipInputs(
