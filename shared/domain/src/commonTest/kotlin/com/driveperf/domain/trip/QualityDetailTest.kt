@@ -45,6 +45,18 @@ class QualityDetailTest {
     }
 
     @Test
+    fun aRecoveredTripsAppKilledGapIsLeftOutTimeLikeItsOverlay() {
+        // What Spans.fromMarks writes for a kill and relaunch (§1.7): a GAP with reason APP_KILLED, not INTERRUPTED.
+        val q = quality(
+            Placement.MOUNTED,
+            TripSegment(SegmentKind.GAP, 900.0, 1_200.0, SegmentReason.APP_KILLED),
+            TripSegment(SegmentKind.GAP, 300.0, 340.0, SegmentReason.TUNNEL, LONG_GAP_LABEL),
+        )
+        assertEquals(listOf(LeftOut(SegmentReason.APP_KILLED, 300.0)), q.leftOut())
+        assertEquals(OverlayStyle.INTERRUPTED, q.overlays().single { it.reason == SegmentReason.APP_KILLED }.style)
+    }
+
+    @Test
     fun overlaysTellShortGapsFromLabelledGapsAndKeepInterruptionsAsGaps() {
         val q = quality(
             Placement.MOUNTED,
