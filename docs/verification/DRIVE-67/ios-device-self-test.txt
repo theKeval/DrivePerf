@@ -1,11 +1,12 @@
-DrivePerf self-test 2026-11-10T22:37:08Z
+DrivePerf self-test 2026-11-11T01:52:23Z
 PASS  Storage after first unlock: Trip files writable (unlocked since boot)
+PASS  Shared core ports (Kotlin types): Clock, TripFileStore (append, sync, gzip, read, SHA-256), PowerState (thermal nominal), MotionSource (gyro yes)
 PASS  CLMonitor name: “parkedSpot” is alphanumeric
 PASS  Permissions: Location always, precise on, motion authorized
-SKIP  Wake triggers: No parking spot yet (armed after the first trip)
+PASS  Wake triggers: Parked region armed
 PASS  Stale wake filter: 10-minute-old fix dropped
 PASS  GPS fix: First fix after 0.0 s, accuracy ≤ 20 m
-PASS  Motion at 50 Hz, off the main thread: 53.0 Hz, |gravity| 1.000 g, gravityUp.z 0.20
-PASS  Motion activity history: 32 activity changes in the last 15 min
-PASS  Wake → candidate records → rejected: Recorded 44 KB before confirmation, then rejected and deleted
-PASS  Manual start → record → stop: Saved as “short”: 304 motion, 7 location samples
+PASS  Motion at 50 Hz, off the main thread: 52.2 Hz in 11 batches, |gravity| 1.000 g, gravityUp.z 1.00
+PASS  Motion activity history: 10 activity changes in the last 15 min
+PASS  Wake → candidate records → rejected: Recorded 58 KB before confirmation, then rejected and deleted
+PASS  Manual start → record → stop: Saved as “short”: 302 motion, 3 location samples, R0 gzipped

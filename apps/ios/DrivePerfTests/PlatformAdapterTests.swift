@@ -61,6 +61,20 @@ final class PlatformAdapterTests: XCTestCase {
         XCTAssertEqual(sample.attitude, Quat(w: 1, x: 0, y: 0, z: 0))
     }
 
+    func testFinalMotionBatchIsDeliveredOffTheCallersThreadBeforeStopReturns() throws {
+        let source = CoreMotionSource()
+        try XCTSkipIf(source.capability().maxRateHz == 0, "Needs a real device")
+        let log = BatchLog()
+        source.start(rateHz: 50) { samples in log.record(onMain: Thread.isMainThread) }
+        Thread.sleep(forTimeInterval: 0.2)  // fewer than one full batch
+
+        source.stop()
+
+        let delivered = log.threads
+        XCTAssertFalse(delivered.isEmpty, "The partial batch is flushed")
+        XCTAssertFalse(delivered.contains(true), "No batch on the main thread")
+    }
+
     func testUserAccelerationIsKinematic() {
         // Core Motion reports the negative of the kinematic acceleration (its raw accelerometer reads −1 g face up).
         let sample = MotionNormalizer.normalize(
@@ -205,4 +219,13 @@ final class PlatformAdapterTests: XCTestCase {
         XCTAssertEqual(FileTripStore.result(for: NSError(domain: NSPOSIXErrorDomain, code: Int(EPERM))), .unavailable)
         XCTAssertEqual(FileTripStore.result(for: CocoaError(.fileReadCorruptFile)), .ioError)
     }
+}
+
+/// Which thread each motion batch arrived on.
+private final class BatchLog: @unchecked Sendable {
+    private let lock = NSLock()
+    private var onMain: [Bool] = []
+
+    func record(onMain value: Bool) { lock.withLock { onMain.append(value) } }
+    var threads: [Bool] { lock.withLock { onMain } }
 }

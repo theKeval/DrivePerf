@@ -6,7 +6,7 @@ import Foundation
 /// private serial queue through a `@Sendable` closure: a closure created in a `@MainActor` context would inherit
 /// main-actor isolation and trap on the first sample, which lost two field trips in Spike 1 (spike change 6).
 /// Samples go to the sink in batches of `batchSize` (≈ 0.5 s at 50 Hz), so the Kotlin core is not called 50 times a
-/// second; `stop()` flushes the last partial batch.
+/// second; `stop()` flushes the last partial batch on the same queue before it returns.
 public final class CoreMotionSource: MotionSourceBridge, @unchecked Sendable {
     public static let batchSize = 25
 
@@ -61,7 +61,14 @@ public final class CoreMotionSource: MotionSourceBridge, @unchecked Sendable {
             }
             return (pending, self.sink)
         }
-        if !rest.isEmpty { sink?(rest) }
+        guard !rest.isEmpty, let sink else { return }
+        // The last partial batch goes out on the motion queue too, never on the caller's thread (spike change 6),
+        // and before `stop()` returns, so no sample arrives after it.
+        if OperationQueue.current === queue {
+            sink(rest)
+        } else {
+            queue.addOperations([BlockOperation { sink(rest) }], waitUntilFinished: true)
+        }
     }
 
     private func collect(_ sample: MotionSample) {
