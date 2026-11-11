@@ -4,53 +4,78 @@ import Foundation
 
 @MainActor
 final class FakeRecorder: TripRecording, TripHistory {
-    var snapshot = RecorderSnapshot()
-    var startError: RecorderError?
+    var status = RecorderStatus.idle
+    /// What a stop saves (nil: the trip is discarded and never listed).
     var stopResult: TripSummary?
+    /// False: a manual wake does not start (the trip file is unavailable before the first unlock).
+    var canStart = true
     var tripList: [TripSummary] = []
-    private(set) var startCount = 0
+    private(set) var wakes: [WakeEvent] = []
     private(set) var autoDetect: Bool?
-    private var observers: [AsyncStream<RecorderSnapshot>.Continuation] = []
+    private var observers: [AsyncStream<RecorderStatus>.Continuation] = []
     private var historyObservers: [AsyncStream<[TripSummary]>.Continuation] = []
 
-    func snapshots() -> AsyncStream<RecorderSnapshot> {
+    func statuses() -> AsyncStream<RecorderStatus> {
         AsyncStream { continuation in
-            continuation.yield(snapshot)
+            continuation.yield(status)
             observers.append(continuation)
         }
     }
 
-    func startManualTrip() throws(RecorderError) {
-        startCount += 1
-        if let startError { throw startError }
-        publish(RecorderSnapshot(
-            phase: .recording,
-            live: LiveTrip(id: "t", source: .manual, startedAt: Date(), distanceM: 0, hasFix: false)))
+    func onLaunch() {}
+
+    func onWake(_ event: WakeEvent) {
+        wakes.append(event)
+        guard canStart else { return }
+        publish(.recording(isManual: event.kind == .manual))
     }
 
-    func stopTrip() async -> TripSummary? {
-        publish(RecorderSnapshot(phase: .idle, lastFinished: stopResult))
-        return stopResult
+    func stop() {
+        if let stopResult { publishTrips(tripList + [stopResult]) }
+        publish(.idle)
     }
+
+    func markPassenger(keep: Bool) {}
 
     func setAutoDetect(enabled: Bool) { autoDetect = enabled }
 
-    func trips() -> AsyncStream<[TripSummary]> {
+    func observeTrips() -> AsyncStream<[TripSummary]> {
         AsyncStream { continuation in
             continuation.yield(tripList)
             historyObservers.append(continuation)
         }
     }
 
-    func publish(_ next: RecorderSnapshot) {
-        snapshot = next
+    func publish(_ next: RecorderStatus) {
+        status = next
         observers.forEach { $0.yield(next) }
+    }
+
+    func publishTrips(_ trips: [TripSummary]) {
+        tripList = trips
+        historyObservers.forEach { $0.yield(trips) }
     }
 
     func finishStreams() {
         observers.forEach { $0.finish() }
         historyObservers.forEach { $0.finish() }
     }
+}
+
+extension RecorderStatus {
+    static func recording(
+        isManual: Bool = true, distanceM: Double = 0, elapsedS: Double = 0, state: RecorderState = .recording
+    ) -> RecorderStatus {
+        RecorderStatus(
+            state: state, tripId: "t", isManual: isManual, elapsedS: elapsedS, distanceM: distanceM,
+            autoDetectEnabled: true)
+    }
+}
+
+/// A fixed clock for wakes created by view models.
+struct FixedClock: ClockBridge {
+    func monotonicNs() -> Int64 { 42_000_000_000 }
+    func wallMs() -> Int64 { 1_800_000_000_000 }
 }
 
 @MainActor
@@ -140,7 +165,7 @@ func makeDependencies(
     preferences: MemoryPreferences = MemoryPreferences(), crash: FakeCrashReporter = FakeCrashReporter()
 ) -> AppDependencies {
     AppDependencies(
-        recorder: recorder, history: recorder, permissions: permissions, preferences: preferences,
+        recorder: recorder, history: recorder, clock: FixedClock(), permissions: permissions, preferences: preferences,
         crashReporter: crash, selfTest: FakeSelfTest(), flags: BuildFlags(), coreInfo: FakeHello(),
         refreshCapture: {})
 }

@@ -22,18 +22,25 @@ protocol BackgroundAssertions: AnyObject {
     func end()
 }
 
-/// Interim `TripRecording` and `TripHistory` until DRIVE-62's shared `TripRecorder` lands. It follows the spec's
-/// state machine for the paths the shell needs (§1.4): wake → CANDIDATE → RECORDING or rejected, manual Start →
-/// RECORDING, Stop or stop timer → FINISHING → PROCESSED, and kill-and-relaunch recovery (§1.7).
+/// Interim implementation of the `TripRecorder` contract (`TripRecording`) and the trip list (`TripHistory`) until
+/// the shared recorder and repositories land (DRIVE-62 slices 2–3). It runs on the same ports the shared core will
+/// use — `LocationSource`, `MotionSource`, `ActivitySource`, `TripFileStore` and `ParkedRegionMonitor` —
+/// and follows the spec's state machine for the paths the shell needs (§1.4): wake → CANDIDATE → RECORDING or
+/// rejected, manual wake → RECORDING, stop or stop timer → FINISHING → PROCESSED, and kill-and-relaunch recovery
+/// (§1.7).
 ///
 /// Spike 1 changes it applies: recording starts at the wake and the candidate's samples are kept (2); the activity
-/// history query is bounded by the previous trip's end (3); a trip only starts when the trip files are writable (5);
-/// no Live Activity for automatic trips, a passive notification instead (9); the parked region is re-armed at every
-/// trip end (1).
+/// history query is bounded by the previous trip's end (3); a trip starts only when its R0 file can be written,
+/// which the store reports as `unavailable` before the first unlock (5); fixes cached from before the wake are
+/// dropped (8); no Live Activity for automatic trips, a passive notification instead (9); the parked region is
+/// re-armed at every trip end (1).
+///
+/// R0 here is an interim CSV capture log (`R0Lines`), appended through `TripFileStore` and gzip-compressed at
+/// finalisation; the real R0 codec belongs to the shared core.
 @MainActor
 final class InterimTripRecorder: TripRecording, TripHistory {
-    private(set) var snapshot = RecorderSnapshot() {
-        didSet { if snapshot != oldValue { snapshotObservers.values.forEach { $0.yield(snapshot) } } }
+    private(set) var status = RecorderStatus.idle {
+        didSet { if status != oldValue { statusObservers.values.forEach { $0.yield(status) } } }
     }
     private(set) var history: [TripSummary] = [] {
         didSet { historyObservers.values.forEach { $0.yield(history) } }
@@ -44,8 +51,8 @@ final class InterimTripRecorder: TripRecording, TripHistory {
     private let motion: any MotionSourceBridge
     private let activity: any ActivitySourceBridge
     private let files: any TripFileStoreBridge
+    private let parkedRegion: (any ParkedRegionMonitorBridge)?
     private let index: TripIndexStore
-    private let triggers: (any WakeTriggerBridge)?
     private let liveSurface: (any LiveSurfacing)?
     private let notifier: (any TripNotifying)?
     private let assertions: (any BackgroundAssertions)?
@@ -53,10 +60,8 @@ final class InterimTripRecorder: TripRecording, TripHistory {
 
     private var active: ActiveTrip?
     private var tick: Task<Void, Never>?
-    private var autoDetectEnabled = false
-    private var alwaysAuthorized = false
     private var lastTripEndedAt: Date?
-    private var snapshotObservers: [UUID: AsyncStream<RecorderSnapshot>.Continuation] = [:]
+    private var statusObservers: [UUID: AsyncStream<RecorderStatus>.Continuation] = [:]
     private var historyObservers: [UUID: AsyncStream<[TripSummary]>.Continuation] = [:]
 
     private struct ActiveTrip {
@@ -64,7 +69,7 @@ final class InterimTripRecorder: TripRecording, TripHistory {
         var source: TripSource
         var startedAt: Date
         var confirmed: Bool
-        var writer: any TripFileWriter
+        var counter: SampleCounter
         var candidate: CandidateDecider?
         var stop: StopDetector
         var distance: DistanceAccumulator
@@ -78,11 +83,12 @@ final class InterimTripRecorder: TripRecording, TripHistory {
         motion: any MotionSourceBridge,
         activity: any ActivitySourceBridge,
         files: any TripFileStoreBridge,
+        parkedRegion: (any ParkedRegionMonitorBridge)? = nil,
         index: TripIndexStore,
-        triggers: (any WakeTriggerBridge)? = nil,
         liveSurface: (any LiveSurfacing)? = nil,
         notifier: (any TripNotifying)? = nil,
         assertions: (any BackgroundAssertions)? = nil,
+        autoDetectEnabled: Bool = true,
         now: @escaping @MainActor () -> Date = { Date() }
     ) {
         self.config = config
@@ -90,71 +96,73 @@ final class InterimTripRecorder: TripRecording, TripHistory {
         self.motion = motion
         self.activity = activity
         self.files = files
+        self.parkedRegion = parkedRegion
         self.index = index
-        self.triggers = triggers
         self.liveSurface = liveSurface
         self.notifier = notifier
         self.assertions = assertions
         self.now = now
+        status.autoDetectEnabled = autoDetectEnabled
     }
 
-    // MARK: Launch
+    // MARK: TripRecording
 
-    /// Loads history and recovers a trip that was running when the app died (§1.7). Call after the platform
-    /// sessions are recreated.
-    func launch() {
+    func statuses() -> AsyncStream<RecorderStatus> {
+        let id = UUID()
+        return AsyncStream { continuation in
+            continuation.yield(status)
+            statusObservers[id] = continuation
+            continuation.onTermination = { [weak self] _ in
+                Task { @MainActor in self?.statusObservers[id] = nil }
+            }
+        }
+    }
+
+    /// Loads history and recovers a trip that was running when the app died (§1.7). The parked region needs no
+    /// re-arming here: `CLMonitor` keeps its condition across launches and the platform monitor restores it.
+    func onLaunch() {
         history = index.loadSummaries()
         lastTripEndedAt = history.first?.endedAt
         recoverInterruptedTrip()
     }
 
-    /// The current permission and choice: automatic trips need Always (S-ONB-08).
-    func updateAuthorization(always: Bool, autoDetectEnabled enabled: Bool) {
-        alwaysAuthorized = always
-        autoDetectEnabled = enabled
-        publishAutoDetect()
-    }
-
-    // MARK: TripRecording
-
-    func snapshots() -> AsyncStream<RecorderSnapshot> {
-        let id = UUID()
-        return AsyncStream { continuation in
-            continuation.yield(snapshot)
-            snapshotObservers[id] = continuation
-            continuation.onTermination = { [weak self] _ in
-                Task { @MainActor in self?.snapshotObservers[id] = nil }
-            }
-        }
-    }
-
-    func startManualTrip() throws(RecorderError) {
-        if let active {
-            guard !active.confirmed else { throw .alreadyRecording }
-            // A manual Start during a candidate confirms it as a manual trip from the wake.
-            self.active?.source = .manual
-            confirm()
-            liveSurface?.start(tripId: active.id, startedAt: active.startedAt)
+    func onWake(_ event: WakeEvent) {
+        let wokeAt = Date(wallMs: event.wallMs)
+        if event.kind == .manual {
+            startManual(wokeAt: wokeAt)
             return
         }
-        guard files.isWritable() else { throw .storageLocked }
-        try begin(source: .manual, wokeAt: now())
-        if let active { liveSurface?.start(tripId: active.id, startedAt: active.startedAt) }
+        // Stale events are dropped (spike change 8); the platform filter already removes most of them.
+        guard active == nil, status.autoDetectEnabled,
+            now().timeIntervalSince(wokeAt) <= config.maxWakeAgeS
+        else { return }
+        begin(source: .auto, wokeAt: wokeAt)
     }
 
-    func stopTrip() async -> TripSummary? {
-        guard active?.confirmed == true else { return nil }
-        return finish(endedAt: now())
+    func stop() {
+        guard active?.confirmed == true else { return }
+        finish(endedAt: now())
+    }
+
+    /// Passenger mode is outside the shell (DRIVE-67): keeping finishes the trip as recorded, discarding deletes it.
+    func markPassenger(keep: Bool) {
+        guard let trip = active, trip.confirmed else { return }
+        if keep {
+            finish(endedAt: now())
+        } else {
+            discardActive()
+            liveSurface?.end()
+            notifier?.removeTripNotifications(tripId: trip.id)
+        }
     }
 
     func setAutoDetect(enabled: Bool) {
-        autoDetectEnabled = enabled
-        publishAutoDetect()
+        status.autoDetectEnabled = enabled
     }
 
     // MARK: TripHistory
 
-    func trips() -> AsyncStream<[TripSummary]> {
+    func observeTrips() -> AsyncStream<[TripSummary]> {
         let id = UUID()
         return AsyncStream { continuation in
             continuation.yield(history)
@@ -166,51 +174,62 @@ final class InterimTripRecorder: TripRecording, TripHistory {
     }
 
     func delete(tripId: String) {
-        files.delete(tripId: tripId)
+        _ = files.deleteTrip(tripId: tripId)
         index.remove(tripId: tripId)
         history = index.loadSummaries()
     }
 
-    // MARK: Wakes
-
-    /// A platform wake (§1.3). Ignored unless automatic trips are on with Always location and storage is open.
-    func handle(_ wake: WakeEvent) {
-        guard active == nil, autoDetectEnabled, alwaysAuthorized, files.isWritable() else { return }
-        let wokeAt = Date(timeIntervalSince1970: TimeInterval(wake.receivedWallMs) / 1000)
-        try? begin(source: .automatic, wokeAt: wokeAt)
-    }
-
     // MARK: Trip loop
 
-    private func begin(source: TripSource, wokeAt: Date) throws(RecorderError) {
+    private func startManual(wokeAt: Date) {
+        if let trip = active {
+            guard !trip.confirmed else { return }
+            // A manual start during a candidate confirms it as a manual trip from the wake.
+            active?.source = .manual
+            confirm()
+            liveSurface?.start(tripId: trip.id, startedAt: trip.startedAt)
+            return
+        }
+        begin(source: .manual, wokeAt: wokeAt)
+        if let active { liveSurface?.start(tripId: active.id, startedAt: active.startedAt) }
+    }
+
+    private func begin(source: TripSource, wokeAt: Date) {
         let id = UUID().uuidString.lowercased()
-        let writer: any TripFileWriter
-        do {
-            writer = try files.open(tripId: id)
-        } catch {
-            throw .storageLocked
+        // The first write decides whether a trip can start: before the first unlock the store says `unavailable`.
+        guard files.append(tripId: id, kind: .r0, bytes: R0Lines.header(tripId: id, source: source)) == .ok else {
+            _ = files.deleteTrip(tripId: id)
+            return
         }
         assertions?.begin()
         let stopWindow = source == .manual ? config.manualStopS : config.autoStopS
+        let counter = SampleCounter()
         active = ActiveTrip(
-            id: id, source: source, startedAt: wokeAt, confirmed: source == .manual, writer: writer,
-            candidate: source == .automatic ? CandidateDecider(wokeAt: wokeAt, config: config) : nil,
+            id: id, source: source, startedAt: wokeAt, confirmed: source == .manual, counter: counter,
+            candidate: source == .auto ? CandidateDecider(wokeAt: wokeAt, config: config) : nil,
             stop: StopDetector(startedAt: wokeAt, stopWindowS: stopWindow, movingSpeedMps: config.movingSpeedMps),
             distance: DistanceAccumulator(config: config), lastCheckpointAt: wokeAt)
-        startSampling(notBefore: wokeAt, writer: writer)
-        if source == .automatic { queryActivityHistory(until: wokeAt) }
-        publishActive()
+        startSampling(tripId: id, counter: counter)
+        if source == .auto { queryActivityHistory(until: wokeAt) }
+        publish()
         checkpoint()
     }
 
-    private func startSampling(notBefore: Date, writer: any TripFileWriter) {
-        location.start(
-            notBeforeWallMs: Int64(notBefore.timeIntervalSince1970 * 1000),
-            onSample: { [weak self] sample in self?.ingest(sample) },
-            onStationary: { _ in },
-            onIssue: { _ in })
-        motion.start(rateHz: config.imuHz) { @Sendable sample in writer.append(sample) }
-        activity.start { [weak self] sample in self?.ingest(sample) }
+    private func startSampling(tripId: String, counter: SampleCounter) {
+        let files = files
+        location.start { [weak self] samples in
+            deliverOnMain { self?.ingest(samples, tripId: tripId) }
+        }
+        // Motion stays on the motion queue: encode and append there, never on the main actor (spike change 6).
+        motion.start(rateHz: config.imuHz) { samples in
+            guard !samples.isEmpty,
+                files.append(tripId: tripId, kind: .r0, bytes: R0Lines.encode(samples)) == .ok
+            else { return }
+            counter.add(motion: samples.count)
+        }
+        activity.start { [weak self] samples in
+            deliverOnMain { self?.ingest(samples, tripId: tripId) }
+        }
         tick?.cancel()
         tick = Task { [weak self] in
             while !Task.isCancelled {
@@ -232,37 +251,48 @@ final class InterimTripRecorder: TripRecording, TripHistory {
     /// Bounded by the previous trip's end, so the 15-minute query edge is never mistaken for the motion start
     /// (spike change 3).
     private func queryActivityHistory(until wokeAt: Date) {
+        guard let tripId = active?.id else { return }
         var from = wokeAt.addingTimeInterval(-config.activityHistoryWindowS)
         if let lastTripEndedAt, lastTripEndedAt > from { from = lastTripEndedAt }
-        activity.queryHistory(
-            fromWallMs: Int64(from.timeIntervalSince1970 * 1000), toWallMs: Int64(wokeAt.timeIntervalSince1970 * 1000)
-        ) { [weak self] samples in
-            samples.sorted { $0.startWallMs < $1.startWallMs }.forEach { self?.ingest($0) }
+        activity.queryHistory(fromWallMs: from.wallMs, toWallMs: wokeAt.wallMs) { [weak self] samples in
+            deliverOnMain { self?.ingest(samples, tripId: tripId) }
         }
     }
 
-    private func ingest(_ sample: LocationSample) {
-        guard var trip = active else { return }
-        trip.writer.append(sample)
-        trip.distance.ingest(sample)
-        let time = Date(timeIntervalSince1970: TimeInterval(sample.wallMs) / 1000)
-        trip.candidate?.observe(speedMps: sample.speedMps, accuracyM: sample.hAccM, at: time)
-        trip.stop.observe(speedMps: sample.speedMps, at: time)
+    private func ingest(_ samples: [LocationSample], tripId: String) {
+        guard var trip = active, trip.id == tripId else { return }
+        // A stream's first fix can be cached from before the wake (spike change 8).
+        let earliest = trip.startedAt.addingTimeInterval(-config.wakeFixToleranceS).wallMs
+        let fresh = samples.filter { $0.wallMs >= earliest }
+        guard !fresh.isEmpty else { return }
+        if files.append(tripId: tripId, kind: .r0, bytes: R0Lines.encode(fresh)) == .ok {
+            trip.counter.add(location: fresh.count)
+        }
+        for sample in fresh {
+            trip.distance.ingest(sample)
+            let time = Date(wallMs: sample.wallMs)
+            trip.candidate?.observe(speedMps: sample.speedMps, accuracyM: sample.hAccM, at: time)
+            trip.stop.observe(speedMps: sample.speedMps, at: time)
+        }
         let firstFix = !trip.hasFix
         trip.hasFix = true
         active = trip
         if firstFix { assertions?.end() }
-        publishActive()
+        publish()
         if trip.confirmed, trip.source == .manual {
             liveSurface?.update(distanceM: trip.distance.distanceM, hasFix: true)
         }
     }
 
-    private func ingest(_ sample: ActivitySample) {
-        guard active != nil else { return }
-        active?.writer.append(sample)
-        active?.candidate?.observe(sample)
-        active?.stop.observe(sample)
+    private func ingest(_ samples: [ActivitySample], tripId: String) {
+        guard active?.id == tripId, !samples.isEmpty else { return }
+        if files.append(tripId: tripId, kind: .r0, bytes: R0Lines.encode(samples)) == .ok {
+            active?.counter.add(activity: samples.count)
+        }
+        for sample in samples.sorted(by: { $0.wallMs < $1.wallMs }) {
+            active?.candidate?.observe(sample)
+            active?.stop.observe(sample)
+        }
     }
 
     /// One tick of the trip loop (every second while sampling). Internal so tests drive it with a test clock.
@@ -273,12 +303,15 @@ final class InterimTripRecorder: TripRecording, TripHistory {
             switch candidate.decide(now: time) {
             case .pending: break
             case .confirmed: confirm()
-            case .rejected, .timedOut: reject()
+            case .rejected, .timedOut:
+                discardActive()
+                return
             }
         } else if trip.stop.hasEnded(now: time) {
-            _ = finish(endedAt: trip.source == .automatic ? trip.stop.lastMovingAt : time)
+            finish(endedAt: trip.source == .auto ? trip.stop.lastMovingAt : time)
             return
         }
+        publish()
         if time.timeIntervalSince(trip.lastCheckpointAt) >= config.checkpointS { checkpoint() }
     }
 
@@ -287,67 +320,62 @@ final class InterimTripRecorder: TripRecording, TripHistory {
         trip.confirmed = true
         trip.candidate = nil
         active = trip
-        if trip.source == .automatic { notifier?.postAutoTripRecording(tripId: trip.id) }
-        publishActive()
+        if trip.source == .auto { notifier?.postAutoTripRecording(tripId: trip.id) }
+        publish()
         checkpoint()
     }
 
-    /// CANDIDATE → IDLE: stop and delete the samples now (§1.4).
-    private func reject() {
+    /// CANDIDATE → IDLE (or a discarded passenger trip): stop and delete the samples now (§1.4).
+    private func discardActive() {
         guard let trip = active else { return }
         stopSampling()
-        trip.writer.close()
-        files.delete(tripId: trip.id)
+        _ = files.deleteTrip(tripId: trip.id)
         index.clearCheckpoint()
         active = nil
-        publishActive()
+        publish()
     }
 
-    @discardableResult
-    private func finish(endedAt: Date) -> TripSummary? {
-        guard let trip = active else { return nil }
-        snapshot.phase = .finishing
-        trip.writer.flush()
-        let counts = trip.writer.counts
+    private func finish(endedAt: Date) {
+        guard let trip = active else { return }
+        status.state = .finishing
         stopSampling()
-        trip.writer.close()
+        _ = files.sync(tripId: trip.id, kind: .r0)
+        let counts = trip.counter.counts
         liveSurface?.end()
         notifier?.removeTripNotifications(tripId: trip.id)
         if let spot = trip.distance.lastUsable {
-            triggers?.armParkedRegion(lat: spot.lat, lng: spot.lng, radiusM: config.parkedRadiusM)
+            parkedRegion?.arm(center: GeoPoint(lat: spot.lat, lng: spot.lng), radiusM: config.parkedRadiusM)
         }
         index.clearCheckpoint()
         active = nil
         lastTripEndedAt = endedAt
         let duration = max(endedAt.timeIntervalSince(trip.startedAt), 0)
-        var summary: TripSummary?
         switch classifyTrip(
             source: trip.source, distanceM: trip.distance.distanceM, durationS: duration, config: config)
         {
         case .discard:
-            files.delete(tripId: trip.id)
-        case .keep(let status):
-            let saved = TripSummary(
-                id: trip.id, source: trip.source, status: status, startedAt: trip.startedAt, endedAt: endedAt,
-                distanceM: trip.distance.distanceM, samples: counts)
-            index.append(saved)
+            _ = files.deleteTrip(tripId: trip.id)
+        case .keep(let tripStatus):
+            _ = files.compress(tripId: trip.id, kind: .r0)
+            index.append(
+                TripSummary(
+                    id: trip.id, source: trip.source, status: tripStatus, startedAt: trip.startedAt,
+                    endedAt: endedAt, distanceM: trip.distance.distanceM, samples: counts))
             history = index.loadSummaries()
-            summary = saved
         }
-        snapshot = RecorderSnapshot(phase: .idle, live: nil, autoDetect: snapshot.autoDetect, lastFinished: summary)
-        return summary
+        publish()
     }
 
     private func checkpoint() {
         guard var trip = active else { return }
-        trip.writer.flush()
+        _ = files.sync(tripId: trip.id, kind: .r0)
         trip.lastCheckpointAt = now()
         active = trip
         index.save(
             TripIndexStore.Checkpoint(
                 tripId: trip.id, source: trip.source, confirmed: trip.confirmed, startedAt: trip.startedAt,
                 lastCheckpointAt: trip.lastCheckpointAt, distanceM: trip.distance.distanceM,
-                samples: trip.writer.counts))
+                samples: trip.counter.counts))
     }
 
     // MARK: Recovery (§1.7)
@@ -357,54 +385,76 @@ final class InterimTripRecorder: TripRecording, TripHistory {
         let age = now().timeIntervalSince(saved.lastCheckpointAt)
         guard saved.confirmed else {
             // A candidate that died before confirmation is not a trip.
-            files.delete(tripId: saved.tripId)
+            _ = files.deleteTrip(tripId: saved.tripId)
             index.clearCheckpoint()
             return
         }
-        if age <= config.resumeWindowS, files.isWritable(), let writer = try? files.open(tripId: saved.tripId) {
+        // Resuming appends to the existing R0; the store reports `unavailable` if it cannot be reopened (locked).
+        if age <= config.resumeWindowS,
+            files.append(tripId: saved.tripId, kind: .r0, bytes: R0Lines.resumed(at: now())) == .ok
+        {
             let stopWindow = saved.source == .manual ? config.manualStopS : config.autoStopS
+            let counter = SampleCounter(saved.samples)
             active = ActiveTrip(
-                id: saved.tripId, source: saved.source, startedAt: saved.startedAt, confirmed: true, writer: writer,
+                id: saved.tripId, source: saved.source, startedAt: saved.startedAt, confirmed: true, counter: counter,
                 candidate: nil,
                 stop: StopDetector(startedAt: now(), stopWindowS: stopWindow, movingSpeedMps: config.movingSpeedMps),
                 distance: DistanceAccumulator(config: config, distanceM: saved.distanceM),
                 lastCheckpointAt: now())
-            startSampling(notBefore: now(), writer: writer)
+            startSampling(tripId: saved.tripId, counter: counter)
             if saved.source == .manual { liveSurface?.start(tripId: saved.tripId, startedAt: saved.startedAt) }
-            publishActive()
+            publish()
             return
         }
-        let summary = TripSummary(
-            id: saved.tripId, source: saved.source, status: .interrupted, startedAt: saved.startedAt,
-            endedAt: saved.lastCheckpointAt, distanceM: saved.distanceM, samples: saved.samples)
-        index.append(summary)
+        index.append(
+            TripSummary(
+                id: saved.tripId, source: saved.source, status: .interrupted, startedAt: saved.startedAt,
+                endedAt: saved.lastCheckpointAt, distanceM: saved.distanceM, samples: saved.samples))
         index.clearCheckpoint()
         history = index.loadSummaries()
     }
 
     // MARK: Publishing
 
-    private func publishActive() {
+    private func publish() {
         guard let trip = active else {
-            snapshot.phase = .idle
-            snapshot.live = nil
+            status = RecorderStatus(
+                state: .idle, tripId: nil, isManual: false, elapsedS: 0, distanceM: 0,
+                autoDetectEnabled: status.autoDetectEnabled)
             return
         }
-        snapshot.phase = trip.confirmed ? .recording : .candidate
-        snapshot.live = LiveTrip(
-            id: trip.id, source: trip.source, startedAt: trip.startedAt, distanceM: trip.distance.distanceM,
-            hasFix: trip.hasFix)
+        status = RecorderStatus(
+            state: trip.confirmed ? .recording : .candidate, tripId: trip.id, isManual: trip.source == .manual,
+            elapsedS: max(now().timeIntervalSince(trip.startedAt), 0).rounded(.down),
+            distanceM: trip.distance.distanceM, autoDetectEnabled: status.autoDetectEnabled)
+    }
+}
+
+/// Sample counts, updated from the motion queue and the main actor.
+final class SampleCounter: @unchecked Sendable {
+    private let lock = NSLock()
+    private var value: SampleCounts
+
+    init(_ initial: SampleCounts = SampleCounts()) {
+        value = initial
     }
 
-    private func publishAutoDetect() {
-        if !autoDetectEnabled {
-            snapshot.autoDetect = .manual
-        } else if !files.isWritable() {
-            snapshot.autoDetect = .needsAttention(reason: .storageLocked)
-        } else if !alwaysAuthorized {
-            snapshot.autoDetect = .needsAttention(reason: .locationWhileUsing)
-        } else {
-            snapshot.autoDetect = .ready
+    var counts: SampleCounts { lock.withLock { value } }
+
+    func add(location: Int = 0, motion: Int = 0, activity: Int = 0) {
+        lock.withLock {
+            value.location += location
+            value.motion += motion
+            value.activity += activity
         }
+    }
+}
+
+/// Port sinks may be called on any thread; the recorder runs on the main actor. Queued in call order.
+func deliverOnMain(_ work: @escaping @MainActor @Sendable () -> Void) {
+    if Thread.isMainThread {
+        MainActor.assumeIsolated(work)
+    } else {
+        DispatchQueue.main.async { MainActor.assumeIsolated(work) }
     }
 }

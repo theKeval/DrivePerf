@@ -1,93 +1,92 @@
 import Foundation
 
-/// The recorder seam: what screens need from the trip state machine (pipeline-and-scoring.md §1). DRIVE-62 builds
-/// the real `TripRecorder` in `:shared:pipeline`; until it lands, the app target supplies an interim Swift
-/// implementation behind this same protocol, so features never change when the Kotlin one replaces it.
+/// The recorder seam features code against: a Swift mirror of the Kotlin `TripRecorder` contract in
+/// `com.driveperf.domain.capture` (pipeline-and-scoring.md §1). The Kotlin `status` StateFlow becomes `status` plus
+/// `statuses()`. Until the shared recorder implementation lands (DRIVE-62 slices 2–3), the app target supplies an
+/// interim Swift recorder behind this protocol; afterwards it adapts the Kotlin one, and features do not change.
 
-public enum TripSource: String, Equatable, Sendable, Codable {
-    case manual, automatic
-}
-
-/// Recorder states (§1.2). `processed` is transient and never published.
-public enum RecorderPhase: String, Equatable, Sendable, Codable {
+/// Kotlin `RecorderState`. `PROCESSED` is transient and shows as `idle`.
+public enum RecorderState: String, Equatable, Sendable, Codable {
     case idle, candidate, recording, paused, finishing
 }
 
-/// The active trip, as the in-drive screen and the Live Activity show it: status only, never speed or score
-/// (SAF-02).
-public struct LiveTrip: Equatable, Sendable {
-    public var id: String
-    public var source: TripSource
-    public var startedAt: Date
+/// Kotlin `RecorderStatus`: what live surfaces may show. Elapsed time, distance and capture state only; no live
+/// score, event or coaching (SAF-02).
+public struct RecorderStatus: Equatable, Sendable {
+    public var state: RecorderState
+    /// The trip being recorded; nil when idle. A candidate's trip is not shown in the UI.
+    public var tripId: String?
+    /// A manually started trip (it shows a Stop control).
+    public var isManual: Bool
+    public var elapsedS: Double
+    /// Gated distance so far.
     public var distanceM: Double
-    /// False until the first usable fix ("Finding GPS…").
-    public var hasFix: Bool
-
-    public init(id: String, source: TripSource, startedAt: Date, distanceM: Double, hasFix: Bool) {
-        self.id = id
-        self.source = source
-        self.startedAt = startedAt
-        self.distanceM = distanceM
-        self.hasFix = hasFix
-    }
-}
-
-public enum AutoDetectStatus: Equatable, Sendable {
-    /// Automatic trips are on and the triggers are armed.
-    case ready
-    /// The user chose manual trips.
-    case manual
-    /// Automatic trips are on but cannot run (for example location is "While Using").
-    case needsAttention(reason: AttentionReason)
-}
-
-public enum AttentionReason: String, Equatable, Sendable {
-    case locationWhileUsing, locationDenied, storageLocked
-}
-
-public struct RecorderSnapshot: Equatable, Sendable {
-    public var phase: RecorderPhase
-    /// Present in `candidate`, `recording`, `paused` and `finishing`. Screens show it only once confirmed.
-    public var live: LiveTrip?
-    public var autoDetect: AutoDetectStatus
-    /// The trip that finished most recently in this session, for S-DRV-04.
-    public var lastFinished: TripSummary?
+    /// False while the user has paused automatic detection.
+    public var autoDetectEnabled: Bool
 
     public init(
-        phase: RecorderPhase = .idle, live: LiveTrip? = nil, autoDetect: AutoDetectStatus = .manual,
-        lastFinished: TripSummary? = nil
+        state: RecorderState, tripId: String?, isManual: Bool, elapsedS: Double, distanceM: Double,
+        autoDetectEnabled: Bool
     ) {
-        self.phase = phase
-        self.live = live
-        self.autoDetect = autoDetect
-        self.lastFinished = lastFinished
+        self.state = state
+        self.tripId = tripId
+        self.isManual = isManual
+        self.elapsedS = elapsedS
+        self.distanceM = distanceM
+        self.autoDetectEnabled = autoDetectEnabled
     }
 
+    /// Kotlin `RecorderStatus.IDLE`.
+    public static let idle = RecorderStatus(
+        state: .idle, tripId: nil, isManual: false, elapsedS: 0, distanceM: 0, autoDetectEnabled: true)
+
     /// A confirmed trip is running: the D1 gate locks the app to the in-drive screen.
-    public var isDriving: Bool { phase == .recording || phase == .paused }
+    public var isDriving: Bool { state == .recording || state == .paused || state == .finishing }
 }
 
-public enum RecorderError: Error, Equatable, Sendable {
-    case locationNotAuthorized
-    case storageLocked
-    case alreadyRecording
-}
-
+/// Kotlin `TripRecorder`.
 @MainActor
 public protocol TripRecording: AnyObject {
-    var snapshot: RecorderSnapshot { get }
-    /// Emits the current snapshot first, then every change.
-    func snapshots() -> AsyncStream<RecorderSnapshot>
-    /// `MANUAL` wake: IDLE → RECORDING (§1.4).
-    func startManualTrip() throws(RecorderError)
-    /// User Stop, confirmed on S-DRV-02: RECORDING/PAUSED → FINISHING → PROCESSED. Returns the saved trip.
-    func stopTrip() async -> TripSummary?
-    /// Turns automatic trips on or off (the S-ONB-08 choice).
+    var status: RecorderStatus { get }
+    /// Emits the current status first, then every change.
+    func statuses() -> AsyncStream<RecorderStatus>
+    /// Once per process start, after the platform has recreated its location sessions (ADR-002 §5): re-arms the
+    /// parked region and recovers a trip that was recording when the app was killed (§1.7).
+    func onLaunch()
+    /// A wake from an OS trigger, or `.manual` for a user start. Stale events are dropped.
+    func onWake(_ event: WakeEvent)
+    /// The user confirmed Stop.
+    func stop()
+    /// The user marked the current trip as a passenger trip, keeping it or discarding it.
+    func markPassenger(keep: Bool)
+    /// Turns automatic detection on or off. Manual starts work either way.
     func setAutoDetect(enabled: Bool)
 }
 
 // MARK: - History
 
+/// Kotlin `TripSource`.
+public enum TripSource: String, Equatable, Sendable, Codable {
+    case auto, manual
+
+    /// Also reads `automatic`, the name rows recorded before the shared ports used.
+    public init(from decoder: any Decoder) throws {
+        let raw = try decoder.singleValueContainer().decode(String.self)
+        self = raw == "automatic" ? .auto : try TripSource(rawValue: raw).orThrow(decoder)
+    }
+}
+
+extension Optional where Wrapped == TripSource {
+    fileprivate func orThrow(_ decoder: any Decoder) throws -> TripSource {
+        guard let self else {
+            throw DecodingError.dataCorrupted(.init(codingPath: decoder.codingPath, debugDescription: "TripSource"))
+        }
+        return self
+    }
+}
+
+/// The subset of Kotlin `TripStatus` the interim recorder produces, plus `short`, which the shared core expresses
+/// through quality once scoring lands (§1.6).
 public enum TripStatus: String, Equatable, Sendable, Codable {
     /// Committed and complete.
     case finalised
@@ -97,7 +96,21 @@ public enum TripStatus: String, Equatable, Sendable, Codable {
     case short
 }
 
-/// A processed trip as the lists show it. It carries no coordinates.
+/// Sample counts written to a trip's capture log.
+public struct SampleCounts: Equatable, Sendable, Codable {
+    public var location: Int
+    public var motion: Int
+    public var activity: Int
+
+    public init(location: Int = 0, motion: Int = 0, activity: Int = 0) {
+        self.location = location
+        self.motion = motion
+        self.activity = activity
+    }
+}
+
+/// A raw recorded trip row, as the lists show it until the shared `TripRepository` and its `Trip` land. It carries
+/// no coordinates.
 public struct TripSummary: Identifiable, Equatable, Sendable, Codable {
     public var id: String
     public var source: TripSource
@@ -123,8 +136,9 @@ public struct TripSummary: Identifiable, Equatable, Sendable, Codable {
     public var duration: TimeInterval { endedAt.timeIntervalSince(startedAt) }
 }
 
+/// The trip list's source, after Kotlin `TripRepository.observeTrips()`.
 @MainActor
 public protocol TripHistory: AnyObject {
-    /// Emits the processed trips (newest first) now and after every change.
-    func trips() -> AsyncStream<[TripSummary]>
+    /// Emits the recorded trips (newest first) now and after every change.
+    func observeTrips() -> AsyncStream<[TripSummary]>
 }

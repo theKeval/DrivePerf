@@ -6,95 +6,97 @@ import Foundation
 /// (automotive navigation) and the legacy `startUpdatingLocation` keep-alive, because a `CLBackgroundActivitySession`
 /// created during a background wake can report `insufficientlyInUse`, and whether `liveUpdates` alone keeps a
 /// background-woken app running is still untested (spike results, A19). One fix per ~second is kept.
-@MainActor
-public final class CoreLocationSource: NSObject, LocationSourceBridge {
-    /// Turn off only for an A19 experiment on `liveUpdates` alone.
-    public var legacyKeepAlive = true
+///
+/// Callable from any thread (the Kotlin core calls ports from its own); Core Location runs on the main thread.
+/// Fixes are delivered one per batch at ~1 Hz. Dropping fixes cached from before a wake is the core's job.
+public final class CoreLocationSource: LocationSourceBridge, @unchecked Sendable {
+    private let engine: Engine
 
-    private let clock: any ClockBridge
-    private let manager = CLLocationManager()
-    private var backgroundSession: CLBackgroundActivitySession?
-    private var liveTask: Task<Void, Never>?
-    private var notBefore = Date.distantPast
-    private var lastAccepted: Date?
-    private var onSample: (@MainActor (LocationSample) -> Void)?
-    private var onStationary: (@MainActor (Bool) -> Void)?
-    private var onIssue: (@MainActor (LocationIssue) -> Void)?
-
-    public init(clock: any ClockBridge = SystemClock()) {
-        self.clock = clock
-        super.init()
-        manager.delegate = self
-        manager.activityType = .automotiveNavigation
-        manager.desiredAccuracy = kCLLocationAccuracyBestForNavigation
-        manager.distanceFilter = kCLDistanceFilterNone
-        manager.pausesLocationUpdatesAutomatically = false
-        manager.showsBackgroundLocationIndicator = true
+    @MainActor
+    public init(clock: SystemClock = SystemClock()) {
+        engine = Engine(clock: clock)
     }
 
-    public func start(
-        notBeforeWallMs: Int64,
-        onSample: @escaping @MainActor (LocationSample) -> Void,
-        onStationary: @escaping @MainActor (Bool) -> Void,
-        onIssue: @escaping @MainActor (LocationIssue) -> Void
-    ) {
-        stop()
-        notBefore = Date(wallMs: notBeforeWallMs)
-        self.onSample = onSample
-        self.onStationary = onStationary
-        self.onIssue = onIssue
-        backgroundSession = CLBackgroundActivitySession()
-        liveTask = Task { [weak self] in
-            do {
-                for try await update in CLLocationUpdate.liveUpdates(.automotiveNavigation) {
-                    guard let self, !Task.isCancelled else { return }
-                    self.handle(update)
-                }
-            } catch {
-                self?.onIssue?(.locationUnavailable)
-            }
-        }
-        if legacyKeepAlive {
-            manager.allowsBackgroundLocationUpdates = true
-            manager.startUpdatingLocation()
-        }
+    /// Turn off only for an A19 experiment on `liveUpdates` alone.
+    @MainActor
+    public var legacyKeepAlive: Bool {
+        get { engine.legacyKeepAlive }
+        set { engine.legacyKeepAlive = newValue }
+    }
+
+    public func start(sink: @escaping @Sendable ([LocationSample]) -> Void) {
+        let engine = engine
+        onMain { engine.start(sink: sink) }
     }
 
     public func stop() {
-        liveTask?.cancel()
-        liveTask = nil
-        manager.stopUpdatingLocation()
-        manager.allowsBackgroundLocationUpdates = false
-        backgroundSession?.invalidate()
-        backgroundSession = nil
-        lastAccepted = nil
-        onSample = nil
-        onStationary = nil
-        onIssue = nil
+        let engine = engine
+        onMain { engine.stop() }
     }
 
-    private func handle(_ update: CLLocationUpdate) {
-        if update.authorizationDenied { onIssue?(.authorizationDenied) }
-        if update.insufficientlyInUse { onIssue?(.insufficientlyInUse) }
-        if update.serviceSessionRequired { onIssue?(.serviceSessionRequired) }
-        if update.locationUnavailable { onIssue?(.locationUnavailable) }
-        onStationary?(update.stationary)
-        if let location = update.location { ingest(location) }
-    }
+    @MainActor
+    private final class Engine: NSObject, CLLocationManagerDelegate {
+        var legacyKeepAlive = true
+        private let clock: SystemClock
+        private let manager = CLLocationManager()
+        private var backgroundSession: CLBackgroundActivitySession?
+        private var liveTask: Task<Void, Never>?
+        private var lastAccepted: Date?
+        private var sink: (@Sendable ([LocationSample]) -> Void)?
 
-    fileprivate func ingest(_ location: CLLocation) {
-        guard
-            let sample = LocationMapping.sample(
-                from: location, notBefore: notBefore, lastAccepted: lastAccepted, clock: clock)
-        else { return }
-        lastAccepted = location.timestamp
-        onSample?(sample)
-    }
-}
+        init(clock: SystemClock) {
+            self.clock = clock
+            super.init()
+            manager.delegate = self
+            manager.activityType = .automotiveNavigation
+            manager.desiredAccuracy = kCLLocationAccuracyBestForNavigation
+            manager.distanceFilter = kCLDistanceFilterNone
+            manager.pausesLocationUpdatesAutomatically = false
+            manager.showsBackgroundLocationIndicator = true
+        }
 
-extension CoreLocationSource: @preconcurrency CLLocationManagerDelegate {
-    public func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
-        locations.forEach(ingest)
+        func start(sink: @escaping @Sendable ([LocationSample]) -> Void) {
+            self.sink = sink
+            guard liveTask == nil else { return }
+            backgroundSession = CLBackgroundActivitySession()
+            liveTask = Task { [weak self] in
+                do {
+                    for try await update in CLLocationUpdate.liveUpdates(.automotiveNavigation) {
+                        guard let self, !Task.isCancelled else { return }
+                        if let location = update.location { self.ingest(location) }
+                    }
+                } catch {
+                    // The stream ended (authorization lost); the app reports permissions separately.
+                }
+            }
+            if legacyKeepAlive {
+                manager.allowsBackgroundLocationUpdates = true
+                manager.startUpdatingLocation()
+            }
+        }
+
+        func stop() {
+            liveTask?.cancel()
+            liveTask = nil
+            manager.stopUpdatingLocation()
+            manager.allowsBackgroundLocationUpdates = false
+            backgroundSession?.invalidate()
+            backgroundSession = nil
+            lastAccepted = nil
+            sink = nil
+        }
+
+        func ingest(_ location: CLLocation) {
+            guard let sink,
+                let sample = LocationMapping.sample(from: location, lastAccepted: lastAccepted, clock: clock)
+            else { return }
+            lastAccepted = location.timestamp
+            sink([sample])
+        }
+
+        nonisolated func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
+            MainActor.assumeIsolated { locations.forEach(ingest) }
+        }
     }
 }
 
@@ -102,17 +104,12 @@ extension CoreLocationSource: @preconcurrency CLLocationManagerDelegate {
 public enum LocationMapping {
     /// Two streams deliver the same fix; keep one per this interval.
     public static let minimumInterval: TimeInterval = 0.5
-    /// A fix may be timestamped slightly before the wake that it caused (spike: up to 0.25 s).
-    public static let wakeTolerance: TimeInterval = 5
-
     public static func sample(
-        from location: CLLocation, notBefore: Date, lastAccepted: Date?, clock: any ClockBridge
+        from location: CLLocation, lastAccepted: Date?, clock: SystemClock
     ) -> LocationSample? {
-        if location.timestamp < notBefore.addingTimeInterval(-wakeTolerance) { return nil }
         if let lastAccepted, location.timestamp.timeIntervalSince(lastAccepted) < minimumInterval { return nil }
-        let ageNs = Int64((Date().timeIntervalSince(location.timestamp) * 1_000_000_000).rounded())
         return LocationSample(
-            tMonoNs: clock.nowMonoNs() - max(ageNs, 0),
+            tMonoNs: clock.monotonicNs(atWall: location.timestamp),
             wallMs: location.timestamp.wallMs,
             lat: location.coordinate.latitude,
             lng: location.coordinate.longitude,

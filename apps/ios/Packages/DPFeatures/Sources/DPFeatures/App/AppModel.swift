@@ -7,6 +7,8 @@ import Observation
 public struct AppDependencies {
     public var recorder: any TripRecording
     public var history: any TripHistory
+    /// The monotonic and wall clock wakes are stamped with.
+    public var clock: any ClockBridge
     public var permissions: any PermissionRequesting
     public var preferences: any PreferencesStoring
     public var crashReporter: any CrashReporting
@@ -19,13 +21,14 @@ public struct AppDependencies {
     public var runSelfTestOnLaunch: Bool
 
     public init(
-        recorder: any TripRecording, history: any TripHistory, permissions: any PermissionRequesting,
-        preferences: any PreferencesStoring, crashReporter: any CrashReporting, selfTest: any SelfTesting,
+        recorder: any TripRecording, history: any TripHistory, clock: any ClockBridge,
+        permissions: any PermissionRequesting, preferences: any PreferencesStoring, crashReporter: any CrashReporting, selfTest: any SelfTesting,
         flags: BuildFlags, coreInfo: any HelloProviding, refreshCapture: @escaping @MainActor () -> Void,
         runSelfTestOnLaunch: Bool = false
     ) {
         self.recorder = recorder
         self.history = history
+        self.clock = clock
         self.permissions = permissions
         self.preferences = preferences
         self.crashReporter = crashReporter
@@ -58,7 +61,9 @@ public final class AppModel {
         self.dependencies = dependencies
         route = dependencies.preferences.preferences.onboardingCompleted ? .shell : .onboarding
         isSelfTestPresented = dependencies.runSelfTestOnLaunch
-        capture = CaptureViewModel(recorder: dependencies.recorder, permissions: dependencies.permissions)
+        capture = CaptureViewModel(
+            recorder: dependencies.recorder, history: dependencies.history, permissions: dependencies.permissions,
+            clock: dependencies.clock)
         trips = TripListViewModel(history: dependencies.history)
         profile = ProfileViewModel(dependencies: dependencies)
         if route == .onboarding { onboarding = makeOnboarding() }

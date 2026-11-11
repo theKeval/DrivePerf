@@ -20,8 +20,8 @@ struct InDriveView: View {
     }
 
     private func content(now: Date) -> some View {
-        let live = capture.snapshot.live
-        let startedAt = live?.startedAt ?? now
+        let status = capture.status
+        let startedAt = capture.tripStartedAt ?? now
         return VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: DPSpace.s3) {
                 Circle().fill(DPColor.live).frame(width: 12, height: 12)
@@ -30,7 +30,7 @@ struct InDriveView: View {
             }
             .padding(.top, 18)
             .accessibilityElement(children: .combine)
-            Text(sourceLine(live: live, startedAt: startedAt))
+            Text(sourceLine(isManual: status.isManual, startedAt: startedAt))
                 .font(.subheadline)
                 .foregroundStyle(Color(rgba: 0xA3AA_B6FF))
                 .padding(.top, DPSpace.s2)
@@ -42,24 +42,16 @@ struct InDriveView: View {
                         .minimumScaleFactor(0.5)
                         .lineLimit(1)
                 }
+                // The recorder status has no GNSS-fix flag, so the "Finding GPS…" state is not shown (reported to
+                // DRIVE-62 as a possible additive field).
                 Metric(label: "DISTANCE") {
-                    if live?.hasFix == true {
-                        HStack(alignment: .firstTextBaseline, spacing: DPSpace.s1) {
-                            Text(DriveFormat.kilometres(live?.distanceM ?? 0)).dpNumeral(.xl)
-                            Text("km").dpNumeral(.m).foregroundStyle(Color(rgba: 0xA3AA_B6FF))
-                        }
-                    } else {
-                        Text("—").dpNumeral(.xl)
+                    HStack(alignment: .firstTextBaseline, spacing: DPSpace.s1) {
+                        Text(DriveFormat.kilometres(status.distanceM)).dpNumeral(.xl)
+                        Text("km").dpNumeral(.m).foregroundStyle(Color(rgba: 0xA3AA_B6FF))
                     }
                 }
             }
             .foregroundStyle(.white)
-            if live?.hasFix != true {
-                StatusCard(
-                    icon: .gps, title: "Finding GPS…",
-                    detail: "Motion is already recording. Distance starts with the first fix.")
-                    .padding(.top, DPSpace.s6)
-            }
             Spacer()
             Button {
                 capture.requestStop()
@@ -79,9 +71,9 @@ struct InDriveView: View {
         .padding(.horizontal, DPSpace.s6)
     }
 
-    private func sourceLine(live: LiveTrip?, startedAt: Date) -> String {
+    private func sourceLine(isManual: Bool, startedAt: Date) -> String {
         let time = DriveFormat.clock(startedAt)
-        return live?.source == .automatic ? "Started automatically · \(time)" : "Started by you · \(time)"
+        return isManual ? "Started by you · \(time)" : "Started automatically · \(time)"
     }
 }
 
@@ -98,40 +90,20 @@ private struct Metric<Value: View>: View {
     }
 }
 
-private struct StatusCard: View {
-    let icon: DPIcon
-    let title: String
-    let detail: String
-
-    var body: some View {
-        HStack(alignment: .top, spacing: DPSpace.s3) {
-            icon.image.resizable().frame(width: 22, height: 22).foregroundStyle(DPColor.accent)
-            VStack(alignment: .leading, spacing: DPSpace.s0_5) {
-                Text(title).font(DPFont.body.weight(.semibold)).foregroundStyle(.white)
-                Text(detail).font(DPFont.bodySecondary).foregroundStyle(Color(rgba: 0xA3AA_B6FF))
-            }
-        }
-        .padding(DPSpace.s4)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: DPRadius.lg, style: .continuous))
-        .accessibilityElement(children: .combine)
-    }
-}
-
 /// S-DRV-02 End trip sheet: a deliberate second step so a mis-tap never ends a drive.
 struct EndTripSheet: View {
     let capture: CaptureViewModel
 
     var body: some View {
         TimelineView(.periodic(from: .now, by: 1)) { context in
-            let live = capture.snapshot.live
+            let startedAt = capture.tripStartedAt
             let short = capture.isShortTrip(now: context.date)
             VStack(alignment: .leading, spacing: DPSpace.s4) {
                 Text("End this drive?").font(DPFont.sheetTitle).foregroundStyle(DPColor.text)
-                if let live {
+                if let startedAt {
                     Text(
-                        "\(DriveFormat.elapsed(context.date.timeIntervalSince(live.startedAt))) · "
-                            + "\(DriveFormat.kilometres(live.distanceM)) km"
+                        "\(DriveFormat.elapsed(context.date.timeIntervalSince(startedAt))) · "
+                            + "\(DriveFormat.kilometres(capture.status.distanceM)) km"
                     )
                     .font(.system(size: 22, weight: .semibold).width(.expanded))
                     .monospacedDigit()

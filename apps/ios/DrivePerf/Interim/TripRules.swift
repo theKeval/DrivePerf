@@ -27,6 +27,10 @@ struct TripRulesConfig: Sendable {
     var minimumStepM = 5.0
     var imuHz = 50
     var checkpointS = 5.0
+    /// Older wakes are stale (spike change 8: region events are delivered late on a relaunch).
+    var maxWakeAgeS = 900.0
+    /// A fix may be timestamped slightly before the wake that it caused (spike: up to 0.25 s).
+    var wakeFixToleranceS = 5.0
 }
 
 enum CandidateDecision: Equatable {
@@ -50,7 +54,7 @@ struct CandidateDecider {
     }
 
     mutating func observe(_ activity: ActivitySample) {
-        if let latestActivity, activity.startWallMs < latestActivity.startWallMs { return }
+        if let latestActivity, activity.wallMs < latestActivity.wallMs { return }
         latestActivity = activity
     }
 
@@ -69,14 +73,14 @@ struct CandidateDecider {
 
     func decide(now: Date) -> CandidateDecision {
         let humanPowered = latestActivity?.isHumanPowered ?? false
-        let cycling = latestActivity.map { $0.kind == .cycling && $0.confidence >= .medium } ?? false
+        let cycling = latestActivity.map { $0.type == .cycling && $0.confidence >= .medium } ?? false
         if goodFixSeen {
             if !cycling, let fastSince, let lastSpeedAt,
                 lastSpeedAt.timeIntervalSince(fastSince) >= config.sustainedDurationS
             {
                 return .confirmed
             }
-            if let activity = latestActivity, activity.kind == .automotive, activity.confidence >= .medium,
+            if let activity = latestActivity, activity.type == .automotive, activity.confidence >= .medium,
                 !humanPowered, let lastSpeed, let lastSpeedAt, lastSpeed >= config.automotiveSpeedMps,
                 now.timeIntervalSince(lastSpeedAt) <= config.speedFreshnessS
             {

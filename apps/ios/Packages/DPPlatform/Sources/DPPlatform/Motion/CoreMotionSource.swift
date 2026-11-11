@@ -5,39 +5,108 @@ import Foundation
 /// `MotionSource` on `CMDeviceMotion` (50 Hz nominal, `xArbitraryCorrectedZVertical`). Samples are delivered on a
 /// private serial queue through a `@Sendable` closure: a closure created in a `@MainActor` context would inherit
 /// main-actor isolation and trap on the first sample, which lost two field trips in Spike 1 (spike change 6).
+/// Samples go to the sink in batches of `batchSize` (≈ 0.5 s at 50 Hz), so the Kotlin core is not called 50 times a
+/// second; `stop()` flushes the last partial batch.
 public final class CoreMotionSource: MotionSourceBridge, @unchecked Sendable {
-    private let manager = CMMotionManager()
-    private let queue: OperationQueue
-    private let lock = NSLock()
+    public static let batchSize = 25
 
-    public init() {
+    private let manager = CMMotionManager()
+    private let recorder = CMSensorRecorder()
+    private let queue: OperationQueue
+    private let clock: SystemClock
+    private let lock = NSLock()
+    private var pending: [MotionSample] = []
+    private var sink: (@Sendable ([MotionSample]) -> Void)?
+
+    public init(clock: SystemClock = SystemClock()) {
+        self.clock = clock
         queue = OperationQueue()
         queue.name = "com.driveperf.motion"
         queue.maxConcurrentOperationCount = 1
         queue.qualityOfService = .userInitiated
     }
 
-    public var isAvailable: Bool { manager.isDeviceMotionAvailable }
+    public func capability() -> MotionCapability {
+        MotionCapability(
+            hasGyroscope: manager.isGyroAvailable, maxRateHz: manager.isDeviceMotionAvailable ? 100 : 0)
+    }
 
-    public func start(rateHz: Int, onSample: @escaping @Sendable (MotionSample) -> Void) {
+    public func start(rateHz: Int, sink: @escaping @Sendable ([MotionSample]) -> Void) {
         lock.withLock {
             guard manager.isDeviceMotionAvailable else { return }
             manager.stopDeviceMotionUpdates()
+            pending = []
+            self.sink = sink
             manager.deviceMotionUpdateInterval = 1 / Double(max(rateHz, 1))
-            manager.startDeviceMotionUpdates(using: .xArbitraryCorrectedZVertical, to: queue) { @Sendable motion, _ in
-                guard let motion else { return }
-                onSample(MotionNormalizer.sample(from: motion))
+            let clock = clock
+            manager.startDeviceMotionUpdates(using: .xArbitraryCorrectedZVertical, to: queue) {
+                @Sendable [weak self] motion, _ in
+                guard let self, let motion else { return }
+                self.collect(MotionNormalizer.sample(from: motion, clock: clock))
             }
         }
     }
 
-    /// IMU back-off (§1.6: 10 Hz after 120 s stationary) and back to 50 Hz on a pull-away.
-    public func setRate(hz: Int) {
-        lock.withLock { manager.deviceMotionUpdateInterval = 1 / Double(max(hz, 1)) }
+    /// IMU back-off (F-CAP-16: 50, 25 or 10 Hz).
+    public func setRate(rateHz: Int) {
+        lock.withLock { manager.deviceMotionUpdateInterval = 1 / Double(max(rateHz, 1)) }
     }
 
     public func stop() {
-        lock.withLock { manager.stopDeviceMotionUpdates() }
+        let (rest, sink) = lock.withLock { () -> ([MotionSample], (@Sendable ([MotionSample]) -> Void)?) in
+            manager.stopDeviceMotionUpdates()
+            defer {
+                pending = []
+                self.sink = nil
+            }
+            return (pending, self.sink)
+        }
+        if !rest.isEmpty { sink?(rest) }
+    }
+
+    private func collect(_ sample: MotionSample) {
+        let ready = lock.withLock { () -> ([MotionSample], (@Sendable ([MotionSample]) -> Void)?)? in
+            pending.append(sample)
+            guard pending.count >= Self.batchSize else { return nil }
+            defer { pending = [] }
+            return (pending, sink)
+        }
+        if let (batch, sink) = ready { sink?(batch) }
+    }
+
+    /// Starts `CMSensorRecorder`, so the estimated start (§2.8) has accelerometer history to read. The recording
+    /// is kept by the OS for up to 12 hours; call it again at every launch while automatic trips are on.
+    /// Does nothing without Motion & Fitness access, so it never shows the prompt.
+    public func recordAccelerometerHistory(forHours hours: Double = 12) {
+        guard CMSensorRecorder.isAccelerometerRecordingAvailable(),
+            CMSensorRecorder.authorizationStatus() == .authorized
+        else { return }
+        recorder.recordAccelerometer(forDuration: hours * 3600)
+    }
+
+    public func queryRecordedAccelerometer(
+        fromWallMs: Int64, toWallMs: Int64, callback: @escaping @Sendable ([RecordedAccelSample]) -> Void
+    ) {
+        guard CMSensorRecorder.isAccelerometerRecordingAvailable(), fromWallMs < toWallMs else {
+            callback([])
+            return
+        }
+        let clock = clock
+        DispatchQueue.global(qos: .utility).async {
+            let recorder = CMSensorRecorder()
+            var samples: [RecordedAccelSample] = []
+            if let list = recorder.accelerometerData(from: Date(wallMs: fromWallMs), to: Date(wallMs: toWallMs)) {
+                var items = NSFastEnumerationIterator(list)
+                while let next = items.next() {
+                    guard let item = next as? CMRecordedAccelerometerData else { continue }
+                    let a = item.acceleration
+                    samples.append(
+                        RecordedAccelSample(
+                            tMonoNs: clock.monotonicNs(atWall: item.startDate), accelG: Vec3(x: a.x, y: a.y, z: a.z)))
+                }
+            }
+            callback(samples)
+        }
     }
 }
 
@@ -58,28 +127,29 @@ public enum MotionNormalizer {
     public static let gravitySign = -1.0
     static let degreesPerRadian = 180 / Double.pi
 
-    public static func sample(from motion: CMDeviceMotion) -> MotionSample {
+    public static func sample(from motion: CMDeviceMotion, clock: SystemClock) -> MotionSample {
         let q = motion.attitude.quaternion
         return normalize(
-            timestamp: motion.timestamp,
+            tMonoNs: clock.monotonicNs(atUptime: motion.timestamp),
             userAcceleration: (motion.userAcceleration.x, motion.userAcceleration.y, motion.userAcceleration.z),
             gravity: (motion.gravity.x, motion.gravity.y, motion.gravity.z),
             rotationRate: (motion.rotationRate.x, motion.rotationRate.y, motion.rotationRate.z),
-            quaternion: (q.x, q.y, q.z, q.w))
+            quaternion: (q.w, q.x, q.y, q.z))
     }
 
     public static func normalize(
-        timestamp: TimeInterval,
+        tMonoNs: Int64,
         userAcceleration a: (Double, Double, Double),
         gravity g: (Double, Double, Double),
         rotationRate r: (Double, Double, Double),
+        /// (w, x, y, z)
         quaternion q: (Double, Double, Double, Double)?
     ) -> MotionSample {
         MotionSample(
-            tMonoNs: Int64((timestamp * 1_000_000_000).rounded()),
+            tMonoNs: tMonoNs,
             userAccelG: Vec3(x: a.0 * userAccelerationSign, y: a.1 * userAccelerationSign, z: a.2 * userAccelerationSign),
             gravityUp: Vec3(x: g.0 * gravitySign, y: g.1 * gravitySign, z: g.2 * gravitySign),
             rotRateDps: Vec3(x: r.0 * degreesPerRadian, y: r.1 * degreesPerRadian, z: r.2 * degreesPerRadian),
-            attitude: q.map { Quat(x: $0.0, y: $0.1, z: $0.2, w: $0.3) })
+            attitude: q.map { Quat(w: $0.0, x: $0.1, y: $0.2, z: $0.3) })
     }
 }

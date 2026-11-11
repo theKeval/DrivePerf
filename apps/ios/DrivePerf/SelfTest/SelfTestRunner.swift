@@ -4,8 +4,9 @@ import DPSharedBridge
 import Foundation
 
 /// On-device self-test of the full trip path (spike change 10): three of Spike 1's four bugs were invisible to unit
-/// tests and only showed on the phone. It runs the real adapters and a throw-away recorder with short timers,
-/// in a separate folder, so no trip of the user's is touched. Results hold counts, rates and timings, never a
+/// tests and only showed on the phone. It runs the real adapters, through the Kotlin port types where the shared core
+/// will call them (`CorePortChecks`), and a throw-away recorder with short timers, in a separate folder, so no trip of
+/// the user's is touched. Results hold counts, rates and timings, never a
 /// location. Run it from Profile › Diagnostics, or launch with `-selfTest` from a Mac (README).
 @MainActor
 final class SelfTestRunner: SelfTesting {
@@ -28,15 +29,16 @@ final class SelfTestRunner: SelfTesting {
     private func runAll() async {
         steps = Self.plan
         publish()
-        guard !environment.recorder.snapshot.isDriving else {
+        guard !environment.recorder.status.isDriving else {
             for index in steps.indices { steps[index].state = .skipped("A drive is recording") }
             finish()
             return
         }
         await step("storage") {
-            self.environment.files.isWritable()
+            self.environment.files.isUnlockedSinceBoot()
                 ? .passed("Trip files writable (unlocked since boot)") : .failed("Trip files are locked")
         }
+        await step("corePorts") { await CorePortChecks.checkPorts() }
         await step("monitorName") {
             MonitorNaming.isValid(WakeTriggerMonitor.monitorName)
                 ? .passed("“\(WakeTriggerMonitor.monitorName)” is alphanumeric") : .failed("Invalid CLMonitor name")
@@ -55,7 +57,7 @@ final class SelfTestRunner: SelfTesting {
         }
         await step("staleWake") {
             let filter = WakeFilter()
-            let now = SystemClock().nowWallMs()
+            let now = SystemClock().wallMs()
             let stale = filter.accepts(
                 source: .significantChange, eventWallMs: now - 600_000, nowWallMs: now, processStartWallMs: 0,
                 appInForeground: false)
@@ -64,11 +66,11 @@ final class SelfTestRunner: SelfTesting {
         // The self-test never shows a permission prompt: steps that need one are skipped until onboarding granted it.
         let granted = await environment.permissions.current()
         let needsLocation = SelfTestState.skipped("Needs location access (finish onboarding first)")
-        await step("gps") { granted.location.canRecord ? await Self.checkGPS() : needsLocation }
-        await step("motion") { await Self.checkMotion() }
+        await step("gps") { granted.location.canRecord ? await CorePortChecks.checkGPS() : needsLocation }
+        await step("motion") { await CorePortChecks.checkMotion() }
         await step("activity") {
             granted.motion == .authorized
-                ? await Self.checkActivityHistory() : .skipped("Needs Motion & Fitness access")
+                ? await CorePortChecks.checkActivityHistory() : .skipped("Needs Motion & Fitness access")
         }
         await step("wakePath") { granted.location.canRecord ? await self.checkWakePath() : needsLocation }
         await step("manualPath") { granted.location.canRecord ? await self.checkManualPath() : needsLocation }
@@ -77,6 +79,7 @@ final class SelfTestRunner: SelfTesting {
 
     private static let plan: [SelfTestStep] = [
         SelfTestStep(id: "storage", title: "Storage after first unlock"),
+        SelfTestStep(id: "corePorts", title: "Shared core ports (Kotlin types)"),
         SelfTestStep(id: "monitorName", title: "CLMonitor name"),
         SelfTestStep(id: "permissions", title: "Permissions"),
         SelfTestStep(id: "triggers", title: "Wake triggers"),
@@ -108,93 +111,48 @@ final class SelfTestRunner: SelfTesting {
 
     // MARK: Checks
 
-    private static func checkGPS() async -> SelfTestState {
-        let source = CoreLocationSource()
-        let started = Date()
-        let result: (TimeInterval, Double?)? = await withCheckedContinuation { continuation in
-            var done = false
-            let finish: @MainActor ((TimeInterval, Double?)?) -> Void = { value in
-                guard !done else { return }
-                done = true
-                source.stop()
-                continuation.resume(returning: value)
-            }
-            source.start(
-                notBeforeWallMs: SystemClock().nowWallMs(),
-                onSample: { sample in finish((Date().timeIntervalSince(started), sample.hAccM)) },
-                onStationary: { _ in }, onIssue: { _ in })
-            Task { @MainActor in
-                try? await Task.sleep(for: .seconds(30))
-                finish(nil)
-            }
-        }
-        guard let (latency, accuracy) = result else { return .failed("No fix in 30 s (go outside or near a window)") }
-        let bucket = accuracy.map { $0 <= 20 ? "≤ 20 m" : $0 <= 50 ? "≤ 50 m" : "> 50 m" } ?? "unknown"
-        return .passed(String(format: "First fix after %.1f s, accuracy %@", latency, bucket))
-    }
-
-    private static func checkMotion() async -> SelfTestState {
-        let source = CoreMotionSource()
-        guard source.isAvailable else { return .failed("Device motion unavailable") }
-        let probe = MotionProbe()
-        source.start(rateHz: 50) { @Sendable sample in probe.record(sample, onMain: Thread.isMainThread) }
-        try? await Task.sleep(for: .seconds(5))
-        source.stop()
-        let result = probe.result
-        let rate = Double(result.count) / 5
-        guard result.count > 0 else { return .failed("No samples") }
-        guard !result.anyOnMain else { return .failed("Callback ran on the main thread") }
-        let gravity = String(format: "%.3f", result.meanGravityNorm)
-        return rate >= 45
-            ? .passed(String(format: "%.1f Hz, |gravity| %@ g, gravityUp.z %.2f", rate, gravity, result.lastGravityUpZ))
-            : .failed(String(format: "Only %.1f Hz", rate))
-    }
-
-    private static func checkActivityHistory() async -> SelfTestState {
-        let source = CoreMotionActivitySource()
-        guard source.isAvailable else { return .skipped("Motion activity unavailable") }
-        let now = SystemClock().nowWallMs()
-        let samples: [ActivitySample] = await withCheckedContinuation { continuation in
-            source.queryHistory(fromWallMs: now - 900_000, toWallMs: now) { continuation.resume(returning: $0) }
-        }
-        return .passed("\(samples.count) activity changes in the last 15 min")
-    }
-
     /// A synthetic `MOVE_SIGNAL` wake into a throw-away recorder: it must record from the wake (fixes and motion
     /// before any confirmation), then reject on the short timeout and delete its samples.
     private func checkWakePath() async -> SelfTestState {
         let (recorder, files, root) = makeScratchRecorder(candidateTimeoutS: 8)
         defer { try? FileManager.default.removeItem(at: root) }
-        recorder.updateAuthorization(always: true, autoDetectEnabled: true)
-        let wall = SystemClock().nowWallMs()
-        recorder.handle(WakeEvent(kind: .moveSignal, eventWallMs: wall, receivedWallMs: wall))
-        guard recorder.snapshot.phase == .candidate, let tripId = recorder.snapshot.live?.id else {
+        let clock = SystemClock()
+        recorder.onWake(WakeEvent(kind: .moveSignal, tMonoNs: clock.monotonicNs(), wallMs: clock.wallMs()))
+        guard recorder.status.state == .candidate, let tripId = recorder.status.tripId else {
             return .failed("Wake did not open a candidate")
         }
         try? await Task.sleep(for: .seconds(4))
-        let size = files.sizeBytes(tripId: tripId)
+        _ = files.sync(tripId: tripId, kind: .r0)
+        let size = files.describe(tripId: tripId, kind: .r0, withSha256: false)?.sizeBytes ?? 0
         try? await Task.sleep(for: .seconds(6))
-        guard recorder.snapshot.phase == .idle else { return .failed("Candidate did not time out") }
-        guard files.sizeBytes(tripId: tripId) == 0 else { return .failed("Rejected samples were not deleted") }
+        guard recorder.status.state == .idle else { return .failed("Candidate did not time out") }
+        guard files.tripIds().isEmpty else { return .failed("Rejected samples were not deleted") }
         return size > 0
             ? .passed("Recorded \(size / 1024) KB before confirmation, then rejected and deleted")
             : .failed("No samples written after the wake")
     }
 
     private func checkManualPath() async -> SelfTestState {
-        let (recorder, _, root) = makeScratchRecorder(candidateTimeoutS: 8)
+        let (recorder, files, root) = makeScratchRecorder(candidateTimeoutS: 8)
         defer { try? FileManager.default.removeItem(at: root) }
-        do {
-            try recorder.startManualTrip()
-        } catch {
-            return .failed("Start failed: \(error)")
+        let clock = SystemClock()
+        recorder.onWake(
+            WakeEvent(kind: .manual, tMonoNs: clock.monotonicNs(), wallMs: clock.wallMs(), sourceDetail: "app"))
+        guard recorder.status.state == .recording, let tripId = recorder.status.tripId else {
+            return .failed("Manual start did not record")
         }
         try? await Task.sleep(for: .seconds(6))
-        guard let summary = await recorder.stopTrip() else { return .failed("Stop returned no trip") }
+        recorder.stop()
+        guard let summary = recorder.history.first(where: { $0.id == tripId }) else {
+            return .failed("Stop saved no trip")
+        }
         guard summary.samples.motion > 0 else { return .failed("No motion samples saved") }
+        guard files.describe(tripId: tripId, kind: .r0, withSha256: false)?.compressed == true else {
+            return .failed("R0 was not compressed at the end")
+        }
         return .passed(
             "Saved as “\(summary.status.rawValue)”: \(summary.samples.motion) motion, "
-                + "\(summary.samples.location) location samples")
+                + "\(summary.samples.location) location samples, R0 gzipped")
     }
 
     private func makeScratchRecorder(candidateTimeoutS: TimeInterval) -> (InterimTripRecorder, FileTripStore, URL) {
@@ -208,31 +166,6 @@ final class SelfTestRunner: SelfTesting {
             activity: CoreMotionActivitySource(), files: files, index: TripIndexStore(root: root))
         return (recorder, files, root)
     }
-}
-
-/// Collects motion statistics from Core Motion's queue.
-private final class MotionProbe: @unchecked Sendable {
-    struct Result {
-        var count = 0
-        var gravityNormSum = 0.0
-        var anyOnMain = false
-        var lastGravityUpZ = 0.0
-        var meanGravityNorm: Double { count == 0 ? 0 : gravityNormSum / Double(count) }
-    }
-
-    private let lock = NSLock()
-    private var value = Result()
-
-    func record(_ sample: MotionSample, onMain: Bool) {
-        lock.withLock {
-            value.count += 1
-            value.gravityNormSum += sample.gravityUp.norm
-            value.lastGravityUpZ = sample.gravityUp.z
-            value.anyOnMain = value.anyOnMain || onMain
-        }
-    }
-
-    var result: Result { lock.withLock { value } }
 }
 
 /// Writes the last result to the app's Documents folder (timings and counts only), so it can be pulled with

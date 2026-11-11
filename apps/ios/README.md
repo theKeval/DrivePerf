@@ -57,15 +57,16 @@ until the Sentry EU project exists, ADR-007) and the flags `DP_FEATURE_SIGN_IN_W
 | Path | What |
 |---|---|
 | `DrivePerf.xcodeproj` | Targets `DrivePerf` (app), `DrivePerfWidgets` (Live Activity extension) and `DrivePerfTests`. Source folders are synchronized: **new files under `DrivePerf/`, `DrivePerfWidgets/`, `Shared/` and `DrivePerfTests/` are picked up without editing the project file.** |
-| `DrivePerf/` | App target and composition root (`Composition/AppEnvironment.swift`). The only code that imports the Kotlin framework (`SharedCoreHelloProvider.swift`) |
-| `DrivePerf/Interim/` | **Temporary** Swift trip recorder and trip index, so the shell records end to end before the shared core exists. Replaced by DRIVE-62's `TripRecorder` and SQLDelight repositories behind the same `TripRecording` / `TripHistory` protocols |
+| `DrivePerf/` | App target and composition root (`Composition/AppEnvironment.swift`). The only code that imports the Kotlin framework |
+| `DrivePerf/CoreBridge/` | The DPPlatform adapters as the Kotlin ports from `:shared:domain` (`LocationSource`, `MotionSource`, `ActivitySource`, `PowerState`, `ParkedRegionMonitor`, `TripFileStore`, `Clock`): conversion only, ready for `PlatformBindings` |
+| `DrivePerf/Interim/` | **Temporary** Swift implementation of the `TripRecorder` contract and a trip index of raw recorded rows, so the shell records end to end before the shared recorder lands. It runs on the same ports and writes R0 bytes through `TripFileStore`. Replaced by DRIVE-62's `TripRecorder` and `TripRepository` behind the same `TripRecording` / `TripHistory` protocols |
 | `DrivePerf/SelfTest/` | On-device self-test of the trip path (Spike 1 change 10) |
 | `DrivePerfWidgets/` | Live Activity for manual trips (Lock Screen and Dynamic Island). Links `DPDesignSystem` only, never the Kotlin framework |
 | `Shared/` | `RecordingActivityAttributes` and `StopTripIntent`, compiled into the app and the extension |
 | `Packages/DPDesignSystem` | Tokens from `docs/design/system/tokens.json` (colours, spacing, radii, type, DP Numerals) and components; SVG icons copied from the design assets |
 | `Packages/DPFeatures` | Screens and view models: `Onboarding`, `App` (shell), `Capture`, `Drives`, `Profile` |
-| `Packages/DPPlatform` | Apple-framework adapters: `CoreLocationSource`, `WakeTriggerMonitor` (CLMonitor, significant change, Visits), `LocationServiceSessions` (CLServiceSession), `CoreMotionSource`, `CoreMotionActivitySource`, `FileTripStore`, permissions, notifications, crash-report stub |
-| `Packages/DPSharedBridge` | The Swift seam: sample types and callback-style `*Bridge` ports named after the shared ports (`LocationSource`, `MotionSource`, `ActivitySource`, `Clock`, `TripFileStore`), plus `TripRecording`, `TripHistory` and the app ports |
+| `Packages/DPPlatform` | Apple-framework adapters: `CoreLocationSource`, `WakeTriggerMonitor` (CLMonitor parked region, significant change, Visits), `LocationServiceSessions` (CLServiceSession), `CoreMotionSource` (with `CMSensorRecorder` history), `CoreMotionActivitySource`, `SystemPowerState`, `FileTripStore` (byte store, gzip), `SystemClock`, permissions, notifications, crash-report stub |
+| `Packages/DPSharedBridge` | The Swift seam: Swift mirrors of the shared capture types and ports (same names and fields as `com.driveperf.domain.capture`, with a `Bridge` suffix on the ports), `TripRecording` (the `TripRecorder` contract), `TripHistory` and the app ports. DPPlatform and DPFeatures cannot link the Kotlin framework, so they use these |
 | `Config/` | xcconfig, Info.plist fragments, `Local.xcconfig.example` |
 | `Scripts/build-shared-framework.sh` | Run Script phase: `./gradlew :shared:ios-export:embedAndSignAppleFrameworkForXcode` |
 
@@ -74,9 +75,13 @@ Dependency rules (ADR-002 section 2): `DPFeatures` sees `DPDesignSystem` and `DP
 
 ## Capture: what the shell does
 
+- **Shared ports:** every adapter implements the Swift mirror of a `:shared:domain` port, and `CoreBridge/` wraps it
+  in the Kotlin protocol. They follow the Kotlin contract: callable from any thread, batched sinks (motion in batches
+  of 25), `FileResult` codes instead of errors, one monotonic clock (`CLOCK_MONOTONIC_RAW`, which keeps counting
+  during sleep; Core Location and Core Motion timestamps are converted to it).
 - **Launch order (ADR-002 §5):** `didFinishLaunching` checks that trip files are readable (a protected sentinel file,
   not `isProtectedDataAvailable`), holds the `CLServiceSession` (Always when automatic trips are on), arms the wake
-  triggers, then recovers an interrupted trip. The Kotlin core is not touched on this path.
+  triggers, then calls the recorder's `onLaunch()`, which recovers an interrupted trip.
 - **Wake triggers:** the parked-location `CLMonitor` region (named `parkedSpot`, alphanumeric) is the primary trigger,
   re-armed at every trip end and every launch; significant change is the fallback; Visits only place the first parking
   spot. Wakes older than 5 minutes (fixes) or 15 minutes (region events) are dropped.
@@ -84,8 +89,9 @@ Dependency rules (ADR-002 section 2): `DPFeatures` sees `DPDesignSystem` and `DP
   candidate's samples are kept when it is confirmed. Motion callbacks are `@Sendable` and run on their own queue.
 - **Manual trips** start from the accessory's Start button and show a Live Activity. **Automatic trips never start a
   local Live Activity** (it fails in the background); they post a passive "Recording your drive" notification.
-- Trip files are an interim CSV capture log in Application Support (`completeUntilFirstUserAuthentication`), never
-  uploaded. Summaries hold no coordinates.
+- Trip files live under `Application Support/Capture/trips/<id>/`: R0 and R1 `completeUnlessOpen` (written while
+  locked), R0 excluded from backup, gzipped when the trip ends. Until the shared R0 codec lands, R0 holds an interim
+  CSV capture log. Nothing is uploaded, and the trip rows hold no coordinates.
 
 ## Tests
 
@@ -103,7 +109,8 @@ xcrun devicectl device process launch --device <UDID> --terminate-existing <bund
 xcrun devicectl device copy from --device <UDID> --domain-type appDataContainer --domain-identifier <bundle ID> --source Documents/self-test.txt --destination self-test.txt
 ```
 
-It checks storage, the monitor name, permissions, the stale-wake filter, a GPS fix, 50 Hz motion off the main thread,
-activity history, a synthetic wake (records from the wake, then rejects and deletes) and a manual start/stop, in a
-scratch folder. The report holds counts and timings only. The real-drive checklist is
+It checks storage, the shared core ports through the Kotlin types (clock, a `TripFileStore` round trip with gzip and
+SHA-256, power, motion capability), the monitor name, permissions, the stale-wake filter, a GPS fix, 50 Hz motion off
+the main thread and activity history (all three through the Kotlin sinks), a synthetic wake (records from the wake,
+then rejects and deletes) and a manual start/stop, in a scratch folder. The report holds counts and timings only. The real-drive checklist is
 [MANUAL-DRIVE-TEST.md](MANUAL-DRIVE-TEST.md).

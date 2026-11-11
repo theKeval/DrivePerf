@@ -5,7 +5,8 @@ import DPSharedBridge
 import Foundation
 
 /// Composition root (ADR-002 §5). Builds the platform adapters and the recorder once per process and hands features
-/// their protocols. The only place that knows concrete types.
+/// their protocols. The only place that knows concrete types. `corePorts` wraps the same adapters as the Kotlin
+/// ports, ready for `DrivePerfCore.start` when the shared recorder lands.
 @MainActor
 final class AppEnvironment {
     static let shared = AppEnvironment()
@@ -14,9 +15,17 @@ final class AppEnvironment {
     let permissions = SystemPermissions()
     let crashReporter = ConsentGatedCrashReporter()
     let flags = BuildFlags.fromBundle()
+    let clock = SystemClock()
     let files = FileTripStore()
     let triggers = WakeTriggerMonitor()
+    let location = CoreLocationSource()
+    let motion = CoreMotionSource()
+    let activity = CoreMotionActivitySource()
+    let power = SystemPowerState()
     let recorder: InterimTripRecorder
+    private(set) lazy var corePorts = CorePorts(
+        clock: clock, location: location, motion: motion, activity: activity, power: power, parkedRegion: triggers,
+        tripFiles: files)
     private(set) lazy var selfTest = SelfTestRunner(environment: self)
     private let sessions = LocationServiceSessions()
     private let authorization = CLLocationManager()
@@ -28,21 +37,23 @@ final class AppEnvironment {
 
     private init() {
         recorder = InterimTripRecorder(
-            location: CoreLocationSource(),
-            motion: CoreMotionSource(),
-            activity: CoreMotionActivitySource(),
+            location: location,
+            motion: motion,
+            activity: activity,
             files: files,
+            parkedRegion: triggers,
             index: TripIndexStore(root: FileTripStore.defaultRoot),
-            triggers: triggers,
             liveSurface: LiveActivityController(),
             notifier: NotificationAdapter(),
-            assertions: UIKitBackgroundAssertions())
+            assertions: UIKitBackgroundAssertions(),
+            autoDetectEnabled: preferences.preferences.autoTripsEnabled)
     }
 
     var dependencies: AppDependencies {
         AppDependencies(
             recorder: recorder,
             history: recorder,
+            clock: clock,
             permissions: permissions,
             preferences: preferences,
             crashReporter: crashReporter,
@@ -58,10 +69,10 @@ final class AppEnvironment {
     func launch() {
         guard !launched, !Self.isRunningUnitTests else { return }
         // Before the first unlock after a reboot the trip files are unreadable; wait for protected data (EC-RBT).
-        guard files.isWritable() else { return }
+        guard files.isUnlockedSinceBoot() else { return }
         launched = true
         refreshCapture()
-        recorder.launch()
+        recorder.onLaunch()
         crashReporter.apply(consent: preferences.preferences.sendCrashReports)
     }
 
@@ -82,16 +93,17 @@ final class AppEnvironment {
         } else {
             sessions.release()
         }
-        if auto && always && files.isWritable() {
+        if auto && always && files.isUnlockedSinceBoot() {
             if !triggersArmed {
-                triggers.arm { [weak self] wake in self?.recorder.handle(wake) }
+                triggers.startTriggers { [weak self] wake in self?.recorder.onWake(wake) }
                 triggersArmed = true
             }
+            motion.recordAccelerometerHistory()
         } else if triggersArmed {
-            triggers.disarm()
+            triggers.stopTriggers()
             triggersArmed = false
         }
-        recorder.updateAuthorization(always: always, autoDetectEnabled: auto)
+        recorder.setAutoDetect(enabled: auto)
     }
 }
 
@@ -100,6 +112,6 @@ enum TripIntentHandler {
     @MainActor
     static func stopTrip() async {
         AppEnvironment.shared.launch()
-        _ = await AppEnvironment.shared.recorder.stopTrip()
+        AppEnvironment.shared.recorder.stop()
     }
 }

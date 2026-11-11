@@ -9,17 +9,20 @@ import UIKit
 /// 7. the monitor name is alphanumeric (`parked-spot` crashed `CLMonitor.init`);
 /// 8. stale events and cached fixes are dropped by `WakeFilter`.
 ///
-/// `arm` must run early in `didFinishLaunching`: Core Location only holds events for a relaunched app for a few
+/// It is the `ParkedRegionMonitor` port (`arm(center:radiusM:)`, `disarm()`), callable from any thread, and the
+/// app-side wake source: `startTriggers` delivers `WakeEvent`s that the app passes to `TripRecording.onWake`.
+///
+/// `startTriggers` must run early in `didFinishLaunching`: Core Location only holds events for a relaunched app for a few
 /// seconds (ADR-002 §5: sessions are recreated in Swift before the Kotlin core starts).
 @MainActor
-public final class WakeTriggerMonitor: NSObject, WakeTriggerBridge {
+public final class WakeTriggerMonitor: NSObject, ParkedRegionMonitorBridge {
     /// Fixed and alphanumeric; `MonitorNaming.isValid` is unit-tested against it.
     nonisolated public static let monitorName = "parkedSpot"
     nonisolated public static let parkedIdentifier = "parked"
 
     public private(set) var isParkedRegionArmed = false
 
-    private let clock: any ClockBridge
+    private let clock: SystemClock
     private let spotStore: ParkedSpotStore
     private let filter = WakeFilter()
     private let slcManager = CLLocationManager()
@@ -29,36 +32,54 @@ public final class WakeTriggerMonitor: NSObject, WakeTriggerBridge {
     private var monitorTask: Task<Void, Never>?
     private var onWake: (@MainActor (WakeEvent) -> Void)?
 
-    public init(clock: any ClockBridge = SystemClock(), spotStore: ParkedSpotStore = ParkedSpotStore()) {
+    public init(clock: SystemClock = SystemClock(), spotStore: ParkedSpotStore = ParkedSpotStore()) {
         self.clock = clock
         self.spotStore = spotStore
-        processStartWallMs = clock.nowWallMs()
+        processStartWallMs = clock.wallMs()
         super.init()
         slcManager.delegate = self
         visitManager.delegate = self
     }
 
-    public func arm(onWake: @escaping @MainActor (WakeEvent) -> Void) {
+    /// Starts the triggers and delivers fresh wakes. Stale events (cached fixes after a relaunch, old region events)
+    /// are dropped first (spike change 8).
+    public func startTriggers(onWake: @escaping @MainActor (WakeEvent) -> Void) {
         self.onWake = onWake
         slcManager.startMonitoringSignificantLocationChanges()
         visitManager.startMonitoringVisits()
         restoreMonitor()
     }
 
-    public func disarm() {
+    /// Stops every trigger and removes the parked region (automatic trips turned off).
+    public func stopTriggers() {
         onWake = nil
         slcManager.stopMonitoringSignificantLocationChanges()
         visitManager.stopMonitoringVisits()
+        removeParkedRegion()
         monitorTask?.cancel()
         monitorTask = nil
+    }
+
+    // MARK: ParkedRegionMonitor
+
+    nonisolated public func arm(center: GeoPoint, radiusM: Double) {
+        onMain { self.armParkedRegion(center: center, radiusM: radiusM) }
+    }
+
+    nonisolated public func disarm() {
+        onMain { self.removeParkedRegion() }
+    }
+
+    private func removeParkedRegion() {
+        spotStore.clear()
         if let monitor {
             Task { await monitor.remove(Self.parkedIdentifier) }
         }
         isParkedRegionArmed = false
     }
 
-    public func armParkedRegion(lat: Double, lng: Double, radiusM: Double) {
-        let spot = ParkedSpot(lat: lat, lng: lng, radiusM: radiusM)
+    private func armParkedRegion(center: GeoPoint, radiusM: Double) {
+        let spot = ParkedSpot(lat: center.lat, lng: center.lng, radiusM: radiusM)
         spotStore.save(spot)
         guard let monitor else { return }
         add(spot, to: monitor)
@@ -96,31 +117,32 @@ public final class WakeTriggerMonitor: NSObject, WakeTriggerBridge {
 
     private func handle(_ event: CLMonitor.Event) {
         guard event.identifier == Self.parkedIdentifier, event.state == .unsatisfied else { return }
-        deliver(.parkedExit, eventWallMs: event.date.wallMs, source: .region)
+        deliver(.parkedExit, at: event.date, source: .region)
     }
 
-    fileprivate func deliver(_ kind: WakeKind, eventWallMs: Int64, source: WakeFilter.Source) {
-        let now = clock.nowWallMs()
+    fileprivate func deliver(_ kind: WakeKind, at date: Date, source: WakeFilter.Source) {
+        let eventWallMs = date.wallMs
+        let now = clock.wallMs()
         let foreground = UIApplication.shared.applicationState == .active
         guard
             filter.accepts(
                 source: source, eventWallMs: eventWallMs, nowWallMs: now, processStartWallMs: processStartWallMs,
                 appInForeground: foreground)
         else { return }
-        onWake?(WakeEvent(kind: kind, eventWallMs: eventWallMs, receivedWallMs: now))
+        onWake?(WakeEvent(kind: kind, tMonoNs: clock.monotonicNs(atWall: date), wallMs: eventWallMs))
     }
 
     fileprivate func handleVisitArrival(lat: Double, lng: Double) {
         // With no previous trip, the first parking spot comes from a Visit (PRD F-CAP-02).
         guard spotStore.load() == nil else { return }
-        armParkedRegion(lat: lat, lng: lng, radiusM: ParkedSpot.defaultRadiusM)
+        armParkedRegion(center: GeoPoint(lat: lat, lng: lng), radiusM: ParkedSpot.defaultRadiusM)
     }
 }
 
 extension WakeTriggerMonitor: @preconcurrency CLLocationManagerDelegate {
     public func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
         guard manager === slcManager, let location = locations.last else { return }
-        deliver(.moveSignal, eventWallMs: location.timestamp.wallMs, source: .significantChange)
+        deliver(.moveSignal, at: location.timestamp, source: .significantChange)
     }
 
     public func locationManager(_ manager: CLLocationManager, didVisit visit: CLVisit) {
@@ -184,6 +206,10 @@ public struct ParkedSpotStore: Sendable {
         try? FileManager.default.createDirectory(
             at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
         try? data.write(to: url, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
+    }
+
+    public func clear() {
+        try? FileManager.default.removeItem(at: url)
     }
 
     public func load() -> ParkedSpot? {

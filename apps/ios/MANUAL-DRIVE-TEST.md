@@ -11,7 +11,8 @@ pass/fail only. Do not commit trip files, exports or screenshots that show a map
    automatically** on and choose **Change to Always Allow**, allow notifications, choose your consent toggles.
    - Pass: the Ready screen lists Automatic trips On, Location Always, Motion & Fitness On, Notifications On.
 3. Profile (top-right) › Diagnostics › **Run self-test**, phone face up near a window.
-   - Pass: "All checks passed" ("Wake triggers" may say "No parking spot yet" before the first trip).
+   - Pass: "All checks passed", including "Shared core ports" ("Wake triggers" may say "No parking spot yet" before
+     the first trip).
 4. Drives tab shows "Your drives will appear here." and the accessory reads **Auto-detect on · ready**.
 
 **Drive 1: manual trip (at least 3 minutes, over 500 m)**
@@ -19,7 +20,7 @@ pass/fail only. Do not commit trip files, exports or screenshots that show a map
 | # | Step | Pass when |
 |---|---|---|
 | 1 | Parked, tap **Start** in the accessory | The in-drive screen appears: "Recording", "Started by you · time", elapsed counting |
-| 2 | Before moving, glance at Distance | Shows "—" and "Finding GPS…" until the first fix, then km |
+| 2 | Before moving, glance at Distance | Shows 0.0 km, then counts up once you drive |
 | 3 | Lock the phone | A Live Activity shows "Recording", the timer and distance; the Dynamic Island shows the Loop and timer |
 | 4 | Drive. Do not touch the phone | Nothing to do: the app only shows status |
 | 5 | Park. Unlock, tap **Stop** | "End this drive?" sheet; **Keep recording** returns to the in-drive screen |

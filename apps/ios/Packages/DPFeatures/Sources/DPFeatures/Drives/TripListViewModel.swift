@@ -49,7 +49,7 @@ public final class TripListViewModel {
     }
 
     public func observe() async {
-        for await list in history.trips() {
+        for await list in history.observeTrips() {
             trips = list.sorted { $0.startedAt > $1.startedAt }
             hasLoaded = true
         }

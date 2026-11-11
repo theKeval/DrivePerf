@@ -5,6 +5,7 @@ import SwiftUI
 /// Root: onboarding, or the shell with the in-drive gate on top (D1, screen-map.md §2.2).
 public struct AppRootView: View {
     @State private var model: AppModel
+    @Environment(\.scenePhase) private var scenePhase
 
     public init(dependencies: AppDependencies) {
         _model = State(initialValue: AppModel(dependencies: dependencies))
@@ -20,6 +21,9 @@ public struct AppRootView: View {
             }
         }
         .task { await model.capture.observe() }
+        .task(id: scenePhase) {
+            if scenePhase == .active { await model.capture.refreshReadiness() }
+        }
         .task { await model.trips.observe() }
         .sheet(isPresented: $model.isSelfTestPresented) {
             NavigationStack {

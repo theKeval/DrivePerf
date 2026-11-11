@@ -1,11 +1,11 @@
 // swift-tools-version: 6.2
 import PackageDescription
 
-// Swift-facing contract with the Kotlin core (ADR-002 section 8): plain Swift types and protocols that
-// features code against. The Kotlin framework "DrivePerfShared" is imported only by the app target, which
-// supplies the implementations (apps/ios/DrivePerf/SharedCoreHelloProvider.swift); that way the framework
-// is always built (Run Script phase) before any Swift that imports it. DRIVE-67 grows this package into the
-// full set of *Bridge protocols for natively implemented ports.
+// Swift-facing contract with the Kotlin core (ADR-002 section 8): Swift mirrors of the shared capture types and
+// ports, the TripRecorder contract and the app ports, which DPPlatform implements and DPFeatures codes against.
+// The Kotlin framework "DrivePerfShared" is imported only by the app target, which adapts these to the Kotlin
+// protocols (apps/ios/DrivePerf/CoreBridge/); that way the framework is always built (Run Script phase) before
+// any Swift that imports it.
 let package = Package(
     name: "DPSharedBridge",
     platforms: [.iOS("26.0")],

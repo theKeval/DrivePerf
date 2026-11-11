@@ -2,21 +2,28 @@ import CoreMotion
 import DPSharedBridge
 import Foundation
 
-/// `ActivitySource` on `CMMotionActivityManager`. Not a wake trigger: history is queried on a wake (§1.3).
-@MainActor
-public final class CoreMotionActivitySource: ActivitySourceBridge {
+/// `ActivitySource` on `CMMotionActivityManager`. Not a wake trigger on iOS: the core queries history on a wake
+/// (§1.3). Callbacks run on a private queue.
+public final class CoreMotionActivitySource: ActivitySourceBridge, @unchecked Sendable {
     private let manager = CMMotionActivityManager()
+    private let queue: OperationQueue
+    private let clock: SystemClock
 
-    public init() {}
+    public init(clock: SystemClock = SystemClock()) {
+        self.clock = clock
+        queue = OperationQueue()
+        queue.name = "com.driveperf.activity"
+        queue.maxConcurrentOperationCount = 1
+    }
 
     public var isAvailable: Bool { CMMotionActivityManager.isActivityAvailable() }
 
-    public func start(onActivity: @escaping @MainActor (ActivitySample) -> Void) {
+    public func start(sink: @escaping @Sendable ([ActivitySample]) -> Void) {
         guard isAvailable else { return }
-        manager.startActivityUpdates(to: .main) { activity in
+        let clock = clock
+        manager.startActivityUpdates(to: queue) { activity in
             guard let activity else { return }
-            let sample = ActivityMapping.sample(from: activity)
-            MainActor.assumeIsolated { onActivity(sample) }
+            sink([ActivityMapping.sample(from: activity, clock: clock)])
         }
     }
 
@@ -25,16 +32,17 @@ public final class CoreMotionActivitySource: ActivitySourceBridge {
     }
 
     public func queryHistory(
-        fromWallMs: Int64, toWallMs: Int64, completion: @escaping @MainActor ([ActivitySample]) -> Void
+        fromWallMs: Int64, toWallMs: Int64, callback: @escaping @Sendable ([ActivitySample]) -> Void
     ) {
         guard isAvailable, fromWallMs < toWallMs else {
-            completion([])
+            callback([])
             return
         }
-        manager.queryActivityStarting(from: Date(wallMs: fromWallMs), to: Date(wallMs: toWallMs), to: .main) {
+        let clock = clock
+        manager.queryActivityStarting(from: Date(wallMs: fromWallMs), to: Date(wallMs: toWallMs), to: queue) {
             activities, _ in
-            let samples = (activities ?? []).map(ActivityMapping.sample(from:))
-            MainActor.assumeIsolated { completion(samples) }
+            callback(
+                (activities ?? []).map { ActivityMapping.sample(from: $0, clock: clock) }.sorted { $0.wallMs < $1.wallMs })
         }
     }
 }
@@ -42,17 +50,18 @@ public final class CoreMotionActivitySource: ActivitySourceBridge {
 /// `CMMotionActivity` → `ActivitySample`. Automotive wins when automotive and stationary are both set at a red
 /// light (A3 §1.1).
 public enum ActivityMapping {
-    public static func sample(from activity: CMMotionActivity) -> ActivitySample {
+    public static func sample(from activity: CMMotionActivity, clock: SystemClock) -> ActivitySample {
         ActivitySample(
-            startWallMs: activity.startDate.wallMs,
-            kind: kind(
+            tMonoNs: clock.monotonicNs(atWall: activity.startDate),
+            wallMs: activity.startDate.wallMs,
+            type: type(
                 automotive: activity.automotive, cycling: activity.cycling, running: activity.running,
                 walking: activity.walking, stationary: activity.stationary),
             confidence: confidence(activity.confidence))
     }
 
-    public static func kind(automotive: Bool, cycling: Bool, running: Bool, walking: Bool, stationary: Bool)
-        -> ActivityKind
+    public static func type(automotive: Bool, cycling: Bool, running: Bool, walking: Bool, stationary: Bool)
+        -> ActivityType
     {
         if automotive { return .automotive }
         if cycling { return .cycling }

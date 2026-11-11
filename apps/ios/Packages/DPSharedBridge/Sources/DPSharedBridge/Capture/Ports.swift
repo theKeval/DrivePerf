@@ -1,102 +1,121 @@
-/// Device-facing ports the platform implements (ADR-002 §3; pipeline-and-scoring.md §0.1, §2.1). Names follow the
-/// Kotlin ports DRIVE-62 adds to `:shared:domain` (`LocationSource`, `MotionSource`, `ActivitySource`, `Clock`,
-/// `TripFileStore`) with the `Bridge` suffix ADR-002 uses for Swift-implemented, callback-style protocols: no
-/// `async` and no streams in the signatures, so a Kotlin adapter can wrap them with `suspendCancellableCoroutine`.
+import Foundation
+
+/// Swift mirrors of the device-facing ports in `:shared:domain` and `:shared:foundation` (ADR-002 §3):
+/// `LocationSource`, `MotionSource`, `ActivitySource`, `PowerState`, `ParkedRegionMonitor`, `TripFileStore` and
+/// `Clock`. Same methods, callback style with batched sinks, no `async` and no streams. `DPPlatform` implements them
+/// on Apple frameworks; the app target wraps each one in the Kotlin protocol (`DrivePerf/CoreBridge/`), which only
+/// converts types.
 ///
-/// Platform code delivers samples and nothing else: it never decides whether a trip exists, how a sample is
-/// filtered or what a score is (§0.1).
+/// The Kotlin contract applies: the core calls these from one confined thread (not the main thread), and sinks may
+/// be called on any thread. So the protocols are `Sendable` and not main-actor isolated; adapters that need the main
+/// thread (Core Location) hop to it themselves. Platform code delivers samples and nothing else: it never decides
+/// whether a trip exists, how a sample is filtered or what a score is (§0.1).
 
-/// Monotonic and wall clocks (`Clock`).
+/// Kotlin `Clock`. The monotonic reading is the clock every sample's `tMonoNs` uses.
 public protocol ClockBridge: Sendable {
-    func nowMonoNs() -> Int64
-    func nowWallMs() -> Int64
+    /// Never goes backwards and keeps counting while the phone sleeps.
+    func monotonicNs() -> Int64
+    /// UTC epoch milliseconds, display only.
+    func wallMs() -> Int64
 }
 
-/// Why location stopped or degraded, reported next to the samples.
-public enum LocationIssue: String, Equatable, Sendable {
-    case authorizationDenied, insufficientlyInUse, serviceSessionRequired, locationUnavailable
-}
-
-/// GNSS at ~1 Hz, best for navigation (`LocationSource`).
-@MainActor
-public protocol LocationSourceBridge: AnyObject {
-    /// Starts fixes. Fixes timestamped before `notBeforeWallMs` are dropped: a stream's first fix can be cached
-    /// from before the wake (spike change 8).
-    func start(
-        notBeforeWallMs: Int64,
-        onSample: @escaping @MainActor (LocationSample) -> Void,
-        onStationary: @escaping @MainActor (Bool) -> Void,
-        onIssue: @escaping @MainActor (LocationIssue) -> Void)
+/// Kotlin `LocationSource`: 1 Hz GNSS for automotive use. Running it keeps a backgrounded app alive.
+public protocol LocationSourceBridge: AnyObject, Sendable {
+    /// Starts delivering fixes to `sink`. Calling it again replaces the sink.
+    func start(sink: @escaping @Sendable ([LocationSample]) -> Void)
+    /// Stops fixes. Safe to call when stopped.
     func stop()
 }
 
-/// Device motion at 50 Hz nominal (`MotionSource`). `onSample` runs on the source's own queue, never the main
-/// actor, so it must be `@Sendable` (spike change 6).
+/// Kotlin `MotionSource`: device motion, 50 Hz nominal.
 public protocol MotionSourceBridge: AnyObject, Sendable {
-    var isAvailable: Bool { get }
-    func start(rateHz: Int, onSample: @escaping @Sendable (MotionSample) -> Void)
-    func setRate(hz: Int)
+    func capability() -> MotionCapability
+    /// Starts delivering samples, in time order within a batch. The sink runs on the source's own queue, never the
+    /// main actor (spike change 6).
+    func start(rateHz: Int, sink: @escaping @Sendable ([MotionSample]) -> Void)
+    /// Changes the rate while running (50, 25 or 10 Hz).
+    func setRate(rateHz: Int)
+    func stop()
+    /// Raw accelerometer history between two UTC times (`CMSensorRecorder`, §2.8). `callback` runs exactly once.
+    func queryRecordedAccelerometer(
+        fromWallMs: Int64, toWallMs: Int64, callback: @escaping @Sendable ([RecordedAccelSample]) -> Void)
+}
+
+/// Kotlin `ActivitySource`: the OS activity classifier.
+public protocol ActivitySourceBridge: AnyObject, Sendable {
+    func start(sink: @escaping @Sendable ([ActivitySample]) -> Void)
+    func stop()
+    /// History between two UTC times, oldest first, exactly the window asked (never padded; the core bounds it,
+    /// spike change 3). `callback` runs exactly once.
+    func queryHistory(fromWallMs: Int64, toWallMs: Int64, callback: @escaping @Sendable ([ActivitySample]) -> Void)
+}
+
+/// Kotlin `PowerState`.
+public protocol PowerStateBridge: AnyObject, Sendable {
+    /// The current status, read synchronously from any thread.
+    func current() -> PowerStatus
+    func start(sink: @escaping @Sendable (PowerStatus) -> Void)
     func stop()
 }
 
-/// Motion activity (`ActivitySource`). History queries are bounded by the caller (spike change 3).
-@MainActor
-public protocol ActivitySourceBridge: AnyObject {
-    var isAvailable: Bool { get }
-    func start(onActivity: @escaping @MainActor (ActivitySample) -> Void)
-    func stop()
-    func queryHistory(
-        fromWallMs: Int64, toWallMs: Int64, completion: @escaping @MainActor ([ActivitySample]) -> Void)
-}
-
-/// Platform wake triggers (§1.3): the parked-location region first, significant change and Visits as fallbacks.
-@MainActor
-public protocol WakeTriggerBridge: AnyObject {
-    /// Starts the triggers and delivers fresh wakes. Stale events (cached fixes after a relaunch, old region
-    /// events) are dropped before they reach `onWake` (spike change 8).
-    func arm(onWake: @escaping @MainActor (WakeEvent) -> Void)
+/// Kotlin `ParkedRegionMonitor`: the region around the last parking spot whose exit wakes the app
+/// (`PARKED_EXIT`). The core re-arms it at every trip end and on every launch.
+public protocol ParkedRegionMonitorBridge: AnyObject, Sendable {
+    /// Arms (or moves) the single parked region.
+    func arm(center: GeoPoint, radiusM: Double)
     func disarm()
-    /// Arms the parked region at the end of a trip (`ArmParkedRegion`, 120 m, P-05). Called at every trip end and
-    /// re-armed on every launch (spike change 1).
-    func armParkedRegion(lat: Double, lng: Double, radiusM: Double)
-    var isParkedRegionArmed: Bool { get }
 }
 
-/// Appends a trip's raw samples (the R0 capture log). Thread-safe: motion arrives off the main actor.
-public protocol TripFileWriter: AnyObject, Sendable {
-    func append(_ sample: LocationSample)
-    func append(_ sample: MotionSample)
-    func append(_ sample: ActivitySample)
-    /// Writes buffered samples to disk (≤ 5 s, §0.2).
-    func flush()
-    func close()
-    var counts: SampleCounts { get }
+// MARK: - Trip files
+
+/// Kotlin `TripFileKind` (data-model.md §2.1).
+public enum TripFileKind: String, Equatable, Sendable, CaseIterable {
+    /// Capture log, appended while recording, never uploaded or backed up.
+    case r0
+    /// Analysis file, written once at finalisation.
+    case r1
+    /// Preview track.
+    case preview
 }
 
-public struct SampleCounts: Equatable, Sendable, Codable {
-    public var location: Int
-    public var motion: Int
-    public var activity: Int
+/// Kotlin `FileResult`.
+public enum FileResult: String, Equatable, Sendable {
+    case ok
+    case diskFull
+    /// The file is protected and the phone has not been unlocked since boot.
+    case unavailable
+    case ioError
+}
 
-    public init(location: Int = 0, motion: Int = 0, activity: Int = 0) {
-        self.location = location
-        self.motion = motion
-        self.activity = activity
+/// Kotlin `StoredFile`. `sha256` is lower-case hex, or nil when it was not requested.
+public struct StoredFile: Equatable, Sendable {
+    public var sizeBytes: Int64
+    public var sha256: String?
+    public var compressed: Bool
+
+    public init(sizeBytes: Int64, sha256: String?, compressed: Bool) {
+        self.sizeBytes = sizeBytes
+        self.sha256 = sha256
+        self.compressed = compressed
     }
 }
 
-public enum TripFileError: Error, Equatable, Sendable {
-    /// Before the first unlock after a reboot (EC-RBT): no trip may start.
-    case storageLocked
-    case writeFailed
-}
-
-/// Trip files on disk (`TripFileStore`).
+/// Kotlin `TripFileStore`: byte storage under `trips/<tripId>/`. The file format is the core's job; this port stores
+/// bytes with the right protection. Calls are synchronous and never on the main thread in production; results are
+/// codes, never thrown errors.
 public protocol TripFileStoreBridge: AnyObject, Sendable {
-    /// True once the phone has been unlocked since boot. Decided by reading a protected sentinel file, not by
-    /// `isProtectedDataAvailable`, which is false on every lock (spike change 5).
-    func isWritable() -> Bool
-    func open(tripId: String) throws(TripFileError) -> any TripFileWriter
-    func delete(tripId: String)
-    func sizeBytes(tripId: String) -> Int64
+    /// Appends to the end of the file, creating it if needed. Buffered: call `sync` to make it durable.
+    func append(tripId: String, kind: TripFileKind, bytes: Data) -> FileResult
+    /// `fsync`.
+    func sync(tripId: String, kind: TripFileKind) -> FileResult
+    /// Replaces the whole file atomically.
+    func write(tripId: String, kind: TripFileKind, bytes: Data) -> FileResult
+    /// Gzip in place (RFC 1952); `read` keeps returning the uncompressed bytes.
+    func compress(tripId: String, kind: TripFileKind) -> FileResult
+    func read(tripId: String, kind: TripFileKind) -> Data?
+    func describe(tripId: String, kind: TripFileKind, withSha256: Bool) -> StoredFile?
+    func delete(tripId: String, kind: TripFileKind) -> FileResult
+    func deleteTrip(tripId: String) -> FileResult
+    func tripIds() -> [String]
+    func freeSpaceBytes() -> Int64
 }

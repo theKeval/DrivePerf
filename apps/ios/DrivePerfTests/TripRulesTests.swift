@@ -7,10 +7,11 @@ final class TripRulesTests: XCTestCase {
     private let config = TripRulesConfig()
     private let t0 = Date(timeIntervalSince1970: 1_800_000_000)
 
-    private func activity(_ kind: ActivityKind, _ confidence: ActivityConfidence = .high, at offset: TimeInterval = 0)
+    private func activity(_ type: ActivityType, _ confidence: ActivityConfidence = .high, at offset: TimeInterval = 0)
         -> ActivitySample
     {
-        ActivitySample(startWallMs: Int64((t0.timeIntervalSince1970 + offset) * 1000), kind: kind, confidence: confidence)
+        ActivitySample(
+            tMonoNs: 0, wallMs: Int64((t0.timeIntervalSince1970 + offset) * 1000), type: type, confidence: confidence)
     }
 
     func testSustainedSpeedForTwentySecondsConfirms() {
@@ -97,8 +98,8 @@ final class TripRulesTests: XCTestCase {
 
     func testShortTripsAreKeptWhenManualAndDiscardedWhenAutomatic() {
         XCTAssertEqual(classifyTrip(source: .manual, distanceM: 300, durationS: 600, config: config), .keep(.short))
-        XCTAssertEqual(classifyTrip(source: .automatic, distanceM: 300, durationS: 600, config: config), .discard)
-        XCTAssertEqual(classifyTrip(source: .automatic, distanceM: 5000, durationS: 100, config: config), .discard)
-        XCTAssertEqual(classifyTrip(source: .automatic, distanceM: 5000, durationS: 600, config: config), .keep(.finalised))
+        XCTAssertEqual(classifyTrip(source: .auto, distanceM: 300, durationS: 600, config: config), .discard)
+        XCTAssertEqual(classifyTrip(source: .auto, distanceM: 5000, durationS: 100, config: config), .discard)
+        XCTAssertEqual(classifyTrip(source: .auto, distanceM: 5000, durationS: 600, config: config), .keep(.finalised))
     }
 }

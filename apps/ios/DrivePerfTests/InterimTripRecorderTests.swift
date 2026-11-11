@@ -9,7 +9,7 @@ final class InterimTripRecorderTests: XCTestCase {
     private var motion: FakeMotionSource!
     private var activity: FakeActivitySource!
     private var files: MemoryTripFiles!
-    private var triggers: FakeWakeTriggers!
+    private var parked: SpyParkedRegion!
     private var live: SpyLiveSurface!
     private var notifier: SpyNotifier!
     private var root: URL!
@@ -20,7 +20,7 @@ final class InterimTripRecorderTests: XCTestCase {
         motion = FakeMotionSource()
         activity = FakeActivitySource()
         files = MemoryTripFiles()
-        triggers = FakeWakeTriggers()
+        parked = SpyParkedRegion()
         live = SpyLiveSurface()
         notifier = SpyNotifier()
         root = makeTempDirectory()
@@ -30,18 +30,22 @@ final class InterimTripRecorderTests: XCTestCase {
         try? FileManager.default.removeItem(at: root)
     }
 
-    private func makeRecorder() -> InterimTripRecorder {
+    private func makeRecorder(autoDetect: Bool = true) -> InterimTripRecorder {
         let clock = clock!
         let recorder = InterimTripRecorder(
-            location: location, motion: motion, activity: activity, files: files, index: TripIndexStore(root: root),
-            triggers: triggers, liveSurface: live, notifier: notifier, now: { clock.now })
-        recorder.launch()
+            location: location, motion: motion, activity: activity, files: files, parkedRegion: parked,
+            index: TripIndexStore(root: root), liveSurface: live, notifier: notifier, autoDetectEnabled: autoDetect,
+            now: { clock.now })
+        recorder.onLaunch()
         return recorder
     }
 
-    private func wake(_ recorder: InterimTripRecorder) {
-        let wall = Int64(clock.now.timeIntervalSince1970 * 1000)
-        recorder.handle(WakeEvent(kind: .parkedExit, eventWallMs: wall, receivedWallMs: wall))
+    private func wake(_ recorder: InterimTripRecorder, ago seconds: TimeInterval = 0) {
+        recorder.onWake(clock.wake(.parkedExit, ago: seconds))
+    }
+
+    private func startManual(_ recorder: InterimTripRecorder) {
+        recorder.onWake(clock.wake(.manual))
     }
 
     /// Drives `seconds` at `speed`, one fix per second, `step` metres apart.
@@ -56,160 +60,190 @@ final class InterimTripRecorderTests: XCTestCase {
 
     // MARK: Manual trips
 
-    func testManualStartRecordsAndShowsLiveActivity() throws {
+    func testManualWakeRecordsAndShowsLiveActivity() {
         let recorder = makeRecorder()
 
-        try recorder.startManualTrip()
+        startManual(recorder)
 
-        XCTAssertEqual(recorder.snapshot.phase, .recording)
-        XCTAssertEqual(recorder.snapshot.live?.source, .manual)
-        XCTAssertTrue(recorder.snapshot.isDriving)
+        XCTAssertEqual(recorder.status.state, .recording)
+        XCTAssertTrue(recorder.status.isManual)
+        XCTAssertTrue(recorder.status.isDriving)
         XCTAssertTrue(location.isRunning)
         XCTAssertTrue(motion.isRunning)
         XCTAssertEqual(motion.rates, [50])
         XCTAssertEqual(live.started.count, 1)
     }
 
-    func testManualStopSavesTripReArmsParkedRegionAndEndsLiveActivity() async throws {
+    func testManualStopSavesTripReArmsParkedRegionAndEndsLiveActivity() {
         let recorder = makeRecorder()
-        try recorder.startManualTrip()
+        startManual(recorder)
+        let tripId = recorder.status.tripId ?? ""
         var position = 0.0
         drive(seconds: 200, speed: 15, recorder: recorder, from: &position)
+        XCTAssertEqual(recorder.status.elapsedS, 200)
+        XCTAssertEqual(recorder.status.distanceM, 3000, accuracy: 30)
         motion.send(count: 100)
 
-        let summary = await recorder.stopTrip()
+        recorder.stop()
 
+        let summary = recorder.history.first
+        XCTAssertEqual(summary?.id, tripId)
         XCTAssertEqual(summary?.status, .finalised)
         XCTAssertEqual(summary?.source, .manual)
         XCTAssertEqual(summary?.distanceM ?? 0, 3000, accuracy: 30)
         XCTAssertEqual(summary?.samples.motion, 100)
         XCTAssertEqual(summary?.samples.location, 200)
-        XCTAssertEqual(recorder.snapshot.phase, .idle)
-        XCTAssertEqual(recorder.snapshot.lastFinished, summary)
-        XCTAssertEqual(recorder.history.map(\.id), [summary?.id])
-        XCTAssertEqual(triggers.armedSpots.count, 1)
-        XCTAssertEqual(triggers.armedSpots.first?.radiusM, 120)
+        XCTAssertEqual(files.r0Lines(tripId: tripId, prefix: "M"), 100)
+        XCTAssertEqual(files.r0Lines(tripId: tripId, prefix: "L"), 200)
+        XCTAssertEqual(files.describe(tripId: tripId, kind: .r0, withSha256: false)?.compressed, true)
+        XCTAssertEqual(recorder.status, .idle)
+        XCTAssertEqual(recorder.history.count, 1)
+        XCTAssertEqual(parked.armed.count, 1)
+        XCTAssertEqual(parked.armed.first?.radiusM, 120)
         XCTAssertEqual(live.ended, 1)
         XCTAssertFalse(location.isRunning)
         XCTAssertFalse(motion.isRunning)
     }
 
-    func testShortManualTripIsKeptAsShort() async throws {
+    func testShortManualTripIsKeptAsShort() {
         let recorder = makeRecorder()
-        try recorder.startManualTrip()
+        startManual(recorder)
         clock.advance(30)
 
-        let summary = await recorder.stopTrip()
+        recorder.stop()
 
-        XCTAssertEqual(summary?.status, .short)
+        XCTAssertEqual(recorder.history.first?.status, .short)
         XCTAssertEqual(recorder.history.count, 1)
     }
 
-    func testStartFailsWhileStorageIsLockedBeforeFirstUnlock() {
-        files.writable = false
+    func testNothingStartsWhileTheTripFileIsUnavailableBeforeFirstUnlock() {
+        files.available = false
         let recorder = makeRecorder()
 
-        XCTAssertThrowsError(try recorder.startManualTrip()) { error in
-            XCTAssertEqual(error as? RecorderError, .storageLocked)
-        }
-        XCTAssertEqual(recorder.snapshot.phase, .idle)
+        startManual(recorder)
+        wake(recorder)
+
+        XCTAssertEqual(recorder.status.state, .idle)
+        XCTAssertFalse(location.isRunning)
+        XCTAssertTrue(files.tripIds().isEmpty)
+    }
+
+    func testPassengerDiscardDeletesTheTrip() {
+        let recorder = makeRecorder()
+        startManual(recorder)
+        let tripId = recorder.status.tripId ?? ""
+        clock.advance(300)
+
+        recorder.markPassenger(keep: false)
+
+        XCTAssertEqual(recorder.status.state, .idle)
+        XCTAssertTrue(recorder.history.isEmpty)
+        XCTAssertEqual(files.deletedTrips, [tripId])
+        XCTAssertEqual(live.ended, 1)
     }
 
     // MARK: Automatic trips
 
-    func testWakeIsIgnoredWithoutAutoDetectOrAlways() {
-        let recorder = makeRecorder()
-        recorder.updateAuthorization(always: false, autoDetectEnabled: true)
+    func testWakeIsIgnoredWhileAutoDetectIsOffButManualStillWorks() {
+        let recorder = makeRecorder(autoDetect: false)
 
         wake(recorder)
+        XCTAssertEqual(recorder.status.state, .idle)
+        XCTAssertFalse(recorder.status.autoDetectEnabled)
 
-        XCTAssertEqual(recorder.snapshot.phase, .idle)
-        XCTAssertEqual(recorder.snapshot.autoDetect, .needsAttention(reason: .locationWhileUsing))
+        startManual(recorder)
+        XCTAssertEqual(recorder.status.state, .recording)
+    }
+
+    func testStaleWakeIsDropped() {
+        let recorder = makeRecorder()
+
+        wake(recorder, ago: 1000)
+
+        XCTAssertEqual(recorder.status.state, .idle)
     }
 
     func testWakeRecordsFromTheWakeAndConfirmsOnSustainedSpeedWithoutLiveActivity() {
         let recorder = makeRecorder()
-        recorder.updateAuthorization(always: true, autoDetectEnabled: true)
         let wokeAt = clock.now
 
         wake(recorder)
 
-        XCTAssertEqual(recorder.snapshot.phase, .candidate)
-        XCTAssertFalse(recorder.snapshot.isDriving)
+        XCTAssertEqual(recorder.status.state, .candidate)
+        XCTAssertFalse(recorder.status.isDriving)
+        XCTAssertFalse(recorder.status.isManual)
         XCTAssertTrue(location.isRunning, "GNSS starts at the wake")
-        XCTAssertEqual(location.notBeforeWallMs, Int64(wokeAt.timeIntervalSince1970 * 1000))
+        let tripId = recorder.status.tripId ?? ""
+        // A fix cached from before the wake is dropped (spike change 8).
+        location.send(metresNorth: 0, speedMps: 0, at: wokeAt.addingTimeInterval(-60))
         motion.send(count: 50)
         var position = 0.0
         drive(seconds: 22, speed: 10, recorder: recorder, from: &position)
 
-        XCTAssertEqual(recorder.snapshot.phase, .recording)
-        XCTAssertEqual(recorder.snapshot.live?.startedAt, wokeAt, "The trip starts at the wake")
+        XCTAssertEqual(recorder.status.state, .recording)
+        XCTAssertEqual(recorder.status.elapsedS, 22, "The trip starts at the wake")
         XCTAssertEqual(notifier.posted.count, 1)
         XCTAssertTrue(live.started.isEmpty, "No local Live Activity for automatic trips")
-        let tripId = recorder.snapshot.live?.id ?? ""
-        XCTAssertEqual(files.writers[tripId]?.counts.motion, 50, "Candidate samples are kept")
+        XCTAssertEqual(files.r0Lines(tripId: tripId, prefix: "M"), 50, "Candidate samples are kept")
+        XCTAssertEqual(files.r0Lines(tripId: tripId, prefix: "L"), 22)
     }
 
     func testCandidateTimesOutAndDeletesSamples() {
         let recorder = makeRecorder()
-        recorder.updateAuthorization(always: true, autoDetectEnabled: true)
         wake(recorder)
-        let tripId = recorder.snapshot.live?.id ?? ""
+        let tripId = recorder.status.tripId ?? ""
 
         clock.advance(181)
         recorder.evaluate()
 
-        XCTAssertEqual(recorder.snapshot.phase, .idle)
-        XCTAssertEqual(files.deleted, [tripId])
+        XCTAssertEqual(recorder.status.state, .idle)
+        XCTAssertEqual(files.deletedTrips, [tripId])
+        XCTAssertTrue(files.tripIds().isEmpty)
         XCTAssertTrue(recorder.history.isEmpty)
     }
 
     func testWalkingCandidateIsRejectedAfterNinetySeconds() {
         let recorder = makeRecorder()
-        recorder.updateAuthorization(always: true, autoDetectEnabled: true)
         wake(recorder)
         activity.send(.walking, at: clock.now)
         var position = 0.0
         drive(seconds: 91, speed: 1.4, recorder: recorder, from: &position)
 
-        XCTAssertEqual(recorder.snapshot.phase, .idle)
+        XCTAssertEqual(recorder.status.state, .idle)
     }
 
     func testAutomaticTripEndsAfterStopTimerAtLastMovement() {
         let recorder = makeRecorder()
-        recorder.updateAuthorization(always: true, autoDetectEnabled: true)
         wake(recorder)
         var position = 0.0
         drive(seconds: 120, speed: 12, recorder: recorder, from: &position)
         let lastMoving = clock.now
         drive(seconds: 241, speed: 0, recorder: recorder, from: &position)
 
-        XCTAssertEqual(recorder.snapshot.phase, .idle)
+        XCTAssertEqual(recorder.status.state, .idle)
         let trip = recorder.history.first
-        XCTAssertEqual(trip?.source, .automatic)
+        XCTAssertEqual(trip?.source, .auto)
         XCTAssertEqual(trip?.endedAt, lastMoving)
     }
 
     func testShortAutomaticTripIsDiscarded() {
         let recorder = makeRecorder()
-        recorder.updateAuthorization(always: true, autoDetectEnabled: true)
         wake(recorder)
         var position = 0.0
         drive(seconds: 25, speed: 8, recorder: recorder, from: &position)
-        XCTAssertEqual(recorder.snapshot.phase, .recording)
+        XCTAssertEqual(recorder.status.state, .recording)
         drive(seconds: 241, speed: 0, recorder: recorder, from: &position)
 
-        XCTAssertEqual(recorder.snapshot.phase, .idle)
+        XCTAssertEqual(recorder.status.state, .idle)
         XCTAssertTrue(recorder.history.isEmpty)
     }
 
-    func testActivityHistoryIsBoundedByThePreviousTripEnd() async throws {
+    func testActivityHistoryIsBoundedByThePreviousTripEnd() {
         let recorder = makeRecorder()
-        try recorder.startManualTrip()
+        startManual(recorder)
         clock.advance(300)
-        _ = await recorder.stopTrip()
+        recorder.stop()
         let endedAt = clock.now
-        recorder.updateAuthorization(always: true, autoDetectEnabled: true)
         clock.advance(120)
 
         wake(recorder)
@@ -219,30 +253,30 @@ final class InterimTripRecorderTests: XCTestCase {
 
     // MARK: Recovery (§1.7)
 
-    func testRecentCheckpointResumesTheSameTripAfterRelaunch() throws {
+    func testRecentCheckpointResumesTheSameTripAfterRelaunch() {
         let first = makeRecorder()
-        try first.startManualTrip()
-        let tripId = first.snapshot.live?.id
+        startManual(first)
+        let tripId = first.status.tripId
         clock.advance(10)
         first.evaluate()
 
         clock.advance(60)
         let relaunched = makeRecorder()
 
-        XCTAssertEqual(relaunched.snapshot.phase, .recording)
-        XCTAssertEqual(relaunched.snapshot.live?.id, tripId)
+        XCTAssertEqual(relaunched.status.state, .recording)
+        XCTAssertEqual(relaunched.status.tripId, tripId)
     }
 
-    func testStaleCheckpointBecomesInterruptedTrip() throws {
+    func testStaleCheckpointBecomesInterruptedTrip() {
         let first = makeRecorder()
-        try first.startManualTrip()
+        startManual(first)
         clock.advance(10)
         first.evaluate()
 
         clock.advance(3600)
         let relaunched = makeRecorder()
 
-        XCTAssertEqual(relaunched.snapshot.phase, .idle)
+        XCTAssertEqual(relaunched.status.state, .idle)
         XCTAssertEqual(relaunched.history.first?.status, .interrupted)
     }
 }

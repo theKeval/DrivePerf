@@ -4,30 +4,47 @@ import XCTest
 
 @MainActor
 final class CaptureViewModelTests: XCTestCase {
-    private func liveSnapshot(source: TripSource = .manual, distanceM: Double = 0) -> RecorderSnapshot {
-        RecorderSnapshot(
-            phase: .recording,
-            live: LiveTrip(id: "t", source: source, startedAt: Date(), distanceM: distanceM, hasFix: true))
+    private func makeModel(
+        _ recorder: FakeRecorder = FakeRecorder(), permissions: FakePermissions = FakePermissions(),
+        now: Date = Date(timeIntervalSince1970: 1_800_000_000)
+    ) -> CaptureViewModel {
+        CaptureViewModel(
+            recorder: recorder, history: recorder, permissions: permissions, clock: FixedClock(), now: { now },
+            finishTimeout: .milliseconds(100))
     }
 
     func testStartWithoutLocationAsksForSettingsAndDoesNotRecord() async {
         let recorder = FakeRecorder()
         let permissions = FakePermissions()
         permissions.state.location = .denied
-        let model = CaptureViewModel(recorder: recorder, permissions: permissions)
+        let model = makeModel(recorder, permissions: permissions)
 
         await model.start()
 
         XCTAssertEqual(model.startProblem, .locationDenied)
-        XCTAssertEqual(recorder.startCount, 0)
+        XCTAssertTrue(recorder.wakes.isEmpty)
     }
 
-    func testStartWhileStorageIsLockedReportsIt() async {
+    func testStartSendsAManualWakeStampedWithTheClock() async {
         let recorder = FakeRecorder()
-        recorder.startError = .storageLocked
         let permissions = FakePermissions()
         permissions.state.location = .whenInUse
-        let model = CaptureViewModel(recorder: recorder, permissions: permissions)
+        let model = makeModel(recorder, permissions: permissions)
+
+        await model.start()
+
+        XCTAssertEqual(
+            recorder.wakes,
+            [WakeEvent(kind: .manual, tMonoNs: 42_000_000_000, wallMs: 1_800_000_000_000, sourceDetail: "app")])
+        XCTAssertNil(model.startProblem)
+    }
+
+    func testStartThatDoesNotRecordReportsLockedStorage() async {
+        let recorder = FakeRecorder()
+        recorder.canStart = false
+        let permissions = FakePermissions()
+        permissions.state.location = .whenInUse
+        let model = makeModel(recorder, permissions: permissions)
 
         await model.start()
 
@@ -35,20 +52,20 @@ final class CaptureViewModelTests: XCTestCase {
     }
 
     func testADriverTripLocksTheAppToTheInDriveScreen() {
-        let model = CaptureViewModel(recorder: FakeRecorder(), permissions: FakePermissions())
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        let model = makeModel(now: now)
 
-        model.apply(liveSnapshot())
+        model.apply(.recording(elapsedS: 90))
 
         XCTAssertEqual(model.cover, .recording)
+        XCTAssertEqual(model.tripStartedAt, now.addingTimeInterval(-90), "Start time derived from elapsedS")
         guard case .recording = model.accessory else { return XCTFail("Accessory should show recording") }
     }
 
     func testACandidateDoesNotLockTheApp() {
-        let model = CaptureViewModel(recorder: FakeRecorder(), permissions: FakePermissions())
-        var candidate = liveSnapshot(source: .automatic)
-        candidate.phase = .candidate
+        let model = makeModel()
 
-        model.apply(candidate)
+        model.apply(.recording(isManual: false, state: .candidate))
 
         XCTAssertNil(model.cover)
     }
@@ -59,8 +76,9 @@ final class CaptureViewModelTests: XCTestCase {
             id: "t", source: .manual, status: .finalised, startedAt: Date(), endedAt: Date(), distanceM: 3000,
             samples: SampleCounts())
         recorder.stopResult = saved
-        let model = CaptureViewModel(recorder: recorder, permissions: FakePermissions())
-        model.apply(liveSnapshot())
+        let model = makeModel(recorder)
+        recorder.publish(.recording())
+        model.apply(.recording())
 
         model.requestStop()
         XCTAssertTrue(model.isEndSheetPresented)
@@ -76,32 +94,58 @@ final class CaptureViewModelTests: XCTestCase {
         XCTAssertNil(model.cover)
     }
 
-    func testATripEndingOnItsOwnShowsTheFinishedState() {
-        let model = CaptureViewModel(recorder: FakeRecorder(), permissions: FakePermissions())
-        model.apply(liveSnapshot(source: .automatic))
+    func testADiscardedTripShowsTheFinishedStateWithoutATrip() async {
+        let recorder = FakeRecorder()
+        let model = makeModel(recorder)
+        recorder.publish(.recording())
+        model.apply(.recording())
 
-        model.apply(RecorderSnapshot(phase: .idle, lastFinished: nil))
+        await model.endDrive()
 
         XCTAssertEqual(model.cover, .finished(nil))
     }
 
-    func testAccessoryFollowsAutoDetectStatus() {
-        let model = CaptureViewModel(recorder: FakeRecorder(), permissions: FakePermissions())
-        model.apply(RecorderSnapshot(autoDetect: .ready))
+    func testATripEndingOnItsOwnShowsTheFinishedState() async {
+        let recorder = FakeRecorder()
+        let model = makeModel(recorder)
+        model.apply(.recording(isManual: false))
+        let saved = TripSummary(
+            id: "t", source: .auto, status: .finalised, startedAt: Date(), endedAt: Date(), distanceM: 9000,
+            samples: SampleCounts())
+        recorder.publishTrips([saved])
+
+        model.apply(.idle)
+        for _ in 0..<50 where model.cover == .recording { await Task.yield() }
+
+        XCTAssertEqual(model.cover, .finished(saved))
+    }
+
+    func testAccessoryFollowsAutoDetectAndLocationAccess() async {
+        let permissions = FakePermissions()
+        let model = makeModel(permissions: permissions)
+
+        permissions.state.location = .always
+        await model.refreshReadiness()
         XCTAssertEqual(model.accessory, .ready)
-        model.apply(RecorderSnapshot(autoDetect: .needsAttention(reason: .locationWhileUsing)))
+
+        permissions.state.location = .whenInUse
+        await model.refreshReadiness()
         XCTAssertEqual(model.accessory, .attention(.locationWhileUsing))
-        model.apply(RecorderSnapshot(autoDetect: .manual))
+
+        var manual = RecorderStatus.idle
+        manual.autoDetectEnabled = false
+        model.apply(manual)
         XCTAssertEqual(model.accessory, .manual)
     }
 
     func testShortTripBannerUnderFiveHundredMetresOrTwoMinutes() {
-        let model = CaptureViewModel(recorder: FakeRecorder(), permissions: FakePermissions())
-        model.apply(liveSnapshot(distanceM: 400))
-        XCTAssertTrue(model.isShortTrip(now: Date().addingTimeInterval(600)))
-        model.apply(liveSnapshot(distanceM: 4000))
-        XCTAssertTrue(model.isShortTrip(now: Date().addingTimeInterval(60)))
-        XCTAssertFalse(model.isShortTrip(now: Date().addingTimeInterval(600)))
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        let model = makeModel(now: now)
+        model.apply(.recording(distanceM: 400))
+        XCTAssertTrue(model.isShortTrip(now: now.addingTimeInterval(600)))
+        model.apply(.recording(distanceM: 4000))
+        XCTAssertTrue(model.isShortTrip(now: now.addingTimeInterval(60)))
+        XCTAssertFalse(model.isShortTrip(now: now.addingTimeInterval(600)))
     }
 
     func testDriveFormatting() {
@@ -131,7 +175,7 @@ final class TripListViewModelTests: XCTestCase {
         -> TripSummary
     {
         TripSummary(
-            id: id, source: .automatic, status: status, startedAt: start,
+            id: id, source: .auto, status: status, startedAt: start,
             endedAt: start.addingTimeInterval(minutes * 60), distanceM: km * 1000, samples: SampleCounts())
     }
 

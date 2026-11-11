@@ -65,7 +65,6 @@ struct CaptureStatusAccessory: View {
             switch reason {
             case .locationWhileUsing: "Location is set to While Using"
             case .locationDenied: "Location is off"
-            case .storageLocked: "Unlock your phone once to resume"
             }
         case .recording: nil
         }
