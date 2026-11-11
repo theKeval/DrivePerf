@@ -47,7 +47,15 @@ final class FakeRecorder: TripRecording, TripHistory {
         publish(.idle)
     }
 
-    func markPassenger(keep: Bool) {}
+    private(set) var passengerMarks: [Bool] = []
+    /// What `markPassenger(keep: true)` saves, as the core does: the trip ends and is listed (nil: not listed).
+    var passengerResult: TripSummary?
+
+    func markPassenger(keep: Bool) {
+        passengerMarks.append(keep)
+        if keep, let passengerResult { publishTrips(tripList + [passengerResult]) }
+        publish(.idle)
+    }
 
     func setAutoDetect(enabled: Bool) { autoDetect = enabled }
 

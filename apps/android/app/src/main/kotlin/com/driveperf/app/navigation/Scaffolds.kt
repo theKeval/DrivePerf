@@ -1,6 +1,9 @@
 package com.driveperf.app.navigation
 
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FabPosition
@@ -70,7 +73,18 @@ fun TabScaffold(
             }
         },
         floatingActionButtonPosition = FabPosition.Center,
-        content = content,
+        content = { padding ->
+            val autoDetectOff = callbacks.autoDetectOff
+            if (selected == Tab.Drives && autoDetectOff != null) {
+                // F-ONB-04.6: Home says when automatic trips are off, above the tab's own content.
+                Column(modifier = Modifier.padding(top = padding.calculateTopPadding())) {
+                    AutoDetectNotice(autoDetectOff, onFix = callbacks.onFixAutoDetect)
+                    Box(modifier = Modifier.weight(1f)) { content(PaddingValues(bottom = padding.calculateBottomPadding())) }
+                }
+            } else {
+                content(padding)
+            }
+        },
     )
 }
 

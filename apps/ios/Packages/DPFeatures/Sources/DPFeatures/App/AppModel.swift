@@ -12,6 +12,8 @@ public struct AppDependencies {
     public var permissions: any PermissionRequesting
     public var preferences: any PreferencesStoring
     public var crashReporter: any CrashReporting
+    /// Usage statistics behind the user's choice (F-ONB-08).
+    public var analytics: any UsageAnalytics
     public var selfTest: any SelfTesting
     public var flags: BuildFlags
     public var coreInfo: any HelloProviding
@@ -19,12 +21,15 @@ public struct AppDependencies {
     public var refreshCapture: @MainActor () -> Void
     /// `-selfTest` launch argument: open and run the on-device self-test at launch.
     public var runSelfTestOnLaunch: Bool
+    /// The phone's movement after a trip, for the in-drive content hold (F-CAP-07.4). Nil: no signal, the hold is 60 s.
+    public var movement: (any MovementMonitoring)?
 
     public init(
         recorder: any TripRecording, history: any TripHistory, clock: any ClockBridge,
-        permissions: any PermissionRequesting, preferences: any PreferencesStoring, crashReporter: any CrashReporting, selfTest: any SelfTesting,
-        flags: BuildFlags, coreInfo: any HelloProviding, refreshCapture: @escaping @MainActor () -> Void,
-        runSelfTestOnLaunch: Bool = false
+        permissions: any PermissionRequesting, preferences: any PreferencesStoring, crashReporter: any CrashReporting,
+        analytics: any UsageAnalytics = NoUsageAnalytics(), selfTest: any SelfTesting, flags: BuildFlags,
+        coreInfo: any HelloProviding, refreshCapture: @escaping @MainActor () -> Void,
+        runSelfTestOnLaunch: Bool = false, movement: (any MovementMonitoring)? = nil
     ) {
         self.recorder = recorder
         self.history = history
@@ -32,11 +37,13 @@ public struct AppDependencies {
         self.permissions = permissions
         self.preferences = preferences
         self.crashReporter = crashReporter
+        self.analytics = analytics
         self.selfTest = selfTest
         self.flags = flags
         self.coreInfo = coreInfo
         self.refreshCapture = refreshCapture
         self.runSelfTestOnLaunch = runSelfTestOnLaunch
+        self.movement = movement
     }
 }
 
@@ -63,7 +70,7 @@ public final class AppModel {
         isSelfTestPresented = dependencies.runSelfTestOnLaunch
         capture = CaptureViewModel(
             recorder: dependencies.recorder, history: dependencies.history, permissions: dependencies.permissions,
-            clock: dependencies.clock)
+            clock: dependencies.clock, movement: dependencies.movement)
         trips = TripListViewModel(history: dependencies.history)
         profile = ProfileViewModel(dependencies: dependencies)
         if route == .onboarding { onboarding = makeOnboarding() }
@@ -72,7 +79,7 @@ public final class AppModel {
     private func makeOnboarding() -> OnboardingViewModel {
         OnboardingViewModel(
             permissions: dependencies.permissions, preferences: dependencies.preferences,
-            crashReporter: dependencies.crashReporter, refreshCapture: dependencies.refreshCapture,
+            crashReporter: dependencies.crashReporter, analytics: dependencies.analytics, refreshCapture: dependencies.refreshCapture,
             onFinished: { [weak self] in self?.finishOnboarding() })
     }
 
