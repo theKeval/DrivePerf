@@ -1,6 +1,7 @@
 package com.driveperf.di
 
 import com.driveperf.domain.capture.ActivitySource
+import com.driveperf.domain.feedback.MarkEventNeeded
 import com.driveperf.domain.capture.LocationSource
 import com.driveperf.domain.capture.MotionSource
 import com.driveperf.domain.capture.ParkedRegionMonitor
@@ -34,9 +35,19 @@ public interface PlatformBindings {
     public fun deviceId(): String
 }
 
-/** What the apps use after start. */
+/**
+ * What the apps use after start. [markEventNeeded] is "Was it needed?" / "Count it again" (F-SCO-05); feedback is read
+ * through [trips].
+ */
 public class CoreServices internal constructor(
     public val recorder: TripRecorder,
     public val trips: TripRepository,
     public val routes: RouteRepository,
-)
+    public val markEventNeeded: MarkEventNeeded,
+    private val onClose: () -> Unit,
+) {
+    /** Stops the recorder's work and closes the database. Only for a scratch core; the app's core lives as long as the process. */
+    public fun close() {
+        onClose()
+    }
+}

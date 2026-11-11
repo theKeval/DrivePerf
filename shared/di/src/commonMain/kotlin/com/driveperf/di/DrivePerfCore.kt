@@ -1,26 +1,32 @@
 package com.driveperf.di
 
 import com.driveperf.data.local.DatabaseDriverFactory
+import com.driveperf.data.local.LocalEventFeedbackStore
 import com.driveperf.data.local.LocalRouteHistory
 import com.driveperf.data.local.LocalRouteRepository
 import com.driveperf.data.local.LocalTripHistory
 import com.driveperf.data.local.LocalTripRepository
 import com.driveperf.data.local.LocalTripStore
+import com.driveperf.data.local.ProtoAnalysisFileStore
 import com.driveperf.data.local.ProtoCaptureLog
 import com.driveperf.data.local.ProtoPreviewStore
 import com.driveperf.data.local.openDatabase
+import com.driveperf.domain.feedback.MarkEventNeeded
 import com.driveperf.domain.hello.GetHelloMessage
 import com.driveperf.domain.hello.HelloMessage
 import com.driveperf.foundation.platformDescription
 import com.driveperf.pipeline.PipelineFinaliser
 import com.driveperf.pipeline.capture.CapturePersistence
+import com.driveperf.pipeline.capture.CaptureConfig
 import com.driveperf.pipeline.capture.CapturePorts
 import com.driveperf.pipeline.capture.TripFinaliser
 import com.driveperf.pipeline.capture.TripRecorderEngine
+import com.driveperf.pipeline.score.FeedbackRescorer
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlin.coroutines.CoroutineContext
 
 /**
@@ -39,16 +45,40 @@ public object DrivePerfCore {
     public fun hello(): HelloMessage = GetHelloMessage()(platformDescription())
 
     /** Wires the core on [database]. Calling it again returns the first instance. */
-    @OptIn(ExperimentalCoroutinesApi::class)
     internal fun startWith(
         platform: PlatformBindings,
         database: DatabaseDriverFactory,
         io: CoroutineContext,
         finaliser: ((com.driveperf.data.local.db.DrivePerfDatabase) -> TripFinaliser)? = null,
-    ): CoreServices = started ?: run {
-        val db = openDatabase(database.create())
+    ): CoreServices = started ?: build(platform, database, io, finaliser).also { started = it }
+
+    /**
+     * A separate core on its own [database] that never becomes [services], for the on-device self-test: it must not
+     * touch the user's trips (spike change 10). [capture] shortens its timers. Close it when done.
+     */
+    internal fun scratch(
+        platform: PlatformBindings,
+        database: DatabaseDriverFactory,
+        io: CoroutineContext,
+        capture: CaptureConfig,
+    ): CoreServices = build(platform, database, io, null, capture)
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    private fun build(
+        platform: PlatformBindings,
+        database: DatabaseDriverFactory,
+        io: CoroutineContext,
+        finaliser: ((com.driveperf.data.local.db.DrivePerfDatabase) -> TripFinaliser)?,
+        capture: CaptureConfig = CaptureConfig(),
+    ): CoreServices {
+        val driver = database.create()
+        val db = openDatabase(driver)
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default.limitedParallelism(1))
         val store = LocalTripStore(db, platform.deviceId(), io)
-        val previews = ProtoPreviewStore(platform.tripFiles(), io)
+        val files = platform.tripFiles()
+        val clock = platform.clock()
+        val previews = ProtoPreviewStore(files, io)
+        val history = LocalTripHistory(db, io)
         val recorder = TripRecorderEngine(
             ports = CapturePorts(
                 location = platform.location(),
@@ -56,23 +86,34 @@ public object DrivePerfCore {
                 activity = platform.activity(),
                 power = platform.power(),
                 parkedRegion = platform.parkedRegion(),
-                files = platform.tripFiles(),
+                files = files,
             ),
             persistence = CapturePersistence(
                 store,
-                ProtoCaptureLog(platform.tripFiles(), io),
-                finaliser?.invoke(db) ?: PipelineFinaliser(LocalTripHistory(db, io), LocalRouteHistory(db, previews, io)),
+                ProtoCaptureLog(files, io),
+                finaliser?.invoke(db) ?: PipelineFinaliser(history, LocalRouteHistory(db, previews, io)),
                 previews,
+                ProtoAnalysisFileStore(files, io),
             ),
-            clock = platform.clock(),
+            clock = clock,
             zones = SystemTimeZone(),
-            scope = CoroutineScope(SupervisorJob() + Dispatchers.Default.limitedParallelism(1)),
+            scope = scope,
+            config = capture,
         )
-        CoreServices(
+        val trips = LocalTripRepository(db, files, io)
+        val routes = LocalRouteRepository(db, io)
+        return CoreServices(
             recorder = recorder,
-            trips = LocalTripRepository(db, platform.tripFiles(), io),
-            routes = LocalRouteRepository(db, io),
-        ).also { started = it }
+            trips = trips,
+            routes = routes,
+            markEventNeeded = MarkEventNeeded(
+                trips, routes, LocalEventFeedbackStore(db, io), FeedbackRescorer(history, previews), clock,
+            ),
+            onClose = {
+                scope.cancel()
+                driver.close()
+            },
+        )
     }
 
     /** Forgets the started core. Tests only. */

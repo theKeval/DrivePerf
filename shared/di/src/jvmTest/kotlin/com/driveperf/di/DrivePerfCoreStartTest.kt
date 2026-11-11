@@ -1,8 +1,11 @@
 package com.driveperf.di
 
+import com.driveperf.domain.capture.LocationSample
 import com.driveperf.domain.capture.RecorderState
 import com.driveperf.domain.capture.WakeEvent
 import com.driveperf.domain.capture.WakeKind
+import com.driveperf.domain.trip.TripSource
+import com.driveperf.domain.tripfile.TripFileKind
 import com.driveperf.testing.FakeActivitySource
 import com.driveperf.testing.FakeLocationSource
 import com.driveperf.testing.FakeMotionSource
@@ -17,6 +20,7 @@ import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertNotNull
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
@@ -62,5 +66,40 @@ class DrivePerfCoreStartTest {
         assertEquals("device-1", bindings.deviceId())
         assertTrue(core.trips.observeTrips().first().isEmpty())
         assertTrue(core.routes.observeRoutes().first().isEmpty())
+    }
+
+    @Test
+    fun aManualTripIsFinalisedThroughThePipelineWithItsR1File() = runBlocking {
+        val core = DrivePerfCore.start(bindings)
+        core.recorder.onLaunch()
+        core.recorder.onWake(WakeEvent(WakeKind.MANUAL, clock.monotonicNs(), clock.wallMs(), "app"))
+        withTimeout(5_000) { core.recorder.status.first { it.state == RecorderState.RECORDING } }
+        repeat(30) { i ->
+            clock.advanceS(1.0)
+            val t = clock.monotonicNs()
+            bindings.location.emit(LocationSample(t, clock.wallMs(), 2.5 + i * 1e-4, -27.5, 10.0, 4.0, 3.0, 12.0, 0.3, 0.0, 3.0))
+        }
+        withTimeout(5_000) { core.recorder.status.first { it.distanceM > 0.0 } }
+        core.recorder.stop()
+        val trip = withTimeout(10_000) { core.trips.observeTrips().first { it.isNotEmpty() } }.single()
+        assertEquals(TripSource.MANUAL, trip.source)
+        val r1 = assertNotNull(bindings.files.describe(trip.id, TripFileKind.R1, withSha256 = false))
+        assertTrue(r1.compressed, "R1 is gzip-compressed at finalisation")
+        assertTrue(assertNotNull(bindings.files.describe(trip.id, TripFileKind.R0, withSha256 = false)).compressed)
+    }
+
+    @Test
+    fun aScratchCoreIsSeparateAndUsesItsOwnTimers() = runBlocking {
+        val scratch = DrivePerfCore.scratch(
+            bindings, com.driveperf.data.local.JvmDatabaseDriverFactory(), kotlinx.coroutines.Dispatchers.IO,
+            com.driveperf.pipeline.capture.CaptureConfig(candidateTimeoutS = 0.2),
+        )
+        assertFailsWith<IllegalStateException>("a scratch core never becomes the app's core") { DrivePerfCore.services }
+        scratch.recorder.onLaunch()
+        scratch.recorder.onWake(WakeEvent(WakeKind.MOVE_SIGNAL, clock.monotonicNs(), clock.wallMs(), null))
+        withTimeout(5_000) { scratch.recorder.status.first { it.state == RecorderState.CANDIDATE } }
+        withTimeout(5_000) { scratch.recorder.status.first { it.state == RecorderState.IDLE } }
+        assertTrue(bindings.files.tripIds().isEmpty(), "the rejected candidate's samples are deleted")
+        scratch.close()
     }
 }

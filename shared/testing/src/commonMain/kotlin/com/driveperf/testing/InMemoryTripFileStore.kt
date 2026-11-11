@@ -7,13 +7,15 @@ import com.driveperf.domain.tripfile.TripFileStore
 
 /**
  * A [TripFileStore] in memory. [sync] marks the appended bytes durable; [crash] drops what was not synced, the way
- * a kill loses the unflushed tail.
+ * a kill loses the unflushed tail. Like the platform stores, a trip's folder stays (and is listed by [tripIds]) until
+ * [deleteTrip], even when its last file was deleted.
  */
 @Suppress("TooManyFunctions") // the port's ten operations plus the crash hook
 public class InMemoryTripFileStore(public var freeBytes: Long = Long.MAX_VALUE) : TripFileStore {
     private val files = mutableMapOf<Pair<String, TripFileKind>, MutableList<Byte>>()
     private val durable = mutableMapOf<Pair<String, TripFileKind>, Int>()
     private val compressed = mutableSetOf<Pair<String, TripFileKind>>()
+    private val folders = mutableSetOf<String>()
 
     /** Number of [sync] calls, to check fsync cadence. */
     public var syncCount: Int = 0
@@ -21,6 +23,7 @@ public class InMemoryTripFileStore(public var freeBytes: Long = Long.MAX_VALUE) 
 
     override fun append(tripId: String, kind: TripFileKind, bytes: ByteArray): FileResult {
         if (freeBytes < bytes.size) return FileResult.DISK_FULL
+        folders += tripId
         files.getOrPut(tripId to kind) { mutableListOf() }.addAll(bytes.toList())
         return FileResult.OK
     }
@@ -32,6 +35,7 @@ public class InMemoryTripFileStore(public var freeBytes: Long = Long.MAX_VALUE) 
     }
 
     override fun write(tripId: String, kind: TripFileKind, bytes: ByteArray): FileResult {
+        folders += tripId
         files[tripId to kind] = bytes.toMutableList()
         durable[tripId to kind] = bytes.size
         return FileResult.OK
@@ -62,11 +66,14 @@ public class InMemoryTripFileStore(public var freeBytes: Long = Long.MAX_VALUE) 
     public var deleteTripResult: FileResult = FileResult.OK
 
     override fun deleteTrip(tripId: String): FileResult {
-        if (deleteTripResult == FileResult.OK) TripFileKind.entries.forEach { delete(tripId, it) }
+        if (deleteTripResult == FileResult.OK) {
+            TripFileKind.entries.forEach { delete(tripId, it) }
+            folders -= tripId
+        }
         return deleteTripResult
     }
 
-    override fun tripIds(): List<String> = files.keys.map { it.first }.distinct().sorted()
+    override fun tripIds(): List<String> = folders.sorted()
 
     override fun freeSpaceBytes(): Long = freeBytes
 

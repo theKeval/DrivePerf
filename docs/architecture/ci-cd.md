@@ -15,7 +15,13 @@ What `.github/workflows/` does today, and what is deliberately inert. ADR-008 is
 | `release-ios.yml` | tag `v*` | TestFlight upload | **inert** (fails on purpose if enabled early) |
 | `jira-sync.yml`, `review-router.yml` | as before | Jira and review automation | unchanged |
 
-Differences from ADR-008's table: path filters use GitHub's native `paths:` instead of `dorny/paths-filter` (no third-party action needed); the Firestore rules tests stay in `web.yml`, which already owns `backend/firebase/`; SQLDelight `verifyMigrations`, Roborazzi, the OpenAPI contract tests and the server tests against Firebase emulators join when their code exists (DRIVE-62, DRIVE-72, DRIVE-76).
+Differences from ADR-008's table: path filters use GitHub's native `paths:` instead of `dorny/paths-filter` (no third-party action needed); the Firestore rules tests stay in `web.yml`, which already owns `backend/firebase/`; Roborazzi, the OpenAPI contract tests and the server tests against Firebase emulators join when their code exists (DRIVE-72, DRIVE-76). SQLDelight's `verifySqlDelightMigration` runs in `shared.yml` since DRIVE-206.
+
+**Firestore indexes are not deployed by CI.** `web.yml` deploys hosting and `firestore:rules` only. After a change to
+`backend/firebase/firestore.indexes.json` is merged, Keval deploys the indexes by hand, `dev` first and then `prod`,
+with `firebase deploy --only firestore:indexes --project <dev|prod>` (on Keval's Mac:
+`node /opt/homebrew/lib/node_modules/npm/bin/npx-cli.js firebase deploy --only firestore:indexes --project dev`). See
+[firebase-backend-setup.md A4](../launch/firebase-backend-setup.md).
 
 ## What is inert, why, and how to switch it on
 

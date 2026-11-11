@@ -26,8 +26,12 @@ import com.driveperf.domain.trip.CaptureMeta
 import com.driveperf.domain.trip.Trip
 import com.driveperf.domain.trip.TripKind
 import com.driveperf.domain.trip.TripSource
+import com.driveperf.domain.capture.FinalisedTrip
 import com.driveperf.domain.trip.TripStatus
+import com.driveperf.domain.tripfile.AnalysisFileStore
+import com.driveperf.domain.tripfile.FileResult
 import com.driveperf.domain.tripfile.TripFileKind
+import com.driveperf.domain.tripfile.TripFileRef
 import com.driveperf.domain.tripfile.TripFileStore
 import com.driveperf.foundation.Clock
 import com.driveperf.foundation.Units
@@ -53,12 +57,13 @@ public data class CapturePorts(
     val files: TripFileStore,
 )
 
-/** Where the recorder persists. [previews] stores preview tracks; null skips them (tests). */
+/** Where the recorder persists. [previews] and [analysis] store preview tracks and R1 files; null skips them (tests). */
 public data class CapturePersistence(
     val store: TripStore,
     val log: CaptureLog,
     val finaliser: TripFinaliser,
     val previews: PreviewStore? = null,
+    val analysis: AnalysisFileStore? = null,
 )
 
 /**
@@ -356,23 +361,41 @@ public class TripRecorderEngine(
                 FinaliseRequest(it, effect.endNs, effect.kind, trip?.manual ?: false, effect.interruption, clock.wallMs()),
             )
         }
-        val finished = result?.trip
-        if (finished == null) {
-            discard(effect.tripId)
-        } else {
-            persistence.store.saveFinalised(finished)
-            if (finished.preview.isNotEmpty()) persistence.previews?.write(effect.tripId, finished.preview)
-            ports.files.compress(effect.tripId, TripFileKind.R0)
-        }
+        val finished = result?.trips.orEmpty()
+        // A split whose first part was too short to keep still commits the later parts (§1.6, F-CAP-17).
+        if (finished.none { it.trip.id == effect.tripId }) discard(effect.tripId)
+        finished.forEach { commit(it) }
         val parking = result?.parking
         if (parking != null) persistence.store.setLastParking(parking)
         send { now -> MachineEvent.Finalised(now, parking) }
     }
 
+    /**
+     * Commits one finished trip (data-model.md §2.3 step 2): replaces its R0 when it is part of a split, writes and
+     * hashes R1, compresses R0, then commits every row with the file references in one transaction. A split part whose
+     * R0 could not be replaced keeps the original log untouched and is committed without an R0 reference, so a partial
+     * or unsplit capture is never recorded as that part's R0.
+     */
+    private suspend fun commit(finished: FinalisedTrip) {
+        val id = finished.trip.id
+        val r0Kept = finished.splitCapture?.let { persistence.log.replace(it.header, it.batches()) } ?: true
+        val r1 = finished.analysis?.let { persistence.analysis?.write(finished.trip, it) }
+        val r0 = if (r0Kept && ports.files.compress(id, TripFileKind.R0) == FileResult.OK) r0Ref(id) else null
+        persistence.store.saveFinalised(finished.copy(analysis = null, splitCapture = null, files = listOfNotNull(r0, r1)))
+        if (finished.preview.isNotEmpty()) persistence.previews?.write(id, finished.preview)
+    }
+
+    private fun r0Ref(tripId: String): TripFileRef? = ports.files.describe(tripId, TripFileKind.R0, withSha256 = true)?.let {
+        val sha = it.sha256 ?: return null
+        TripFileRef(TripFileKind.R0, R0_FORMAT_VERSION, sha, it.sizeBytes, "trips/$tripId/r0.v$R0_FORMAT_VERSION.pb.gz")
+    }
+
+    /** Drops a candidate or a discarded trip: its rows, its R0 and its folder, so nothing of it is left on disk. */
     private suspend fun discard(tripId: String) {
         backfills.remove(tripId)
         persistence.store.deleteNow(tripId)
         persistence.log.delete(tripId)
+        ports.files.deleteTrip(tripId)
     }
 
     private fun publishStatus(now: Long) {
@@ -394,5 +417,6 @@ public class TripRecorderEngine(
 
     private companion object {
         const val MS_PER_S = 1000.0
+        const val R0_FORMAT_VERSION = 1
     }
 }
