@@ -1,4 +1,79 @@
 {
-  "indexes": [],
-  "fieldOverrides": []
+  "indexes": [
+    {
+      "collectionGroup": "accounts",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "backup.state", "order": "ASCENDING" },
+        { "fieldPath": "backup.purgeAt", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "accounts",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "backup.state", "order": "ASCENDING" },
+        { "fieldPath": "backup.nextReminderAt", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "accounts",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "backup.state", "order": "ASCENDING" },
+        { "fieldPath": "backup.writeUntil", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "accounts",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "deletionRequestedAt", "order": "ASCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": [
+    { "collectionGroup": "trips", "fieldPath": "previewTrack", "indexes": [] },
+    { "collectionGroup": "trips", "fieldPath": "events", "indexes": [] },
+    { "collectionGroup": "trips", "fieldPath": "eventFeedback", "indexes": [] },
+    { "collectionGroup": "trips", "fieldPath": "score", "indexes": [] },
+    { "collectionGroup": "trips", "fieldPath": "quality", "indexes": [] },
+    { "collectionGroup": "trips", "fieldPath": "stops", "indexes": [] },
+    { "collectionGroup": "trips", "fieldPath": "files", "indexes": [] },
+    { "collectionGroup": "trips", "fieldPath": "bbox", "indexes": [] },
+    { "collectionGroup": "trips", "fieldPath": "fieldClock", "indexes": [] },
+    {
+      "collectionGroup": "trips",
+      "fieldPath": "deletedAt",
+      "indexes": [
+        { "order": "ASCENDING", "queryScope": "COLLECTION" },
+        { "order": "ASCENDING", "queryScope": "COLLECTION_GROUP" }
+      ]
+    },
+    {
+      "collectionGroup": "routes",
+      "fieldPath": "deletedAt",
+      "indexes": [
+        { "order": "ASCENDING", "queryScope": "COLLECTION" },
+        { "order": "ASCENDING", "queryScope": "COLLECTION_GROUP" }
+      ]
+    },
+    {
+      "collectionGroup": "vehicles",
+      "fieldPath": "deletedAt",
+      "indexes": [
+        { "order": "ASCENDING", "queryScope": "COLLECTION" },
+        { "order": "ASCENDING", "queryScope": "COLLECTION_GROUP" }
+      ]
+    },
+    {
+      "collectionGroup": "places",
+      "fieldPath": "deletedAt",
+      "indexes": [
+        { "order": "ASCENDING", "queryScope": "COLLECTION" },
+        { "order": "ASCENDING", "queryScope": "COLLECTION_GROUP" }
+      ]
+    }
+  ]
 }
