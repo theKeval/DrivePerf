@@ -48,6 +48,7 @@ public interface PlatformBindings {
  * What the apps use after start. [markEventNeeded] is "Was it needed?" / "Count it again" (F-SCO-05); feedback is read
  * through [trips]. [corrections] answers "Was this a bus or train?" and corrects what a trip was (F-CAP-04).
  */
+@Suppress("LongParameterList") // The core's ports for the apps: one property each, built only by DrivePerfCore.
 public class CoreServices internal constructor(
     public val recorder: TripRecorder,
     public val trips: TripRepository,
