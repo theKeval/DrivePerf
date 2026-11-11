@@ -10,6 +10,8 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
     <uses-permission android:name="android.permission.POST_PROMOTED_NOTIFICATIONS" />
+    <!-- Re-arms the wake path after a reboot: activity transitions and geofences do not survive one. -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
     <uses-feature android:name="android.hardware.location.gps" android:required="false" />
     <uses-feature android:name="android.hardware.sensor.accelerometer" android:required="false" />
@@ -23,6 +25,23 @@
         <receiver
             android:name=".activity.ActivityUpdateReceiver"
             android:exported="false" />
+
+        <!-- Background wake path (DRIVE-206): activity transitions and the parked-region geofence, delivered by Play
+             services through PendingIntents, also when the process is dead. -->
+        <receiver
+            android:name=".wake.ActivityTransitionReceiver"
+            android:exported="false" />
+        <receiver
+            android:name=".wake.GeofenceReceiver"
+            android:exported="false" />
+        <receiver
+            android:name=".wake.BootReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
     </application>
 
 </manifest>
