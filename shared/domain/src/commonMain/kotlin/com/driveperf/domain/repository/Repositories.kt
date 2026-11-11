@@ -7,6 +7,7 @@ import com.driveperf.domain.score.Score
 import com.driveperf.domain.trip.DrivingEvent
 import com.driveperf.domain.trip.EventFeedback
 import com.driveperf.domain.trip.Trip
+import com.driveperf.domain.tripfile.FileResult
 import kotlinx.coroutines.flow.Flow
 
 /**
@@ -29,8 +30,11 @@ public interface TripRepository {
     /** A trip's current score, or null. */
     public suspend fun score(tripId: String): Score?
 
-    /** Deletes a trip, its rows and its files (F-PRV-04). */
-    public suspend fun delete(tripId: String)
+    /**
+     * Deletes a trip's files, then its rows (F-PRV-04). When the files cannot be deleted the trip is kept and the
+     * file failure returned, so no raw location or motion data is left without a trip; the user can try again.
+     */
+    public suspend fun delete(tripId: String): FileResult
 }
 
 /** Read side of routes and records. */
@@ -46,4 +50,31 @@ public interface RouteRepository {
 
     /** The current record of a route, or null. */
     public suspend fun personalBest(routeId: String): PersonalBest?
+}
+
+/** A finished trip with what the scorer needs from it: its score and its route, if matched. */
+public data class ScoredTrip(val trip: com.driveperf.domain.trip.Trip, val score: Score?, val routeId: String?)
+
+/**
+ * History the finaliser reads for baselines, efficiency and route matching (§5.7, §5.9, §7). Implemented in
+ * `:shared:data:local`; not a platform port.
+ */
+public interface TripHistory {
+    /** Finalised trips that started before [beforeStartedAt], newest first (`startedAt` desc, `id` desc), at most [limit]. */
+    public suspend fun finishedBefore(beforeStartedAt: Long, limit: Int): List<ScoredTrip>
+}
+
+/** What route matching reads (§7). Implemented in `:shared:data:local`; not a platform port. */
+public interface RouteHistory {
+    /** Live routes and candidates (not merged, not deleted). */
+    public suspend fun routes(): List<Route>
+
+    /** Prior runs of a route, newest first, at most [limit]. */
+    public suspend fun runs(routeId: String, limit: Int): List<ScoredTrip>
+
+    /** The route's current record, or null. */
+    public suspend fun personalBest(routeId: String): PersonalBest?
+
+    /** A trip's preview track, or null when it is gone. */
+    public suspend fun preview(tripId: String): List<com.driveperf.domain.trip.PreviewRow>?
 }

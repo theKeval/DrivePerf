@@ -1,0 +1,26 @@
+CREATE TABLE recap (
+  id                TEXT NOT NULL PRIMARY KEY,
+  kind              TEXT NOT NULL,
+  period_start      TEXT NOT NULL,
+  period_end        TEXT NOT NULL,
+  complete          INTEGER NOT NULL,
+  content_json      TEXT NOT NULL,
+  algorithm_version TEXT NOT NULL,
+  computed_at       INTEGER NOT NULL,
+  delivered_at      INTEGER,
+  viewed_at         INTEGER,
+  UNIQUE (kind, period_start)
+);
+
+CREATE TABLE entitlement_cache (
+  id            INTEGER NOT NULL PRIMARY KEY CHECK (id = 1),
+  plan          TEXT NOT NULL,
+  source        TEXT NOT NULL,
+  is_pro        INTEGER NOT NULL,
+  started_at    INTEGER,
+  expires_at    INTEGER,
+  will_renew    INTEGER,
+  founding      INTEGER NOT NULL DEFAULT 0,
+  backup_json   TEXT,
+  fetched_at    INTEGER NOT NULL
+);

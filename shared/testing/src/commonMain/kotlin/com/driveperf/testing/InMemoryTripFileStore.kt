@@ -58,9 +58,12 @@ public class InMemoryTripFileStore(public var freeBytes: Long = Long.MAX_VALUE) 
         return FileResult.OK
     }
 
+    /** What [deleteTrip] answers; anything but OK leaves the files in place. */
+    public var deleteTripResult: FileResult = FileResult.OK
+
     override fun deleteTrip(tripId: String): FileResult {
-        TripFileKind.entries.forEach { delete(tripId, it) }
-        return FileResult.OK
+        if (deleteTripResult == FileResult.OK) TripFileKind.entries.forEach { delete(tripId, it) }
+        return deleteTripResult
     }
 
     override fun tripIds(): List<String> = files.keys.map { it.first }.distinct().sorted()

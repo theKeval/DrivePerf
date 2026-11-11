@@ -1,0 +1,20 @@
+{
+  "fixture": "syn-mixed-tunnel-01",
+  "pipelineVersion": "pipe-1.0.0",
+  "algorithmVersion": "smooth-1.0.0",
+  "priorTrips": [],
+  "expect": {
+    "badge": "USABLE",
+    "context": "MIXED",
+    "smoothness": 99,
+    "calibrating": { "k": 1, "of": 3 },
+    "distanceM": 4679.0,
+    "ledger": { "T": 276.4, "brake": 0.35, "accel": 0.74, "corner": 0.13 },
+    "events": [],
+    "spans": [
+      { "kind": "GAP", "t0S": 92.00, "t1S": 153.00, "reason": "TUNNEL" }
+    ],
+    "tip": { "tipId": "accel_progressive", "category": "ACCELERATION" }
+  },
+  "tolerance": { "ledger": 0.02, "tPeakS": 0.04, "peakG": 0.002, "distanceM": 1.0 }
+}

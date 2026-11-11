@@ -1,17 +1,29 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!-- ADR-007: no advertising identifier, ever. Some SDKs add AD_ID through the manifest merger. -->
+    <uses-permission android:name="com.google.android.gms.permission.AD_ID" tools:node="remove" />
 
     <application
+        android:name=".DrivePerfApplication"
         android:allowBackup="false"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_rules"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:supportsRtl="true"
-        android:theme="@android:style/Theme.Material.NoActionBar">
+        android:theme="@style/Theme.DrivePerf">
+
+        <!-- ADR-007: Sentry starts only after crash-report consent, through SentryCrashReporter. -->
+        <meta-data android:name="io.sentry.auto-init" android:value="false" />
+        <meta-data android:name="io.sentry.attach-screenshot" android:value="false" />
+        <meta-data android:name="io.sentry.attach-view-hierarchy" android:value="false" />
+
         <activity
             android:name=".MainActivity"
-            android:exported="true">
+            android:exported="true"
+            android:launchMode="singleTop">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />

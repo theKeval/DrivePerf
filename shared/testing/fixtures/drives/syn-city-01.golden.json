@@ -1,0 +1,22 @@
+{
+  "fixture": "syn-city-01",
+  "pipelineVersion": "pipe-1.0.0",
+  "algorithmVersion": "smooth-1.0.0",
+  "priorTrips": [],
+  "expect": {
+    "badge": "GOOD",
+    "context": "CITY",
+    "smoothness": 92,
+    "calibrating": { "k": 1, "of": 3 },
+    "distanceM": 2611.8,
+    "ledger": { "T": 248.0, "brake": 5.70, "accel": 5.55, "corner": 3.21 },
+    "events": [
+      { "type": "CORNER", "tPeakS": 47.32, "peakG": 0.416, "confidence": "MEDIUM" },
+      { "type": "ACCEL", "tPeakS": 98.52, "peakG": 0.357, "confidence": "HIGH" },
+      { "type": "BRAKE", "tPeakS": 256.28, "peakG": 0.414, "confidence": "HIGH" }
+    ],
+    "spans": [],
+    "tip": { "tipId": "brake_light", "category": "BRAKING" }
+  },
+  "tolerance": { "ledger": 0.02, "tPeakS": 0.04, "peakG": 0.002, "distanceM": 1.0 }
+}

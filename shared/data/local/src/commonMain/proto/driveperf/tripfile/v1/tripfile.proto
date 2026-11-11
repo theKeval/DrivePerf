@@ -1,0 +1,131 @@
+// DrivePerf trip file, format_version 1 (data-model.md §2.4, ADR-003). Published as the portable schema in
+// "Download all my data" (F-PRV-02).
+//
+// A trip file is: magic "DPTF" (4 bytes) + varint header length + Header + repeated (varint length + Chunk).
+// The whole stream is gzip-compressed after finalisation (.pb.gz). Readers must ignore unknown fields.
+//
+// Integer channels: every value is quantised with the Header's Quantisation, then delta-encoded from the previous
+// sample of the same channel in the chunk (the first value is absolute). Deltas use 32-bit two's-complement
+// wrapping, so decoding adds them back with the same wrap. An absent value is the raw sentinel -2147483648
+// (INT32_MIN) before delta encoding.
+//
+// Additions to data-model.md §2.4 for DRIVE-62, all additive: Header fields 14-17, Chunk fields 6-7, Mark types
+// 11-13, and the PreviewTrack message (data-model.md §2.5).
+syntax = "proto3";
+package driveperf.tripfile.v1;
+
+message Header {
+  uint32 format_version = 1;        // 1
+  Kind kind = 2;                    // R0 or R1
+  string trip_id = 3;               // UUIDv7
+  int64 started_at_ms = 4;          // UTC epoch ms of t = 0
+  sint32 tz_offset_min = 5;
+  string tz_id = 6;
+  string platform = 7;              // ios | android
+  string device_model_class = 8;
+  string app_version = 9;
+  string pipeline_version = 10;     // R1 only
+  float motion_rate_hz = 11;        // nominal (R0: 50, R1: 25)
+  Frame motion_frame = 12;          // DEVICE (R0) or VEHICLE (R1)
+  Quantisation q = 13;
+  int64 started_at_mono_ns = 14;    // monotonic clock reading at t = 0 (R0 only; for kill recovery)
+  string wake_kind = 15;            // PARKED_EXIT | MOVE_SIGNAL | ACTIVITY_VEHICLE | MANUAL | RELAUNCH
+  string source_detail = 16;        // enum key, never free text
+  Parking parking = 17;             // where and when the car was parked before this trip, if known
+  enum Kind { KIND_UNSPECIFIED = 0; R0 = 1; R1 = 2; }
+  enum Frame { FRAME_UNSPECIFIED = 0; DEVICE = 1; VEHICLE = 2; }
+}
+
+message Parking {
+  sint32 lat = 1;                   // latlng_deg_per_unit
+  sint32 lng = 2;
+  int64 at_ms = 3;                  // UTC epoch ms
+}
+
+// Fixed-point scales so every channel is an integer.
+message Quantisation {
+  double latlng_deg_per_unit = 1;   // 1e-7  (about 1.1 cm)
+  double alt_m_per_unit = 2;        // 0.1
+  double speed_mps_per_unit = 3;    // 0.01
+  double accuracy_m_per_unit = 4;   // 0.1
+  double course_deg_per_unit = 5;   // 0.1
+  double accel_g_per_unit = 6;      // 0.001 (milli-g)
+  double gyro_dps_per_unit = 7;     // 0.01 deg/s
+  double quat_per_unit = 8;         // 1e-4
+}
+
+message Chunk {
+  int64 chunk_t0_ms = 1;            // offset from started_at_ms (monotonic clock based); negative for backfill
+  Gnss gnss = 2;
+  Motion motion = 3;                // device-frame (R0) or vehicle-frame (R1)
+  repeated Mark marks = 4;          // state changes inside this chunk
+  Pressure pressure = 5;            // reserved: no barometer in v1 (decision D8)
+  Activity activity = 6;            // R0: activity classifications, live and from history
+  RecordedAccel recorded_accel = 7; // R0: raw accelerometer history for the estimated start (never scored, D6)
+}
+
+// 1 Hz nominal.
+message Gnss {
+  repeated sint64 dt_ms = 1;        // first value relative to chunk_t0_ms
+  repeated sint64 wall_ms_delta = 2;// UTC wall-clock time of the fix minus the t-derived time (usually 0)
+  repeated sint32 lat = 3;
+  repeated sint32 lng = 4;
+  repeated sint32 alt = 5;
+  repeated sint32 h_acc = 6;
+  repeated sint32 v_acc = 7;
+  repeated sint32 speed = 8;        // Doppler speed
+  repeated sint32 speed_acc = 9;
+  repeated sint32 course = 10;
+  repeated sint32 course_acc = 11;
+  repeated uint32 quality = 12;     // R1: 0 observed, 1 estimated, 2 gap, 3 excluded (fixture q)
+}
+
+message Motion {
+  repeated sint64 dt_ms = 1;
+  // R0 (DEVICE frame): user acceleration, gravity, rotation rate, attitude quaternion
+  repeated sint32 ax = 2;  repeated sint32 ay = 3;  repeated sint32 az = 4;
+  repeated sint32 gx = 5;  repeated sint32 gy = 6;  repeated sint32 gz = 7;
+  repeated sint32 rx = 8;  repeated sint32 ry = 9;  repeated sint32 rz = 10;
+  repeated sint32 qw = 11; repeated sint32 qx = 12; repeated sint32 qy = 13; repeated sint32 qz = 14;
+  // R1 (VEHICLE frame): longitudinal (+ accelerating), lateral (+ turning right), vertical, yaw rate
+  repeated sint32 lon_g = 20; repeated sint32 lat_g = 21; repeated sint32 vert_g = 22; repeated sint32 yaw_dps = 23;
+  repeated uint32 quality = 24;     // R1 quality bits, pipeline-and-scoring.md §2.7
+}
+
+message Activity {
+  repeated sint64 dt_ms = 1;
+  repeated sint64 wall_ms_delta = 2;
+  repeated uint32 type = 3;         // 0 STATIONARY, 1 WALKING, 2 RUNNING, 3 CYCLING, 4 AUTOMOTIVE, 5 UNKNOWN
+  repeated uint32 confidence = 4;   // 0 LOW, 1 MEDIUM, 2 HIGH
+}
+
+message RecordedAccel {
+  repeated sint64 dt_ms = 1;
+  repeated sint32 ax = 2; repeated sint32 ay = 3; repeated sint32 az = 4;   // gravity included, g
+}
+
+message Pressure { repeated sint64 dt_ms = 1; repeated sint32 hpa_x100 = 2; }
+
+message Mark {
+  int64 t_ms = 1;
+  Type type = 2;
+  string detail = 3;                // enum key or number, never free text
+  enum Type {
+    TYPE_UNSPECIFIED = 0; RECORDING_STARTED = 1; PAUSED = 2; RESUMED = 3; APP_KILLED = 4;
+    PHONE_MOVED = 5; ALIGNMENT_SETTLED = 6; LOW_BATTERY = 7; THERMAL = 8; GNSS_LOST = 9; GNSS_RESTORED = 10;
+    CONFIRMED = 11; IMU_RATE = 12; IMU_STOPPED = 13;
+  }
+}
+
+// preview.pb (data-model.md §2.5): at most 400 rows, the same quantisation and delta coding as the chunks above.
+message PreviewTrack {
+  uint32 format_version = 1;        // 1
+  repeated sint64 t_ms = 2;         // from started_at_ms
+  repeated sint32 lat = 3;
+  repeated sint32 lng = 4;
+  repeated sint32 speed = 5;
+  repeated sint32 lon_g = 6;
+  repeated sint32 lat_g = 7;
+  repeated sint32 elev = 8;
+  repeated uint32 quality = 9;      // 0 observed, 1 estimated, 2 gap, 3 excluded
+}

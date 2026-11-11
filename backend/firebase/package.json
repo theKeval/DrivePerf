@@ -4,7 +4,8 @@
   "type": "module",
   "description": "Firestore rules, indexes and Hosting config for driveperf-dev / driveperf-prod (ADR-002, ADR-008), with emulator tests.",
   "scripts": {
-    "test": "firebase emulators:exec --only firestore --project demo-driveperf \"vitest run\"",
+    "test": "firebase emulators:exec --only firestore --project demo-driveperf \"vitest run --no-file-parallelism\"",
+    "emulators": "firebase emulators:start --only auth,firestore --project demo-driveperf",
     "test:watch": "vitest"
   },
   "devDependencies": {

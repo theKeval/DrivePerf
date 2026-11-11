@@ -68,7 +68,7 @@ The arrow means "may depend on". Anything not listed is forbidden.
 | `:shared:pipeline` | foundation, domain (entities only) | same as domain; no I/O, no clocks except injected `Clock` |
 | `:shared:presentation` | foundation, domain | data/*, api-contract, any SDK |
 | `:shared:api-contract` | kotlinx.serialization | domain (mapping happens in data/remote) |
-| `:shared:data:local` | foundation, domain, SQLDelight, Wire, Okio | remote, presentation |
+| `:shared:data:local` | foundation, domain, SQLDelight, Wire, Okio, kotlinx.serialization (JSON columns from the data model; added 2026-11-11, DRIVE-62) | remote, presentation |
 | `:shared:data:remote` | foundation, domain, api-contract, Ktor, purchases-kmp | local, presentation |
 | `:shared:data:sync` | foundation, domain, data:local, data:remote | presentation |
 | `:shared:di` | all shared modules, Koin | — (composition root only) |
