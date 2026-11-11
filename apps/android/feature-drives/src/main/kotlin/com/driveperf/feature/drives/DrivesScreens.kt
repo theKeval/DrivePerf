@@ -47,7 +47,6 @@ import com.driveperf.domain.trip.QualityBadge
 import com.driveperf.domain.trip.Suspect
 import com.driveperf.domain.trip.TripCorrection
 
-private const val LATEST_COUNT = 5
 private const val DIMMED_ALPHA = 0.6f
 
 /**
@@ -74,6 +73,13 @@ fun DrivesHomeScreen(
                     body = stringResource(R.string.drives_empty_body),
                 )
             }
+            if (state.seeAll) {
+                item {
+                    TextButton(onClick = onSeeAll) {
+                        Text(stringResource(R.string.drives_see_not_drives, state.notDrives.size))
+                    }
+                }
+            }
         } else {
             item {
                 Text(
@@ -81,8 +87,8 @@ fun DrivesHomeScreen(
                     style = MaterialTheme.typography.titleLargeEmphasized,
                 )
             }
-            items(state.trips.take(LATEST_COUNT), key = { it.id }) { TripRow(it, state.canCorrect, onAction) }
-            if (state.trips.size > LATEST_COUNT) {
+            items(state.trips.take(LATEST_DRIVES), key = { it.id }) { TripRow(it, state.canCorrect, onAction) }
+            if (state.seeAll) {
                 item { TextButton(onClick = onSeeAll) { Text(stringResource(R.string.drives_see_all)) } }
             }
             item {

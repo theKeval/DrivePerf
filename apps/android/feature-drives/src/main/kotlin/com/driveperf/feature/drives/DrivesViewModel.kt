@@ -36,6 +36,9 @@ data class TripRowUi(
 /** Which list All drives shows (S-HIS-01 filter). */
 enum class DrivesFilter { DRIVES, NOT_DRIVES }
 
+/** How many drives the Drives tab lists before "See all". */
+internal const val LATEST_DRIVES = 5
+
 /** What the Drives tab and the All drives screen draw. */
 data class DrivesUiState(
     val loaded: Boolean = false,
@@ -50,6 +53,12 @@ data class DrivesUiState(
     val quality: QualitySheetUi? = null,
 ) {
     val isEmpty: Boolean get() = loaded && trips.isEmpty()
+
+    /**
+     * The Drives tab links to All drives when it lists only some drives, or when there are trips marked as not a drive:
+     * All drives holds their filter, and they must stay restorable before their 30-day deletion (F-CAP-04 AC3).
+     */
+    val seeAll: Boolean get() = trips.size > LATEST_DRIVES || notDrives.isNotEmpty()
 
     /** The rows of the current filter. */
     val shown: List<TripRowUi> get() = if (filter == DrivesFilter.DRIVES) trips else notDrives
@@ -84,7 +93,8 @@ class DrivesViewModel(
     private data class Selection(
         val detailId: String? = null,
         val qualityId: String? = null,
-        val filter: DrivesFilter = DrivesFilter.DRIVES,
+        /** The user's choice; null until they choose. */
+        val filter: DrivesFilter? = null,
     )
 
     val state: StateFlow<DrivesUiState> = combine(
@@ -97,7 +107,8 @@ class DrivesViewModel(
             loaded = true,
             trips = trips.map(::row),
             notDrives = notDrives.map(::row),
-            filter = sel.filter,
+            // With no drives left, All drives opens on the trips marked as not a drive.
+            filter = sel.filter ?: if (trips.isEmpty() && notDrives.isNotEmpty()) DrivesFilter.NOT_DRIVES else DrivesFilter.DRIVES,
             canCorrect = corrector != null,
             detail = sel.detailId?.let(byId::get)?.let { presenter.detail(it, formatting.start(it.startedWallMs)) },
             quality = sel.qualityId?.let(byId::get)?.let(presenter::quality),

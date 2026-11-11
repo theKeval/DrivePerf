@@ -2,6 +2,7 @@
 <resources>
     <string name="drives_latest">Latest drives</string>
     <string name="drives_see_all">See all</string>
+    <string name="drives_see_not_drives">Not drives (%1$d)</string>
     <string name="drives_recorded">Recorded</string>
     <string name="drives_empty_title">No drives yet</string>
     <string name="drives_empty_body">Tap Start below to record your first drive. It will show up here when you stop.</string>
