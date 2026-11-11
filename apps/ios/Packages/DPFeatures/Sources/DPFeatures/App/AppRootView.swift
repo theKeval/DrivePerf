@@ -21,6 +21,15 @@ public struct AppRootView: View {
             }
         }
         .task { await model.capture.observe() }
+        .task { await model.capture.observeMovement() }
+        .task(id: model.capture.heldContent) {
+            // Content waits behind the lock: check once a second whether it can open (S-DRV-05 ticks itself while it
+            // shows; this covers the time it does not).
+            while model.capture.heldContent != nil, !Task.isCancelled {
+                model.capture.tick(now: Date())
+                try? await Task.sleep(for: .seconds(1))
+            }
+        }
         .task(id: scenePhase) {
             if scenePhase == .active { await model.capture.refreshReadiness() }
         }
@@ -96,7 +105,10 @@ struct ShellView: View {
             cover in
             switch cover {
             case .recording: InDriveView(capture: model.capture)
-            case .finished(let summary): DriveFinishedView(summary: summary, onDone: capture.dismissFinished)
+            case .held: HeldContentView(capture: model.capture)
+            case .decoding: DecodingDriveView(carName: capture.carName, onBack: capture.dismissFinished)
+            case .finished(let outcome):
+                DriveFinishedView(outcome: outcome, carName: capture.carName, onDone: capture.dismissFinished)
             }
         }
         .preferredColorScheme(.dark)

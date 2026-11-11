@@ -15,6 +15,7 @@ final class AppEnvironment {
     let preferences = UserDefaultsPreferences()
     let permissions = SystemPermissions()
     let crashReporter = ConsentGatedCrashReporter()
+    let usageAnalytics = CoreUsageAnalytics()
     let flags = BuildFlags.fromBundle()
     let clock = SystemClock()
     let files = FileTripStore()
@@ -23,6 +24,9 @@ final class AppEnvironment {
     let motion = CoreMotionSource()
     let activity = CoreMotionActivitySource()
     let power = SystemPowerState()
+    /// Its own activity source for the in-drive content hold: the core's `activity` keeps one sink and is stopped at
+    /// the end of every trip.
+    let movement = ActivityMovementMonitor(source: CoreMotionActivitySource())
     let recorder: CoreTripRecorder
     let corrections = CoreTripCorrections()
     private(set) lazy var corePorts = CorePorts(
@@ -53,11 +57,13 @@ final class AppEnvironment {
             permissions: permissions,
             preferences: preferences,
             crashReporter: crashReporter,
+            analytics: usageAnalytics,
             selfTest: selfTest,
             flags: flags,
             coreInfo: SharedCoreHelloProvider(),
             refreshCapture: { [weak self] in self?.refreshCapture() },
-            runSelfTestOnLaunch: ProcessInfo.processInfo.arguments.contains("-selfTest"))
+            runSelfTestOnLaunch: ProcessInfo.processInfo.arguments.contains("-selfTest"),
+            movement: movement)
             .withTripCorrections(corrections)
     }
 
@@ -76,6 +82,12 @@ final class AppEnvironment {
         corrections.attach(services.corrections)
         recorder.onLaunch()
         crashReporter.apply(consent: preferences.preferences.sendCrashReports)
+        // Usage statistics: events wait in memory until the user has chosen (onboarding finished means S-ONB-13 was
+        // answered), then are sent or dropped; a later change in Profile takes effect at once (F-ONB-08).
+        usageAnalytics.attach(services.analytics)
+        if preferences.preferences.onboardingCompleted {
+            usageAnalytics.setUsageConsent(preferences.preferences.shareUsageStatistics)
+        }
     }
 
     /// Every unlock: the first one after a reboot launches; later ones compress R0 files that a finalisation while

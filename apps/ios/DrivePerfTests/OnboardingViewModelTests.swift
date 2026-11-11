@@ -7,6 +7,7 @@ final class OnboardingViewModelTests: XCTestCase {
     private var permissions: FakePermissions!
     private var preferences: MemoryPreferences!
     private var crash: FakeCrashReporter!
+    private var analytics: FakeUsageAnalytics!
     private var refreshes = 0
     private var finished = false
 
@@ -14,13 +15,14 @@ final class OnboardingViewModelTests: XCTestCase {
         permissions = FakePermissions()
         preferences = MemoryPreferences()
         crash = FakeCrashReporter()
+        analytics = FakeUsageAnalytics()
         refreshes = 0
         finished = false
     }
 
     private func makeModel() -> OnboardingViewModel {
         OnboardingViewModel(
-            permissions: permissions, preferences: preferences, crashReporter: crash,
+            permissions: permissions, preferences: preferences, crashReporter: crash, analytics: analytics,
             refreshCapture: { [weak self] in self?.refreshes += 1 },
             onFinished: { [weak self] in self?.finished = true })
     }

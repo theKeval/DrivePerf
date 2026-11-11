@@ -17,11 +17,13 @@ public final class ProfileViewModel {
 
     private let preferences: any PreferencesStoring
     private let crashReporter: any CrashReporting
+    private let analytics: any UsageAnalytics
     private let selfTest: any SelfTesting
 
     public init(dependencies: AppDependencies) {
         preferences = dependencies.preferences
         crashReporter = dependencies.crashReporter
+        analytics = dependencies.analytics
         selfTest = dependencies.selfTest
         flags = dependencies.flags
         coreInfo = dependencies.coreInfo.hello()
@@ -41,6 +43,13 @@ public final class ProfileViewModel {
     public func setShareUsageStatistics(_ on: Bool) {
         shareUsageStatistics = on
         preferences.update { $0.shareUsageStatistics = on }
+        // Takes effect within this session: the gate stops (or starts) sending at once (F-ONB-08.3).
+        analytics.setUsageConsent(on)
+    }
+
+    /// S-PRV-07 "Reset analytics ID". The row arrives with the Privacy Centre; the action is ready for it.
+    public func resetAnalyticsID() {
+        analytics.resetID()
     }
 
     /// On → start the reporter; off → stop it (ADR-007).
