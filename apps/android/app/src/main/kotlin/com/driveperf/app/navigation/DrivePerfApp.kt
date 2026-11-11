@@ -31,7 +31,10 @@ import com.driveperf.feature.account.ProfileScreen
 import com.driveperf.feature.account.ProfileUiState
 import com.driveperf.feature.capture.CaptureUiState
 import com.driveperf.feature.capture.CaptureViewModel
-import com.driveperf.feature.capture.InDriveScreen
+import com.driveperf.feature.capture.DriveCoverHost
+import com.driveperf.feature.capture.InDriveActions
+import com.driveperf.feature.capture.PassengerActions
+import com.driveperf.feature.capture.StopActions
 import com.driveperf.feature.drives.AllDrivesScreen
 import com.driveperf.feature.drives.DrivesHomeScreen
 import com.driveperf.feature.drives.DrivesViewModel
@@ -55,7 +58,9 @@ private val ToolbarClearance = 88.dp // the floating toolbar (64 dp) plus its ga
  * The app's navigation graph.
  *
  * Every navigation passes through the in-drive gate (screen-map.md section 2.2): while a drive is recording, the only
- * screen is [InDriveScreen]; the rest of the graph is not composed, and returns exactly where it was afterwards.
+ * screen is the in-drive cover (S-DRV-01, or S-DRV-05 for held content, then S-DRV-04 after the trip); the rest of the
+ * graph is not composed, and returns exactly where it was afterwards. Content that arrives while locked (a notification
+ * or deep link) goes through `CaptureViewModel.requestContent`.
  */
 @Composable
 fun DrivePerfApp() {
@@ -63,18 +68,28 @@ fun DrivePerfApp() {
     val capture by captureViewModel.state.collectAsStateWithLifecycle()
     val navController = rememberNavController()
 
-    val recording = capture as? CaptureUiState.Recording
-    if (recording != null) {
-        InDriveScreen(
-            state = recording,
-            onStopRequested = captureViewModel::onStopRequested,
-            onStopDismissed = captureViewModel::onStopDismissed,
-            onStopConfirmed = captureViewModel::onStopConfirmed,
-        )
+    val cover by captureViewModel.cover.collectAsStateWithLifecycle()
+    val actions = remember(captureViewModel) { captureViewModel.driveActions() }
+
+    val current = cover
+    if (current != null) {
+        DriveCoverHost(current, actions)
     } else {
         AppNavHost(navController, captureViewModel, capture)
     }
 }
+
+private fun CaptureViewModel.driveActions() = InDriveActions(
+    stop = StopActions(::onStopRequested, ::onStopDismissed, ::onStopConfirmed),
+    passenger = PassengerActions(
+        onRequested = ::onPassengerRequested,
+        onDismissed = ::onPassengerDismissed,
+        onKept = ::onPassengerKept,
+        onDiscardRequested = ::onPassengerDiscardRequested,
+        onDiscardConfirmed = ::onPassengerDiscardConfirmed,
+    ),
+    onCoverDismissed = ::onCoverDismissed,
+)
 
 /** Everything the destinations share, gathered once so each destination stays small. */
 private class AppEnv(

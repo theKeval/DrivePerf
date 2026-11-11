@@ -1,95 +1,159 @@
 package com.driveperf.feature.capture
 
 import android.app.Activity
+import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.foundation.background
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowCompat
 import com.driveperf.designsystem.DpIcons
 import com.driveperf.designsystem.DrivePerfTheme
 
 /**
- * The locked in-drive screen (S-DRV-01): status only. It shows elapsed time, distance so far and GPS health, and nothing
- * that invites a glance while moving: no score, no speed, no map, no haptics (safety rules in screen-map.md section 2.2).
- * The one control is a large Stop button (96 dp, `layout.android.driveButton`) that asks for confirmation first.
+ * The locked in-drive screen (S-DRV-01): status only. A recording indicator, elapsed time, distance and, once the
+ * Garage exists, the car name, and nothing that invites a glance while moving: no score, no speed, no events, no tips,
+ * no map, no navigation, no haptics (safety rules in screen-map.md section 2.2). The controls are a large Stop (it asks
+ * for confirmation first) and a large "I'm a passenger". The state changes at most once a second (the elapsed text).
  */
 @Composable
 fun InDriveScreen(
     state: CaptureUiState.Recording,
-    onStopRequested: () -> Unit,
-    onStopDismissed: () -> Unit,
-    onStopConfirmed: () -> Unit,
+    actions: InDriveActions,
     modifier: Modifier = Modifier,
 ) {
-    // The drive screen is always dark on pure black (tokens.json `driveBg`), whatever the system theme: less glare at night.
+    DriveSurface(modifier) {
+        BackHandler(enabled = true) {} // no way out but the two buttons
+        DriveContent(state, actions)
+    }
+}
+
+/** The always-dark pure-black drive surface (tokens.json `driveBg`), whatever the system theme: less glare at night. */
+@Composable
+internal fun DriveSurface(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
     LightSystemBarIcons()
     DrivePerfTheme(darkTheme = true) {
         Surface(
             modifier = modifier.fillMaxSize(),
             color = DrivePerfTheme.extendedColors.driveBg,
             contentColor = MaterialTheme.colorScheme.onSurface,
-        ) {
-            DriveContent(state, onStopRequested, onStopDismissed, onStopConfirmed)
-        }
-    }
-}
-
-@Composable
-private fun DriveContent(
-    state: CaptureUiState.Recording,
-    onStopRequested: () -> Unit,
-    onStopDismissed: () -> Unit,
-    onStopConfirmed: () -> Unit,
-) {
-    Box(modifier = Modifier.fillMaxSize().safeDrawingPadding().padding(24.dp)) {
-        DriveStatus(state, modifier = Modifier.align(Alignment.Center))
-        StopControl(onStopRequested, modifier = Modifier.align(Alignment.BottomCenter))
-    }
-    if (state.confirmingStop) {
-        AlertDialog(
-            onDismissRequest = onStopDismissed,
-            title = { Text(stringResource(R.string.drive_stop_title)) },
-            text = { Text(stringResource(R.string.drive_stop_body)) },
-            confirmButton = { TextButton(onClick = onStopConfirmed) { Text(stringResource(R.string.drive_stop_confirm)) } },
-            dismissButton = { TextButton(onClick = onStopDismissed) { Text(stringResource(R.string.drive_stop_keep)) } },
+            content = content,
         )
     }
 }
 
 @Composable
-private fun DriveStatus(state: CaptureUiState.Recording, modifier: Modifier = Modifier) {
+private fun DriveContent(state: CaptureUiState.Recording, actions: InDriveActions) {
+    Box(modifier = Modifier.fillMaxSize().safeDrawingPadding().padding(24.dp)) {
+        DriveHeader(state, modifier = Modifier.align(Alignment.TopStart))
+        DriveNumbers(state, modifier = Modifier.align(Alignment.Center))
+        Column(
+            modifier = Modifier.align(Alignment.BottomCenter),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            StopButton(actions.stop.onRequested)
+            PassengerButton(actions.passenger.onRequested)
+        }
+    }
+    if (state.confirmingStop) StopDialog(state.shortTrip, actions)
+    PassengerSheet(state.passengerStep, actions)
+}
+
+@Composable
+private fun StopDialog(shortTrip: Boolean, actions: InDriveActions) {
+    AlertDialog(
+        onDismissRequest = actions.stop.onDismissed,
+        title = { Text(stringResource(R.string.drive_stop_title)) },
+        text = {
+            Text(stringResource(if (shortTrip) R.string.drive_stop_body_short else R.string.drive_stop_body))
+        },
+        confirmButton = {
+            TextButton(onClick = actions.stop.onConfirmed, modifier = Modifier.heightIn(min = DriveTouchMin)) {
+                Text(stringResource(if (shortTrip) R.string.drive_stop_confirm_short else R.string.drive_stop_confirm))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = actions.stop.onDismissed, modifier = Modifier.heightIn(min = DriveTouchMin)) {
+                Text(stringResource(R.string.drive_stop_keep))
+            }
+        },
+    )
+}
+
+@Composable
+private fun DriveHeader(state: CaptureUiState.Recording, modifier: Modifier = Modifier) {
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth().semantics(mergeDescendants = true) {},
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Box(Modifier.size(12.dp).background(MaterialTheme.colorScheme.primary, CircleShape))
+            Text(
+                text = stringResource(R.string.drive_title),
+                style = MaterialTheme.typography.titleMediumEmphasized,
+                modifier = Modifier.weight(1f),
+            )
+            state.carName?.let { name ->
+                Text(
+                    text = name,
+                    style = MaterialTheme.typography.labelLarge,
+                    modifier = Modifier
+                        .background(MaterialTheme.colorScheme.surfaceContainerHigh, RoundedCornerShape(20.dp))
+                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                )
+            }
+        }
+        Text(
+            text = stringResource(
+                if (state.manual) R.string.drive_started_manual else R.string.drive_started_auto,
+                state.startedAtLabel,
+            ),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+@Composable
+private fun DriveNumbers(state: CaptureUiState.Recording, modifier: Modifier = Modifier) {
     Column(
         modifier = modifier,
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Text(
-            text = stringResource(R.string.drive_title),
-            style = MaterialTheme.typography.titleMediumEmphasized,
-            color = MaterialTheme.colorScheme.primary,
+            text = stringResource(R.string.drive_elapsed_label),
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Text(text = state.elapsed, style = MaterialTheme.typography.displayLargeEmphasized)
         Text(
@@ -110,34 +174,35 @@ private fun DriveStatus(state: CaptureUiState.Recording, modifier: Modifier = Mo
 }
 
 @Composable
-private fun StopControl(onStopRequested: () -> Unit, modifier: Modifier = Modifier) {
-    Column(
-        modifier = modifier,
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(16.dp),
+private fun StopButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
+    Button(
+        onClick = onClick,
+        modifier = modifier.fillMaxWidth().heightIn(min = DriveButtonHeight),
+        shape = RoundedCornerShape(28.dp),
+        colors = ButtonDefaults.buttonColors(
+            containerColor = MaterialTheme.colorScheme.errorContainer,
+            contentColor = MaterialTheme.colorScheme.onErrorContainer,
+        ),
     ) {
+        Icon(painter = painterResource(DpIcons.Stop), contentDescription = null, modifier = Modifier.size(28.dp))
         Text(
-            text = stringResource(R.string.drive_locked_hint),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center,
+            text = stringResource(R.string.drive_stop),
+            style = MaterialTheme.typography.titleLarge,
+            modifier = Modifier.padding(start = 12.dp),
         )
-        Button(
-            onClick = onStopRequested,
-            modifier = Modifier.size(96.dp),
-            shape = CircleShape,
-            contentPadding = PaddingValues(0.dp),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = MaterialTheme.colorScheme.errorContainer,
-                contentColor = MaterialTheme.colorScheme.onErrorContainer,
-            ),
-        ) {
-            Icon(
-                painter = painterResource(DpIcons.Stop),
-                contentDescription = stringResource(R.string.drive_stop),
-                modifier = Modifier.size(40.dp),
-            )
-        }
+    }
+}
+
+/** The passenger escape (F-CAP-08): a button as large as Stop, outlined so it is not mistaken for it. */
+@Composable
+internal fun PassengerButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
+    OutlinedButton(
+        onClick = onClick,
+        modifier = modifier.fillMaxWidth().heightIn(min = DriveButtonHeight),
+        shape = RoundedCornerShape(28.dp),
+        border = BorderStroke(1.5.dp, MaterialTheme.colorScheme.outline),
+    ) {
+        Text(text = stringResource(R.string.drive_passenger), style = MaterialTheme.typography.titleLarge)
     }
 }
 
