@@ -89,4 +89,23 @@ class FeedbackRescorerTest {
         assertNull(rescored.smoothness)
         assertNull(rescored.tip)
     }
+
+    @Test
+    fun efficiencyComesBackExactlyAfterSeveralFeedbackChanges() = runTest {
+        val rescorer = FeedbackRescorer(history)
+        val counted = score.copy(ledger = score.ledger!!.copy(stopStartCount = 4, abruptAccelCount = 10))
+        val baseline = rescorer.rescore(request(emptyMap(), counted))
+        val needed = mapOf(brake.id to EventFeedback(brake.id, "t1", needed = true, inaccurate = null, at = 2L))
+        val marked = rescorer.rescore(request(needed, counted))
+        assertEquals(10, marked.ledger?.abruptAccelCount, "the finalisation counts ride along on the ledger")
+        val undone = rescorer.rescore(request(emptyMap(), marked))
+        assertEquals(baseline.efficiency, undone.efficiency, "Count it again from a re-scored score restores efficiency")
+        assertEquals(4, undone.efficiency?.stopStartCount)
+    }
+
+    @Test
+    fun theFinalisationCountsAreOnTheLedger() {
+        assertEquals(out.efficiencyInputs.stopStartCount, out.score?.ledger?.stopStartCount)
+        assertEquals(out.efficiencyInputs.abruptAccels, out.score?.ledger?.abruptAccelCount)
+    }
 }

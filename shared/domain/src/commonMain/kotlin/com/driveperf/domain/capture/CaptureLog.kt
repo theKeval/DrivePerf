@@ -73,6 +73,13 @@ public interface CaptureLog {
     /** Reads the valid prefix of the log, or null when there is none. */
     public suspend fun read(tripId: String): CapturedTrip?
 
+    /**
+     * Replaces the log of [header]'s trip with [header] and [batches] in one atomic write, so a failure (disk full, I/O
+     * error) leaves the previous log as it was. Used to give each part of a split trip its own R0 (§1.6). Returns false
+     * when nothing was replaced.
+     */
+    public suspend fun replace(header: CaptureHeader, batches: List<CaptureBatch>): Boolean
+
     /** Deletes the log. */
     public suspend fun delete(tripId: String)
 }

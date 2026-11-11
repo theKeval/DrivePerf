@@ -36,12 +36,7 @@ public class FeedbackRescorer(
         val trip = request.trip
         val score = request.score
         val routeId = request.routeId
-        val fullMovingS = ledger.perEvent.fold(ledger.base) { sum, e -> sum + e.row }.movingS
-        val efficiency = score.efficiency
-        val inputs = EfficiencyInputs(
-            stopStartCount = efficiency?.stopStartCount ?: 0,
-            abruptAccels = ((efficiency?.abruptAccelsPerMin ?: 0.0) * fullMovingS / SECONDS_PER_MINUTE).roundToInt(),
-        )
+        val inputs = originalInputs(score, ledger)
         val ctx = ScoringContext(
             tripId = trip.id,
             scorable = true,
@@ -76,6 +71,19 @@ public class FeedbackRescorer(
             ),
         )
         return rescored.copy(tip = tip, recordState = request.score.recordState)
+    }
+
+    /**
+     * The efficiency inputs measured at finalisation. They are kept on the ledger; a row stored before that falls back
+     * to reconstructing them from its efficiency, which is exact only before the first re-score.
+     */
+    private fun originalInputs(score: Score, ledger: Ledger): EfficiencyInputs {
+        val stopStarts = ledger.stopStartCount ?: score.efficiency?.stopStartCount ?: 0
+        val abrupt = ledger.abruptAccelCount ?: run {
+            val fullMovingS = ledger.perEvent.fold(ledger.base) { sum, e -> sum + e.row }.movingS
+            ((score.efficiency?.abruptAccelsPerMin ?: 0.0) * fullMovingS / SECONDS_PER_MINUTE).roundToInt()
+        }
+        return EfficiencyInputs(stopStarts, abrupt)
     }
 
     private companion object {
