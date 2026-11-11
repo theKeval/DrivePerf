@@ -31,6 +31,7 @@ import com.driveperf.domain.tripfile.TripFileStore
 import com.driveperf.foundation.Clock
 import com.driveperf.foundation.Units
 import com.driveperf.foundation.newId
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
@@ -39,6 +40,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 
 /** The device ports the recorder drives. */
 public data class CapturePorts(
@@ -73,6 +75,9 @@ public class TripRecorderEngine(
     private val inputs = Channel<Input>(Channel.UNLIMITED)
     private val mutableStatus = MutableStateFlow(RecorderStatus.IDLE)
     private val timers = mutableMapOf<TimerId, Job>()
+
+    /** Recorded-accelerometer queries still running, by trip. Touched only on the engine coroutine. */
+    private val backfills = mutableMapOf<String, CompletableDeferred<List<RecordedAccelSample>>>()
     private var state = MachineState()
     private var gnssOn = false
     private var lastSyncNs = 0L
@@ -110,7 +115,7 @@ public class TripRecorderEngine(
 
         data class Simple(val make: (Long) -> MachineEvent) : Input
 
-        data class Backfill(val tripId: String, val samples: List<RecordedAccelSample>) : Input
+        data class Backfill(val tripId: String, val result: CompletableDeferred<List<RecordedAccelSample>>) : Input
     }
 
     private suspend fun handle(input: Input) {
@@ -120,13 +125,21 @@ public class TripRecorderEngine(
             is Input.Wake -> MachineEvent.Wake(now, clock.wallMs(), input.event, newHeader(input.event, now))
             is Input.Simple -> input.make(now)
             is Input.Backfill -> {
-                persistence.log.append(input.tripId, CaptureBatch(recordedAccel = input.samples))
+                backfillArrived(input)
                 return
             }
         }
+        apply(event, now)
+    }
+
+    /** Reduces [event] and runs its effects. An effect that fails is fed back at once, before any status is shown. */
+    private suspend fun apply(event: MachineEvent, now: Long) {
         val transition = machine.reduce(state, event)
         state = transition.state
-        transition.effects.forEach { execute(it) }
+        for (effect in transition.effects) {
+            val failure = execute(effect)
+            if (failure != null) return apply(failure, now)
+        }
         publishStatus(now)
     }
 
@@ -174,8 +187,11 @@ public class TripRecorderEngine(
         )
     }
 
-    private suspend fun execute(effect: MachineEffect) {
+    /** Runs [effect]; returns the event to feed back when it failed. */
+    private suspend fun execute(effect: MachineEffect): MachineEvent? {
+        if (effect is MachineEffect.CreateTrip) return createTrip(effect)
         if (!executeSensor(effect)) executeOther(effect)
+        return null
     }
 
     /** Sensor effects; false when [effect] is not one. */
@@ -201,11 +217,8 @@ public class TripRecorderEngine(
             is MachineEffect.QueryActivityHistory -> queryHistory(effect)
             is MachineEffect.Schedule -> schedule(effect)
             is MachineEffect.Cancel -> timers.remove(effect.id)?.cancel()
-            is MachineEffect.CreateTrip -> createTrip(effect)
             is MachineEffect.ConfirmTrip -> confirmTrip(effect)
-            is MachineEffect.RunBackfill -> ports.motion.queryRecordedAccelerometer(effect.fromWallMs, effect.toWallMs) {
-                if (it.isNotEmpty()) inputs.trySend(Input.Backfill(effect.tripId, it))
-            }
+            is MachineEffect.RunBackfill -> runBackfill(effect)
             is MachineEffect.Append -> append(effect)
             is MachineEffect.Mark -> {
                 val mark = CaptureMark(effect.tNs, effect.type, effect.detail)
@@ -244,10 +257,11 @@ public class TripRecorderEngine(
         }
     }
 
-    private suspend fun createTrip(effect: MachineEffect.CreateTrip) {
+    /** Opens R0 first: without it nothing would be kept, so a failure drops the trip (returns [MachineEvent.LogFailed]). */
+    private suspend fun createTrip(effect: MachineEffect.CreateTrip): MachineEvent? {
         val h = effect.header
         val wall = clock.wallMs()
-        persistence.log.open(h)
+        if (!persistence.log.open(h)) return MachineEvent.LogFailed(clock.monotonicNs(), h.tripId)
         persistence.store.insertRecording(
             Trip(
                 id = h.tripId,
@@ -266,6 +280,35 @@ public class TripRecorderEngine(
         lastSyncNs = h.startMonoNs
         val free = ports.files.freeSpaceBytes()
         send { now -> MachineEvent.FreeSpace(now, free) }
+        return null
+    }
+
+    /** The query answers on any thread, so its callback only completes the result and queues it. */
+    private fun runBackfill(effect: MachineEffect.RunBackfill) {
+        val result = CompletableDeferred<List<RecordedAccelSample>>()
+        backfills[effect.tripId] = result
+        ports.motion.queryRecordedAccelerometer(effect.fromWallMs, effect.toWallMs) { samples ->
+            result.complete(samples)
+            inputs.trySend(Input.Backfill(effect.tripId, result))
+        }
+    }
+
+    /** A backfill that arrived while recording. Ignored when finalise or discard already took it. */
+    private suspend fun backfillArrived(input: Input.Backfill) {
+        if (backfills[input.tripId] !== input.result) return
+        backfills.remove(input.tripId)
+        appendBackfill(input.tripId, input.result.await())
+    }
+
+    /** Finalisation reads R0 once, so a query still running is waited for (bounded) first. */
+    private suspend fun awaitBackfill(tripId: String) {
+        val pending = backfills.remove(tripId) ?: return
+        val samples = withTimeoutOrNull((config.backfillWaitS * MS_PER_S).toLong()) { pending.await() }
+        if (samples != null) appendBackfill(tripId, samples)
+    }
+
+    private suspend fun appendBackfill(tripId: String, samples: List<RecordedAccelSample>) {
+        if (samples.isNotEmpty()) persistence.log.append(tripId, CaptureBatch(recordedAccel = samples))
     }
 
     private suspend fun confirmTrip(effect: MachineEffect.ConfirmTrip) {
@@ -298,6 +341,7 @@ public class TripRecorderEngine(
 
     private suspend fun finalise(effect: MachineEffect.Finalise) {
         val log = persistence.log
+        awaitBackfill(effect.tripId)
         log.sync(effect.tripId)
         val capture = log.read(effect.tripId)
         val trip = state.trip
@@ -319,6 +363,7 @@ public class TripRecorderEngine(
     }
 
     private suspend fun discard(tripId: String) {
+        backfills.remove(tripId)
         persistence.store.deleteNow(tripId)
         persistence.log.delete(tripId)
     }
@@ -327,7 +372,7 @@ public class TripRecorderEngine(
         val trip = state.trip
         val phase = state.phase
         mutableStatus.value = if (trip == null || phase == RecorderState.IDLE) {
-            RecorderStatus.IDLE.copy(autoDetectEnabled = state.autoDetect)
+            RecorderStatus.IDLE.copy(autoDetectEnabled = state.autoDetect, startFailed = state.startFailed)
         } else {
             RecorderStatus(
                 state = phase,
@@ -338,5 +383,9 @@ public class TripRecorderEngine(
                 autoDetectEnabled = state.autoDetect,
             )
         }
+    }
+
+    private companion object {
+        const val MS_PER_S = 1000.0
     }
 }
