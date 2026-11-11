@@ -101,18 +101,22 @@ internal class PhoneMovement(private val cfg: SignalConfig) {
         return out
     }
 
-    /** Standard deviation of the gravity direction, degrees, against its mean. */
+    /**
+     * Standard deviation of the gravity direction, degrees, against its mean. Samples with no gravity (resampling
+     * gaps leave zero vectors) have no direction and are skipped.
+     */
     fun gravitySpreadDeg(sig: DeviceSignal, range: IntRange): Double {
-        if (range.isEmpty()) return 0.0
+        val valid = range.filter { sig.gravity[it].norm() > 0.0 }
+        if (valid.isEmpty()) return 0.0
         var mean = V3.ZERO
-        for (k in range) mean += sig.gravity[k].unit()
+        for (k in valid) mean += sig.gravity[k].unit()
         val m = mean.unit()
         var ss = 0.0
-        for (k in range) {
+        for (k in valid) {
             val a = angleDeg(m, sig.gravity[k].unit())
             ss += a * a
         }
-        return sqrt(ss / range.count())
+        return sqrt(ss / valid.size)
     }
 
     private companion object {
@@ -120,6 +124,10 @@ internal class PhoneMovement(private val cfg: SignalConfig) {
         const val TILT_TO_S = 1
         const val RAD_TO_DEG = 180.0 / PI
 
-        fun angleDeg(a: V3, b: V3): Double = acos(((a dot b) / (a.norm() * b.norm())).coerceIn(-1.0, 1.0)) * RAD_TO_DEG
+        /** Angle between two directions; 0 when either has none, so a zero vector never yields NaN. */
+        fun angleDeg(a: V3, b: V3): Double {
+            val norms = a.norm() * b.norm()
+            return if (norms == 0.0) 0.0 else acos(((a dot b) / norms).coerceIn(-1.0, 1.0)) * RAD_TO_DEG
+        }
     }
 }

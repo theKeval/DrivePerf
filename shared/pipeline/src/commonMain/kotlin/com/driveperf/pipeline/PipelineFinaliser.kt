@@ -7,6 +7,7 @@ import com.driveperf.domain.capture.WakeKind
 import com.driveperf.domain.repository.ScoredTrip
 import com.driveperf.domain.repository.TripHistory
 import com.driveperf.domain.trip.CaptureMeta
+import com.driveperf.domain.trip.DriveContext
 import com.driveperf.domain.trip.Interruption
 import com.driveperf.domain.trip.QualityBadge
 import com.driveperf.domain.trip.Trip
@@ -90,7 +91,7 @@ public class PipelineFinaliser(
         )
         val draft = trip(request, sig, quality, distance, m, suspect, analysis.context)
         val scorable = request.kind == TripKind.DRIVER && b.badge != QualityBadge.UNSCORABLE && !short
-        val priors = priors(history.finishedBefore(draft.startedAt, HISTORY_LIMIT))
+        val priors = priorsFor(draft.startedAt, analysis.context)
         val outcome = scorer.score(
             analysis,
             ScoringContext(
@@ -114,7 +115,7 @@ public class PipelineFinaliser(
         distance: Double,
         m: com.driveperf.pipeline.signal.Metrics,
         suspect: com.driveperf.domain.trip.Suspect,
-        context: com.driveperf.domain.trip.DriveContext,
+        context: DriveContext,
     ): Trip {
         val h = r.capture.header
         val estimatedM = (sig.estimate?.distanceM ?: 0.0) + (distance - m.gatedDistanceM - (sig.estimate?.distanceM ?: 0.0))
@@ -157,6 +158,24 @@ public class PipelineFinaliser(
         )
     }
 
+    /**
+     * §5.7 baselines use the last 10 eligible trips of a basis, however many ineligible or other-context trips came
+     * in between, so history is read a page at a time until this trip's context has 10 or history ends.
+     */
+    private suspend fun priorsFor(beforeStartedAt: Long, context: DriveContext): List<PriorTrip> {
+        val seen = mutableSetOf<String>()
+        val out = mutableListOf<PriorTrip>()
+        var cursor = beforeStartedAt
+        do {
+            val page = history.finishedBefore(cursor, HISTORY_PAGE).filter { seen.add(it.trip.id) }
+            out += priors(page)
+            // The next page starts at the last startedAt again, so trips sharing it are not skipped.
+            cursor = (page.lastOrNull()?.trip?.startedAt ?: cursor) + 1
+            val enough = out.count { it.context == context } >= Baselines.DEPTH
+        } while (page.isNotEmpty() && !enough)
+        return out
+    }
+
     private fun priors(history: List<ScoredTrip>): List<PriorTrip> = history.mapNotNull { (trip, score, routeId) ->
         val smoothness = score?.smoothness
         if (smoothness == null || !Baselines.eligible(trip, smoothness)) return@mapNotNull null
@@ -176,7 +195,7 @@ public class PipelineFinaliser(
     private companion object {
         const val MS = 1000.0
         const val PERCENT = 100.0
-        const val HISTORY_LIMIT = 200
+        const val HISTORY_PAGE = 200
         const val GNSS_ELIGIBLE_PCT = 60.0
     }
 }
