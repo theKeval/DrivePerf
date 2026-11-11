@@ -4,6 +4,7 @@ import com.driveperf.data.local.DatabaseDriverFactory
 import com.driveperf.data.local.LocalEventFeedbackStore
 import com.driveperf.data.local.LocalRouteHistory
 import com.driveperf.data.local.LocalRouteRepository
+import com.driveperf.data.local.LocalTripCorrections
 import com.driveperf.data.local.LocalTripHistory
 import com.driveperf.data.local.LocalTripRepository
 import com.driveperf.data.local.LocalTripStore
@@ -28,6 +29,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
 import kotlin.coroutines.CoroutineContext
 
 /**
@@ -103,6 +105,9 @@ public object DrivePerfCore {
         )
         val trips = LocalTripRepository(db, files, io)
         val routes = LocalRouteRepository(db, io)
+        // DRIVE-100: trips corrected to not-a-drive more than 30 days ago are deleted once per start.
+        val corrections = LocalTripCorrections(db, trips, io, clock)
+        scope.launch { corrections.purgeExpiredNotDrives() }
         return CoreServices(
             recorder = recorder,
             trips = trips,
@@ -110,6 +115,7 @@ public object DrivePerfCore {
             markEventNeeded = MarkEventNeeded(
                 trips, routes, LocalEventFeedbackStore(db, io), FeedbackRescorer(history, previews), clock,
             ),
+            corrections = corrections,
             analytics = ConsentGatedAnalytics(platform.analyticsSink()),
             onClose = {
                 scope.cancel()

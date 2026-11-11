@@ -121,7 +121,7 @@ final class CoreTripRecorderTests: XCTestCase {
                 durationS: KotlinDouble(value: 600), movingS: nil, stoppedS: nil, stopCount: nil,
                 avgMovingSpeedMps: nil, maxSpeedMps: nil, maxSpeedAtS: nil, elevGainM: nil, elevLossM: nil,
                 elevMinM: nil, elevMaxM: nil, bbox: nil, stops: [], cleanest: nil, quality: nil, interrupted: nil,
-                suspect: .none, suspectAnswer: nil, captureMeta: nil, pipelineVersion: nil, rawState: .full,
+                suspect: .none, suspectAnswer: nil, correction: nil, correctedAt: nil, captureMeta: nil, pipelineVersion: nil, rawState: .full,
                 createdAt: 1, updatedAt: 1, deletedAt: nil)
         }
         let row = KotlinMapping.summary(trip(.finalised, .auto, distance: 4200))

@@ -22,6 +22,7 @@ internal fun TripQueries.upsertTrip(r: TripRow) {
         quality_json = r.quality_json, interrupted_json = r.interrupted_json, capture_meta_json = r.capture_meta_json,
         suspect = r.suspect, suspect_answer = r.suspect_answer, pipeline_version = r.pipeline_version, raw_state = r.raw_state,
         preview_path = r.preview_path, schema_version = r.schema_version, created_at = r.created_at, updated_at = r.updated_at,
-        deleted_at = r.deleted_at, origin_device_id = r.origin_device_id, field_clock = r.field_clock, id = r.id,
+        deleted_at = r.deleted_at, origin_device_id = r.origin_device_id, field_clock = r.field_clock, correction = r.correction,
+        corrected_at = r.corrected_at, id = r.id,
     )
 }

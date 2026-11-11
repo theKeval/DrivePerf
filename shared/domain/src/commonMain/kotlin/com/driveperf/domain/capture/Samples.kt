@@ -19,6 +19,10 @@ public data class GeoPoint(val lat: Double, val lng: Double)
  * @property hAccM horizontal accuracy (radius, 68 %). Null when the platform does not report it.
  * @property speedMps Doppler speed. Null when unavailable (iOS reports −1: the adapter maps it to null).
  * @property courseDeg course over ground, clockwise from true north, 0–360.
+ * @property provider which positioning source produced the fix (F-DQ-03). Null when the adapter cannot tell, and
+ *   for fixes read from R0 files written before DRIVE-167.
+ * @property ageMs how old the fix already was when the adapter received it: delivery time minus fix time, in ms
+ *   (F-DQ-03). Null when unknown, and for R0 files written before DRIVE-167.
  */
 public data class LocationSample(
     val tMonoNs: Long,
@@ -32,7 +36,31 @@ public data class LocationSample(
     val speedAccMps: Double?,
     val courseDeg: Double?,
     val courseAccDeg: Double?,
+    val provider: FixProvider? = null,
+    val ageMs: Long? = null,
 )
+
+/**
+ * The positioning source of a fix (F-DQ-03 platform note: store the provider with every fix). Android reports the
+ * provider name (`gps`, `network`, `fused`) and a mock flag; iOS reports only whether a fix came from an accessory or
+ * was simulated, so its other fixes are [FUSED].
+ */
+public enum class FixProvider {
+    /** The satellite receiver alone (Android `gps`). */
+    GNSS,
+
+    /** The OS blend of satellites, Wi-Fi, cell and sensors (Android `fused`, iOS Core Location). */
+    FUSED,
+
+    /** Wi-Fi or cell positioning without satellites (Android `network`). */
+    NETWORK,
+
+    /** An external receiver (iOS `isProducedByAccessory`). */
+    ACCESSORY,
+
+    /** A mock or simulated location (Android `isMock`, iOS `isSimulatedBySoftware`). */
+    SIMULATED,
+}
 
 /**
  * One device-motion sample in the normalised device frame (pipeline-and-scoring.md §2.1): right-handed, `x` towards

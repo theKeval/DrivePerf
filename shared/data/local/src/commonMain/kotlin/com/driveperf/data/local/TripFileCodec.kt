@@ -154,6 +154,8 @@ internal object TripFileCodec {
             speed_acc = delta(f.map { quantN(it.speedAccMps, q.speed_mps_per_unit) }),
             course = delta(f.map { quantN(it.courseDeg, q.course_deg_per_unit) }),
             course_acc = delta(f.map { quantN(it.courseAccDeg, q.course_deg_per_unit) }),
+            age_ms = delta(f.map { fix -> fix.ageMs?.coerceIn(0L, Int.MAX_VALUE.toLong())?.toInt() ?: Fixed.ABSENT }),
+            provider = f.map { FixProviderCode.of(it.provider) },
         )
     }
 

@@ -63,6 +63,8 @@ public data class PreviewRow(
 /**
  * A trip (data-model.md §1.7, plus `suspect` from pipeline-and-scoring.md §0.8). Summary metrics are null while
  * recording and for discarded trips. Times are UTC epoch ms; offsets in seconds are from [startedAt].
+ *
+ * [correction] is the user's own answer to "what was this?" (F-CAP-04), set with [correctedAt]; [kind] follows it.
  */
 public data class Trip(
     val id: String,
@@ -102,6 +104,8 @@ public data class Trip(
     val interrupted: Interruption? = null,
     val suspect: Suspect = Suspect.NONE,
     val suspectAnswer: SuspectAnswer? = null,
+    val correction: TripCorrection? = null,
+    val correctedAt: Long? = null,
     val captureMeta: CaptureMeta? = null,
     val pipelineVersion: String? = null,
     val rawState: RawState = RawState.FULL,
@@ -109,3 +113,13 @@ public data class Trip(
     val updatedAt: Long,
     val deletedAt: Long? = null,
 )
+
+/** The trip is not a drive (F-CAP-04): it is out of scores and history, in the "Not drives" filter until purged. */
+public val Trip.isNotADrive: Boolean get() = kind == TripKind.TRANSIT || kind == TripKind.NOT_DRIVING
+
+/**
+ * The question the trip still asks, or null (F-CAP-04 AC2–3): "Was this a bus or train?" for [Suspect.TRANSIT],
+ * "Was this a bike ride?" for [Suspect.CYCLING]. Asked only while the trip is a driver trip nobody has answered.
+ */
+public val Trip.openQuestion: Suspect?
+    get() = suspect.takeIf { it != Suspect.NONE && suspectAnswer == null && kind == TripKind.DRIVER && correction == null }

@@ -29,6 +29,7 @@ import com.driveperf.domain.trip.Stop
 import com.driveperf.domain.trip.Suspect
 import com.driveperf.domain.trip.SuspectAnswer
 import com.driveperf.domain.trip.Trip
+import com.driveperf.domain.trip.TripCorrection
 import com.driveperf.domain.trip.TripKind
 import com.driveperf.domain.trip.TripSegment
 import com.driveperf.domain.trip.TripSource
@@ -39,8 +40,6 @@ import com.driveperf.data.local.db.Score as ScoreRow
 import com.driveperf.data.local.db.Trip as TripRow
 
 // Row ↔ domain mapping. Enums are stored as their constant names; booleans as 0/1; JSON columns via columnJson.
-
-
 
 internal fun TripRow.toDomain(spans: List<TripSegment>): Trip = Trip(
     id = id,
@@ -80,6 +79,8 @@ internal fun TripRow.toDomain(spans: List<TripSegment>): Trip = Trip(
     interrupted = decode<InterruptionJson>(interrupted_json)?.toDomain(),
     suspect = Suspect.valueOf(suspect),
     suspectAnswer = suspect_answer?.let { SuspectAnswer.valueOf(it) },
+    correction = enumOrNull<TripCorrection>(correction),
+    correctedAt = corrected_at,
     captureMeta = decode<CaptureMetaJson>(capture_meta_json)?.toDomain(),
     pipelineVersion = pipeline_version,
     rawState = RawState.valueOf(raw_state),
@@ -138,5 +139,7 @@ internal fun Trip.toRow(deviceId: String): TripRow = TripRow(
     deleted_at = deletedAt,
     origin_device_id = deviceId,
     field_clock = "{}",
+    correction = correction?.name,
+    corrected_at = correctedAt,
 )
 

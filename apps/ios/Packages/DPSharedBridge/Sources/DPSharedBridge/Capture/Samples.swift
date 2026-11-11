@@ -67,11 +67,15 @@ public struct LocationSample: Equatable, Sendable {
     public var speedAccMps: Double?
     public var courseDeg: Double?
     public var courseAccDeg: Double?
+    /// Which positioning source produced the fix (F-DQ-03); nil when unknown.
+    public var provider: FixProvider?
+    /// How old the fix already was at delivery, in ms (F-DQ-03); nil when unknown.
+    public var ageMs: Int64?
 
     public init(
         tMonoNs: Int64, wallMs: Int64, lat: Double, lng: Double, altM: Double? = nil, hAccM: Double? = nil,
         vAccM: Double? = nil, speedMps: Double? = nil, speedAccMps: Double? = nil, courseDeg: Double? = nil,
-        courseAccDeg: Double? = nil
+        courseAccDeg: Double? = nil, provider: FixProvider? = nil, ageMs: Int64? = nil
     ) {
         self.tMonoNs = tMonoNs
         self.wallMs = wallMs
@@ -84,9 +88,17 @@ public struct LocationSample: Equatable, Sendable {
         self.speedAccMps = speedAccMps
         self.courseDeg = courseDeg
         self.courseAccDeg = courseAccDeg
+        self.provider = provider
+        self.ageMs = ageMs
     }
 
     public var point: GeoPoint { GeoPoint(lat: lat, lng: lng) }
+}
+
+/// The positioning source of a fix (Kotlin `FixProvider`). Core Location reports only accessory and simulated fixes
+/// apart; everything else is its fused position.
+public enum FixProvider: String, Equatable, Sendable {
+    case gnss, fused, network, accessory, simulated
 }
 
 extension LocationSample: CustomStringConvertible, CustomDebugStringConvertible {

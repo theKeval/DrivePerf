@@ -27,6 +27,7 @@ public class LocalTripRepository(
 ) : TripRepository {
     private val q get() = db.tripQueries
 
+    /** Driver and passenger trips; trips corrected to not-a-drive are in `TripCorrections.observeNotDrives` (F-CAP-04). */
     override fun observeTrips(): Flow<List<Trip>> =
         q.listedTrips().asFlow().mapToList(io).map { rows -> rows.map { it.toDomain(spans(it.id)) } }
 

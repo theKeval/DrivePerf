@@ -69,3 +69,18 @@ INSERT OR REPLACE INTO personal_best VALUES ?;
 
 personalBest:
 SELECT * FROM personal_best WHERE route_id = ?;
+
+deletePersonalBest:
+DELETE FROM personal_best WHERE route_id = ?;
+
+-- A route's best remaining eligible run, for passing on a record whose holder was corrected (§7.4, §7.5).
+-- Ties stay with the earlier trip.
+bestEligibleRun:
+SELECT route_match.trip_id, score.smoothness, trip.started_at
+FROM route_match
+JOIN score ON score.trip_id = route_match.trip_id
+JOIN trip ON trip.id = route_match.trip_id
+WHERE route_match.route_id = ? AND route_match.eligible_for_record = 1 AND score.smoothness IS NOT NULL
+  AND (trip.kind IS NULL OR trip.kind = 'DRIVER') AND trip.deleted_at IS NULL
+ORDER BY score.smoothness DESC, trip.started_at ASC, trip.id ASC
+LIMIT 1;
