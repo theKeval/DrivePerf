@@ -1,0 +1,71 @@
+CREATE TABLE route (
+  id                     TEXT NOT NULL PRIMARY KEY,
+  name                   TEXT,
+  name_preset            TEXT,
+  state                  TEXT,
+  from_label             TEXT,
+  to_label               TEXT,
+  start_lat              REAL,
+  start_lng              REAL,
+  end_lat                REAL,
+  end_lng                REAL,
+  cluster_radius_m       REAL,
+  reference_trip_id      TEXT,
+  distance_m             REAL,
+  linked_route_id        TEXT,
+  is_active              INTEGER NOT NULL DEFAULT 1,
+  merged_into_route_id   TEXT,
+  regular_prompt_sent_at INTEGER,
+  schema_version         INTEGER NOT NULL DEFAULT 1,
+  created_at             INTEGER NOT NULL,
+  updated_at             INTEGER NOT NULL,
+  deleted_at             INTEGER,
+  origin_device_id       TEXT NOT NULL,
+  field_clock            TEXT NOT NULL DEFAULT '{}'
+);
+
+CREATE TABLE route_match (
+  trip_id              TEXT NOT NULL PRIMARY KEY REFERENCES trip(id) ON DELETE CASCADE,
+  route_id             TEXT NOT NULL,
+  similarity           REAL NOT NULL,
+  source               TEXT NOT NULL,
+  eligible_for_record  INTEGER NOT NULL,
+  ineligible_reason    TEXT
+);
+CREATE INDEX route_match_route ON route_match(route_id);
+
+CREATE TABLE personal_best (
+  route_id     TEXT NOT NULL PRIMARY KEY,
+  trip_id      TEXT NOT NULL,
+  smoothness   INTEGER NOT NULL,
+  set_at       INTEGER NOT NULL,
+  history_json TEXT NOT NULL,
+  computed_at  INTEGER NOT NULL
+);
+
+upsertRoute:
+INSERT OR REPLACE INTO route VALUES ?;
+
+routeById:
+SELECT * FROM route WHERE id = ? AND deleted_at IS NULL;
+
+liveRoutes:
+SELECT * FROM route WHERE deleted_at IS NULL AND merged_into_route_id IS NULL ORDER BY created_at DESC, id DESC;
+
+upsertMatch:
+INSERT OR REPLACE INTO route_match VALUES ?;
+
+matchForTrip:
+SELECT * FROM route_match WHERE trip_id = ?;
+
+matchesForRoute:
+SELECT * FROM route_match WHERE route_id = ?;
+
+deleteMatch:
+DELETE FROM route_match WHERE trip_id = ?;
+
+upsertPersonalBest:
+INSERT OR REPLACE INTO personal_best VALUES ?;
+
+personalBest:
+SELECT * FROM personal_best WHERE route_id = ?;

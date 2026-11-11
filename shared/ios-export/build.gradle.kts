@@ -25,3 +25,18 @@ kotlin {
         api(projects.shared.di)
     }
 }
+
+// SQLDelight's native driver calls the system SQLite. A static framework cannot carry linker flags, so declare the
+// library in the framework's module map: Swift and Clang autolinking then add `-lsqlite3` to the app when it imports
+// DrivePerfShared, and the Xcode project needs no extra setting. Runs after SKIE has written the module map.
+tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinNativeLink>().configureEach {
+    doLast {
+        val moduleMap = outputFile.get().resolve("Modules/module.modulemap")
+        if (moduleMap.isFile) {
+            val text = moduleMap.readText()
+            if (!text.contains("link \"sqlite3\"")) {
+                moduleMap.writeText(text.replaceFirst("    use Foundation\n", "    use Foundation\n    link \"sqlite3\"\n"))
+            }
+        }
+    }
+}

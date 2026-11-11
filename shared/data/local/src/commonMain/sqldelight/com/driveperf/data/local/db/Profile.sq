@@ -1,0 +1,47 @@
+-- Local profile, device and consents (data-model.md §2.2). Enums are TEXT holding the Kotlin constant name.
+CREATE TABLE profile (
+  id                 TEXT NOT NULL PRIMARY KEY,
+  account_id         TEXT,
+  display_name       TEXT,
+  region             TEXT NOT NULL,
+  units_json         TEXT NOT NULL,
+  install_at         INTEGER NOT NULL,
+  age_confirmed_at   INTEGER,
+  capture_json       TEXT NOT NULL,
+  notifications_json TEXT NOT NULL,
+  appearance         TEXT NOT NULL DEFAULT 'system',
+  analysis_channels  TEXT NOT NULL DEFAULT '[]',
+  raw_retention      TEXT NOT NULL DEFAULT 'forever',
+  schema_version     INTEGER NOT NULL DEFAULT 1,
+  created_at         INTEGER NOT NULL,
+  updated_at         INTEGER NOT NULL,
+  field_clock        TEXT NOT NULL DEFAULT '{}'
+);
+
+CREATE TABLE device (
+  id               TEXT NOT NULL PRIMARY KEY,
+  platform         TEXT NOT NULL,
+  os_version       TEXT NOT NULL,
+  app_version      TEXT NOT NULL,
+  model_class      TEXT NOT NULL,
+  is_this_device   INTEGER NOT NULL DEFAULT 0,
+  last_backup_at   INTEGER,
+  schema_version   INTEGER NOT NULL DEFAULT 1,
+  created_at       INTEGER NOT NULL,
+  updated_at       INTEGER NOT NULL,
+  deleted_at       INTEGER,
+  field_clock      TEXT NOT NULL DEFAULT '{}'
+);
+
+CREATE TABLE consent (
+  id               TEXT NOT NULL PRIMARY KEY,
+  kind             TEXT NOT NULL,
+  granted          INTEGER NOT NULL,
+  text_version     TEXT NOT NULL,
+  at               INTEGER NOT NULL,
+  tz_offset_min    INTEGER NOT NULL,
+  screen_id        TEXT NOT NULL,
+  device_id        TEXT NOT NULL,
+  schema_version   INTEGER NOT NULL DEFAULT 1
+);
+CREATE INDEX consent_kind_at ON consent(kind, at DESC);
