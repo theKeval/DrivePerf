@@ -15,6 +15,7 @@ final class AppEnvironment {
     let preferences = UserDefaultsPreferences()
     let permissions = SystemPermissions()
     let crashReporter = ConsentGatedCrashReporter()
+    let usageAnalytics = CoreUsageAnalytics()
     let flags = BuildFlags.fromBundle()
     let clock = SystemClock()
     let files = FileTripStore()
@@ -52,6 +53,7 @@ final class AppEnvironment {
             permissions: permissions,
             preferences: preferences,
             crashReporter: crashReporter,
+            analytics: usageAnalytics,
             selfTest: selfTest,
             flags: flags,
             coreInfo: SharedCoreHelloProvider(),
@@ -73,6 +75,12 @@ final class AppEnvironment {
         recorder.attach(KotlinCore(services))
         recorder.onLaunch()
         crashReporter.apply(consent: preferences.preferences.sendCrashReports)
+        // Usage statistics: events wait in memory until the user has chosen (onboarding finished means S-ONB-13 was
+        // answered), then are sent or dropped; a later change in Profile takes effect at once (F-ONB-08).
+        usageAnalytics.attach(services.analytics)
+        if preferences.preferences.onboardingCompleted {
+            usageAnalytics.setUsageConsent(preferences.preferences.shareUsageStatistics)
+        }
     }
 
     /// Every unlock: the first one after a reboot launches; later ones compress R0 files that a finalisation while

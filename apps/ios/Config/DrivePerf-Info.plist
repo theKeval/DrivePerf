@@ -21,6 +21,10 @@
 	<true/>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
+	<key>FIREBASE_ANALYTICS_COLLECTION_ENABLED</key>
+	<false/>
+	<key>GOOGLE_ANALYTICS_IDFA_COLLECTION_ENABLED</key>
+	<false/>
 	<key>DPSentryDSN</key>
 	<string>$(DP_SENTRY_DSN)</string>
 	<key>DPFeatureSignInWithApple</key>

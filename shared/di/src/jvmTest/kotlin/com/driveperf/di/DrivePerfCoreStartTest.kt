@@ -1,5 +1,7 @@
 package com.driveperf.di
 
+import com.driveperf.domain.analytics.AnalyticsEvent
+import com.driveperf.domain.analytics.AnalyticsSink
 import com.driveperf.domain.capture.LocationSample
 import com.driveperf.domain.capture.RecorderState
 import com.driveperf.domain.capture.WakeEvent
@@ -29,6 +31,7 @@ class DrivePerfCoreStartTest {
     private val bindings = object : PlatformBindings {
         val files = InMemoryTripFileStore()
         val location = FakeLocationSource()
+        val analytics = RecordingAnalyticsSink()
 
         override fun clock() = clock
 
@@ -45,6 +48,8 @@ class DrivePerfCoreStartTest {
         override fun tripFiles() = files
 
         override fun deviceId() = "device-1"
+
+        override fun analyticsSink() = analytics
     }
 
     @AfterTest
@@ -101,5 +106,36 @@ class DrivePerfCoreStartTest {
         withTimeout(5_000) { scratch.recorder.status.first { it.state == RecorderState.IDLE } }
         assertTrue(bindings.files.tripIds().isEmpty(), "the rejected candidate's samples are deleted")
         scratch.close()
+    }
+
+    @Test
+    fun analyticsWaitsForTheUsageChoice() {
+        val services = DrivePerfCore.start(bindings)
+        val event = object : AnalyticsEvent {
+            override val name = "onboarding_started"
+            override val properties = emptyMap<String, String>()
+        }
+
+        services.analytics.track(event)
+        assertTrue(bindings.analytics.calls.isEmpty())
+
+        services.analytics.setUsageConsent(false)
+        assertEquals(listOf("enabled=false"), bindings.analytics.calls)
+    }
+}
+
+class RecordingAnalyticsSink : AnalyticsSink {
+    val calls = mutableListOf<String>()
+
+    override fun setCollectionEnabled(enabled: Boolean) {
+        calls += "enabled=$enabled"
+    }
+
+    override fun log(event: AnalyticsEvent) {
+        calls += "log:${event.name}"
+    }
+
+    override fun resetId() {
+        calls += "reset"
     }
 }
