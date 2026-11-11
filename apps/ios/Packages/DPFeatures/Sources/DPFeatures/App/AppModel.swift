@@ -19,6 +19,9 @@ public struct AppDependencies {
     public var refreshCapture: @MainActor () -> Void
     /// `-selfTest` launch argument: open and run the on-device self-test at launch.
     public var runSelfTestOnLaunch: Bool
+    // DRIVE-100, DRIVE-172 (S2): trip corrections and the provenance catalogue for the Drives screens.
+    public var corrections: (any TripCorrecting)?
+    public var provenance = ProvenanceCatalog()
 
     public init(
         recorder: any TripRecording, history: any TripHistory, clock: any ClockBridge,
@@ -64,7 +67,8 @@ public final class AppModel {
         capture = CaptureViewModel(
             recorder: dependencies.recorder, history: dependencies.history, permissions: dependencies.permissions,
             clock: dependencies.clock)
-        trips = TripListViewModel(history: dependencies.history)
+        trips = TripListViewModel(
+            history: dependencies.history, corrections: dependencies.corrections, catalog: dependencies.provenance)
         profile = ProfileViewModel(dependencies: dependencies)
         if route == .onboarding { onboarding = makeOnboarding() }
     }

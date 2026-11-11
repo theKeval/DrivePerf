@@ -24,6 +24,7 @@ final class AppEnvironment {
     let activity = CoreMotionActivitySource()
     let power = SystemPowerState()
     let recorder: CoreTripRecorder
+    let corrections = CoreTripCorrections()
     private(set) lazy var corePorts = CorePorts(
         clock: clock, location: location, motion: motion, activity: activity, power: power, parkedRegion: triggers,
         tripFiles: files)
@@ -57,6 +58,7 @@ final class AppEnvironment {
             coreInfo: SharedCoreHelloProvider(),
             refreshCapture: { [weak self] in self?.refreshCapture() },
             runSelfTestOnLaunch: ProcessInfo.processInfo.arguments.contains("-selfTest"))
+            .withTripCorrections(corrections)
     }
 
     /// Runs inside `didFinishLaunching`, synchronously: the Core Location sessions first, because a background
@@ -71,6 +73,7 @@ final class AppEnvironment {
         let services = DrivePerfCore.shared.start(
             platform: CorePlatformBindings(ports: corePorts, deviceId: DeviceIdentity.current()))
         recorder.attach(KotlinCore(services))
+        corrections.attach(services.corrections)
         recorder.onLaunch()
         crashReporter.apply(consent: preferences.preferences.sendCrashReports)
     }
@@ -120,5 +123,15 @@ enum TripIntentHandler {
     static func stopTrip() async {
         AppEnvironment.shared.launch()
         AppEnvironment.shared.recorder.stop()
+    }
+}
+
+extension AppDependencies {
+    /// DRIVE-100, DRIVE-172 (S2): trip corrections and the shared provenance catalogue for the Drives screens.
+    fileprivate func withTripCorrections(_ corrections: CoreTripCorrections) -> AppDependencies {
+        var copy = self
+        copy.corrections = corrections
+        copy.provenance = KotlinMapping.provenanceCatalog()
+        return copy
     }
 }
