@@ -44,14 +44,17 @@ public final class SystemPermissions: NSObject, PermissionRequesting {
         let reactivated = Task { await Self.waitForReactivation() }
         await Task.yield()
         manager.requestAlwaysAuthorization()
+        // Every child must end on cancellation, or the group outlives the 90 s timeout: awaiting another task's
+        // value does not cancel that task, so the reactivation child cancels it itself.
         await withTaskGroup(of: Void.self) { group in
             group.addTask { await self.waitForAuthorizationChange() }
-            group.addTask { await reactivated.value }
+            group.addTask {
+                await withTaskCancellationHandler { await reactivated.value } onCancel: { reactivated.cancel() }
+            }
             group.addTask { try? await Task.sleep(for: .seconds(90)) }
             await group.next()
             group.cancelAll()
         }
-        reactivated.cancel()
         resumeAuthorizationWaiters()
         return await current()
     }
