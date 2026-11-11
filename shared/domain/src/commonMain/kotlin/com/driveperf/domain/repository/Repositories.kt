@@ -63,3 +63,18 @@ public interface TripHistory {
     /** Finalised trips that started before [beforeStartedAt], newest first (`startedAt` desc, `id` desc), at most [limit]. */
     public suspend fun finishedBefore(beforeStartedAt: Long, limit: Int): List<ScoredTrip>
 }
+
+/** What route matching reads (§7). Implemented in `:shared:data:local`; not a platform port. */
+public interface RouteHistory {
+    /** Live routes and candidates (not merged, not deleted). */
+    public suspend fun routes(): List<Route>
+
+    /** Prior runs of a route, newest first, at most [limit]. */
+    public suspend fun runs(routeId: String, limit: Int): List<ScoredTrip>
+
+    /** The route's current record, or null. */
+    public suspend fun personalBest(routeId: String): PersonalBest?
+
+    /** A trip's preview track, or null when it is gone. */
+    public suspend fun preview(tripId: String): List<com.driveperf.domain.trip.PreviewRow>?
+}

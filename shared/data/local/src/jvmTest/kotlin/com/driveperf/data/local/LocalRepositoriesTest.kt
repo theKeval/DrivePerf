@@ -177,6 +177,29 @@ class LocalRepositoriesTest {
     }
 
     @Test
+    fun routeHistoryListsRunsRecordsAndPreviews() = runTest {
+        val store = LocalTripStore(db, "device-1", coroutineContext)
+        val previews = ProtoPreviewStore(files, coroutineContext)
+        val entry = com.driveperf.domain.route.RecordEntry("t0", 90, 500L)
+        val best = com.driveperf.domain.route.PersonalBest("r1", "t0", 90, 500L, listOf(entry))
+        store.saveFinalised(FinalisedTrip(finished.copy(id = "t0", startedAt = 500L), score = score.copy(tripId = "t0")))
+        store.saveFinalised(
+            FinalisedTrip(
+                finished, listOf(event), score, RouteMatch("t1", "r1", 0.9, MatchSource.AUTO, true, null), route,
+                extraMatches = listOf(RouteMatch("t0", "r1", 0.9, MatchSource.AUTO, true, null)), personalBest = best,
+            ),
+        )
+        previews.write("t0", listOf(com.driveperf.domain.trip.PreviewRow(0.0, 2.0, -27.5, null, null, null, null, 0)))
+        val history = LocalRouteHistory(db, previews, coroutineContext)
+        assertEquals(listOf(route), history.routes())
+        assertEquals(listOf("t1", "t0"), history.runs("r1", 10).map { it.trip.id })
+        assertEquals(1, history.runs("r1", 1).size)
+        assertEquals(best, history.personalBest("r1"))
+        assertEquals(1, history.preview("t0")?.size)
+        assertNull(history.preview("t1"))
+    }
+
+    @Test
     fun aFileDeletionFailureKeepsTheTripAndReportsIt() = runTest {
         val store = LocalTripStore(db, "device-1", coroutineContext)
         val trips = LocalTripRepository(db, files, coroutineContext)

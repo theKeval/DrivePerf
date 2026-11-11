@@ -14,7 +14,7 @@
     "spans": [
       { "kind": "GAP", "t0S": 92.00, "t1S": 153.00, "reason": "TUNNEL" }
     ],
-    "tip": null
+    "tip": { "tipId": "accel_progressive", "category": "ACCELERATION" }
   },
   "tolerance": { "ledger": 0.02, "tPeakS": 0.04, "peakG": 0.002, "distanceM": 1.0 }
 }

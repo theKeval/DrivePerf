@@ -2,6 +2,7 @@ package com.driveperf.pipeline.fixtures
 
 import com.driveperf.domain.capture.CapturedTrip
 import com.driveperf.domain.capture.FinalisedTrip
+import com.driveperf.domain.repository.RouteHistory
 import com.driveperf.domain.repository.ScoredTrip
 import com.driveperf.domain.repository.TripHistory
 import com.driveperf.domain.trip.InterruptionReason
@@ -11,12 +12,16 @@ import com.driveperf.pipeline.capture.FinaliseRequest
 import com.driveperf.pipeline.capture.FinaliseResult
 
 /** Runs the full finaliser on a capture with an optional history. */
-internal class PipelineHarness(private val history: List<ScoredTrip> = emptyList()) {
+internal class PipelineHarness(
+    private val history: List<ScoredTrip> = emptyList(),
+    routes: RouteHistory? = null,
+) {
     private val finaliser = PipelineFinaliser(
         object : TripHistory {
             override suspend fun finishedBefore(beforeStartedAt: Long, limit: Int): List<ScoredTrip> =
                 history.filter { it.trip.startedAt < beforeStartedAt }.sortedByDescending { it.trip.startedAt }.take(limit)
         },
+        routes,
     )
 
     suspend fun run(

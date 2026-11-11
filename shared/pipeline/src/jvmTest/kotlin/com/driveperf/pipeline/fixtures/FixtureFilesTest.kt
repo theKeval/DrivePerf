@@ -70,6 +70,7 @@ class FixtureFilesTest {
             """{ "kind": "${it.kind}", "t0S": ${fixed(it.t0S, 2)}, "t1S": ${fixed(it.t1S, 2)}, "reason": "${it.reason}" }"""
         }.let { if (q.spans.isEmpty()) "[]" else it }
         val calibrating = s?.calibrating?.let { """{ "k": ${it.k}, "of": ${it.of} }""" } ?: "null"
+        val tip = s?.tip?.let { """{ "tipId": "${it.tipId}", "category": "${it.category}" }""" } ?: "null"
         return """
             |{
             |  "fixture": "$id",
@@ -85,7 +86,7 @@ class FixtureFilesTest {
             |    "ledger": $ledger,
             |    "events": $events,
             |    "spans": $spans,
-            |    "tip": null
+            |    "tip": $tip
             |  },
             |  "tolerance": { "ledger": 0.02, "tPeakS": 0.04, "peakG": 0.002, "distanceM": 1.0 }
             |}

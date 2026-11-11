@@ -1,11 +1,13 @@
 package com.driveperf.di
 
 import com.driveperf.data.local.DatabaseDriverFactory
+import com.driveperf.data.local.LocalRouteHistory
 import com.driveperf.data.local.LocalRouteRepository
 import com.driveperf.data.local.LocalTripHistory
 import com.driveperf.data.local.LocalTripRepository
 import com.driveperf.data.local.LocalTripStore
 import com.driveperf.data.local.ProtoCaptureLog
+import com.driveperf.data.local.ProtoPreviewStore
 import com.driveperf.data.local.openDatabase
 import com.driveperf.domain.hello.GetHelloMessage
 import com.driveperf.domain.hello.HelloMessage
@@ -46,6 +48,7 @@ public object DrivePerfCore {
     ): CoreServices = started ?: run {
         val db = openDatabase(database.create())
         val store = LocalTripStore(db, platform.deviceId(), io)
+        val previews = ProtoPreviewStore(platform.tripFiles(), io)
         val recorder = TripRecorderEngine(
             ports = CapturePorts(
                 location = platform.location(),
@@ -58,7 +61,8 @@ public object DrivePerfCore {
             persistence = CapturePersistence(
                 store,
                 ProtoCaptureLog(platform.tripFiles(), io),
-                finaliser?.invoke(db) ?: PipelineFinaliser(LocalTripHistory(db, io)),
+                finaliser?.invoke(db) ?: PipelineFinaliser(LocalTripHistory(db, io), LocalRouteHistory(db, previews, io)),
+                previews,
             ),
             clock = platform.clock(),
             zones = SystemTimeZone(),

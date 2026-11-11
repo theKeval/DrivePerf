@@ -12,7 +12,7 @@
     "ledger": { "T": 305.1, "brake": 0.13, "accel": 0.15, "corner": 0.00 },
     "events": [],
     "spans": [],
-    "tip": null
+    "tip": { "tipId": "accel_merge_build", "category": "ACCELERATION" }
   },
   "tolerance": { "ledger": 0.02, "tPeakS": 0.04, "peakG": 0.002, "distanceM": 1.0 }
 }

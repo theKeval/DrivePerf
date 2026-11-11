@@ -132,3 +132,24 @@ class ProtoCaptureLogTest {
         assertEquals("trip-1", TripFileCodec.decode(corrupt)!!.header.tripId)
     }
 }
+
+class ProtoPreviewStoreTest {
+    @Test
+    fun previewRowsRoundTripWithinQuantisation() = kotlinx.coroutines.test.runTest {
+        val store = ProtoPreviewStore(InMemoryTripFileStore(), coroutineContext)
+        val rows = listOf(
+            com.driveperf.domain.trip.PreviewRow(0.0, 2.0000001, -27.5, null, null, null, null, 1),
+            com.driveperf.domain.trip.PreviewRow(12.345, 2.0001, -27.4999, 13.89, -0.123, 0.045, 10.2, 0),
+        )
+        assertTrue(store.write("t1", rows))
+        val back = assertNotNull(store.read("t1"))
+        assertEquals(2, back.size)
+        assertEquals(12.345, back[1].tS, 0.0005)
+        assertEquals(2.0001, back[1].lat, 1e-9)
+        assertEquals(13.89, back[1].speedMps!!, 0.005)
+        assertEquals(-0.123, back[1].lonG!!, 0.0005)
+        assertNull(back[0].speedMps)
+        assertEquals(1, back[0].quality)
+        assertNull(store.read("missing"))
+    }
+}
