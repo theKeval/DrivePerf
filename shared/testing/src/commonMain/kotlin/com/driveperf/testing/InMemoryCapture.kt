@@ -22,7 +22,11 @@ public class InMemoryCaptureLog : CaptureLog {
     /** When false, [append] fails as on a full disk. */
     public var writable: Boolean = true
 
+    /** When false, [open] fails as when the file cannot be created. */
+    public var openable: Boolean = true
+
     override suspend fun open(header: CaptureHeader): Boolean {
+        if (!openable) return false
         logs[header.tripId] = CapturedTrip(header, emptyList(), emptyList(), emptyList(), emptyList(), emptyList())
         return true
     }

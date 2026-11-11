@@ -49,4 +49,6 @@ public data class CaptureConfig(
     val liveDistanceMinStepM: Double = 5.0,
     // R0 durability (ADR-003): fsync at most every 5 s
     val r0SyncS: Double = 5.0,
+    // §2.8: how long finalisation waits for a recorded-accelerometer query still running
+    val backfillWaitS: Double = 10.0,
 )
