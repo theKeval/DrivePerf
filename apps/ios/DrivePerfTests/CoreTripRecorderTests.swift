@@ -28,7 +28,7 @@ final class CoreTripRecorderTests: XCTestCase {
 
     /// Lets the recorder's observing tasks run.
     private func settle() async {
-        for _ in 0..<5 { await Task.yield() }
+        for _ in 0..<20 { await Task.yield() }
     }
 
     func testBeforeTheCoreStartsCommandsAreDroppedAndTheChoiceIsKept() {
@@ -70,7 +70,7 @@ final class CoreTripRecorderTests: XCTestCase {
     }
 
     func testAnAutomaticTripPostsOneNotificationOnceConfirmed() async {
-        _ = makeRecorder()
+        let recorder = makeRecorder()
         core.send(status(.candidate, manual: false))
         await settle()
         XCTAssertTrue(notifier.posted.isEmpty, "a candidate is not shown")
@@ -83,6 +83,7 @@ final class CoreTripRecorderTests: XCTestCase {
         core.send(.idle)
         await settle()
         XCTAssertEqual(notifier.removed, ["t1"])
+        XCTAssertEqual(recorder.status.state, .idle)
     }
 
     func testTripsFromTheCoreReachTheList() async {

@@ -44,19 +44,16 @@ final class SpyAssertions: BackgroundAssertions {
 @MainActor
 final class FakeSharedCore: SharedCore {
     private(set) var commands: [String] = []
-    private var statusContinuation: AsyncStream<RecorderStatus>.Continuation?
-    private var tripContinuation: AsyncStream<[TripSummary]>.Continuation?
+    // Created up front and buffered, so values sent before the recorder's task subscribes are not lost.
+    private let statusStream = AsyncStream.makeStream(of: RecorderStatus.self)
+    private let tripStream = AsyncStream.makeStream(of: [TripSummary].self)
 
-    func statusUpdates() -> AsyncStream<RecorderStatus> {
-        AsyncStream { statusContinuation = $0 }
-    }
+    func statusUpdates() -> AsyncStream<RecorderStatus> { statusStream.stream }
 
-    func tripUpdates() -> AsyncStream<[TripSummary]> {
-        AsyncStream { tripContinuation = $0 }
-    }
+    func tripUpdates() -> AsyncStream<[TripSummary]> { tripStream.stream }
 
-    func send(_ status: RecorderStatus) { statusContinuation?.yield(status) }
-    func send(_ trips: [TripSummary]) { tripContinuation?.yield(trips) }
+    func send(_ status: RecorderStatus) { statusStream.continuation.yield(status) }
+    func send(_ trips: [TripSummary]) { tripStream.continuation.yield(trips) }
 
     func onLaunch() { commands.append("launch") }
     func onWake(_ event: WakeEvent) { commands.append("wake:\(event.kind)") }
