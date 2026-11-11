@@ -1,5 +1,6 @@
 package com.driveperf.platform.capture
 
+import android.app.Notification
 import android.app.NotificationManager
 import android.app.Service
 import android.content.Intent
@@ -8,6 +9,7 @@ import android.os.IBinder
 import com.driveperf.domain.capture.RecorderState
 import com.driveperf.domain.capture.RecorderStatus
 import com.driveperf.domain.capture.TripRecorder
+import com.driveperf.domain.capture.WakeKind
 import com.driveperf.foundation.Clock
 import com.driveperf.platform.location.FixWatch
 import kotlinx.coroutines.CoroutineScope
@@ -38,6 +40,8 @@ class CaptureForegroundService : Service() {
     private var watching: Job? = null
     private var idleTimeout: Job? = null
     private val tracker = TripClock()
+    private val rateLimit = CaptureNotificationRateLimit()
+    private var foreground = false
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -50,7 +54,7 @@ class CaptureForegroundService : Service() {
         when (intent?.action) {
             ACTION_STOP -> recorder.stop()
             ACTION_WAKE -> intent.let(CaptureStarter::wakeOf)?.let { wake ->
-                goForeground()
+                goForeground(isManualStart = wake.kind == WakeKind.MANUAL)
                 recorder.onWake(wake)
             } ?: endIfIdle()
             else -> goForeground()
@@ -60,13 +64,12 @@ class CaptureForegroundService : Service() {
         return START_STICKY
     }
 
-    private fun goForeground() {
+    private fun goForeground(isManualStart: Boolean = false) {
+        if (foreground) return
         notifications.ensureChannel()
-        startForeground(
-            CaptureNotifications.NOTIFICATION_ID,
-            notifications.buildStarting(clock.wallMs()),
-            ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION,
-        )
+        val notification = recordingNotification(recorder.status.value) ?: notifications.buildStarting(isManualStart)
+        startForeground(CaptureNotifications.NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION)
+        foreground = true
         // A wake the core drops at once (stale, auto detection off) never leaves idle: end after a grace period.
         idleTimeout?.cancel()
         idleTimeout = scope.launch {
@@ -82,20 +85,20 @@ class CaptureForegroundService : Service() {
             if (status.state != RecorderState.IDLE) {
                 active = true
                 idleTimeout?.cancel()
-                notify(status)
+                recordingNotification(status)?.let { notification ->
+                    getSystemService(NotificationManager::class.java).notify(CaptureNotifications.NOTIFICATION_ID, notification)
+                }
             } else if (active) {
                 endService()
             }
         }.launchIn(scope)
     }
 
-    private fun notify(status: RecorderStatus) {
-        val started = tracker.startedWallMs(status, clock.wallMs()) ?: return
-        val manager = getSystemService(NotificationManager::class.java)
-        manager.notify(
-            CaptureNotifications.NOTIFICATION_ID,
-            notifications.build(started, status.distanceM, fixes.status(), clock.wallMs()),
-        )
+    private fun recordingNotification(status: RecorderStatus): Notification? {
+        val nowWallMs = clock.wallMs()
+        val started = tracker.startedWallMs(status, nowWallMs)
+        if (started == null || !rateLimit.shouldPost(status, clock.monotonicNs())) return null
+        return notifications.build(status, started, fixes.status(), nowWallMs)
     }
 
     private fun endIfIdle() {
@@ -103,6 +106,7 @@ class CaptureForegroundService : Service() {
     }
 
     private fun endService() {
+        foreground = false
         stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf()
     }
@@ -146,5 +150,25 @@ class TripClock {
 
     private companion object {
         const val MS_PER_S = 1000.0
+    }
+}
+
+/** Progress updates share a monotonic clock. Recorder state changes always post immediately. */
+internal class CaptureNotificationRateLimit {
+    private var lastTripId: String? = null
+    private var lastState: RecorderState? = null
+    private var lastPostNs = 0L
+
+    fun shouldPost(status: RecorderStatus, nowNs: Long): Boolean {
+        val sameState = status.tripId == lastTripId && status.state == lastState
+        if (sameState && nowNs - lastPostNs < UPDATE_INTERVAL_NS) return false
+        lastTripId = status.tripId
+        lastState = status.state
+        lastPostNs = nowNs
+        return true
+    }
+
+    private companion object {
+        const val UPDATE_INTERVAL_NS = 5_000_000_000L
     }
 }

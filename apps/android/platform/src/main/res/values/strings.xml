@@ -1,11 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="capture_channel_name">Recording a drive</string>
+    <string name="capture_auto_channel_name">Automatic drive recording</string>
     <string name="capture_channel_description">Shown while DrivePerf records a drive. It is status only and never shows a score.</string>
     <string name="capture_notification_title">Recording your drive</string>
+    <string name="capture_notification_starting">Preparing to record</string>
     <string name="capture_notification_searching">Looking for GPS</string>
     <string name="capture_notification_gps_lost">GPS signal lost</string>
     <string name="capture_notification_progress">%1$d min · %2$s km</string>
+    <string name="capture_notification_auto">Started automatically · %1$s</string>
+    <string name="capture_notification_detail">%1$s · %2$s</string>
+    <string name="capture_notification_paused">Paused</string>
+    <string name="capture_notification_finishing">Finishing drive…</string>
     <string name="capture_notification_chip">%1$d min</string>
+    <string name="capture_notification_chip_hours">%1$d h</string>
     <string name="capture_notification_stop">Stop</string>
 </resources>
