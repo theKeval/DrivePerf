@@ -36,6 +36,18 @@ jobs:
       DERIVED_DATA: ${{ github.workspace }}/build/DerivedData
     steps:
       - uses: actions/checkout@v7
+
+      # iOS terminates an app that asks for a protected resource without its usage string (DRIVE-54 AC3, DRIVE-49).
+      - name: Privacy usage strings are present
+        run: |
+          plist=apps/ios/Config/DrivePerf-Info.plist
+          missing=0
+          for key in NSMotionUsageDescription NSLocationWhenInUseUsageDescription NSLocationAlwaysAndWhenInUseUsageDescription; do
+            value="$(/usr/libexec/PlistBuddy -c "Print :$key" "$plist" 2>/dev/null || true)"
+            if [ -z "$value" ]; then echo "::error file=$plist::$key is missing or empty"; missing=1; else echo "$key: ok"; fi
+          done
+          exit $missing
+
       - uses: ./.github/actions/setup-build
 
       - name: Pick and boot an iPhone simulator
