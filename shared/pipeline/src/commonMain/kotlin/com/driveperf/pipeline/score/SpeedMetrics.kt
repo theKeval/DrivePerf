@@ -11,7 +11,10 @@ internal object SpeedMetrics {
     private const val MIN_WINDOWS = 3
     private const val MAX_STEP_S = 1.5
 
-    /** Wobble (§3) and the display-only `speedConsistencyCv`, or nulls with fewer than 3 qualifying windows. */
+    /**
+     * Wobble (§3, the upper middle `[n/2]` of the window stds) and the display-only `speedConsistencyCv` (an ordinary
+     * §0.5 median), or nulls with fewer than 3 qualifying windows.
+     */
     fun wobble(gnss: List<R1Fix>): Pair<Double?, Double?> {
         val stds = mutableListOf<Double>()
         val cvs = mutableListOf<Double>()
@@ -32,8 +35,7 @@ internal object SpeedMetrics {
         }
         if (stds.size < MIN_WINDOWS) return null to null
         stds.sort()
-        cvs.sort()
-        return stds[stds.size / 2] to cvs[cvs.size / 2]
+        return stds[stds.size / 2] to Baselines.median(cvs)
     }
 }
 
