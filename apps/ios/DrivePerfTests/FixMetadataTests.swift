@@ -27,7 +27,10 @@ final class FixMetadataTests: XCTestCase {
 
     func testSimulatedAndAccessoryFixesAreToldApart() {
         XCTAssertEqual(LocationMapping.provider(of: fix(age: 0, simulated: true)), .simulated)
-        XCTAssertEqual(LocationMapping.provider(of: fix(age: 0, accessory: true)), .accessory)
+        // The simulator does not keep the accessory flag on a CLLocation built in a test, so check the rule itself.
+        XCTAssertEqual(LocationMapping.provider(simulated: false, accessory: true), .accessory)
+        XCTAssertEqual(LocationMapping.provider(simulated: true, accessory: true), .simulated)
+        XCTAssertEqual(LocationMapping.provider(simulated: false, accessory: false), .fused)
         let plain = CLLocation(latitude: 0, longitude: 0)
         XCTAssertEqual(LocationMapping.provider(of: plain), .fused)
     }

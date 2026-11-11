@@ -127,8 +127,13 @@ public enum LocationMapping {
     /// F-DQ-03: Core Location tells only accessory and simulated fixes apart; the rest are its fused position.
     public static func provider(of location: CLLocation) -> FixProvider {
         guard let info = location.sourceInformation else { return .fused }
-        if info.isSimulatedBySoftware { return .simulated }
-        if info.isProducedByAccessory { return .accessory }
+        return provider(simulated: info.isSimulatedBySoftware, accessory: info.isProducedByAccessory)
+    }
+
+    /// A simulated fix wins over the accessory flag; anything else is Core Location's fused position.
+    public static func provider(simulated: Bool, accessory: Bool) -> FixProvider {
+        if simulated { return .simulated }
+        if accessory { return .accessory }
         return .fused
     }
 
