@@ -11,8 +11,9 @@ import kotlinx.coroutines.flow.MutableStateFlow
  *   collection and drops the buffer; later events are dropped.
  * - A later change replaces the state at once, so it takes effect within the session.
  *
- * Thread-safe without locks: the state is replaced by compare-and-set, and the sink is called only after the state
- * that allows the call has been published.
+ * Thread-safe: every state change and the sink calls that go with it run under one lock, so the last consent wins,
+ * an event is never sent before collection is enabled or ahead of the buffered ones, and a revocation can't be undone
+ * by an older grant. The lock is held only for in-memory work and the sink call, which is fast and never calls back.
  *
  * @param bufferLimit the most events held while undecided; the oldest are dropped first.
  */
@@ -20,37 +21,48 @@ public class ConsentGatedAnalytics(
     private val sink: AnalyticsSink,
     private val bufferLimit: Int = DEFAULT_BUFFER_LIMIT,
 ) : Analytics {
-    private class State(val allowed: Boolean?, val held: List<AnalyticsEvent>)
-
-    private val state = MutableStateFlow(State(allowed = null, held = emptyList()))
+    // Plain state, guarded by `lock`. A spin lock built on a state flow's compare-and-set works in common code on every
+    // target; critical sections are tiny, so waiting is negligible.
+    private val lock = MutableStateFlow(false)
+    private var allowed: Boolean? = null
+    private var held: List<AnalyticsEvent> = emptyList()
 
     override fun track(event: AnalyticsEvent) {
-        var current = state.value
-        while (current.allowed == null) {
-            if (state.compareAndSet(current, State(null, (current.held + event).takeLast(bufferLimit)))) return
-            current = state.value
+        locked {
+            when (allowed) {
+                true -> sink.log(event)
+                false -> Unit
+                null -> held = (held + event).takeLast(bufferLimit)
+            }
         }
-        if (current.allowed == true) sink.log(event)
     }
 
     override fun setUsageConsent(allowed: Boolean) {
-        val previous = state.getAndSet(State(allowed, emptyList()))
-        sink.setCollectionEnabled(allowed)
-        if (allowed) previous.held.forEach(sink::log)
+        locked {
+            val previouslyHeld = held
+            this.allowed = allowed
+            held = emptyList()
+            sink.setCollectionEnabled(allowed)
+            if (allowed) previouslyHeld.forEach(sink::log)
+        }
     }
 
     override fun resetId() {
-        sink.resetId()
+        locked { sink.resetId() }
+    }
+
+    private inline fun locked(body: () -> Unit) {
+        while (!lock.compareAndSet(expect = false, update = true)) {
+            // Another thread is inside; its work is short.
+        }
+        try {
+            body()
+        } finally {
+            lock.value = false
+        }
     }
 
     private companion object {
         const val DEFAULT_BUFFER_LIMIT = 100
-    }
-}
-
-private fun <T> MutableStateFlow<T>.getAndSet(next: T): T {
-    while (true) {
-        val current = value
-        if (compareAndSet(current, next)) return current
     }
 }
