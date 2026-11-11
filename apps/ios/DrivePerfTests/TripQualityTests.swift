@@ -168,7 +168,8 @@ final class TripQualityTests: XCTestCase {
         XCTAssertEqual(corrections.answers.map(\.1), [true])
         XCTAssertEqual(corrections.corrections.map(\.1), [.walk])
 
-        let task = Task { await model.observeNotDrives() }
+        // observe() keeps Not drives current without the Not drives screen, so a detail finds a trip just corrected.
+        let task = Task { await model.observe() }
         while model.notDrives.isEmpty { await Task.yield() }
         task.cancel()
         XCTAssertEqual(model.notDriveRows.first?.kindLabel, "Bus or train")

@@ -72,7 +72,16 @@ public final class TripListViewModel {
         presenter = TripPresenter(catalog: catalog, calendar: calendar, locale: locale)
     }
 
+    /// Drives and not-drives together, for as long as the app runs: a trip corrected from its detail moves from one list
+    /// to the other, and the detail must still find it (it shows the "Not a drive" banner and Restore).
     public func observe() async {
+        await withTaskGroup(of: Void.self) { group in
+            group.addTask { await self.observeDrives() }
+            group.addTask { await self.observeNotDrives() }
+        }
+    }
+
+    func observeDrives() async {
         for await list in history.observeTrips() {
             trips = list.sorted { $0.startedAt > $1.startedAt }
             hasLoaded = true
@@ -80,7 +89,7 @@ public final class TripListViewModel {
     }
 
     /// The "Not drives" filter's list. Returns at once without a corrections port.
-    public func observeNotDrives() async {
+    func observeNotDrives() async {
         guard let corrections else { return }
         for await list in corrections.observeNotDrives() {
             notDrives = list.sorted { $0.startedAt > $1.startedAt }

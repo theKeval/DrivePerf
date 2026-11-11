@@ -15,6 +15,23 @@ struct DrivesHomeView: View {
                 VStack(alignment: .leading, spacing: DPLayout.sectionGap) {
                     if trips.trips.isEmpty {
                         EmptyDrivesCard(onHowItWorks: onCaptureStatus)
+                        if !trips.notDrives.isEmpty {
+                            // All drives (and its Not drives link) needs a drive; marked trips must stay restorable.
+                            NavigationLink { NotDrivesView(trips: trips) } label: {
+                                HStack {
+                                    Text("Not drives").font(DPFont.body.weight(.semibold))
+                                    Spacer()
+                                    Text("\(trips.notDrives.count)").font(DPFont.body).foregroundStyle(DPColor.text2)
+                                    Image(systemName: "chevron.right").font(DPFont.caption).foregroundStyle(DPColor.text3)
+                                        .accessibilityHidden(true)
+                                }
+                                .foregroundStyle(DPColor.text)
+                                .padding(.horizontal, DPSpace.s4)
+                                .frame(minHeight: DPLayout.touchMin)
+                                .dpCard()
+                            }
+                            .accessibilityHint("Trips you marked as not a drive, kept for 30 days")
+                        }
                     } else {
                         VStack(alignment: .leading, spacing: DPSpace.s3) {
                             HStack {
@@ -132,7 +149,6 @@ struct NotDrivesView: View {
         .dpScreenBackground()
         .navigationTitle("Not drives")
         .navigationBarTitleDisplayMode(.inline)
-        .task { await trips.observeNotDrives() }
     }
 }
 
