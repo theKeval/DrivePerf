@@ -37,50 +37,75 @@ jobs:
       SLACK_WEBHOOK_PM: ${{ secrets.SLACK_WEBHOOK_PM }}
       GH_TOKEN: ${{ github.token }}
     steps:
+      # SECURITY: titles, logins and workflow_dispatch inputs are attacker-controlled
+      # text. Never interpolate them (or step outputs derived from them) into a
+      # `run:` script with ${{ }} — GitHub substitutes the text *before* the shell
+      # parses it, so a quote or $(...) in a title breaks or hijacks the script
+      # (this job holds the Jira token, Slack webhooks and GH_TOKEN). Pass them via
+      # `env:` and reference them as quoted shell variables instead.
       - name: Classify event
         id: ev
+        env:
+          EVT: ${{ github.event_name }}
+          SIM: ${{ github.event.inputs.simulate }}
+          INPUT_NUM: ${{ github.event.inputs.number }}
+          ASSIGNEE_LOGIN: ${{ github.event.assignee.login }}
+          ISSUE_NUM: ${{ github.event.issue.number }}
+          PR_NUM: ${{ github.event.pull_request.number }}
+          ACTION: ${{ github.event.action }}
+          MERGED: ${{ github.event.pull_request.merged }}
+          REPO: ${{ github.repository }}
         run: |
-          EVT="${{ github.event_name }}"
-          SIM="${{ github.event.inputs.simulate }}"
+          set -euo pipefail
+          KIND=skip
           if [ "$EVT" = "workflow_dispatch" ]; then
             KIND="$SIM"
-            NUM="${{ github.event.inputs.number }}"
+            NUM="$INPUT_NUM"
+            # inputs are free text: validate before they reach a URL or a case arm
+            case "$KIND" in pr_opened|pr_merged|issue_assigned) ;; *) echo "::error::unknown simulate value"; exit 1 ;; esac
+            case "$NUM" in ''|*[!0-9]*) echo "::error::number must be numeric"; exit 1 ;; esac
             case "$KIND" in
-              issue_assigned) TITLE=$(gh api "/repos/${{ github.repository }}/issues/$NUM" --jq .title) ;;
-              *)              TITLE=$(gh api "/repos/${{ github.repository }}/pulls/$NUM" --jq .title) ;;
+              issue_assigned) TITLE=$(gh api "/repos/$REPO/issues/$NUM" --jq .title) ;;
+              *)              TITLE=$(gh api "/repos/$REPO/pulls/$NUM" --jq .title) ;;
             esac
           elif [ "$EVT" = "issues" ]; then
             # only react when the Copilot agent is the new assignee
-            LOGIN="${{ github.event.assignee.login }}"
-            case "$LOGIN" in
+            case "$ASSIGNEE_LOGIN" in
               copilot-swe-agent|Copilot) KIND="issue_assigned" ;;
               *) KIND="skip" ;;
             esac
-            NUM="${{ github.event.issue.number }}"
+            NUM="$ISSUE_NUM"
             TITLE=$(jq -r .issue.title "$GITHUB_EVENT_PATH")
           else
-            ACTION="${{ github.event.action }}"
-            NUM="${{ github.event.pull_request.number }}"
+            NUM="$PR_NUM"
             TITLE=$(jq -r .pull_request.title "$GITHUB_EVENT_PATH")
-            MERGED="${{ github.event.pull_request.merged }}"
             case "$ACTION" in
               opened|ready_for_review) KIND="pr_opened" ;;
               closed) [ "$MERGED" = "true" ] && KIND="pr_merged" || KIND="skip" ;;
             esac
           fi
-          echo "kind=$KIND" >> "$GITHUB_OUTPUT"
-          echo "num=$NUM" >> "$GITHUB_OUTPUT"
-          echo "title=$TITLE" >> "$GITHUB_OUTPUT"
+          {
+            echo "kind=$KIND"
+            echo "num=$NUM"
+            # multi-line-safe output: random delimiter so the title can never terminate it
+            DELIM="EOF_$(openssl rand -hex 16)"
+            echo "title<<$DELIM"
+            printf '%s\n' "$TITLE"
+            echo "$DELIM"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Extract & validate Jira key (C8)
         id: key
         if: steps.ev.outputs.kind != 'skip'
+        env:
+          TITLE: ${{ steps.ev.outputs.title }}
+          NUM: ${{ steps.ev.outputs.num }}
+          REPO: ${{ github.repository }}
         run: |
-          TITLE='${{ steps.ev.outputs.title }}'
-          KEY=$(echo "$TITLE" | grep -oE '[A-Z][A-Z0-9]+-[0-9]+' | head -1 || true)
+          KEY=$(printf '%s\n' "$TITLE" | grep -oE '[A-Z][A-Z0-9]+-[0-9]+' | head -1 || true)
           if [ -z "$KEY" ]; then
-            echo "::warning::No Jira key in title: $TITLE"
-            gh api -X POST "/repos/${{ github.repository }}/issues/${{ steps.ev.outputs.num }}/comments" \
+            echo "::warning::No Jira key in title (see the PR/issue)"
+            gh api -X POST "/repos/$REPO/issues/$NUM/comments" \
               -f body=":warning: **Jira sync skipped** — no Jira key (e.g. \`DRIVE-12\`) found in the title. Please add it so the ticket can be updated." > /dev/null
             echo "key=" >> "$GITHUB_OUTPUT"
           else
@@ -89,11 +114,12 @@ jobs:
 
       - name: Sync to Jira + Slack
         if: steps.ev.outputs.kind != 'skip' && steps.key.outputs.key != ''
+        env:
+          KEY: ${{ steps.key.outputs.key }}
+          KIND: ${{ steps.ev.outputs.kind }}
+          NUM: ${{ steps.ev.outputs.num }}
+          REPO: ${{ github.repository }}
         run: |
-          KEY="${{ steps.key.outputs.key }}"
-          KIND="${{ steps.ev.outputs.kind }}"
-          NUM="${{ steps.ev.outputs.num }}"
-          REPO="${{ github.repository }}"
           AUTH="$JIRA_EMAIL:$JIRA_API_TOKEN"
           B="$JIRA_BASE_URL"
 
