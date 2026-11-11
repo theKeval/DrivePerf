@@ -77,6 +77,7 @@ public final class AppModel {
     }
 
     private func finishOnboarding() {
+        profile.refresh()
         route = .shell
         onboarding = nil
     }

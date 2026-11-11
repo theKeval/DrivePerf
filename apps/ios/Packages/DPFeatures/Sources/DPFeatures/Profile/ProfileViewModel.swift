@@ -30,6 +30,14 @@ public final class ProfileViewModel {
         crashStatus = dependencies.crashReporter.status
     }
 
+    /// Re-reads the saved choices. The model outlives onboarding, which saves them too, so Profile calls this when it
+    /// opens and the app calls it when onboarding finishes.
+    public func refresh() {
+        shareUsageStatistics = preferences.preferences.shareUsageStatistics
+        sendCrashReports = preferences.preferences.sendCrashReports
+        crashStatus = crashReporter.status
+    }
+
     public func setShareUsageStatistics(_ on: Bool) {
         shareUsageStatistics = on
         preferences.update { $0.shareUsageStatistics = on }

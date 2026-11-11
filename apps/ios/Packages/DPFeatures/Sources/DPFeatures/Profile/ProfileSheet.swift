@@ -43,6 +43,7 @@ struct ProfileSheet: View {
             }
         }
         .presentationDetents([.large])
+        .onAppear { model.refresh() }
     }
 
     private static var version: String {

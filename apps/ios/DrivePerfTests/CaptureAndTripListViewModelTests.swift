@@ -246,6 +246,25 @@ final class ProfileViewModelTests: XCTestCase {
         XCTAssertEqual(model.crashStatusText, "Off")
     }
 
+    func testProfileShowsChoicesSavedAfterItWasCreated() {
+        let crash = FakeCrashReporter()
+        let preferences = MemoryPreferences()
+        let model = ProfileViewModel(dependencies: makeDependencies(preferences: preferences, crash: crash))
+        XCTAssertFalse(model.sendCrashReports)
+
+        // What onboarding does on a fresh install, after AppModel has built the Profile model.
+        preferences.update {
+            $0.shareUsageStatistics = true
+            $0.sendCrashReports = true
+        }
+        crash.apply(consent: true)
+        model.refresh()
+
+        XCTAssertTrue(model.shareUsageStatistics)
+        XCTAssertTrue(model.sendCrashReports)
+        XCTAssertEqual(model.crashStatus, .notConfigured)
+    }
+
     func testSelfTestStreamsSteps() async {
         let model = ProfileViewModel(dependencies: makeDependencies())
 
