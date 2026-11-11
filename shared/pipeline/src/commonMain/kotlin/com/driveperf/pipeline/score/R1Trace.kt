@@ -9,6 +9,9 @@ public object QualityBits {
     public const val IMU_GAP: Int = 1 shl 4
     public const val LOW_RATE: Int = 1 shl 5
     internal const val NOT_OK: Int = ESTIMATED or EXCLUDED_PHONE or NOT_ALIGNED or IMU_GAP or LOW_RATE
+
+    /** Bits 1–5: any of them makes a sample not ok. */
+    public const val NOT_OK_MASK: Int = NOT_OK
 }
 
 /** One gated GNSS fix on the R1 time base (seconds from `startedAt`). */

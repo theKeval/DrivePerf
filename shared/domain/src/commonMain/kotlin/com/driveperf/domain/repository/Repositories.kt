@@ -51,3 +51,15 @@ public interface RouteRepository {
     /** The current record of a route, or null. */
     public suspend fun personalBest(routeId: String): PersonalBest?
 }
+
+/** A finished trip with what the scorer needs from it: its score and its route, if matched. */
+public data class ScoredTrip(val trip: com.driveperf.domain.trip.Trip, val score: Score?, val routeId: String?)
+
+/**
+ * History the finaliser reads for baselines, efficiency and route matching (§5.7, §5.9, §7). Implemented in
+ * `:shared:data:local`; not a platform port.
+ */
+public interface TripHistory {
+    /** Finalised trips that started before [beforeStartedAt], newest first (`startedAt` desc, `id` desc), at most [limit]. */
+    public suspend fun finishedBefore(beforeStartedAt: Long, limit: Int): List<ScoredTrip>
+}
