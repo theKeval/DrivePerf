@@ -11,13 +11,17 @@ Native Compose app on the shared Kotlin core. Minimum Android 10 (minSdk 29), ta
   recognition, then notifications; then battery guidance and opt-in consent (usage statistics, crash reports; both off).
 - Manual start and stop: a foreground service (type `location`) with a Live Update notification (Android 16 promoted
   `ProgressStyle`; a standard ongoing notification below), a locked in-drive screen, a confirmed Stop, and the trip list.
-- Adapters: Fused Location, `SensorManager` (linear acceleration, gravity, gyroscope, game rotation vector) and Activity
-  Recognition transitions, with the spike 1 capture rules (stale samples dropped, gaps measured only while moving,
+- Adapters implementing DRIVE-62's shared ports (`LocationSource`, `MotionSource`, `ActivitySource`, `TripFileStore`,
+  `Clock`): Fused Location, `SensorManager` (linear acceleration, gravity, gyroscope, game rotation vector, batched to
+  the sink) and Activity Recognition updates with a confidence bucket (the transition API is reserved for the background
+  wake path, not built yet), with the spike 1 capture rules (stale samples dropped, gaps measured only while moving,
   recording starts at once, sensor callbacks on one thread).
 - Crash reporting is Sentry (EU) behind consent, never Crashlytics (ADR-007). See "Crash reporting" below.
 
-**Interim code (replaced when DRIVE-62 lands):** `platform/.../ports` (the five shared interfaces), `InterimTripRecorder`,
-`TripIndex`, `FileTripFileStore` (text R0 format), `LiveTripStats`, and `app/.../bridge`. They are marked `INTERIM (DRIVE-72)`.
+**Interim code (replaced when DRIVE-62's recorder and storage land):** `InterimTripRecorder`, `TripIndex`, `R0Lines` (text
+R0 format), `LiveTripStats`, and `app/.../bridge`. They are marked `INTERIM (DRIVE-72)`. The adapters and `FileTripStore`
+are final: the core's `PlatformBindings` takes them as they are. Failures the callback ports cannot return (missing
+permission or sensor) go to `CaptureFailureBus` as `DomainError.Capture`.
 Scores, Stories, routes and processed trips do not exist yet: trip rows say "Recorded".
 
 ## Run it
