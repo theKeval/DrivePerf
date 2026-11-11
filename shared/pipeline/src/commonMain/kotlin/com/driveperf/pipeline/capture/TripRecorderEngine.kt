@@ -392,10 +392,12 @@ public class TripRecorderEngine(
         TripFileRef(TripFileKind.R0, R0_FORMAT_VERSION, sha, it.sizeBytes, "trips/$tripId/r0.v$R0_FORMAT_VERSION.pb.gz")
     }
 
+    /** Drops a candidate or a discarded trip: its rows, its R0 and its folder, so nothing of it is left on disk. */
     private suspend fun discard(tripId: String) {
         backfills.remove(tripId)
         persistence.store.deleteNow(tripId)
         persistence.log.delete(tripId)
+        ports.files.deleteTrip(tripId)
     }
 
     private fun publishStatus(now: Long) {
