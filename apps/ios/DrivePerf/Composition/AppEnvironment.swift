@@ -24,6 +24,9 @@ final class AppEnvironment {
     let motion = CoreMotionSource()
     let activity = CoreMotionActivitySource()
     let power = SystemPowerState()
+    /// Its own activity source for the in-drive content hold: the core's `activity` keeps one sink and is stopped at
+    /// the end of every trip.
+    let movement = ActivityMovementMonitor(source: CoreMotionActivitySource())
     let recorder: CoreTripRecorder
     private(set) lazy var corePorts = CorePorts(
         clock: clock, location: location, motion: motion, activity: activity, power: power, parkedRegion: triggers,
@@ -58,7 +61,8 @@ final class AppEnvironment {
             flags: flags,
             coreInfo: SharedCoreHelloProvider(),
             refreshCapture: { [weak self] in self?.refreshCapture() },
-            runSelfTestOnLaunch: ProcessInfo.processInfo.arguments.contains("-selfTest"))
+            runSelfTestOnLaunch: ProcessInfo.processInfo.arguments.contains("-selfTest"),
+            movement: movement)
     }
 
     /// Runs inside `didFinishLaunching`, synchronously: the Core Location sessions first, because a background
