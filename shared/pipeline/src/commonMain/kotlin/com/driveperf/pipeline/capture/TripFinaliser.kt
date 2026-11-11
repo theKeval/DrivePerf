@@ -22,8 +22,18 @@ public data class FinaliseRequest(
     val nowWallMs: Long,
 )
 
-/** The result: the rows to commit (null when the trip is discarded, F-CAP-17) and the new parking spot. */
-public data class FinaliseResult(val trip: FinalisedTrip?, val parking: Parking?)
+/**
+ * The result: the trips to commit, in time order, and the new parking spot. Empty when the trip is discarded
+ * (F-CAP-17); more than one when a trip longer than 12 h was split (§1.6). The first keeps the captured trip's ID
+ * unless it was discarded.
+ */
+public data class FinaliseResult(val trips: List<FinalisedTrip>, val parking: Parking?) {
+    /** A single trip, or none when it is discarded. */
+    public constructor(trip: FinalisedTrip?, parking: Parking?) : this(listOfNotNull(trip), parking)
+
+    /** The first trip, or null when everything was discarded. */
+    public val trip: FinalisedTrip? get() = trips.firstOrNull()
+}
 
 /** Turns a captured trip into committed rows: the batch pipeline of §2–§7. */
 public fun interface TripFinaliser {

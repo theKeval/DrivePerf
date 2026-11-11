@@ -1,14 +1,17 @@
 package com.driveperf.di
 
 import com.driveperf.data.local.DatabaseDriverFactory
+import com.driveperf.data.local.LocalEventFeedbackStore
 import com.driveperf.data.local.LocalRouteHistory
 import com.driveperf.data.local.LocalRouteRepository
 import com.driveperf.data.local.LocalTripHistory
 import com.driveperf.data.local.LocalTripRepository
 import com.driveperf.data.local.LocalTripStore
+import com.driveperf.data.local.ProtoAnalysisFileStore
 import com.driveperf.data.local.ProtoCaptureLog
 import com.driveperf.data.local.ProtoPreviewStore
 import com.driveperf.data.local.openDatabase
+import com.driveperf.domain.feedback.MarkEventNeeded
 import com.driveperf.domain.hello.GetHelloMessage
 import com.driveperf.domain.hello.HelloMessage
 import com.driveperf.foundation.platformDescription
@@ -17,6 +20,7 @@ import com.driveperf.pipeline.capture.CapturePersistence
 import com.driveperf.pipeline.capture.CapturePorts
 import com.driveperf.pipeline.capture.TripFinaliser
 import com.driveperf.pipeline.capture.TripRecorderEngine
+import com.driveperf.pipeline.score.FeedbackRescorer
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -48,7 +52,10 @@ public object DrivePerfCore {
     ): CoreServices = started ?: run {
         val db = openDatabase(database.create())
         val store = LocalTripStore(db, platform.deviceId(), io)
-        val previews = ProtoPreviewStore(platform.tripFiles(), io)
+        val files = platform.tripFiles()
+        val clock = platform.clock()
+        val previews = ProtoPreviewStore(files, io)
+        val history = LocalTripHistory(db, io)
         val recorder = TripRecorderEngine(
             ports = CapturePorts(
                 location = platform.location(),
@@ -56,22 +63,28 @@ public object DrivePerfCore {
                 activity = platform.activity(),
                 power = platform.power(),
                 parkedRegion = platform.parkedRegion(),
-                files = platform.tripFiles(),
+                files = files,
             ),
             persistence = CapturePersistence(
                 store,
-                ProtoCaptureLog(platform.tripFiles(), io),
-                finaliser?.invoke(db) ?: PipelineFinaliser(LocalTripHistory(db, io), LocalRouteHistory(db, previews, io)),
+                ProtoCaptureLog(files, io),
+                finaliser?.invoke(db) ?: PipelineFinaliser(history, LocalRouteHistory(db, previews, io)),
                 previews,
+                ProtoAnalysisFileStore(files, io),
             ),
-            clock = platform.clock(),
+            clock = clock,
             zones = SystemTimeZone(),
             scope = CoroutineScope(SupervisorJob() + Dispatchers.Default.limitedParallelism(1)),
         )
+        val trips = LocalTripRepository(db, files, io)
+        val routes = LocalRouteRepository(db, io)
         CoreServices(
             recorder = recorder,
-            trips = LocalTripRepository(db, platform.tripFiles(), io),
-            routes = LocalRouteRepository(db, io),
+            trips = trips,
+            routes = routes,
+            markEventNeeded = MarkEventNeeded(
+                trips, routes, LocalEventFeedbackStore(db, io), FeedbackRescorer(history, previews), clock,
+            ),
         ).also { started = it }
     }
 

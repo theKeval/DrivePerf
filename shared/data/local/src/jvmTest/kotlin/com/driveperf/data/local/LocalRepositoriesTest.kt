@@ -30,6 +30,7 @@ import com.driveperf.domain.trip.CaptureMeta
 import com.driveperf.domain.trip.Confidence
 import com.driveperf.domain.trip.DriveContext
 import com.driveperf.domain.trip.DrivingEvent
+import com.driveperf.domain.trip.EventFeedback
 import com.driveperf.domain.trip.EventType
 import com.driveperf.domain.trip.Interruption
 import com.driveperf.domain.trip.InterruptionReason
@@ -50,6 +51,7 @@ import com.driveperf.domain.trip.TripStatus
 import com.driveperf.domain.trip.TurnDirection
 import com.driveperf.domain.tripfile.FileResult
 import com.driveperf.domain.tripfile.TripFileKind
+import com.driveperf.domain.tripfile.TripFileRef
 import com.driveperf.testing.InMemoryTripFileStore
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
@@ -225,6 +227,34 @@ class LocalRepositoriesTest {
         store.saveFinalised(FinalisedTrip(finished, listOf(event), score))
         assertEquals(setOf(event.id), trips.feedback("t1").keys)
         assertEquals(1, db.tripQueries.filesForTrip("t1").executeAsList().size)
+    }
+
+    @Test
+    fun finalisingRecordsTheTripFiles() = runTest {
+        val store = LocalTripStore(db, "device-1", coroutineContext)
+        val r0 = TripFileRef(TripFileKind.R0, 1, "aa", 100L, "trips/t1/r0.v1.pb.gz")
+        val r1 = TripFileRef(TripFileKind.R1, 1, "bb", 20L, "trips/t1/r1.v1.pb.gz")
+        store.saveFinalised(FinalisedTrip(finished, listOf(event), score, files = listOf(r0, r1)))
+        val rows = db.tripQueries.filesForTrip("t1").executeAsList().sortedBy { it.kind }
+        assertEquals(listOf("R0", "R1"), rows.map { it.kind })
+        assertEquals(listOf("aa", "bb"), rows.map { it.sha256 })
+        assertEquals("trips/t1/r1.v1.pb.gz", rows[1].local_path)
+        assertNull(rows[0].expires_at, "R0 is kept until the user deletes it")
+        assertNull(rows[1].uploaded_at)
+    }
+
+    @Test
+    fun feedbackAndTheNewScoreCommitTogether() = runTest {
+        val store = LocalTripStore(db, "device-1", coroutineContext)
+        val trips = LocalTripRepository(db, files, coroutineContext)
+        store.saveFinalised(FinalisedTrip(finished, listOf(event), score))
+        val feedback = LocalEventFeedbackStore(db, coroutineContext)
+        feedback.save(EventFeedback(event.id, "t1", true, null, 7L), score.copy(smoothness = 99))
+        assertEquals(true, trips.feedback("t1").getValue(event.id).needed)
+        assertEquals(99, trips.score("t1")?.smoothness)
+        feedback.save(EventFeedback(event.id, "t1", false, null, 8L), null)
+        assertEquals(false, trips.feedback("t1").getValue(event.id).needed)
+        assertEquals(99, trips.score("t1")?.smoothness, "a null score leaves the stored one alone")
     }
 
     @Test

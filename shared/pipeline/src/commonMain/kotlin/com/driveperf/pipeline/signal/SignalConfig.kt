@@ -68,4 +68,7 @@ public data class SignalConfig(
     // §1.6 short trips
     val shortTripM: Double = 500.0,
     val shortTripS: Double = 120.0,
+    // §1.6 trips longer than 12 h are split at their longest stop of more than 30 min
+    val splitAfterS: Double = 43_200.0,
+    val splitStopMinS: Double = 1_800.0,
 )

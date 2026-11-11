@@ -4,6 +4,7 @@ import com.driveperf.data.local.db.Driving_event
 import com.driveperf.data.local.db.Event_feedback
 import com.driveperf.data.local.db.Personal_best
 import com.driveperf.data.local.db.Route_match
+import com.driveperf.data.local.db.Trip_file
 import com.driveperf.data.local.db.Trip_segment
 import com.driveperf.domain.route.IneligibleReason
 import com.driveperf.domain.route.MatchSource
@@ -18,6 +19,7 @@ import com.driveperf.domain.score.ScoreBasis
 import com.driveperf.domain.trip.Confidence
 import com.driveperf.domain.trip.DriveContext
 import com.driveperf.domain.trip.DrivingEvent
+import com.driveperf.domain.tripfile.TripFileRef
 import com.driveperf.domain.trip.EventFeedback
 import com.driveperf.domain.trip.EventType
 import com.driveperf.domain.trip.InaccurateReason
@@ -61,3 +63,7 @@ internal fun Event_feedback.toDomain(): EventFeedback =
 internal fun EventFeedback.toRow(): Event_feedback =
     Event_feedback(eventId, tripId, needed.toInt(), inaccurate?.name, at)
 
+
+/** A `trip_file` row (data-model.md §1.17). Not uploaded yet, and R0 has no expiry (pipeline-and-scoring.md §0.3). */
+internal fun TripFileRef.toRow(tripId: String): Trip_file =
+    Trip_file(tripId, kind.name, formatVersion.toLong(), sha256, sizeBytes, localPath, null, null, null)

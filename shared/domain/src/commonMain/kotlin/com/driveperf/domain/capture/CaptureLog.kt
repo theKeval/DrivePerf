@@ -7,6 +7,8 @@ import com.driveperf.domain.score.Score
 import com.driveperf.domain.trip.DrivingEvent
 import com.driveperf.domain.trip.PreviewRow
 import com.driveperf.domain.trip.Trip
+import com.driveperf.domain.tripfile.AnalysisTrace
+import com.driveperf.domain.tripfile.TripFileRef
 
 /** State changes written into the capture log (data-model.md §2.4 `Mark.Type`). */
 public enum class CaptureMarkType {
@@ -100,7 +102,7 @@ public interface TripStore {
 
     /**
      * Commits a finished trip and everything derived from it in one transaction (data-model.md §2.3 step 2): the
-     * trip row with its quality and spans, events, score, route match and a newly created route.
+     * trip row with its quality and spans, events, score, route match, a newly created route and the file rows.
      */
     public suspend fun saveFinalised(result: FinalisedTrip)
 
@@ -117,6 +119,11 @@ public interface TripStore {
  *   route candidate (§7.4).
  * @property personalBest the route record after this trip, when it has a route (§7.5).
  * @property preview the preview track (data-model.md §2.5), stored as a file beside the trip.
+ * @property analysis the R1 analysis signal, written as the trip's R1 file at finalisation (ADR-003). Null when the
+ *   finaliser does not produce one (the summary-only finaliser).
+ * @property splitCapture set when finalisation split a trip longer than 12 h (§1.6): the capture log this trip keeps,
+ *   which replaces its R0 (or creates it for the later part, which has a new ID).
+ * @property files the trip's stored files, filled in by the recorder just before the commit.
  */
 public data class FinalisedTrip(
     val trip: Trip,
@@ -127,6 +134,9 @@ public data class FinalisedTrip(
     val extraMatches: List<RouteMatch> = emptyList(),
     val personalBest: PersonalBest? = null,
     val preview: List<PreviewRow> = emptyList(),
+    val analysis: AnalysisTrace? = null,
+    val splitCapture: CapturedTrip? = null,
+    val files: List<TripFileRef> = emptyList(),
 )
 
 /** The device's time zone, for trip start offsets and part of day (data-model.md P4). */

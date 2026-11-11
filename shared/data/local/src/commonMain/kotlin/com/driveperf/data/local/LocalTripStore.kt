@@ -62,6 +62,7 @@ public class LocalTripStore(
             if (match == null) routes.deleteMatch(trip.id) else routes.upsertMatch(match.toRow())
             result.extraMatches.forEach { routes.upsertMatch(it.toRow()) }
             result.personalBest?.let { routes.upsertPersonalBest(it.toRow(trip.updatedAt)) }
+            result.files.forEach { trips.upsertTripFile(it.toRow(trip.id)) }
         }
     }
 }
