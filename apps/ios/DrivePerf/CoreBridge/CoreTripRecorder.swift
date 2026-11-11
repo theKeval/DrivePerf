@@ -1,18 +1,38 @@
 import DPSharedBridge
 import Foundation
 
-/// Shows a manual trip on the Lock Screen and in the Dynamic Island (ActivityKit). Never used for automatic trips.
+/// Shows a trip on the Lock Screen and in the Dynamic Island (ActivityKit).
 @MainActor
 protocol LiveSurfacing: AnyObject {
+    var activitiesEnabled: Bool { get }
+    var hasEnded: Bool { get }
     func start(tripId: String, startedAt: Date)
+    func present(tripId: String, startedAt: Date, distanceM: Double) -> Bool
+    func resume(tripId: String) -> Bool
     func update(distanceM: Double, hasFix: Bool)
     func end()
+}
+
+extension LiveSurfacing {
+    var activitiesEnabled: Bool { true }
+    var hasEnded: Bool { false }
+    func resume(tripId: String) -> Bool { false }
+
+    func present(tripId: String, startedAt: Date, distanceM: Double) -> Bool {
+        start(tripId: tripId, startedAt: startedAt)
+        return true
+    }
 }
 
 @MainActor
 protocol TripNotifying: AnyObject {
     func postAutoTripRecording(tripId: String)
     func removeTripNotifications(tripId: String)
+    func postDriveDecoded(tripId: String, smoothness: Int?)
+}
+
+extension TripNotifying {
+    func postDriveDecoded(tripId: String, smoothness: Int?) {}
 }
 
 /// A short UIKit background assertion that keeps a wake alive until the trip is moving.
@@ -59,6 +79,12 @@ final class CoreTripRecorder: TripRecording, TripHistory {
     private var autoDetect: Bool
     private var liveTripId: String?
     private var notifiedTripId: String?
+    private var notifiedAutomaticTrip = false
+    private var manualActivityAttemptID: String?
+    private var activityRecoveryAttemptID: String?
+    private(set) var isStartingFromIntent = false
+    var surfaceData: TripSurfaceData?
+    var liveActivitiesEnabled: Bool { liveSurface?.activitiesEnabled ?? false }
     private var statusObservers: [UUID: AsyncStream<RecorderStatus>.Continuation] = [:]
     private var historyObservers: [UUID: AsyncStream<[TripSummary]>.Continuation] = [:]
 
@@ -84,7 +110,10 @@ final class CoreTripRecorder: TripRecording, TripHistory {
             for await next in core.statusUpdates() { self?.apply(next) }
         }
         Task { [weak self] in
-            for await trips in core.tripUpdates() { self?.history = trips }
+            for await trips in core.tripUpdates() {
+                self?.history = trips
+                await self?.surfaceData?.updateLatestDrive(trips)
+            }
         }
     }
 
@@ -137,26 +166,94 @@ final class CoreTripRecorder: TripRecording, TripHistory {
 
     // MARK: Surfaces
 
+    /// Keeps the ActivityKit request inside the system's LiveActivityIntent execution.
+    func startFromIntent(_ wake: WakeEvent) async -> Bool {
+        if isStartingFromIntent { return true }
+        isStartingFromIntent = true
+        defer { isStartingFromIntent = false }
+        let previousFailure = status.startFailed
+        onWake(wake)
+        guard let result = await waitForStatus(where: { $0.isDriving || ($0.startFailed && !previousFailure) }),
+            result.isDriving else { return false }
+        if result.isManual { manualActivityAttemptID = result.tripId }
+        if !showLiveActivity(), result.isManual, let id = result.tripId { postRecordingNotice(tripID: id, automatic: false) }
+        return true
+    }
+
+    func showLiveActivity() -> Bool {
+        guard let id = status.tripId, status.state == .recording || status.state == .paused else { return false }
+        if liveTripId == id { return true }
+        let startedAt = Date().addingTimeInterval(-max(0, status.elapsedS))
+        guard liveSurface?.present(tripId: id, startedAt: startedAt, distanceM: status.distanceM) == true else { return false }
+        liveTripId = id
+        publishRecording()
+        return true
+    }
+
+    func waitForStatus(
+        where predicate: @escaping @MainActor (RecorderStatus) -> Bool
+    ) async -> RecorderStatus? {
+        if predicate(status) { return status }
+        let stream = statuses()
+        let watcher = Task { @MainActor () -> RecorderStatus? in
+            for await next in stream where predicate(next) { return next }
+            return nil
+        }
+        let timeout = Task {
+            try? await Task.sleep(for: .seconds(5))
+            watcher.cancel()
+        }
+        defer { timeout.cancel() }
+        return await withTaskCancellationHandler { await watcher.value } onCancel: { watcher.cancel() }
+    }
+
+    func publishRecording() {
+        surfaceData?.updateRecording(
+            status: status,
+            offersLiveActivity: !status.isManual && status.state != .finishing && liveTripId == nil && liveActivitiesEnabled)
+    }
+
     private func apply(_ next: RecorderStatus) {
         status = next
+        defer { publishRecording() }
         if next.state == .idle || next.distanceM > 0 { assertions?.end() }
         guard let tripId = next.tripId, next.state != .idle else {
             endSurfaces()
             return
         }
-        if liveTripId != nil && liveTripId != tripId || notifiedTripId != nil && notifiedTripId != tripId { endSurfaces() }
-        if next.isManual, next.isDriving, liveTripId == nil {
-            liveSurface?.start(tripId: tripId, startedAt: Date().addingTimeInterval(-next.elapsedS))
-            liveTripId = tripId
+        if liveTripId != nil && liveTripId != tripId || notifiedTripId != nil && notifiedTripId != tripId {
+            endSurfaces()
         }
-        if !next.isManual, next.state == .recording, notifiedTripId == nil {
-            notifier?.postAutoTripRecording(tripId: tripId)
-            notifiedTripId = tripId
+        if next.isDriving, activityRecoveryAttemptID != tripId {
+            activityRecoveryAttemptID = tripId
+            if liveTripId == nil, liveSurface?.resume(tripId: tripId) == true { liveTripId = tripId }
+        }
+        if next.state == .recording || next.state == .paused {
+            if next.isManual {
+                if !isStartingFromIntent, manualActivityAttemptID != tripId {
+                    manualActivityAttemptID = tripId
+                    if !showLiveActivity() { postRecordingNotice(tripID: tripId, automatic: false) }
+                }
+                if liveTripId == tripId, liveSurface?.hasEnded == true {
+                    postRecordingNotice(tripID: tripId, automatic: false)
+                }
+            } else {
+                postRecordingNotice(tripID: tripId, automatic: true)
+            }
         }
         if liveTripId == tripId { liveSurface?.update(distanceM: next.distanceM, hasFix: next.distanceM > 0) }
     }
 
+    private func postRecordingNotice(tripID: String, automatic: Bool) {
+        guard notifiedTripId == nil else { return }
+        notifier?.postAutoTripRecording(tripId: tripID)
+        notifiedTripId = tripID
+        notifiedAutomaticTrip = automatic
+    }
+
     private func endSurfaces() {
+        manualActivityAttemptID = nil
+        activityRecoveryAttemptID = nil
         if liveTripId != nil {
             liveSurface?.end()
             liveTripId = nil
@@ -164,6 +261,13 @@ final class CoreTripRecorder: TripRecording, TripHistory {
         if let id = notifiedTripId {
             notifier?.removeTripNotifications(tripId: id)
             notifiedTripId = nil
+            if notifiedAutomaticTrip, let surfaceData, let notifier {
+                Task {
+                    guard let decoded = await surfaceData.decodedTrip(tripID: id), !status.isDriving else { return }
+                    notifier.postDriveDecoded(tripId: id, smoothness: decoded.smoothness)
+                }
+            }
+            notifiedAutomaticTrip = false
         }
     }
 }

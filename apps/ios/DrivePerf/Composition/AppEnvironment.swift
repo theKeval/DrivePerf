@@ -24,6 +24,7 @@ final class AppEnvironment {
     let activity = CoreMotionActivitySource()
     let power = SystemPowerState()
     let recorder: CoreTripRecorder
+    let surfaceRouter = TripSurfaceRouter()
     private(set) lazy var corePorts = CorePorts(
         clock: clock, location: location, motion: motion, activity: activity, power: power, parkedRegion: triggers,
         tripFiles: files)
@@ -71,6 +72,8 @@ final class AppEnvironment {
         let services = DrivePerfCore.shared.start(
             platform: CorePlatformBindings(ports: corePorts, deviceId: DeviceIdentity.current()))
         recorder.attach(KotlinCore(services))
+        recorder.surfaceData = TripSurfaceData(trips: services.trips)
+        recorder.surfaceData?.updateLocation(canRecord: canRecordFromSystemSurface)
         recorder.onLaunch()
         crashReporter.apply(consent: preferences.preferences.sendCrashReports)
     }
@@ -111,6 +114,8 @@ final class AppEnvironment {
             triggersArmed = false
         }
         recorder.setAutoDetect(enabled: auto)
+        recorder.surfaceData?.updateLocation(canRecord: canRecord)
+        recorder.publishRecording()
     }
 }
 
@@ -120,5 +125,21 @@ enum TripIntentHandler {
     static func stopTrip() async {
         AppEnvironment.shared.launch()
         AppEnvironment.shared.recorder.stop()
+    }
+}
+
+extension AppEnvironment {
+    var canRecordFromSystemSurface: Bool {
+        let status = authorization.authorizationStatus
+        return status == .authorizedAlways || status == .authorizedWhenInUse
+    }
+
+    /// Read on demand by Health Check so a Settings change is visible on return to the app.
+    var liveActivitiesEnabled: Bool { recorder.liveActivitiesEnabled }
+}
+
+extension NotificationAdapter {
+    func postDriveDecoded(tripId: String, smoothness: Int?) {
+        LocalNotifier().postDriveDecoded(tripId: tripId, smoothness: smoothness)
     }
 }
