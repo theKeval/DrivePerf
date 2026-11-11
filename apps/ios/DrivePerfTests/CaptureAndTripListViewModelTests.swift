@@ -10,7 +10,7 @@ final class CaptureViewModelTests: XCTestCase {
     ) -> CaptureViewModel {
         CaptureViewModel(
             recorder: recorder, history: recorder, permissions: permissions, clock: FixedClock(), now: { now },
-            finishTimeout: .milliseconds(100))
+            finishTimeout: .milliseconds(100), startTimeout: .milliseconds(300))
     }
 
     func testStartWithoutLocationAsksForSettingsAndDoesNotRecord() async {
@@ -49,6 +49,34 @@ final class CaptureViewModelTests: XCTestCase {
         await model.start()
 
         XCTAssertEqual(model.startProblem, .storageLocked)
+    }
+
+    func testAStartReportedLaterByTheRecorderIsNotAnError() async {
+        let recorder = FakeRecorder()
+        recorder.startsLater = true
+        let permissions = FakePermissions()
+        permissions.state.location = .whenInUse
+        let model = makeModel(recorder, permissions: permissions)
+
+        await model.start()
+
+        XCTAssertNil(model.startProblem, "the shared core reports the new trip after onWake returns")
+        XCTAssertEqual(recorder.status.state, .recording)
+    }
+
+    func testAStartTheRecorderReportsAsFailedIsLockedStorage() async {
+        let recorder = FakeRecorder()
+        recorder.startsLater = true
+        recorder.failsStart = true
+        let permissions = FakePermissions()
+        permissions.state.location = .whenInUse
+        let model = makeModel(recorder, permissions: permissions)
+
+        let started = ContinuousClock.now
+        await model.start()
+
+        XCTAssertEqual(model.startProblem, .storageLocked)
+        XCTAssertLessThan(ContinuousClock.now - started, .milliseconds(250), "reported at once, not by the timeout")
     }
 
     func testADriverTripLocksTheAppToTheInDriveScreen() {

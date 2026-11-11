@@ -58,8 +58,7 @@ until the Sentry EU project exists, ADR-007) and the flags `DP_FEATURE_SIGN_IN_W
 |---|---|
 | `DrivePerf.xcodeproj` | Targets `DrivePerf` (app), `DrivePerfWidgets` (Live Activity extension) and `DrivePerfTests`. Source folders are synchronized: **new files under `DrivePerf/`, `DrivePerfWidgets/`, `Shared/` and `DrivePerfTests/` are picked up without editing the project file.** |
 | `DrivePerf/` | App target and composition root (`Composition/AppEnvironment.swift`). The only code that imports the Kotlin framework |
-| `DrivePerf/CoreBridge/` | The DPPlatform adapters as the Kotlin ports from `:shared:domain` (`LocationSource`, `MotionSource`, `ActivitySource`, `PowerState`, `ParkedRegionMonitor`, `TripFileStore`, `Clock`): conversion only, ready for `PlatformBindings` |
-| `DrivePerf/Interim/` | **Temporary** Swift implementation of the `TripRecorder` contract and a trip index of raw recorded rows, so the shell records end to end before the shared recorder lands. It runs on the same ports and writes R0 bytes through `TripFileStore`. Replaced by DRIVE-62's `TripRecorder` and `TripRepository` behind the same `TripRecording` / `TripHistory` protocols |
+| `DrivePerf/CoreBridge/` | The DPPlatform adapters as the Kotlin ports from `:shared:domain` (`LocationSource`, `MotionSource`, `ActivitySource`, `PowerState`, `ParkedRegionMonitor`, `TripFileStore`, `Clock`), handed to `DrivePerfCore.start(platform:)` as `CorePlatformBindings`. `CoreTripRecorder` gives the features `TripRecording` / `TripHistory` over the core's `TripRecorder` and `TripRepository` and adds the iOS surfaces (Live Activity, auto-trip notification, wake assertion) |
 | `DrivePerf/SelfTest/` | On-device self-test of the trip path (Spike 1 change 10) |
 | `DrivePerfWidgets/` | Live Activity for manual trips (Lock Screen and Dynamic Island). Links `DPDesignSystem` only, never the Kotlin framework |
 | `Shared/` | `RecordingActivityAttributes` and `StopTripIntent`, compiled into the app and the extension |
@@ -90,8 +89,8 @@ Dependency rules (ADR-002 section 2): `DPFeatures` sees `DPDesignSystem` and `DP
 - **Manual trips** start from the accessory's Start button and show a Live Activity. **Automatic trips never start a
   local Live Activity** (it fails in the background); they post a passive "Recording your drive" notification.
 - Trip files live under `Application Support/Capture/trips/<id>/`: R0 and R1 `completeUnlessOpen` (written while
-  locked), R0 excluded from backup, gzipped when the trip ends. Until the shared R0 codec lands, R0 holds an interim
-  CSV capture log. Nothing is uploaded, and the trip rows hold no coordinates.
+  locked), R0 excluded from backup, gzipped when the trip ends. The shared core writes both (protobuf, data-model.md §2.4) and the
+  trip rows in its SQLite database. Nothing is uploaded.
 
 ## Tests
 

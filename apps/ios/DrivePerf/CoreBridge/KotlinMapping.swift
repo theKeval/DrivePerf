@@ -121,28 +121,55 @@ enum KotlinMapping {
         }
     }
 
+    static func swift(_ s: DrivePerfShared.RecorderStatus) -> DPSharedBridge.RecorderStatus {
+        DPSharedBridge.RecorderStatus(
+            state: swift(s.state), tripId: s.tripId, isManual: s.isManual, elapsedS: s.elapsedS.rounded(.down),
+            distanceM: s.distanceM, autoDetectEnabled: s.autoDetectEnabled, startFailed: s.startFailed)
+    }
+
+    static func swift(_ state: DrivePerfShared.RecorderState) -> DPSharedBridge.RecorderState {
+        switch state {
+        case .idle: .idle
+        case .candidate: .candidate
+        case .recording: .recording
+        case .paused: .paused
+        case .finishing: .finishing
+        }
+    }
+
+    /// A listed trip as the drive list shows it. Recording and discarded trips are never listed (§1.7 of the data
+    /// model); a manual trip under 500 m or 120 s is "Short trip" (§1.6). Sample counts are not kept by the core.
+    static func summary(_ trip: DrivePerfShared.Trip) -> TripSummary? {
+        let distance = trip.distanceM?.doubleValue ?? 0
+        let duration = trip.durationS?.doubleValue ?? 0
+        let status: DPSharedBridge.TripStatus
+        switch trip.status {
+        case .interrupted: status = .interrupted
+        case .finalised:
+            let short = distance < shortTripM || duration < shortTripS
+            status = trip.source == .manual && short ? .short : .finalised
+        case .recording, .discarded: return nil
+        }
+        let started = Date(timeIntervalSince1970: TimeInterval(trip.startedAt) / 1000)
+        let ended = trip.endedAt.map { Date(timeIntervalSince1970: TimeInterval($0.int64Value) / 1000) }
+        return TripSummary(
+            id: trip.id, source: trip.source == .manual ? .manual : .auto, status: status, startedAt: started,
+            endedAt: ended ?? started.addingTimeInterval(duration), distanceM: distance, samples: SampleCounts())
+    }
+
+    private static let shortTripM = 500.0
+    private static let shortTripS = 120.0
+
     // MARK: Bytes
 
-    /// `KotlinByteArray` has no bulk accessor in the Objective-C export, so this copies byte by byte. Fine for the
-    /// ~1 s capture batches; slow for whole-file reads of a long trip (reported to DRIVE-62).
+    /// Bulk copies through the framework's `Bytes` helper (`:shared:ios-export`); `KotlinByteArray` itself only has
+    /// per-byte accessors, too slow for the core's whole-file reads of R0.
     static func kotlin(_ data: Data) -> KotlinByteArray {
-        let array = KotlinByteArray(size: Int32(data.count))
-        data.withUnsafeBytes { raw in
-            for (index, byte) in raw.bindMemory(to: Int8.self).enumerated() {
-                array.set(index: Int32(index), value: byte)
-            }
-        }
-        return array
+        Bytes.shared.fromData(data: data)
     }
 
     static func swift(_ array: KotlinByteArray) -> Data {
-        let count = Int(array.size)
-        var data = Data(count: count)
-        data.withUnsafeMutableBytes { raw in
-            let bytes = raw.bindMemory(to: Int8.self)
-            for index in 0..<count { bytes[index] = array.get(index: Int32(index)) }
-        }
-        return data
+        Bytes.shared.toData(bytes: array)
     }
 
     private static func boxed(_ value: Double?) -> KotlinDouble? {
