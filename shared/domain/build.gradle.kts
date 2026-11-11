@@ -6,11 +6,12 @@ plugins {
 kotlin {
     sourceSets.commonMain.dependencies {
         implementation(projects.shared.foundation)
+        // Repository and recorder contracts expose Flow and StateFlow, so callers need the coroutines types too.
+        api(libs.kotlinx.coroutines.core)
     }
 }
 
-// PRD 7.2: at least 90 % line coverage on domain and pipeline. :shared:pipeline joins this gate in DRIVE-62,
-// when it has code (an empty module has nothing to measure).
+// PRD 7.2: at least 90 % line coverage on domain and pipeline.
 kover {
     reports {
         verify {
