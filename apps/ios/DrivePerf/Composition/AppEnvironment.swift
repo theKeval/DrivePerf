@@ -2,11 +2,12 @@ import CoreLocation
 import DPFeatures
 import DPPlatform
 import DPSharedBridge
+import DrivePerfShared
 import Foundation
 
-/// Composition root (ADR-002 §5). Builds the platform adapters and the recorder once per process and hands features
-/// their protocols. The only place that knows concrete types. `corePorts` wraps the same adapters as the Kotlin
-/// ports, ready for `DrivePerfCore.start` when the shared recorder lands.
+/// Composition root (ADR-002 §5). Builds the platform adapters once per process, starts the shared core on them
+/// (`DrivePerfCore.start`, through `corePorts`) and hands features their protocols. The only place that knows
+/// concrete types.
 @MainActor
 final class AppEnvironment {
     static let shared = AppEnvironment()
@@ -22,7 +23,7 @@ final class AppEnvironment {
     let motion = CoreMotionSource()
     let activity = CoreMotionActivitySource()
     let power = SystemPowerState()
-    let recorder: InterimTripRecorder
+    let recorder: CoreTripRecorder
     private(set) lazy var corePorts = CorePorts(
         clock: clock, location: location, motion: motion, activity: activity, power: power, parkedRegion: triggers,
         tripFiles: files)
@@ -36,13 +37,7 @@ final class AppEnvironment {
     static let isRunningUnitTests = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
 
     private init() {
-        recorder = InterimTripRecorder(
-            location: location,
-            motion: motion,
-            activity: activity,
-            files: files,
-            parkedRegion: triggers,
-            index: TripIndexStore(root: FileTripStore.defaultRoot),
+        recorder = CoreTripRecorder(
             liveSurface: LiveActivityController(),
             notifier: NotificationAdapter(),
             assertions: UIKitBackgroundAssertions(),
@@ -64,22 +59,29 @@ final class AppEnvironment {
             runSelfTestOnLaunch: ProcessInfo.processInfo.arguments.contains("-selfTest"))
     }
 
-    /// Runs inside `didFinishLaunching`, synchronously up to the Core Location sessions: a background relaunch only
-    /// keeps its events for a few seconds (ADR-002 §5, A3 §7.3 #4). The Kotlin core is not started on this path.
+    /// Runs inside `didFinishLaunching`, synchronously: the Core Location sessions first, because a background
+    /// relaunch only keeps its events for a few seconds (ADR-002 §5, A3 §7.3 #4), then the shared core on the same
+    /// adapters, then `onLaunch`, which re-arms the parked region and recovers a killed trip (§1.7).
     func launch() {
         guard !launched, !Self.isRunningUnitTests else { return }
-        // Before the first unlock after a reboot the trip files are unreadable; wait for protected data (EC-RBT).
+        // Before the first unlock after a reboot the trip files and the database are unreadable; wait (EC-RBT).
         guard files.isUnlockedSinceBoot() else { return }
         launched = true
         refreshCapture()
+        let services = DrivePerfCore.shared.start(
+            platform: CorePlatformBindings(ports: corePorts, deviceId: DeviceIdentity.current()))
+        recorder.attach(KotlinCore(services))
         recorder.onLaunch()
         crashReporter.apply(consent: preferences.preferences.sendCrashReports)
     }
 
-    /// Every unlock: the first one after a reboot launches; later ones finish compressions that the lock blocked.
+    /// Every unlock: the first one after a reboot launches; later ones compress R0 files that a finalisation while
+    /// locked could not (the core keeps the trip and its plain R0 then).
     func protectedDataBecameAvailable() {
         if launched {
-            recorder.compressFinishedTrips()
+            for trip in recorder.history where files.describe(tripId: trip.id, kind: .r0, withSha256: false)?.compressed == false {
+                _ = files.compress(tripId: trip.id, kind: .r0)
+            }
         } else {
             launch()
         }

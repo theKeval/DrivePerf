@@ -2,8 +2,7 @@ import Foundation
 
 /// The recorder seam features code against: a Swift mirror of the Kotlin `TripRecorder` contract in
 /// `com.driveperf.domain.capture` (pipeline-and-scoring.md §1). The Kotlin `status` StateFlow becomes `status` plus
-/// `statuses()`. Until the shared recorder implementation lands (DRIVE-62 slices 2–3), the app target supplies an
-/// interim Swift recorder behind this protocol; afterwards it adapts the Kotlin one, and features do not change.
+/// `statuses()`. The app target adapts the Kotlin recorder from `DrivePerfCore` behind it (`CoreTripRecorder`).
 
 /// Kotlin `RecorderState`. `PROCESSED` is transient and shows as `idle`.
 public enum RecorderState: String, Equatable, Sendable, Codable {
@@ -85,8 +84,7 @@ extension Optional where Wrapped == TripSource {
     }
 }
 
-/// The subset of Kotlin `TripStatus` the interim recorder produces, plus `short`, which the shared core expresses
-/// through quality once scoring lands (§1.6).
+/// The listed Kotlin `TripStatus` values, plus `short`: a manual trip under 500 m or 120 s, kept and not scored (§1.6).
 public enum TripStatus: String, Equatable, Sendable, Codable {
     /// Committed and complete.
     case finalised
@@ -109,7 +107,7 @@ public struct SampleCounts: Equatable, Sendable, Codable {
     }
 }
 
-/// A raw recorded trip row, as the lists show it until the shared `TripRepository` and its `Trip` land. It carries
+/// A finished trip row as the lists show it, mapped from the shared `TripRepository`'s `Trip`. It carries
 /// no coordinates.
 public struct TripSummary: Identifiable, Equatable, Sendable, Codable {
     public var id: String
