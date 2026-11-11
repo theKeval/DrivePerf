@@ -23,6 +23,9 @@ public struct AppDependencies {
     public var runSelfTestOnLaunch: Bool
     /// The phone's movement after a trip, for the in-drive content hold (F-CAP-07.4). Nil: no signal, the hold is 60 s.
     public var movement: (any MovementMonitoring)?
+    // DRIVE-100, DRIVE-172 (S2): trip corrections and the provenance catalogue for the Drives screens.
+    public var corrections: (any TripCorrecting)?
+    public var provenance = ProvenanceCatalog()
 
     public init(
         recorder: any TripRecording, history: any TripHistory, clock: any ClockBridge,
@@ -71,7 +74,8 @@ public final class AppModel {
         capture = CaptureViewModel(
             recorder: dependencies.recorder, history: dependencies.history, permissions: dependencies.permissions,
             clock: dependencies.clock, movement: dependencies.movement)
-        trips = TripListViewModel(history: dependencies.history)
+        trips = TripListViewModel(
+            history: dependencies.history, corrections: dependencies.corrections, catalog: dependencies.provenance)
         profile = ProfileViewModel(dependencies: dependencies)
         if route == .onboarding { onboarding = makeOnboarding() }
     }

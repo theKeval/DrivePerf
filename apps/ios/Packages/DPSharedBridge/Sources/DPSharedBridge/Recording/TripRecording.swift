@@ -121,10 +121,21 @@ public struct TripSummary: Identifiable, Equatable, Sendable, Codable {
     public var endedAt: Date
     public var distanceM: Double
     public var samples: SampleCounts
+    /// Who was driving, after any correction (F-CAP-04).
+    public var kind: TripKind
+    /// The user's correction, and when they made it (for the 30-day "Not drives" purge).
+    public var correction: TripCorrection?
+    public var correctedAt: Date?
+    /// "Was this a bus or train?" / "Was this a bike ride?" while nobody has answered.
+    public var question: TripQuestion?
+    /// The data-quality badge and its detail (F-DQ-04); nil for trips finalised without analysis.
+    public var quality: TripQualitySummary?
+    public var stats: TripStats
 
     public init(
         id: String, source: TripSource, status: TripStatus, startedAt: Date, endedAt: Date, distanceM: Double,
-        samples: SampleCounts
+        samples: SampleCounts, kind: TripKind = .driver, correction: TripCorrection? = nil, correctedAt: Date? = nil,
+        question: TripQuestion? = nil, quality: TripQualitySummary? = nil, stats: TripStats = TripStats()
     ) {
         self.id = id
         self.source = source
@@ -133,6 +144,12 @@ public struct TripSummary: Identifiable, Equatable, Sendable, Codable {
         self.endedAt = endedAt
         self.distanceM = distanceM
         self.samples = samples
+        self.kind = kind
+        self.correction = correction
+        self.correctedAt = correctedAt
+        self.question = question
+        self.quality = quality
+        self.stats = stats
     }
 
     public var duration: TimeInterval { endedAt.timeIntervalSince(startedAt) }

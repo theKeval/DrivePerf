@@ -165,7 +165,10 @@ enum KotlinMapping {
         let ended = trip.endedAt.map { Date(timeIntervalSince1970: TimeInterval($0.int64Value) / 1000) }
         return TripSummary(
             id: trip.id, source: trip.source == .manual ? .manual : .auto, status: status, startedAt: started,
-            endedAt: ended ?? started.addingTimeInterval(duration), distanceM: distance, samples: SampleCounts())
+            endedAt: ended ?? started.addingTimeInterval(duration), distanceM: distance, samples: SampleCounts(),
+            kind: swift(trip.kind), correction: trip.correction.map(swift),
+            correctedAt: trip.correctedAt.map { Date(wallMs: $0.int64Value) }, question: question(trip),
+            quality: trip.quality.map(swift), stats: stats(trip))
     }
 
     private static let shortTripM = 500.0

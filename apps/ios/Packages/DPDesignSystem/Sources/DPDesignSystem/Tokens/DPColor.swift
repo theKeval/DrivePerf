@@ -95,6 +95,8 @@ public enum DPColor {
         public static let qualityUsable = Color(dark: 0x8FB8_FFFF, light: 0x2F5D_B8FF)
         public static let qualityLimited = Color(dark: 0xF5B6_48FF, light: 0x9A5F_00FF)
         public static let qualityUnscorable = Color(dark: 0x8C95_A3FF, light: 0x7A83_92FF)
+        /// `--dp-data-gap-stroke`: GPS gaps and interrupted stretches.
+        public static let gapStroke = Color(dark: 0x7A83_92FF, light: 0x7A83_92FF)
         public static let speed = Color(dark: 0xD6DC_E4FF, light: 0x404A_58FF)
     }
 }
