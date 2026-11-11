@@ -28,11 +28,12 @@ public val TripQuality.phoneState: PhoneState
 public data class LeftOut(val reason: SegmentReason, val seconds: Double)
 
 /**
- * What was left out of the score and why, longest first (F-DQ-04 AC2). Covers excluded and interrupted spans; the
- * estimated start and GNSS gaps are shown on their own rows.
+ * What was left out of the score and why, longest first (F-DQ-04 AC2). Covers excluded and interrupted spans,
+ * including the `GAP` spans with reason `APP_KILLED` that a recovered trip gets (§1.7); the estimated start and GNSS
+ * gaps are shown on their own rows.
  */
 public fun TripQuality.leftOut(): List<LeftOut> =
-    spans.filter { it.kind == SegmentKind.EXCLUDED || it.kind == SegmentKind.INTERRUPTED }
+    spans.filter { it.isLeftOut }
         .groupBy { it.reason ?: SegmentReason.APP_KILLED }
         .map { (reason, list) -> LeftOut(reason, unionSeconds(list)) }
         .filter { it.seconds > 0 }
@@ -90,6 +91,11 @@ public fun TripQuality.overlays(): List<TrackOverlay> = spans.map { s ->
     }
     TrackOverlay(style, s.t0S, s.t1S, s.reason)
 }.sortedWith(compareBy<TrackOverlay> { it.t0S }.thenBy { it.style.ordinal })
+
+/** Excluded or interrupted: measured or missing time that never counts towards the score. */
+private val TripSegment.isLeftOut: Boolean
+    get() = kind == SegmentKind.EXCLUDED || kind == SegmentKind.INTERRUPTED ||
+        (kind == SegmentKind.GAP && reason == SegmentReason.APP_KILLED)
 
 /** The label key the pipeline puts on GNSS gaps of 3 min or more (pipeline-and-scoring.md §2.7). */
 public const val LONG_GAP_LABEL: String = "gap.labelled"
