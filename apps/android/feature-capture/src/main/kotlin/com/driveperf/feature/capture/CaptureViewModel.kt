@@ -256,8 +256,11 @@ class CaptureViewModel(
             val moving = controller.isMoving(hold.endedAtMs)
             val now = nowWallMs()
             val calmSince = if (moving) null else hold.calmSinceMs ?: now
-            if (calmSince != null && now - calmSince >= CALM_MS) {
+            // The cap is a safety valve: with no live activity signal the last reading can stay "automotive" forever.
+            val calm = calmSince != null && now - calmSince >= CALM_MS
+            if (calm || now - hold.endedAtMs >= HOLD_MAX_MS) {
                 releaseHeld(clearHold = true)
+                controller.onMovementWatchEnded()
             } else {
                 ui.update { if (it.hold != null) it.copy(hold = hold.copy(calmSinceMs = calmSince)) else it }
             }
@@ -268,7 +271,7 @@ class CaptureViewModel(
     private fun releaseHeld(clearHold: Boolean) {
         val held = ui.value.held
         ui.update { it.copy(held = null, hold = if (clearHold) null else it.hold) }
-        held?.let(mutableReleased::tryEmit)
+        held?.takeIf { it.reopensWhenReleased }?.let(mutableReleased::tryEmit)
     }
 
     // ---- events ----
@@ -339,6 +342,7 @@ class CaptureViewModel(
         const val FINISH_TIMEOUT_MS = 3_000L
         const val POLL_MS = 250L
         const val CALM_MS = 60_000L
+        const val HOLD_MAX_MS = 600_000L
         const val MS_PER_S = 1_000L
         const val SECONDS_PER_MINUTE = 60L
         const val HALF_MINUTE_S = 30L

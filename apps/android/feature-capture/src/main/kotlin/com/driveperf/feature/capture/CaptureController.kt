@@ -53,6 +53,9 @@ interface CaptureController {
      * for 60 s of false.
      */
     suspend fun isMoving(sinceWallMs: Long): Boolean = false
+
+    /** The post-trip hold is over (released, or capped): stop any movement watching [isMoving] started. */
+    fun onMovementWatchEnded() {}
 }
 
 /** A committed trip as the saved screen shows it. */

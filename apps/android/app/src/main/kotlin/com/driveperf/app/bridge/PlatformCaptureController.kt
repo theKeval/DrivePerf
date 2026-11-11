@@ -54,6 +54,9 @@ class PlatformCaptureController(
     private val onPermissions: (PermissionState) -> Unit = {},
 ) : CaptureController {
     private val tripClock = TripClock()
+    private var watching = false
+
+    @Volatile private var liveActivity: ActivitySample? = null
 
     override val snapshot: StateFlow<CaptureSnapshot> = combine(recorder.status, ticks()) { status, _ ->
         snapshotOf(status, tripClock.startedWallMs(status, clock.wallMs()), fixes.status())
@@ -87,12 +90,32 @@ class PlatformCaptureController(
 
     override suspend fun finishedTrip(tripId: String): FinishedTrip? = trips.trip(tripId)?.let(::finishedOf)
 
-    /** The OS activity since the trip ended; a newer, non-automotive reading (or none) means it has stopped. */
+    /**
+     * Whether the latest OS activity says automotive. The core stops activity updates when the trip finalises, and an
+     * unchanged activity sends nothing more, so the last reading before the end is carried across it (history looks
+     * back [LOOKBACK_MS]) and the source is restarted for the hold, which reports the current activity and its changes.
+     */
     override suspend fun isMoving(sinceWallMs: Long): Boolean {
-        val samples = suspendCancellableCoroutine { continuation ->
-            activity.queryHistory(sinceWallMs, clock.wallMs()) { continuation.resume(it) }
+        watchMovement()
+        val history = suspendCancellableCoroutine { continuation ->
+            activity.queryHistory(sinceWallMs - LOOKBACK_MS, clock.wallMs()) { continuation.resume(it) }
         }
-        return stillAutomotive(samples)
+        return stillAutomotive(history + listOfNotNull(liveActivity))
+    }
+
+    @Synchronized
+    private fun watchMovement() {
+        if (watching || recorder.status.value.state != RecorderState.IDLE) return
+        watching = true
+        activity.start { samples -> samples.maxByOrNull { it.wallMs }?.let { liveActivity = it } }
+    }
+
+    @Synchronized
+    override fun onMovementWatchEnded() {
+        // A new trip has taken the source over by now: leave it running.
+        if (watching && recorder.status.value.state == RecorderState.IDLE) activity.stop()
+        watching = false
+        liveActivity = null
     }
 
     private fun ticks() = flow {
@@ -127,6 +150,7 @@ class PlatformCaptureController(
         }
 
         private const val MS_PER_S = 1_000.0
+        private const val LOOKBACK_MS = 3_600_000L
 
         /** A candidate is not shown (spec §1.4); a start the core could not open its files for is a failure. */
         fun snapshotOf(status: RecorderStatus, startedWallMs: Long?, gps: GpsStatus): CaptureSnapshot = when {

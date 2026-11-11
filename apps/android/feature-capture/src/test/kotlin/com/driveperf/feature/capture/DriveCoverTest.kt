@@ -30,6 +30,8 @@ class DriveCoverTest {
         var starts = 0
         var finished: FinishedTrip? = null
         var moving = false
+        var watchEnds = 0
+        override fun onMovementWatchEnded() { watchEnds++ }
         override fun start() { starts++ }
         override fun stop() { stops++ }
         override fun markPassenger(keep: Boolean) { passengerMarks += keep }
@@ -329,5 +331,33 @@ class DriveCoverTest {
         controller.snapshot.value = recording("t2")
         passTime(1)
         assertTrue(vm.cover.value is DriveCover.InDrive)
+    }
+
+    @Test
+    fun `a paywall or share prompt held during the trip is dropped, not reopened`() = runTest(dispatcher) {
+        val vm = viewModel()
+        val opened = mutableListOf<ContentTarget>()
+        backgroundScope.launch { vm.released.collect { opened += it } }
+        controller.snapshot.value = recording()
+        runCurrent()
+        vm.requestContent(ContentTarget.PAYWALL)
+        controller.snapshot.value = CaptureSnapshot.Idle
+        passTime(61_000)
+        assertFalse(vm.isLocked())
+        assertTrue("the paywall is not reopened", opened.isEmpty())
+    }
+
+    @Test
+    fun `the hold is capped when the phone never looks calm, and the watch ends`() = runTest(dispatcher) {
+        val vm = viewModel()
+        controller.moving = true
+        controller.snapshot.value = recording()
+        runCurrent()
+        controller.snapshot.value = CaptureSnapshot.Idle
+        passTime(300_000)
+        assertTrue(vm.isLocked())
+        passTime(301_000)
+        assertFalse("a stale automotive reading cannot hold content for ever", vm.isLocked())
+        assertEquals(1, controller.watchEnds)
     }
 }

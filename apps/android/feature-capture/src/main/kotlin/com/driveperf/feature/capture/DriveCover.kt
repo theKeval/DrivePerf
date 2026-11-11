@@ -4,14 +4,16 @@ package com.driveperf.feature.capture
 enum class PassengerStep { HIDDEN, CHOOSE, CONFIRM_DISCARD }
 
 /** What a held request wanted to open (F-CAP-07.2). Paywalls and share prompts are never named on the hold screen. */
-enum class ContentTarget(val noun: HeldNoun) {
+enum class ContentTarget(val noun: HeldNoun, val reopensWhenReleased: Boolean = true) {
     STORY(HeldNoun.STORY),
     REPLAY(HeldNoun.REPLAY),
     ANALYSIS(HeldNoun.ANALYSIS),
     RECAP(HeldNoun.RECAP),
     WRAPPED(HeldNoun.WRAPPED),
-    SHARE(HeldNoun.STORY),
-    PAYWALL(HeldNoun.STORY),
+
+    /** Held share prompts and paywalls are dropped, not reopened (S-DRV-05; a paywall waits for the next parked open). */
+    SHARE(HeldNoun.STORY, reopensWhenReleased = false),
+    PAYWALL(HeldNoun.STORY, reopensWhenReleased = false),
 }
 
 /** The word the S-DRV-05 title uses: "Your <noun> will be ready when you've parked". */
