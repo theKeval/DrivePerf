@@ -8,6 +8,7 @@ import com.driveperf.server.ports.AccountRecord
 import com.driveperf.server.ports.AccountStatus
 import com.driveperf.server.ports.BackupState
 import com.driveperf.server.ports.ObjectInfo
+import com.driveperf.server.ports.PendingUpload
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -22,9 +23,10 @@ class DeleteAccountCascadeTest {
     private val accounts = FakeAccounts(journal)
     private val requests = FakeRequests(journal)
     private val external = FakeExternal(journal)
+    private val ledger = FakeLedger()
 
     private fun cascade(objectStore: FakeObjectStore = objects) =
-        DeleteAccountCascade(AccountDataSources(objectStore, userData, external, external, external), accounts, requests, clock)
+        DeleteAccountCascade(AccountDataSources(objectStore, userData, external, external, external, ledger), accounts, requests, clock)
 
     private fun seed(accountId: String, trips: Int = 3) {
         repeat(trips) {
@@ -109,7 +111,7 @@ class DeleteAccountCascadeTest {
                 if (!done) { done = true; userData.documents[accountId] = 2 }
             }
         }
-        val c = DeleteAccountCascade(AccountDataSources(objects, userData, racing, external, external), accounts, requests, clock)
+        val c = DeleteAccountCascade(AccountDataSources(objects, userData, racing, external, external, ledger), accounts, requests, clock)
 
         val first = c.run(req, clock.now + 60_000)
         assertEquals(DeleteAccountCascade.Outcome.MORE_WORK, first)
@@ -120,6 +122,31 @@ class DeleteAccountCascadeTest {
         assertEquals(DeleteAccountCascade.Outcome.DONE, second)
         assertEquals(0, userData.documents["carol"])
         assertEquals(1, journal.events.count { it == "auth.delete(carol)" })
+    }
+
+    @Test
+    fun waitsForIssuedUploadUrlsToExpireThenSweepsWhatLandedLate() {
+        seed("fay")
+        val req = request("fay")
+        val key = "u/fay/t/trip-late/r1.pb.gz"
+        ledger.record("fay", PendingUpload(key, "0".repeat(64), 10, clock.now + 10 * 60_000))
+
+        // Everything is deleted, but a URL issued before the request is still usable: the sweep must not run yet.
+        assertEquals(DeleteAccountCascade.Outcome.MORE_WORK, cascade().run(req, clock.now + 60_000))
+        assertFalse(journal.events.any { it.startsWith("auth.delete") })
+        assertFalse("step(VERIFIED)" in journal.events)
+
+        // The device finishes its upload while the URL is valid.
+        objects.objects[key] = ObjectInfo(10, emptyMap())
+        clock.now += 10 * 60_000 + 5 * 60_000
+        val resumed = requests.requests.getValue(req.id)
+        assertEquals(DeleteAccountCascade.Outcome.MORE_WORK, cascade().run(resumed, clock.now + 60_000))
+        assertTrue("steps.reset" in journal.events)
+        assertFalse(journal.events.any { it.startsWith("auth.delete") })
+
+        assertEquals(DeleteAccountCascade.Outcome.DONE, cascade().run(requests.requests.getValue(req.id), clock.now + 60_000))
+        assertTrue(objects.objects.isEmpty())
+        assertEquals(1, journal.events.count { it == "auth.delete(fay)" })
     }
 
     @Test

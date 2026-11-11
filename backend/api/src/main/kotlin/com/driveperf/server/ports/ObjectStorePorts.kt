@@ -37,4 +37,10 @@ internal interface UploadLedger {
     fun record(accountId: String, upload: PendingUpload)
 
     fun find(accountId: String, key: String): PendingUpload?
+
+    /**
+     * The latest moment any upload URL issued for [accountId] can still be used, or null when none was issued. Entries
+     * must outlive the account's user data and go with the account record, so the deletion cascade can still read this.
+     */
+    fun latestExpiryEpochMillis(accountId: String): Long?
 }

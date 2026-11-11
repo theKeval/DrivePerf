@@ -124,6 +124,9 @@ internal class FakeLedger : UploadLedger {
     override fun record(accountId: String, upload: PendingUpload) { rows[accountId to upload.key] = upload }
 
     override fun find(accountId: String, key: String): PendingUpload? = rows[accountId to key]
+
+    override fun latestExpiryEpochMillis(accountId: String): Long? =
+        rows.filterKeys { it.first == accountId }.values.maxOfOrNull { it.expiresAtEpochMillis }
 }
 
 internal class FakeSigner : BlobSigner {

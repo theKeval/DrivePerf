@@ -9,6 +9,7 @@ import com.driveperf.server.ports.IdentityAdmin
 import com.driveperf.server.ports.ObjectStore
 import com.driveperf.server.ports.RideAlongPasses
 import com.driveperf.server.ports.SubscriberDirectory
+import com.driveperf.server.ports.UploadLedger
 import com.driveperf.server.ports.UserDataStore
 
 /** Every place that can hold data about one account, besides the account record itself. */
@@ -18,6 +19,7 @@ internal class AccountDataSources(
     val subscribers: SubscriberDirectory,
     val rideAlong: RideAlongPasses,
     val identity: IdentityAdmin,
+    val uploads: UploadLedger,
 )
 
 /**
@@ -36,10 +38,11 @@ internal class DeleteAccountCascade(
     private val subscribers get() = sources.subscribers
     private val rideAlong get() = sources.rideAlong
     private val identity get() = sources.identity
+    private val uploads get() = sources.uploads
 
     enum class Outcome { DONE, MORE_WORK }
 
-    private enum class StepResult { DONE, OUT_OF_TIME, LEFTOVERS }
+    private enum class StepResult { DONE, OUT_OF_TIME, LEFTOVERS, WAITING }
 
     fun run(request: DeletionRequest, deadlineEpochMillis: Long): Outcome {
         check(AccountIds.isValid(request.accountId)) { "invalid account id in deletion request ${request.id}" }
@@ -52,7 +55,7 @@ internal class DeleteAccountCascade(
             }
             when (result) {
                 StepResult.DONE -> requests.recordStep(request.id, step)
-                StepResult.OUT_OF_TIME -> outcome = Outcome.MORE_WORK
+                StepResult.OUT_OF_TIME, StepResult.WAITING -> outcome = Outcome.MORE_WORK
                 StepResult.LEFTOVERS -> {
                     requests.resetSteps(request.id)
                     outcome = Outcome.MORE_WORK
@@ -69,7 +72,7 @@ internal class DeleteAccountCascade(
         DeletionStep.USER_DATA -> deleteUserData(accountId, deadline)
         DeletionStep.SUBSCRIBER -> done { subscribers.deleteSubscriber(accountId) }
         DeletionStep.RIDE_ALONG -> done { rideAlong.forgetAccount(accountId) }
-        DeletionStep.VERIFIED -> if (hasLeftovers(accountId)) StepResult.LEFTOVERS else StepResult.DONE
+        DeletionStep.VERIFIED -> verify(accountId)
         DeletionStep.ACCOUNT -> done {
             identity.deleteUser(accountId)
             accounts.delete(accountId)
@@ -100,11 +103,27 @@ internal class DeleteAccountCascade(
         return if (deleted > 0) StepResult.OUT_OF_TIME else StepResult.DONE
     }
 
+    /**
+     * A presigned PUT cannot be revoked and the account is only marked as deleting, so an upload started just before the
+     * request can still land after the objects were listed. The sweep therefore waits until every URL issued for the
+     * account has expired, plus a grace period for a transfer that began just before; a late object is then found by
+     * the sweep and the cascade starts over.
+     */
+    private fun verify(accountId: String): StepResult {
+        val lastUsable = uploads.latestExpiryEpochMillis(accountId)?.plus(IN_FLIGHT_GRACE_MILLIS)
+        return when {
+            lastUsable != null && clock.nowEpochMillis() < lastUsable -> StepResult.WAITING
+            hasLeftovers(accountId) -> StepResult.LEFTOVERS
+            else -> StepResult.DONE
+        }
+    }
+
     private fun hasLeftovers(accountId: String): Boolean =
         userData.hasAnyData(accountId) || AccountIds.objectPrefixes(accountId).any { objects.listKeys(it, 1).isNotEmpty() }
 
     private companion object {
         const val OBJECT_BATCH = 1000
         const val DOCUMENT_BATCH = 500
+        const val IN_FLIGHT_GRACE_MILLIS = 5 * 60 * 1000L
     }
 }

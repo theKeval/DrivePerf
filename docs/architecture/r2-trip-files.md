@@ -62,7 +62,7 @@ Download (restore, read-only while LAPSED)
 ## 5. Deletion
 
 - **User deletes a trip or all trips:** `DELETE /v1/blobs/{key}` or `POST /v1/backup:wipe`; the purge job removes objects 7 days after the tombstone (the decisions log's safety window).
-- **Account deletion:** step 2 of the cascade lists and deletes every object under `u/{accountId}/` and `x/{accountId}/` in batches of 1,000, then the verification sweep lists both prefixes again and must find nothing before the Auth user and the account record are removed. The trailing slash in the prefixes keeps account `ab` apart from `abc` (tested). See `DeleteAccountCascade`.
+- **Account deletion:** step 2 of the cascade lists and deletes every object under `u/{accountId}/` and `x/{accountId}/` in batches of 1,000, then the verification sweep lists both prefixes again and must find nothing before the Auth user and the account record are removed. The sweep first waits until every presigned URL issued for the account has expired (the `UploadLedger` records the expiry) plus a 5-minute grace for a transfer that started just before, because a presigned PUT cannot be revoked; an object that lands late is found by the sweep and the cascade starts over (tested). The ledger entries must therefore be stored with the account record, which is deleted last. The trailing slash in the prefixes keeps account `ab` apart from `abc` (tested). See `DeleteAccountCascade`.
 - **Orphans:** objects uploaded but never referenced are removed by the daily sweep after 24 hours.
 
 ## 6. Export bundle
