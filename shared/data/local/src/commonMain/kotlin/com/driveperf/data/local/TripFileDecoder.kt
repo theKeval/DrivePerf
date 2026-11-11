@@ -56,6 +56,8 @@ internal class TripFileDecoder(private val h: CaptureHeader, private val wall0: 
         val speedAcc = undelta(g.speed_acc)
         val course = undelta(g.course)
         val courseAcc = undelta(g.course_acc)
+        // Fields 13-14 (DRIVE-167) are absent from older files: those fixes have no age or provider.
+        val age = undelta(g.age_ms)
         for (i in t.indices) {
             fixes += LocationSample(
                 tMonoNs = mono(t[i]),
@@ -69,6 +71,8 @@ internal class TripFileDecoder(private val h: CaptureHeader, private val wall0: 
                 speedAccMps = dequantN(speedAcc[i], q.speed_mps_per_unit),
                 courseDeg = dequantN(course[i], q.course_deg_per_unit),
                 courseAccDeg = dequantN(courseAcc[i], q.course_deg_per_unit),
+                provider = g.provider.getOrNull(i)?.let(FixProviderCode::provider),
+                ageMs = age.getOrNull(i)?.takeIf { it != Fixed.ABSENT }?.toLong(),
             )
         }
     }

@@ -8,6 +8,7 @@ import com.driveperf.domain.capture.ParkedRegionMonitor
 import com.driveperf.domain.capture.PowerState
 import com.driveperf.domain.repository.RouteRepository
 import com.driveperf.domain.repository.TripRepository
+import com.driveperf.domain.trip.TripCorrections
 import com.driveperf.domain.capture.TripRecorder
 import com.driveperf.domain.tripfile.TripFileStore
 import com.driveperf.foundation.Clock
@@ -37,13 +38,14 @@ public interface PlatformBindings {
 
 /**
  * What the apps use after start. [markEventNeeded] is "Was it needed?" / "Count it again" (F-SCO-05); feedback is read
- * through [trips].
+ * through [trips]. [corrections] answers "Was this a bus or train?" and corrects what a trip was (F-CAP-04).
  */
 public class CoreServices internal constructor(
     public val recorder: TripRecorder,
     public val trips: TripRepository,
     public val routes: RouteRepository,
     public val markEventNeeded: MarkEventNeeded,
+    public val corrections: TripCorrections,
     private val onClose: () -> Unit,
 ) {
     /** Stops the recorder's work and closes the database. Only for a scratch core; the app's core lives as long as the process. */

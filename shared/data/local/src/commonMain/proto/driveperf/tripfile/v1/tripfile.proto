@@ -10,7 +10,8 @@
 // (INT32_MIN) before delta encoding.
 //
 // Additions to data-model.md §2.4 for DRIVE-62, all additive: Header fields 14-17, Chunk fields 6-7, Mark types
-// 11-13, and the PreviewTrack message (data-model.md §2.5).
+// 11-13, and the PreviewTrack message (data-model.md §2.5). DRIVE-167 adds Gnss fields 13-14 (fix age and provider,
+// F-DQ-03); files written before them have neither, and readers treat both as unknown.
 syntax = "proto3";
 package driveperf.tripfile.v1;
 
@@ -78,6 +79,8 @@ message Gnss {
   repeated sint32 course = 10;
   repeated sint32 course_acc = 11;
   repeated uint32 quality = 12;     // R1: 0 observed, 1 estimated, 2 gap, 3 excluded (fixture q)
+  repeated sint32 age_ms = 13;      // R0: fix age at delivery in ms (delta-coded like the channels above)
+  repeated uint32 provider = 14;    // R0: 0 unknown, 1 GNSS, 2 FUSED, 3 NETWORK, 4 ACCESSORY, 5 SIMULATED (not delta-coded)
 }
 
 message Motion {

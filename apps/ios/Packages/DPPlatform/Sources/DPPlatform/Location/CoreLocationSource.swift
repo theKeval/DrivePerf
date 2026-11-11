@@ -119,6 +119,22 @@ public enum LocationMapping {
             speedMps: location.speed >= 0 ? location.speed : nil,
             speedAccMps: location.speedAccuracy >= 0 ? location.speedAccuracy : nil,
             courseDeg: location.course >= 0 ? location.course : nil,
-            courseAccDeg: location.courseAccuracy >= 0 ? location.courseAccuracy : nil)
+            courseAccDeg: location.courseAccuracy >= 0 ? location.courseAccuracy : nil,
+            provider: provider(of: location),
+            ageMs: ageMs(of: location, now: clock.wallMs()))
+    }
+
+    /// F-DQ-03: Core Location tells only accessory and simulated fixes apart; the rest are its fused position.
+    public static func provider(of location: CLLocation) -> FixProvider {
+        guard let info = location.sourceInformation else { return .fused }
+        if info.isSimulatedBySoftware { return .simulated }
+        if info.isProducedByAccessory { return .accessory }
+        return .fused
+    }
+
+    /// How old the fix was at delivery, in ms; nil for a fix stamped in the future (a clock change).
+    public static func ageMs(of location: CLLocation, now wallMs: Int64) -> Int64? {
+        let age = wallMs - location.timestamp.wallMs
+        return age >= 0 ? age : nil
     }
 }

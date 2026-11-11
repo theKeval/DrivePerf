@@ -1,5 +1,7 @@
 -- Trips and everything derived from them (data-model.md §2.2, plus pipeline-and-scoring.md §0.8: suspect,
 -- suspect_answer). quality_json holds TripQuality without its spans; the spans live in trip_segment.
+-- correction and corrected_at (schema 2, DRIVE-100): the user's answer to what the trip was, and when; a trip
+-- corrected to not-a-drive (kind TRANSIT or NOT_DRIVING) is purged 30 days after corrected_at (F-CAP-04 AC3).
 CREATE TABLE trip (
   id                    TEXT NOT NULL PRIMARY KEY,
   status                TEXT NOT NULL,
@@ -49,11 +51,14 @@ CREATE TABLE trip (
   updated_at            INTEGER NOT NULL,
   deleted_at            INTEGER,
   origin_device_id      TEXT NOT NULL,
-  field_clock           TEXT NOT NULL DEFAULT '{}'
+  field_clock           TEXT NOT NULL DEFAULT '{}',
+  correction            TEXT,
+  corrected_at          INTEGER
 );
 CREATE INDEX trip_started ON trip(started_at DESC) WHERE deleted_at IS NULL;
 CREATE INDEX trip_vehicle ON trip(vehicle_id, started_at DESC) WHERE deleted_at IS NULL;
 CREATE INDEX trip_status  ON trip(status);
+CREATE INDEX trip_not_drive ON trip(corrected_at) WHERE deleted_at IS NULL AND kind IN ('TRANSIT', 'NOT_DRIVING');
 
 CREATE TABLE trip_segment (
   trip_id   TEXT NOT NULL REFERENCES trip(id) ON DELETE CASCADE,
@@ -190,7 +195,9 @@ UPDATE trip SET
   updated_at = :updated_at,
   deleted_at = :deleted_at,
   origin_device_id = :origin_device_id,
-  field_clock = :field_clock
+  field_clock = :field_clock,
+  correction = :correction,
+  corrected_at = :corrected_at
 WHERE id = :id;
 
 tripById:
@@ -202,7 +209,27 @@ SELECT * FROM trip WHERE status = 'RECORDING' AND deleted_at IS NULL ORDER BY st
 listedTrips:
 SELECT * FROM trip
 WHERE status IN ('FINALISED', 'INTERRUPTED') AND deleted_at IS NULL
+  AND (kind IS NULL OR kind NOT IN ('TRANSIT', 'NOT_DRIVING'))
 ORDER BY started_at DESC, id DESC;
+
+-- The "Not drives" filter (F-CAP-04 AC3).
+notDrives:
+SELECT * FROM trip
+WHERE status IN ('FINALISED', 'INTERRUPTED') AND deleted_at IS NULL AND kind IN ('TRANSIT', 'NOT_DRIVING')
+ORDER BY started_at DESC, id DESC;
+
+expiredNotDrives:
+SELECT id FROM trip
+WHERE deleted_at IS NULL AND kind IN ('TRANSIT', 'NOT_DRIVING') AND corrected_at IS NOT NULL AND corrected_at <= ?;
+
+setCorrection:
+UPDATE trip SET
+  kind = :kind,
+  correction = :correction,
+  corrected_at = :corrected_at,
+  suspect_answer = :suspect_answer,
+  updated_at = :updated_at
+WHERE id = :id;
 
 finishedBefore:
 SELECT * FROM trip

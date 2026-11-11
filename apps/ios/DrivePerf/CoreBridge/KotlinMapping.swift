@@ -24,7 +24,18 @@ enum KotlinMapping {
         DrivePerfShared.LocationSample(
             tMonoNs: s.tMonoNs, wallMs: s.wallMs, lat: s.lat, lng: s.lng, altM: boxed(s.altM), hAccM: boxed(s.hAccM),
             vAccM: boxed(s.vAccM), speedMps: boxed(s.speedMps), speedAccMps: boxed(s.speedAccMps),
-            courseDeg: boxed(s.courseDeg), courseAccDeg: boxed(s.courseAccDeg))
+            courseDeg: boxed(s.courseDeg), courseAccDeg: boxed(s.courseAccDeg), provider: s.provider.map(kotlin),
+            ageMs: s.ageMs.map { KotlinLong(longLong: $0) })
+    }
+
+    static func kotlin(_ p: DPSharedBridge.FixProvider) -> DrivePerfShared.FixProvider {
+        switch p {
+        case .gnss: .gnss
+        case .fused: .fused
+        case .network: .network
+        case .accessory: .accessory
+        case .simulated: .simulated
+        }
     }
 
     static func kotlin(_ s: DPSharedBridge.MotionSample) -> DrivePerfShared.MotionSample {

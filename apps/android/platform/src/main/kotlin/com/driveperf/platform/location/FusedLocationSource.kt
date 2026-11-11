@@ -2,6 +2,7 @@ package com.driveperf.platform.location
 
 import android.annotation.SuppressLint
 import android.content.Context
+import android.os.SystemClock
 import com.driveperf.domain.capture.LocationSink
 import com.driveperf.domain.capture.LocationSource
 import com.driveperf.foundation.Clock
@@ -69,7 +70,8 @@ class FusedLocationSource(
     private class Session(@Volatile var sink: LocationSink, private val filter: LocationBatchFilter) {
         val callback = object : LocationCallback() {
             override fun onLocationResult(result: LocationResult) {
-                val fresh = filter.fresh(result.locations.map { it.toSample() })
+                val now = SystemClock.elapsedRealtimeNanos()
+                val fresh = filter.fresh(result.locations.map { it.toSample(now) })
                 if (fresh.isNotEmpty()) sink.onLocations(fresh)
             }
         }

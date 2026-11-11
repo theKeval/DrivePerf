@@ -1,0 +1,6 @@
+-- Schema 1 → 2 (DRIVE-100, F-CAP-04): the user's correction of what a trip was, and when. A trip corrected to
+-- not-a-drive (kind TRANSIT or NOT_DRIVING) leaves history for the "Not drives" filter and is purged 30 days after
+-- corrected_at. Existing rows keep both NULL: nobody has corrected them.
+ALTER TABLE trip ADD COLUMN correction TEXT;
+ALTER TABLE trip ADD COLUMN corrected_at INTEGER;
+CREATE INDEX trip_not_drive ON trip(corrected_at) WHERE deleted_at IS NULL AND kind IN ('TRANSIT', 'NOT_DRIVING');
