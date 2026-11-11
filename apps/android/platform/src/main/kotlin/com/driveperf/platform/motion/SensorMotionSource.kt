@@ -7,66 +7,65 @@ import android.hardware.SensorEventListener
 import android.hardware.SensorManager
 import android.os.Handler
 import android.os.HandlerThread
+import com.driveperf.domain.capture.MotionCapability
+import com.driveperf.domain.capture.MotionSample
+import com.driveperf.domain.capture.MotionSink
+import com.driveperf.domain.capture.MotionSource
+import com.driveperf.domain.capture.RecordedAccelCallback
+import com.driveperf.foundation.Clock
+import com.driveperf.foundation.DomainError
 import com.driveperf.platform.FreshnessFilter
-import com.driveperf.platform.ports.CaptureFailure
-import com.driveperf.platform.ports.Clock
-import com.driveperf.platform.ports.MotionCapabilities
-import com.driveperf.platform.ports.MotionSample
-import com.driveperf.platform.ports.MotionSource
-import kotlinx.coroutines.channels.awaitClose
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.buffer
-import kotlinx.coroutines.flow.callbackFlow
-import kotlinx.coroutines.flow.emitAll
-import kotlinx.coroutines.flow.filter
-import kotlinx.coroutines.flow.flow
-import java.util.concurrent.atomic.AtomicLong
+import com.driveperf.platform.capture.CaptureFailureBus
 
 /**
- * [MotionSource] on `SensorManager`: linear acceleration, gravity, gyroscope and the game rotation vector at 50 Hz.
- * No magnetometer is used.
+ * [MotionSource] on `SensorManager`: linear acceleration, gravity, gyroscope and the game rotation vector. No
+ * magnetometer is used.
  *
- * All sensor callbacks run on one private [HandlerThread], and the [MotionAssembler] is only touched from it. Samples
- * cross to the collector through a bounded channel with `trySend`, so a slow collector never blocks the sensor
- * thread; dropped samples are counted in [droppedSamples] (the capture-quality figure, never silent loss).
+ * All sensor callbacks run on one private [HandlerThread], and the [MotionAssembler], the freshness gate and the
+ * [MotionBatcher] are only touched from it (spike 1 change 6). The sink is called on that thread and must return
+ * quickly; the core enqueues and returns. Nothing is delivered after [stop] returns.
  *
- * Samples that are stale, in the future or out of order are dropped ([FreshnessFilter]).
+ * Samples that are stale, in the future or out of order are dropped ([FreshnessFilter]): the emulator and some devices
+ * deliver mistimed samples right after registering.
  *
- * Without a gyroscope the source reads the raw accelerometer and splits out gravity with a 0.3 Hz low-pass,
- * reporting [MotionCapabilities.hasGyro] = false (`NO_GYRO`): cornering events are off for such trips.
+ * Without a gyroscope the source reads the raw accelerometer and splits out gravity with a 0.3 Hz low-pass; the
+ * capability then reports `hasGyroscope = false` (`NO_GYRO`) and cornering events are off for such trips.
  */
-class SensorMotionSource(context: Context, private val clock: Clock) : MotionSource {
+class SensorMotionSource(
+    context: Context,
+    private val clock: Clock,
+    private val failures: CaptureFailureBus,
+) : MotionSource {
     private val sensorManager = context.applicationContext.getSystemService(Context.SENSOR_SERVICE) as SensorManager
-    private val dropped = AtomicLong(0)
+    private val capability = MotionCapability(
+        hasGyroscope = sensorManager.getDefaultSensor(Sensor.TYPE_GYROSCOPE) != null,
+        maxRateHz = maxRate(),
+    )
+    private var running: Run? = null
 
-    /** Samples that could not be delivered because the collector fell behind. */
-    val droppedSamples: Long get() = dropped.get()
+    override fun capability(): MotionCapability = capability
 
-    override val capabilities: MotionCapabilities =
-        MotionCapabilities(hasGyro = sensorManager.getDefaultSensor(Sensor.TYPE_GYROSCOPE) != null)
-
-    override fun samples(): Flow<MotionSample> = flow {
-        // Some devices (and the emulator) deliver cached or mistimed samples right after registering: drop them.
-        val gate = FreshnessFilter(maxAgeNs = FreshnessFilter.MOTION_MAX_AGE_NS)
-        emitAll(updates().filter { gate.accept(it.tMonoNs, clock.monotonicNs()) })
-    }
-
-    private fun updates(): Flow<MotionSample> = callbackFlow {
-        val linear = sensorManager.getDefaultSensor(Sensor.TYPE_LINEAR_ACCELERATION)
-        val accel = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
-        val primary = if (capabilities.hasGyro) linear else accel
+    @Synchronized
+    override fun start(rateHz: Int, sink: MotionSink) {
+        stop()
+        val primary = sensorManager.getDefaultSensor(
+            if (capability.hasGyroscope) Sensor.TYPE_LINEAR_ACCELERATION else Sensor.TYPE_ACCELEROMETER,
+        )
         if (primary == null) {
-            close(CaptureFailure.SensorUnavailable("accelerometer"))
-            return@callbackFlow
+            failures.report(DomainError.Capture.SensorUnavailable)
+            return
         }
-
         val thread = HandlerThread("dp-motion").also { it.start() }
         val handler = Handler(thread.looper)
-        val deliver: (MotionSample) -> Unit = { sample -> if (trySend(sample).isFailure) dropped.incrementAndGet() }
-        val listener = if (capabilities.hasGyro) FullListener(deliver) else NoGyroListener(deliver)
-        val sensors = if (capabilities.hasGyro) {
+        val batcher = MotionBatcher(sink)
+        val gate = FreshnessFilter(maxAgeNs = FreshnessFilter.MOTION_MAX_AGE_NS)
+        val deliver: (MotionSample) -> Unit = { sample ->
+            if (gate.accept(sample.tMonoNs, clock.monotonicNs())) batcher.add(sample)
+        }
+        val listener = if (capability.hasGyroscope) FullListener(deliver) else NoGyroListener(deliver)
+        val sensors = if (capability.hasGyroscope) {
             listOfNotNull(
-                linear,
+                primary,
                 sensorManager.getDefaultSensor(Sensor.TYPE_GRAVITY),
                 sensorManager.getDefaultSensor(Sensor.TYPE_GYROSCOPE),
                 sensorManager.getDefaultSensor(Sensor.TYPE_GAME_ROTATION_VECTOR),
@@ -74,14 +73,51 @@ class SensorMotionSource(context: Context, private val clock: Clock) : MotionSou
         } else {
             listOf(primary)
         }
-        for (sensor in sensors) {
-            sensorManager.registerListener(listener, sensor, SAMPLING_PERIOD_US, MAX_REPORT_LATENCY_US, handler)
+        val current = Run(thread, handler, listener, sensors)
+        running = current
+        register(current, rateHz)
+    }
+
+    @Synchronized
+    override fun setRate(rateHz: Int) {
+        val current = running ?: return
+        sensorManager.unregisterListener(current.listener)
+        register(current, rateHz)
+    }
+
+    @Synchronized
+    override fun stop() {
+        val current = running ?: return
+        running = null
+        sensorManager.unregisterListener(current.listener)
+        // quit() discards queued events, so the sink hears nothing after stop() returns; a batch still filling (under
+        // 200 ms of data) is dropped with them.
+        current.thread.quit()
+    }
+
+    /** Android keeps no accelerometer history for apps, so there is nothing to answer with. */
+    override fun queryRecordedAccelerometer(fromWallMs: Long, toWallMs: Long, callback: RecordedAccelCallback) {
+        callback.onResult(emptyList())
+    }
+
+    private fun register(current: Run, rateHz: Int) {
+        val periodUs = MICROS_PER_SECOND / rateHz.coerceAtLeast(1)
+        for (sensor in current.sensors) {
+            sensorManager.registerListener(current.listener, sensor, periodUs, MAX_REPORT_LATENCY_US, current.handler)
         }
-        awaitClose {
-            sensorManager.unregisterListener(listener)
-            thread.quitSafely()
-        }
-    }.buffer(CHANNEL_CAPACITY)
+    }
+
+    private fun maxRate(): Int {
+        val minDelayUs = sensorManager.getDefaultSensor(Sensor.TYPE_LINEAR_ACCELERATION)?.minDelay ?: 0
+        return if (minDelayUs > 0) MICROS_PER_SECOND / minDelayUs else DEFAULT_MAX_RATE_HZ
+    }
+
+    private class Run(
+        val thread: HandlerThread,
+        val handler: Handler,
+        val listener: SensorEventListener,
+        val sensors: List<Sensor>,
+    )
 
     /** Four-sensor path. Runs only on the sensor thread. */
     private class FullListener(private val deliver: (MotionSample) -> Unit) : SensorEventListener {
@@ -123,8 +159,8 @@ class SensorMotionSource(context: Context, private val clock: Clock) : MotionSou
     }
 
     private companion object {
-        const val SAMPLING_PERIOD_US = 20_000 // 50 Hz
+        const val MICROS_PER_SECOND = 1_000_000
+        const val DEFAULT_MAX_RATE_HZ = 50
         const val MAX_REPORT_LATENCY_US = 500_000
-        const val CHANNEL_CAPACITY = 2_048 // about 40 s at 50 Hz
     }
 }

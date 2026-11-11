@@ -4,14 +4,13 @@ import android.app.Service
 import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.IBinder
-import com.driveperf.platform.ports.AndroidClock
+import com.driveperf.platform.AndroidClock
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
-import kotlinx.coroutines.launch
 import org.koin.android.ext.android.inject
 
 /**
@@ -57,10 +56,8 @@ class CaptureForegroundService : Service() {
     }
 
     private fun stopTrip() {
-        scope.launch {
-            recorder.stop()
-            endService()
-        }
+        recorder.stop()
+        endService()
     }
 
     private fun endService() {

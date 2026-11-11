@@ -1,34 +1,45 @@
 package com.driveperf.platform.activity
 
-import com.driveperf.platform.ports.ActivityKind
-import com.driveperf.platform.ports.TransitionKind
-import com.google.android.gms.location.ActivityTransition
+import com.driveperf.domain.capture.ActivityConfidence
+import com.driveperf.domain.capture.ActivitySample
+import com.driveperf.domain.capture.ActivityType
 import com.google.android.gms.location.DetectedActivity
-import java.util.concurrent.TimeUnit
 
-/** Activity types DrivePerf listens for, in registration order. Everything else is ignored. */
-internal val WATCHED_ACTIVITIES: List<Int> = listOf(
-    DetectedActivity.IN_VEHICLE,
-    DetectedActivity.ON_BICYCLE,
-    DetectedActivity.WALKING,
-    DetectedActivity.RUNNING,
-    DetectedActivity.STILL,
-)
-
-internal fun activityKindOf(detectedActivity: Int): ActivityKind? = when (detectedActivity) {
-    DetectedActivity.IN_VEHICLE -> ActivityKind.VEHICLE
-    DetectedActivity.ON_BICYCLE -> ActivityKind.BICYCLE
-    DetectedActivity.WALKING -> ActivityKind.WALKING
-    DetectedActivity.RUNNING -> ActivityKind.RUNNING
-    DetectedActivity.STILL -> ActivityKind.STILL
-    else -> null
+/** Maps a Google Play services activity type to the platform-neutral [ActivityType]. */
+internal fun activityTypeOf(detectedActivity: Int): ActivityType = when (detectedActivity) {
+    DetectedActivity.IN_VEHICLE -> ActivityType.AUTOMOTIVE
+    DetectedActivity.ON_BICYCLE -> ActivityType.CYCLING
+    DetectedActivity.WALKING, DetectedActivity.ON_FOOT -> ActivityType.WALKING
+    DetectedActivity.RUNNING -> ActivityType.RUNNING
+    DetectedActivity.STILL -> ActivityType.STATIONARY
+    else -> ActivityType.UNKNOWN
 }
 
-internal fun transitionKindOf(transitionType: Int): TransitionKind? = when (transitionType) {
-    ActivityTransition.ACTIVITY_TRANSITION_ENTER -> TransitionKind.ENTER
-    ActivityTransition.ACTIVITY_TRANSITION_EXIT -> TransitionKind.EXIT
-    else -> null
+/**
+ * Buckets Play services' 0-100 confidence into the three levels iOS reports, so the core reads one scale on both
+ * platforms (pipeline-and-scoring.md section 1.3).
+ */
+internal fun confidenceOf(percent: Int): ActivityConfidence = when {
+    percent >= HIGH_FROM_PERCENT -> ActivityConfidence.HIGH
+    percent >= MEDIUM_FROM_PERCENT -> ActivityConfidence.MEDIUM
+    else -> ActivityConfidence.LOW
 }
 
-/** Transitions older than this at delivery are dropped: spike 1 found cached wake events up to 14 h old. */
-internal val MAX_TRANSITION_AGE_NS: Long = TimeUnit.MINUTES.toNanos(5)
+/**
+ * Turns the stream of "most probable activity" readings into change events: a sample is emitted only when the type or
+ * the confidence level differs from the last one emitted, and its time is when the new state was first seen, which is
+ * what [ActivitySample.tMonoNs] means ("when the activity started"). Not thread-safe: the OS delivers on one thread.
+ */
+internal class ActivityChangeFilter {
+    private var last: ActivitySample? = null
+
+    fun onReading(sample: ActivitySample): ActivitySample? {
+        val previous = last
+        val changed = previous == null || previous.type != sample.type || previous.confidence != sample.confidence
+        if (changed) last = sample
+        return if (changed) sample else null
+    }
+}
+
+private const val HIGH_FROM_PERCENT = 75
+private const val MEDIUM_FROM_PERCENT = 50

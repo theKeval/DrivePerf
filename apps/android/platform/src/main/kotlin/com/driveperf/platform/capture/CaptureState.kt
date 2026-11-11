@@ -1,6 +1,6 @@
 package com.driveperf.platform.capture
 
-import com.driveperf.platform.ports.CaptureFailure
+import com.driveperf.foundation.DomainError
 
 /** How the GNSS stream looks right now. Shown as a status, never as a score. */
 enum class GpsStatus { SEARCHING, GOOD, LOST }
@@ -19,6 +19,6 @@ sealed interface CaptureState {
         val gps: GpsStatus,
     ) : CaptureState
 
-    /** Capture stopped because something it needs went away (for example a revoked permission). */
-    data class Failed(val failure: CaptureFailure) : CaptureState
+    /** Capture stopped because something it needs went away (a revoked permission, a full disk). */
+    data class Failed(val error: DomainError) : CaptureState
 }

@@ -1,8 +1,9 @@
 package com.driveperf.platform.motion
 
-import com.driveperf.platform.ports.MotionSample
-import com.driveperf.platform.ports.Quat
-import com.driveperf.platform.ports.Vec3
+import com.driveperf.domain.capture.MotionSample
+import com.driveperf.domain.capture.Quat
+import com.driveperf.domain.capture.Vec3
+import com.driveperf.foundation.Units
 import kotlin.math.PI
 import kotlin.math.sqrt
 
@@ -51,7 +52,7 @@ internal class MotionAssembler {
         } else {
             MotionSample(
                 tMonoNs = tNs,
-                userAccelG = Vec3(xMs2 / STANDARD_GRAVITY, yMs2 / STANDARD_GRAVITY, zMs2 / STANDARD_GRAVITY),
+                userAccelG = Vec3(xMs2 / Units.G, yMs2 / Units.G, zMs2 / Units.G),
                 gravityUp = up,
                 rotRateDps = rot,
                 attitude = attitude,
@@ -60,7 +61,6 @@ internal class MotionAssembler {
     }
 
     companion object {
-        const val STANDARD_GRAVITY = 9.80665
         const val RAD_TO_DEG = 180.0 / PI
         private const val MIN_GRAVITY = 1e-6
     }

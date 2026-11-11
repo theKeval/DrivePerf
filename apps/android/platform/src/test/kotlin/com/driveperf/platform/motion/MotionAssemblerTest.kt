@@ -1,5 +1,6 @@
 package com.driveperf.platform.motion
 
+import com.driveperf.foundation.Units
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
@@ -19,7 +20,7 @@ class MotionAssemblerTest {
     @Test
     fun `acceleration is converted from metres per second squared to g without a sign change`() {
         val assembler = primed()
-        val sample = assembler.onLinearAcceleration(10, MotionAssembler.STANDARD_GRAVITY, -0.5 * MotionAssembler.STANDARD_GRAVITY, 0.0)!!
+        val sample = assembler.onLinearAcceleration(10, Units.G, -0.5 * Units.G, 0.0)!!
         assertEquals(1.0, sample.userAccelG.x, 1e-9)
         assertEquals(-0.5, sample.userAccelG.y, 1e-9)
         assertEquals(0.0, sample.userAccelG.z, 1e-9)

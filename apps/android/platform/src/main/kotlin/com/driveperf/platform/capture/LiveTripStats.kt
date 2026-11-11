@@ -1,6 +1,6 @@
 package com.driveperf.platform.capture
 
-import com.driveperf.platform.ports.LocationSample
+import com.driveperf.domain.capture.LocationSample
 import kotlin.math.asin
 import kotlin.math.cos
 import kotlin.math.pow

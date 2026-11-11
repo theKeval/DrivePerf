@@ -28,6 +28,7 @@ dependencies {
     implementation(libs.koin.android)
     implementation(libs.sentry.android)
 
+    testImplementation(projects.shared.testing)
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.turbine)

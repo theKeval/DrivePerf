@@ -1,6 +1,6 @@
 package com.driveperf.platform.capture
 
-import com.driveperf.platform.ports.LocationSample
+import com.driveperf.domain.capture.LocationSample
 
 /**
  * Measures how complete GNSS delivery was **while the car was moving** (spike 1 change 4). iOS and Android both slow

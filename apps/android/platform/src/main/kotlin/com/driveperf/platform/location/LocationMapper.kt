@@ -1,7 +1,7 @@
 package com.driveperf.platform.location
 
 import android.location.Location
-import com.driveperf.platform.ports.LocationSample
+import com.driveperf.domain.capture.LocationSample
 
 /** Converts an Android [Location] into the sample contract. Android already reports m/s, metres and degrees. */
 internal fun Location.toSample(): LocationSample = LocationSample(

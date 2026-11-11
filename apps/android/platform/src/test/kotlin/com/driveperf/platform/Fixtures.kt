@@ -1,8 +1,8 @@
 package com.driveperf.platform
 
-import com.driveperf.platform.ports.LocationSample
-import com.driveperf.platform.ports.MotionSample
-import com.driveperf.platform.ports.Vec3
+import com.driveperf.domain.capture.LocationSample
+import com.driveperf.domain.capture.MotionSample
+import com.driveperf.domain.capture.Vec3
 
 /**
  * Synthetic samples only. The coordinates are a made-up straight line in the open ocean: this repository is public and
