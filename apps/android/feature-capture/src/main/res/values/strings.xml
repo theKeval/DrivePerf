@@ -16,7 +16,48 @@
     <string name="drive_stop">Stop</string>
     <string name="drive_stop_title">End this drive?</string>
     <string name="drive_stop_body">The drive is saved on your phone and added to your list.</string>
+    <string name="drive_stop_body_short">This drive is very short, under 500 m or 2 minutes. It is kept with a \"Short trip\" label, without a score.</string>
     <string name="drive_stop_confirm">End drive</string>
+    <string name="drive_stop_confirm_short">End anyway</string>
     <string name="drive_stop_keep">Keep recording</string>
-    <string name="drive_locked_hint">Other screens are locked while you drive.</string>
+    <string name="drive_started_manual">Started by you · %1$s</string>
+    <string name="drive_started_auto">Started automatically · %1$s</string>
+    <string name="drive_elapsed_label">Elapsed</string>
+    <string name="drive_passenger">I\'m a passenger</string>
+
+    <!-- S-DRV-05 -->
+    <string name="drive_held_title">Your %1$s will be ready when you\'ve parked.</string>
+    <string name="drive_held_body">It opens by itself after a minute stopped. Nothing to tap until then.</string>
+    <string name="drive_noun_story">Story</string>
+    <string name="drive_noun_replay">Replay</string>
+    <string name="drive_noun_analysis">Analysis</string>
+    <string name="drive_noun_recap">recap</string>
+    <string name="drive_noun_wrapped">Wrapped</string>
+
+    <!-- S-DRV-03 -->
+    <string name="passenger_title">Not driving?</string>
+    <string name="passenger_subtitle">Only if someone else is at the wheel.</string>
+    <string name="passenger_keep">Keep the trip as a passenger trip</string>
+    <string name="passenger_keep_detail">Saved without a score. DrivePerf unlocks.</string>
+    <string name="passenger_discard">Don\'t save this trip</string>
+    <string name="passenger_discard_detail">Recording stops and the data is deleted.</string>
+    <string name="passenger_cancel">Cancel</string>
+    <string name="passenger_discard_confirm_title">Delete this trip?</string>
+    <string name="passenger_discard_confirm_body">Recording stops and everything recorded is deleted within a minute. This can\'t be undone.</string>
+    <string name="passenger_discard_confirm">Delete this trip</string>
+
+    <!-- S-DRV-04 -->
+    <string name="decoding_title">Decoding your drive…</string>
+    <string name="saved_passenger_decoding">Saving your passenger trip…</string>
+    <string name="decoding_body">Usually under 10 seconds. You can leave; we\'ll tell you when it\'s ready.</string>
+    <string name="saved_title">Drive saved</string>
+    <string name="saved_title_short">Short trip saved</string>
+    <string name="saved_title_passenger">Passenger trip saved · not scored</string>
+    <string name="saved_summary">%1$s km · %2$d min</string>
+    <string name="saved_auto_ended">There was no movement for 15 minutes, so DrivePerf ended this trip for you.</string>
+    <string name="saved_note">Its Story arrives with the scoring update. The recording is safe on this phone.</string>
+    <string name="saved_passenger_note">It is kept in your list and left out of scores.</string>
+    <string name="saved_back">Back to Drives</string>
+    <string name="not_saved_title">Trip not saved</string>
+    <string name="not_saved_body">Nothing was kept.</string>
 </resources>

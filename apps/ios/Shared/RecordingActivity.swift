@@ -2,7 +2,7 @@ import ActivityKit
 import AppIntents
 import Foundation
 
-/// The manual-trip Live Activity (S-LIVE-01, S-LIVE-02). Compiled into the app and the widget extension. Status
+/// The recording Live Activity (S-LIVE-01, S-LIVE-02). Compiled into the app and the widget extension. Status
 /// only: elapsed time and distance, never speed, score or record pace (SAF-02).
 struct RecordingActivityAttributes: ActivityAttributes {
     struct ContentState: Codable, Hashable {
@@ -11,6 +11,7 @@ struct RecordingActivityAttributes: ActivityAttributes {
         var hasFix: Bool
         /// True after Stop: "Drive decoded." until the activity is dismissed.
         var ended: Bool
+        var carName: String? = nil
     }
 
     var tripId: String
@@ -22,11 +23,18 @@ struct StopTripIntent: LiveActivityIntent {
     static let title: LocalizedStringResource = "Stop drive"
     static let description = IntentDescription("Ends the drive DrivePerf is recording.")
 
+    @Parameter(title: "Trip")
+    var tripID: String
+
     init() {}
+
+    init(tripID: String) { self.tripID = tripID }
 
     func perform() async throws -> some IntentResult {
         #if DRIVEPERF_APP
-            await TripIntentHandler.stopTrip()
+            let environment = await AppEnvironment.shared
+            await environment.launch()
+            await TripIntentHandler.stop(recorder: environment.recorder, expectedTripID: tripID)
         #endif
         return .result()
     }
