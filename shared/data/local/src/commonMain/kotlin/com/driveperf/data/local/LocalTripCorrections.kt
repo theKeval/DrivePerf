@@ -10,6 +10,7 @@ import com.driveperf.domain.trip.SuspectAnswer
 import com.driveperf.domain.trip.Trip
 import com.driveperf.domain.trip.TripCorrection
 import com.driveperf.domain.trip.TripCorrections
+import com.driveperf.domain.trip.TripKind
 import com.driveperf.domain.trip.TripStatus
 import com.driveperf.domain.tripfile.FileResult
 import com.driveperf.foundation.Clock
@@ -60,7 +61,7 @@ public class LocalTripCorrections(
     /**
      * Sets [to] on [trip]. A suspected trip's question is answered by the correction itself: "Yes" when it matches the
      * suspicion, otherwise "No" (it was something else, or a drive after all). [TripCorrection.DRIVER] clears the
-     * correction, so the trip is an ordinary drive again.
+     * correction, so the trip is an ordinary drive again. Any other correction takes the trip off its route (§7.4).
      */
     private fun write(trip: Trip, to: TripCorrection): Trip {
         val now = clock.wallMs()
@@ -72,6 +73,7 @@ public class LocalTripCorrections(
         val correction = to.takeUnless { it == TripCorrection.DRIVER }
         val correctedAt = correction?.let { now }
         q.setCorrection(to.kind.name, correction?.name, correctedAt, answer?.name, now, trip.id)
+        if (to.kind != TripKind.DRIVER) db.removeFromRoute(trip.id, now)
         return trip.copy(
             kind = to.kind, correction = correction, correctedAt = correctedAt, suspectAnswer = answer, updatedAt = now,
         )
