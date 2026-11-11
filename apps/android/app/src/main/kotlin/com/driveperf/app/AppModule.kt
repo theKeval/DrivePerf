@@ -51,7 +51,7 @@ val appModule = module {
     single { WakePath(androidContext(), get(), get(), get()) }
 
     single {
-        PlatformCaptureController(androidContext(), get(), get(), get(), get(), get(), get<WakePath>()::refresh)
+        PlatformCaptureController(androidContext(), get(), get(), get(), get(), get(), get(), get(), get<WakePath>()::refresh)
     } bind CaptureController::class
     single<TripListSource> { PlatformTripListSource(get()) }
 

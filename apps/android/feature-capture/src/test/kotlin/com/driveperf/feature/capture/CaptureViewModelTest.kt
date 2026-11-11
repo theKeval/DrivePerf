@@ -22,8 +22,14 @@ class CaptureViewModelTest {
         override val canRecord: StateFlow<Boolean> = MutableStateFlow(canRecord)
         var starts = 0
         var stops = 0
+        val passengerMarks = mutableListOf<Boolean>()
+        var finished: FinishedTrip? = null
+        var moving = false
         override fun start() { starts++ }
         override fun stop() { stops++ }
+        override fun markPassenger(keep: Boolean) { passengerMarks += keep }
+        override suspend fun finishedTrip(tripId: String): FinishedTrip? = finished
+        override suspend fun isMoving(sinceWallMs: Long): Boolean = moving
     }
 
     private var nowMs = 100_000L
