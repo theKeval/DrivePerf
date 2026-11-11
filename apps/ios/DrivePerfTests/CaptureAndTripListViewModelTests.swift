@@ -117,7 +117,7 @@ final class CaptureViewModelTests: XCTestCase {
         model.requestStop()
         await model.endDrive()
 
-        XCTAssertEqual(model.cover, .finished(saved))
+        XCTAssertEqual(model.cover, .finished(.saved(saved, autoEnded: false)))
         model.dismissFinished()
         XCTAssertNil(model.cover)
     }
@@ -130,7 +130,7 @@ final class CaptureViewModelTests: XCTestCase {
 
         await model.endDrive()
 
-        XCTAssertEqual(model.cover, .finished(nil))
+        XCTAssertEqual(model.cover, .finished(.saved(nil, autoEnded: false)))
     }
 
     func testATripEndingOnItsOwnShowsTheFinishedState() async {
@@ -143,9 +143,9 @@ final class CaptureViewModelTests: XCTestCase {
         recorder.publishTrips([saved])
 
         model.apply(.idle)
-        for _ in 0..<50 where model.cover == .recording { await Task.yield() }
+        for _ in 0..<50 where model.cover == .recording || model.cover == .decoding { await Task.yield() }
 
-        XCTAssertEqual(model.cover, .finished(saved))
+        XCTAssertEqual(model.cover, .finished(.saved(saved, autoEnded: false)))
     }
 
     func testAccessoryFollowsAutoDetectAndLocationAccess() async {
