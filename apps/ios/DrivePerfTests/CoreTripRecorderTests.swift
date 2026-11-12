@@ -26,9 +26,26 @@ final class CoreTripRecorderTests: XCTestCase {
             state: state, tripId: id, isManual: manual, elapsedS: 12, distanceM: distance, autoDetectEnabled: false)
     }
 
-    /// Lets the recorder's observing tasks run.
+    /// Lets the recorder's observing tasks run. Use it only before checking that something did *not* happen.
     private func settle() async {
         for _ in 0..<20 { await Task.yield() }
+    }
+
+    /// Waits until `condition` holds, or fails after `timeout`. The recorder applies statuses on its own task, which
+    /// shares the main actor with the trip-list and widget-snapshot tasks, so a fixed number of yields is not enough
+    /// on a busy CI runner (DRIVE-209).
+    private func waitUntil(
+        _ message: String, timeout: Duration = .seconds(2), file: StaticString = #filePath, line: UInt = #line,
+        _ condition: () -> Bool
+    ) async {
+        let deadline = ContinuousClock.now + timeout
+        while !condition() {
+            if ContinuousClock.now >= deadline {
+                XCTFail("timed out waiting for: \(message)", file: file, line: line)
+                return
+            }
+            try? await Task.sleep(for: .milliseconds(5))
+        }
     }
 
     func testBeforeTheCoreStartsCommandsAreDroppedAndTheChoiceIsKept() {
@@ -56,7 +73,7 @@ final class CoreTripRecorderTests: XCTestCase {
         let recorder = makeRecorder()
         core.send(status(.recording))
         core.send(status(.recording, distance: 150))
-        await settle()
+        await waitUntil("the second status is applied") { recorder.status.distanceM == 150 }
         XCTAssertEqual(recorder.status.distanceM, 150)
         XCTAssertEqual(live.started, ["t1"])
         XCTAssertEqual(live.updates.last, 150)
@@ -64,7 +81,7 @@ final class CoreTripRecorderTests: XCTestCase {
         XCTAssertTrue(notifier.posted.isEmpty, "manual trips use the Live Activity, not the notification")
 
         core.send(.idle)
-        await settle()
+        await waitUntil("the trip ends") { recorder.status.state == .idle }
         XCTAssertEqual(live.ended, 1)
         XCTAssertEqual(recorder.status.state, .idle)
     }
@@ -77,11 +94,11 @@ final class CoreTripRecorderTests: XCTestCase {
         core.send(status(.recording, manual: false))
         core.send(status(.paused, manual: false))
         core.send(status(.recording, manual: false, distance: 900))
-        await settle()
+        await waitUntil("all three statuses are applied") { recorder.status.distanceM == 900 }
         XCTAssertEqual(notifier.posted, ["t1"])
         XCTAssertTrue(live.started.isEmpty)
         core.send(.idle)
-        await settle()
+        await waitUntil("the trip ends") { recorder.status.state == .idle }
         XCTAssertEqual(notifier.removed, ["t1"])
         XCTAssertEqual(recorder.status.state, .idle)
     }
