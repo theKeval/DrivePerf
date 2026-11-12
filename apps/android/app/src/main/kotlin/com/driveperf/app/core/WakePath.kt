@@ -3,6 +3,7 @@ package com.driveperf.app.core
 import android.content.Context
 import com.driveperf.domain.capture.RecorderState
 import com.driveperf.domain.capture.TripRecorder
+import com.driveperf.domain.capture.WakeKind
 import com.driveperf.feature.onboarding.PermissionState
 import com.driveperf.platform.AndroidClock
 import com.driveperf.platform.capture.CaptureForegroundService
@@ -41,6 +42,9 @@ class WakePath(
     val status = health.status
     private val inDriveScreenVisible = MutableStateFlow(false)
 
+    /** Whether OS wakes may start a trip now: the opt-in and every permission behind it (see [automaticAllowed]). */
+    @Volatile private var automaticNow = false
+
     fun dismissForceStopNotice() = health.dismissForceStopNotice()
 
     fun setInDriveScreenVisible(visible: Boolean) {
@@ -50,7 +54,11 @@ class WakePath(
 
     /** Call once from `Application.onCreate`, after the core started and before `onLaunch`. */
     fun install(permissions: PermissionState, scope: CoroutineScope, location: FixWatch) {
-        WakeDispatcher.setHandler { wake -> CaptureStarter.start(context, wake) }
+        WakeDispatcher.setHandler { wake ->
+            // The core keeps auto-detect on while a permission is missing, so it can report "needs attention" (F-CAP-14);
+            // OS wakes then stop here, as they did when the core itself had auto-detect off.
+            if (wake.kind == WakeKind.MANUAL || automaticNow) CaptureStarter.start(context, wake)
+        }
         health.onLaunch(optedIn()) { sinceMs -> ForceStopHistory.detected(context, sinceMs) }
         parkedRegion.onRegistered = health::parkedRegionRegistered
         refresh(permissions)
@@ -76,7 +84,10 @@ class WakePath(
         val enabled = optedIn()
         val automatic = automaticAllowed(permissions, enabled)
         val attempt = health.refresh(enabled, automatic)
-        recorder.setAutoDetect(automatic)
+        automaticNow = automatic
+        // As on iOS: auto-detect follows the user's choice, and missing permissions show as "needs attention".
+        recorder.setAutoDetect(enabled)
+        recorder.setTriggersAvailable(automaticAllowed(permissions, optedIn = true))
         if (automatic) {
             transitions.arm { armed -> health.activityRegistrationFinished(attempt, armed) }
             parkedRegion.rearmIfNeeded()
