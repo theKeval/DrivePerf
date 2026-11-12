@@ -53,6 +53,12 @@ struct ShellView: View {
     @State private var isProfilePresented = false
     @State private var isStatusPresented = false
 
+    private func openRequestedStatus() {
+        guard model.statusRequests.isPending, model.capture.cover == nil else { return }
+        model.statusRequests.consume()
+        isStatusPresented = true
+    }
+
     var body: some View {
         @Bindable var capture = model.capture
         TabView(selection: $selection) {
@@ -99,11 +105,9 @@ struct ShellView: View {
             CaptureStatusSheet(capture: model.capture)
         }
         // The watchdog notification opens the status sheet, which says what to fix (S-LIVE-10 → S-HOME-02).
-        .onChange(of: model.statusRequests.isPending, initial: true) { _, pending in
-            guard pending, capture.cover == nil else { return }
-            model.statusRequests.consume()
-            isStatusPresented = true
-        }
+        // A request made under a drive's cover waits and opens when the cover closes.
+        .onChange(of: model.statusRequests.isPending, initial: true) { openRequestedStatus() }
+        .onChange(of: model.capture.cover) { openRequestedStatus() }
         .sheet(item: $capture.startProblem) { problem in
             StartProblemSheet(problem: problem, capture: model.capture)
         }
