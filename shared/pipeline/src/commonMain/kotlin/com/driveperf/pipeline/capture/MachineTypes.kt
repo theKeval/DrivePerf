@@ -9,6 +9,7 @@ import com.driveperf.domain.capture.LocationSample
 import com.driveperf.domain.capture.MotionSample
 import com.driveperf.domain.capture.Parking
 import com.driveperf.domain.capture.PowerStatus
+import com.driveperf.domain.capture.RearmReason
 import com.driveperf.domain.capture.RecorderState
 import com.driveperf.domain.capture.Vec3
 import com.driveperf.domain.capture.WakeEvent
@@ -20,7 +21,18 @@ import kotlin.math.sqrt
 internal enum class TimerId { CANDIDATE_TIMEOUT, STOP, IMU_IDLE }
 
 /** Why a trip is being finished. */
-internal enum class EndReason { STOP_TIMER, USER_STOP, PASSENGER, LOW_BATTERY, RECOVERED_INTERRUPTED }
+internal enum class EndReason(val analyticsKey: String?) {
+    STOP_TIMER("stop_timer"),
+    USER_STOP("user"),
+    PASSENGER("user"),
+    LOW_BATTERY("battery"),
+
+    /** R0 can no longer be written at all, after the IMU was already stopped for space (EC-STO). */
+    STORAGE("storage"),
+
+    /** Not an end the user sees as one: the trip was found after a kill. No `trip_ended`. */
+    RECOVERED_INTERRUPTED(null),
+}
 
 /** The trip being captured. [startMonoNs] is `t = 0`: the wake, so nothing after the trigger is lost (Spike 1). */
 internal data class ActiveTrip(
@@ -96,6 +108,8 @@ internal data class MachineState(
     val distanceFix: LocationSample? = null,
     /** The last start was dropped because R0 could not be created. */
     val startFailed: Boolean = false,
+    /** False while the platform reports that its OS triggers cannot run (F-CAP-14 health). */
+    val triggersAvailable: Boolean = true,
 )
 
 /** Inputs to the reducer. Every event carries the monotonic time it is handled at, so the reducer reads no clock. */
@@ -109,7 +123,23 @@ internal sealed interface MachineEvent {
         val dbAvailable: Boolean,
         val parking: Parking?,
         val recovering: Recovery?,
+        val reason: RearmReason = RearmReason.LAUNCH,
     ) : MachineEvent
+
+    /** The app came to the foreground (F-CAP-14 check-in). */
+    data class Foreground(override val nowNs: Long) : MachineEvent
+
+    /** The user opened the app from the watchdog notification. */
+    data class WatchdogOpened(override val nowNs: Long) : MachineEvent
+
+    /** The platform reports whether its OS triggers can run. */
+    data class TriggersAvailable(override val nowNs: Long, val available: Boolean) : MachineEvent
+
+    /**
+     * An R0 append for [tripId] failed (disk full or I/O error, EC-STO). [hadMotion] when the batch held IMU samples:
+     * those may have been queued before the IMU was stopped, so their failure says nothing about GNSS writes.
+     */
+    data class AppendFailed(override val nowNs: Long, val tripId: String, val hadMotion: Boolean = false) : MachineEvent
 
     /** A wake. [newTrip] is the header to use if it starts a trip (ID, zone and parking filled in by the caller). */
     data class Wake(override val nowNs: Long, val nowWallMs: Long, val wake: WakeEvent, val newTrip: CaptureHeader) :
@@ -206,6 +236,15 @@ internal sealed interface MachineEffect {
 
     /** Deletes a rejected candidate or an unsaved passenger trip now. */
     data class Discard(val tripId: String) : MachineEffect
+
+    /** Sends a capture analytics event. */
+    data class Track(val event: CaptureEvent) : MachineEffect
+
+    /** A check-in (F-CAP-14): records the time and moves the watchdog notification ahead. */
+    data object CheckIn : MachineEffect
+
+    /** Automatic detection went off: removes the watchdog notification. */
+    data object WatchdogOff : MachineEffect
 }
 
 /** One reducer step. */

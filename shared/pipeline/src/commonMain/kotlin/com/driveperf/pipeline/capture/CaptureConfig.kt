@@ -51,4 +51,8 @@ public data class CaptureConfig(
     val r0SyncS: Double = 5.0,
     // §2.8: how long finalisation waits for a recorded-accelerometer query still running
     val backfillWaitS: Double = 10.0,
+    // F-CAP-14 watchdog (A3 §1.5): the notification is due this long after the last check-in, and two notifications
+    // are at least watchdogMinGapS apart. Both come from the PRD; Batch 3 checks them against real wake patterns.
+    val watchdogSilenceS: Double = 86_400.0,
+    val watchdogMinGapS: Double = 259_200.0,
 )
