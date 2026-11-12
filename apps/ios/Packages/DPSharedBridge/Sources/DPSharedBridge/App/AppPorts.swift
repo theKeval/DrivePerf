@@ -42,14 +42,6 @@ public struct PermissionSnapshot: Equatable, Sendable {
     }
 }
 
-/// When automatic trip detection last checked in: armed at a launch or foreground, or woken by the OS (F-CAP-14).
-/// Timestamps only. Features show it on the capture status sheet (S-HOME-02) and Home.
-@MainActor
-public protocol AutoDetectCheckIns: AnyObject {
-    /// The last check-in, or nil before the first one on this install.
-    var lastCheckIn: Date? { get }
-}
-
 @MainActor
 public protocol PermissionRequesting: AnyObject {
     func current() async -> PermissionSnapshot

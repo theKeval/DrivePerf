@@ -24,8 +24,8 @@ final class AppEnvironment {
     let motion = CoreMotionSource()
     let activity = CoreMotionActivitySource()
     let power = SystemPowerState()
-    /// F-CAP-14: remembers each check-in of automatic detection and keeps the "may be paused" notice 24 h ahead.
-    let watchdog = AutoDetectWatchdog()
+    /// F-CAP-14: schedules the "may be paused" notice the core asks for.
+    let watchdog = NotificationWatchdog()
     /// Its own activity source for the in-drive content hold: the core's `activity` keeps one sink and is stopped at
     /// the end of every trip.
     let movement = ActivityMovementMonitor(source: CoreMotionActivitySource())
@@ -68,7 +68,7 @@ final class AppEnvironment {
             runSelfTestOnLaunch: ProcessInfo.processInfo.arguments.contains("-selfTest"),
             movement: movement)
             .withTripCorrections(corrections)
-            .withAutoDetectStatus(checkIns: watchdog, requests: surfaceRouter.statusRequests)
+            .withStatusRequests(surfaceRouter.statusRequests)
     }
 
     /// Runs inside `didFinishLaunching`, synchronously: the Core Location sessions first, because a background
@@ -81,12 +81,14 @@ final class AppEnvironment {
         launched = true
         refreshCapture()
         let services = DrivePerfCore.shared.start(
-            platform: CorePlatformBindings(ports: corePorts, deviceId: DeviceIdentity.current()))
+            platform: CorePlatformBindings(ports: corePorts, deviceId: DeviceIdentity.current(), watchdog: watchdog))
         recorder.attach(KotlinCore(services))
         recorder.surfaceData = TripSurfaceData(trips: services.trips)
         recorder.surfaceData?.updateLocation(canRecord: canRecordFromSystemSurface)
         corrections.attach(services.corrections)
-        recorder.onLaunch()
+        // The first launch after a restart re-arms the triggers and says why (F-CAP-14.3).
+        recorder.onLaunch(reason: BootDetector().isFirstLaunchSinceBoot() ? .boot : .launch)
+        updateTriggerAvailability()
         crashReporter.apply(consent: preferences.preferences.sendCrashReports)
         // Usage statistics: events wait in memory until the user has chosen (onboarding finished means S-ONB-13 was
         // answered), then are sent or dropped; a later change in Profile takes effect at once (F-ONB-08).
@@ -123,27 +125,37 @@ final class AppEnvironment {
         }
         if auto && always && files.isUnlockedSinceBoot() {
             if !triggersArmed {
-                triggers.startTriggers { [weak self] wake in
-                    // Any wake proves auto-detect is alive (F-CAP-14.1).
-                    self?.watchdog.checkIn()
-                    self?.recorder.onWake(wake)
-                }
+                triggers.startTriggers { [weak self] wake in self?.recorder.onWake(wake) }
                 triggersArmed = true
             }
             motion.recordAccelerometerHistory()
-            // Armed at launch, on every foreground and after onboarding: a check-in too (F-CAP-14.4).
-            watchdog.checkIn()
-        } else {
-            if triggersArmed {
-                triggers.stopTriggers()
-                triggersArmed = false
-            }
-            // Nothing is armed, so there is nothing to watch: no "may be paused" notice for an off switch.
-            watchdog.cancel()
+        } else if triggersArmed {
+            triggers.stopTriggers()
+            triggersArmed = false
         }
         recorder.setAutoDetect(enabled: auto)
         recorder.surfaceData?.updateLocation(canRecord: canRecord)
         recorder.publishRecording()
+        updateTriggerAvailability()
+    }
+
+    /// The scene became active: re-read permissions and re-arm, then tell the core, which counts it as a check-in and
+    /// moves the watchdog notice 24 h ahead (F-CAP-14.1, F-CAP-14.4).
+    func foregrounded() {
+        refreshCapture()
+        guard launched else { return }
+        recorder.onForeground()
+    }
+
+    /// Tells the core whether the OS triggers can run, from what the user can fix in Settings (Always location, Motion
+    /// & Fitness, precise location, Background App Refresh). The core turns it into "Auto-detect needs attention".
+    private func updateTriggerAvailability() {
+        guard !Self.isRunningUnitTests else { return }
+        Task { [weak self] in
+            guard let self else { return }
+            let snapshot = await permissions.current()
+            recorder.setTriggersAvailable(AutoDetectReadiness.reasons(for: snapshot).isEmpty)
+        }
     }
 }
 
@@ -157,12 +169,9 @@ enum TripIntentHandler {
 }
 
 extension AppDependencies {
-    /// DRIVE-150: the last check-in for the status sheet, and the watchdog notification's way into that sheet.
-    fileprivate func withAutoDetectStatus(
-        checkIns: any AutoDetectCheckIns, requests: CaptureStatusRequests
-    ) -> AppDependencies {
+    /// DRIVE-150: the watchdog notification's way into the capture status sheet.
+    fileprivate func withStatusRequests(_ requests: CaptureStatusRequests) -> AppDependencies {
         var copy = self
-        copy.checkIns = checkIns
         copy.statusRequests = requests
         return copy
     }

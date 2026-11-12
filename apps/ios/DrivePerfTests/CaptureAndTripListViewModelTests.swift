@@ -196,23 +196,14 @@ final class CaptureViewModelTests: XCTestCase {
         XCTAssertTrue(model.attentionReasons.isEmpty)
     }
 
-    func testLastCheckInComesFromTheCheckInSource() async {
-        let checkIns = FakeCheckIns()
-        let permissions = FakePermissions()
-        permissions.state = Self.healthy
-        let recorder = FakeRecorder()
-        let model = CaptureViewModel(
-            recorder: recorder, history: recorder, permissions: permissions, clock: FixedClock(), checkIns: checkIns)
+    func testLastCheckInComesFromTheRecorderStatus() {
+        let model = makeModel()
         XCTAssertNil(model.lastCheckIn)
 
-        checkIns.lastCheckIn = Date(timeIntervalSince1970: 1_799_999_000)
-        await model.refreshReadiness()
+        var status = RecorderStatus.idle
+        status.lastCheckIn = Date(timeIntervalSince1970: 1_799_999_000)
+        model.apply(status)
         XCTAssertEqual(model.lastCheckIn, Date(timeIntervalSince1970: 1_799_999_000))
-
-        // A check-in made in the background shows on the next status change too.
-        checkIns.lastCheckIn = Date(timeIntervalSince1970: 1_800_000_500)
-        model.apply(.idle)
-        XCTAssertEqual(model.lastCheckIn, Date(timeIntervalSince1970: 1_800_000_500))
     }
 
     func testShortTripBannerUnderFiveHundredMetresOrTwoMinutes() {

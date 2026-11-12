@@ -13,7 +13,7 @@ enum TripNotificationRoute: Equatable {
 
     init?(actionID: String, requestID: String, category: String, tripID: String) {
         guard actionID == UNNotificationDefaultActionIdentifier else { return nil }
-        if requestID == AutoDetectWatchdog.identifier {
+        if requestID == NotificationWatchdog.identifier {
             self = .watchdog
             return
         }
@@ -48,8 +48,9 @@ final class TripSurfaceRouter {
             // The shell opens on Drives. Its existing capture gate takes precedence during another drive.
             break
         case .watchdog:
-            // The app was opened, so auto-detect re-arms (a check-in); the sheet shows what, if anything, to fix.
-            AppEnvironment.shared.refreshCapture()
+            // The app was opened, so the scene's foreground check-in re-arms auto-detect; the sheet shows what, if
+            // anything, to fix.
+            recorder.onWatchdogOpened()
             statusRequests.request()
             return
         }

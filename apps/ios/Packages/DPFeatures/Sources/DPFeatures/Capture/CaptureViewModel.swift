@@ -82,8 +82,8 @@ public final class CaptureViewModel {
     private var permissionSnapshot = PermissionSnapshot()
     /// Everything that currently keeps automatic trips from running (F-CAP-02), most important first.
     public var attentionReasons: [AttentionReason] { AutoDetectReadiness.reasons(for: permissionSnapshot) }
-    /// When auto-detect last checked in (F-CAP-14); nil before the first check-in or without a check-in source.
-    public private(set) var lastCheckIn: Date?
+    /// When auto-detect last checked in: a launch, wake, foreground or re-arm with it on (F-CAP-14, from the core).
+    public var lastCheckIn: Date? { status.lastCheckIn }
     /// A trip the user is ending right now (Stop, passenger, Don't save): the outcome is theirs to set.
     private var ending: EndKind?
     /// The lock after a trip: from the trip's end until the phone has been calm for `DriveLock.calmInterval`.
@@ -99,7 +99,6 @@ public final class CaptureViewModel {
     private let permissions: any PermissionRequesting
     private let clock: any ClockBridge
     private let movement: (any MovementMonitoring)?
-    private let checkIns: (any AutoDetectCheckIns)?
     private let now: @MainActor () -> Date
     /// How long to wait for a stopped trip to appear in the list before showing the done screen without it.
     private let finishTimeout: Duration
@@ -107,7 +106,7 @@ public final class CaptureViewModel {
 
     public init(
         recorder: any TripRecording, history: any TripHistory, permissions: any PermissionRequesting,
-        clock: any ClockBridge, movement: (any MovementMonitoring)? = nil, checkIns: (any AutoDetectCheckIns)? = nil,
+        clock: any ClockBridge, movement: (any MovementMonitoring)? = nil,
         now: @escaping @MainActor () -> Date = { Date() }, finishTimeout: Duration = .seconds(3),
         startTimeout: Duration = .seconds(5)
     ) {
@@ -116,7 +115,6 @@ public final class CaptureViewModel {
         self.permissions = permissions
         self.clock = clock
         self.movement = movement
-        self.checkIns = checkIns
         self.now = now
         self.finishTimeout = finishTimeout
         self.startTimeout = startTimeout
@@ -143,18 +141,11 @@ public final class CaptureViewModel {
     /// last check-in. Call at launch and on every foreground.
     public func refreshReadiness() async {
         permissionSnapshot = await permissions.current()
-        refreshCheckIn()
-    }
-
-    /// Re-reads the last check-in, which the platform records at every arm and wake, in the background too.
-    public func refreshCheckIn() {
-        lastCheckIn = checkIns?.lastCheckIn
     }
 
     func apply(_ next: RecorderStatus) {
         let previous = status
         status = next
-        refreshCheckIn()
         if let tripId = next.tripId, tripId != previous.tripId {
             tripStartedAt = now().addingTimeInterval(-next.elapsedS)
             // A new trip ends the hold of the last one (the lock applies to it anyway).
