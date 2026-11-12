@@ -13,7 +13,7 @@ What `.github/workflows/` does today, and what is deliberately inert. ADR-008 is
 | `nightly.yml` | schedule 06:17 UTC | `npm audit` (high or critical) and Maestro smoke flows | audit active. Maestro passes with a notice until `.maestro/*.yaml` exists |
 | `release-android.yml` | tag `v*` | builds `bundleProdRelease` | **inert** |
 | `release-ios.yml` | tag `v*` | TestFlight upload | **inert** (fails on purpose if enabled early) |
-| `jira-sync.yml`, `review-router.yml` | as before | Jira and review automation | unchanged |
+| ~~`jira-sync.yml`, `review-router.yml`~~ | — | Jira sync and Copilot review routing from the `agentic-workflow` harness | **removed** (DRIVE-210, 2026-11-11). Jira is updated by the coordinator; PR review is the Codex review bot. The `JIRA_*`, `SLACK_WEBHOOK_*` and `AGENT_PAT` repository secrets are kept, unused, for a future harness |
 
 Differences from ADR-008's table: path filters use GitHub's native `paths:` instead of `dorny/paths-filter` (no third-party action needed); the Firestore rules tests stay in `web.yml`, which already owns `backend/firebase/`; Roborazzi, the OpenAPI contract tests and the server tests against Firebase emulators join when their code exists (DRIVE-72, DRIVE-76). SQLDelight's `verifySqlDelightMigration` runs in `shared.yml` since DRIVE-206.
 
