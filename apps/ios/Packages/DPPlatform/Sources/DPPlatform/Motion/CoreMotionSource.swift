@@ -37,7 +37,7 @@ public final class CoreMotionSource: MotionSourceBridge, @unchecked Sendable {
             manager.stopDeviceMotionUpdates()
             pending = []
             self.sink = sink
-            manager.deviceMotionUpdateInterval = 1 / Double(max(rateHz, 1))
+            manager.deviceMotionUpdateInterval = Self.interval(forRateHz: rateHz)
             let clock = clock
             manager.startDeviceMotionUpdates(using: .xArbitraryCorrectedZVertical, to: queue) {
                 @Sendable [weak self] motion, _ in
@@ -47,9 +47,15 @@ public final class CoreMotionSource: MotionSourceBridge, @unchecked Sendable {
         }
     }
 
-    /// IMU back-off (F-CAP-16: 50, 25 or 10 Hz).
+    /// IMU back-off (F-CAP-16: 50, 25 or 10 Hz). The shared core decides when (Low Power Mode, battery at or below
+    /// 15 %, thermal state serious or critical); this only applies it, to the running updates at once.
     public func setRate(rateHz: Int) {
-        lock.withLock { manager.deviceMotionUpdateInterval = 1 / Double(max(rateHz, 1)) }
+        lock.withLock { manager.deviceMotionUpdateInterval = Self.interval(forRateHz: rateHz) }
+    }
+
+    /// The update interval for a requested rate: never faster than the hardware's 100 Hz, never slower than 1 Hz.
+    static func interval(forRateHz rateHz: Int) -> TimeInterval {
+        1 / Double(min(max(rateHz, 1), 100))
     }
 
     public func stop() {

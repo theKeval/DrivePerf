@@ -96,6 +96,20 @@ Dependency rules (ADR-002 section 2): `DPFeatures` sees `DPDesignSystem` and `DP
   spot. Wakes older than 5 minutes (fixes) or 15 minutes (region events) are dropped.
 - **Recording starts at the wake**, GNSS (`liveUpdates` plus the legacy keep-alive) and 50 Hz device motion, and the
   candidate's samples are kept when it is confirmed. Motion callbacks are `@Sendable` and run on their own queue.
+- **Auto-detect health (F-CAP-02, F-CAP-14):** at launch and on every foreground the app reads Always location,
+  Motion & Fitness, precise location and Background App Refresh (`AutoDetectReadiness`, DPFeatures) and tells the core
+  through `setTriggersAvailable`. Home shows "Auto-detect on / off / needs attention" with a Fix button (the capture
+  status sheet, which names every problem and opens Settings) and the accessory shows "Last check-in" from
+  `RecorderStatus.lastCheckIn`.
+- **Watchdog (F-CAP-14, EC-FQ):** iOS cannot see a force-quit, so the core schedules a local notice 24 h after each
+  check-in (launch, wake, foreground), at most once per 72 h, through `NotificationWatchdog` (one request,
+  fixed identifier, replaced each time). Tapping it opens the status sheet and tells the core
+  (`onWatchdogOpened`). The first launch after a restart is reported to the core as `boot` (`BootDetector`).
+- **Power (F-CAP-16):** `SystemPowerState` feeds battery level, charging, Low Power Mode and `ProcessInfo.thermalState`
+  to the core; the core's IMU rate (50, 25 or 10 Hz) is applied by `CoreMotionSource.setRate`. iOS has no location
+  rate control worth using (`mayBatchLocation` is Android only), so GNSS stays at 1 Hz while recording and is off
+  while armed. The in-drive screen reports `setInDriveScreenVisible` as it shows and hides, so both platforms share one
+  contract. No background task is added.
 - **Manual trips** start from the accessory's Start button and show a Live Activity. **Automatic trips never start a
   local Live Activity** (it fails in the background); they post a passive "Recording your drive" notification.
 - Trip files live under `Application Support/Capture/trips/<id>/`: R0 and R1 `completeUnlessOpen` (written while

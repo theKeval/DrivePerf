@@ -13,6 +13,9 @@ struct DrivesHomeView: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: DPLayout.sectionGap) {
+                    if case .attention(let reason) = capture.accessory {
+                        AutoDetectAttentionBanner(reason: reason, onFix: onCaptureStatus)
+                    }
                     if trips.trips.isEmpty {
                         EmptyDrivesCard(onHowItWorks: onCaptureStatus)
                         if !trips.notDrives.isEmpty {
@@ -55,6 +58,31 @@ struct DrivesHomeView: View {
                 ToolbarItem(placement: .topBarTrailing) { ProfileAvatarButton(action: onProfile) }
             }
         }
+    }
+}
+
+/// S-HOME-01 state banner "needs attention": what stopped auto-detect, and the way to fix it (the status sheet).
+private struct AutoDetectAttentionBanner: View {
+    let reason: AttentionReason
+    let onFix: () -> Void
+
+    var body: some View {
+        HStack(spacing: DPSpace.s3) {
+            GlyphDisc(.info, tone: .warning, size: 32)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Auto-detect needs attention").font(DPFont.body.weight(.semibold)).foregroundStyle(DPColor.text)
+                Text(reason.shortText).font(DPFont.bodySecondary).foregroundStyle(DPColor.text2)
+            }
+            Spacer(minLength: DPSpace.s2)
+            Button("Fix", action: onFix)
+                .font(DPFont.body.weight(.semibold))
+                .foregroundStyle(DPColor.accentText)
+                .frame(minHeight: DPLayout.touchMin)
+        }
+        .padding(DPSpace.s3)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(DPColor.warningContainer, in: RoundedRectangle(cornerRadius: DPRadius.md))
+        .accessibilityElement(children: .contain)
     }
 }
 

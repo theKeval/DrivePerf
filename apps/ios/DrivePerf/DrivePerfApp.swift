@@ -13,7 +13,7 @@ struct DrivePerfApp: App {
                 router: AppEnvironment.shared.surfaceRouter,
                 dependencies: AppEnvironment.shared.dependencies)
                 .onChange(of: scenePhase) { _, phase in
-                    if phase == .active { AppEnvironment.shared.refreshCapture() }
+                    if phase == .active { AppEnvironment.shared.foregrounded() }
                 }
         }
     }

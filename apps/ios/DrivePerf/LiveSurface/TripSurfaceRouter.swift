@@ -8,10 +8,16 @@ import UserNotifications
 enum TripNotificationRoute: Equatable {
     case recording(String)
     case decoded(String)
+    /// "Auto-detect may be paused" (F-CAP-14, S-LIVE-10): opens the capture status sheet.
+    case watchdog
 
     init?(actionID: String, requestID: String, category: String, tripID: String) {
-        guard actionID == UNNotificationDefaultActionIdentifier, !tripID.isEmpty,
-            requestID == LocalNotifier.identifier(for: tripID) else { return nil }
+        guard actionID == UNNotificationDefaultActionIdentifier else { return nil }
+        if requestID == NotificationWatchdog.identifier {
+            self = .watchdog
+            return
+        }
+        guard !tripID.isEmpty, requestID == LocalNotifier.identifier(for: tripID) else { return nil }
         switch category {
         case LocalNotifier.recordingCategory, "":
             // Recording notices delivered before categories were added have the same identifier and thread.
@@ -29,6 +35,8 @@ enum TripNotificationRoute: Equatable {
 final class TripSurfaceRouter {
     private(set) var rootRevision = 0
     var isLocationHelpPresented = false
+    /// Opens the capture status sheet from a notification (the watchdog).
+    let statusRequests = CaptureStatusRequests()
 
     func showLocationHelp() { isLocationHelpPresented = true }
 
@@ -39,6 +47,12 @@ final class TripSurfaceRouter {
         case .decoded:
             // The shell opens on Drives. Its existing capture gate takes precedence during another drive.
             break
+        case .watchdog:
+            // The app was opened, so the scene's foreground check-in re-arms auto-detect; the sheet shows what, if
+            // anything, to fix.
+            recorder.onWatchdogOpened()
+            statusRequests.request()
+            return
         }
         isLocationHelpPresented = false
         // Re-enter the shell at its root so an existing sheet cannot cover the in-drive screen.

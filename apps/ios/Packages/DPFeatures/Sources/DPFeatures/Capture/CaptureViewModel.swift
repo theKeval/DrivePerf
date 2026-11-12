@@ -2,11 +2,6 @@ import DPSharedBridge
 import Foundation
 import Observation
 
-/// Why automatic trips cannot run although they are on.
-public enum AttentionReason: String, Equatable, Sendable {
-    case locationWhileUsing, locationDenied
-}
-
 /// Capture status, manual Start/Stop and the in-drive gate (S-HOME-01 accessory, S-DRV-01, S-DRV-02, S-DRV-04).
 /// It reads the recorder's `RecorderStatus` (the Kotlin `TripRecorder` contract) and the trip list for the trip
 /// that just finished.
@@ -84,7 +79,11 @@ public final class CaptureViewModel {
     public var onOpenContent: ((HeldContent) -> Void)?
     /// The car's nickname for the chip on S-DRV-01 and S-DRV-04. Garage (DRIVE-173) fills it; until then nothing shows.
     public var carName: String?
-    private var location = LocationAccess.notDetermined
+    private var permissionSnapshot = PermissionSnapshot()
+    /// Everything that currently keeps automatic trips from running (F-CAP-02), most important first.
+    public var attentionReasons: [AttentionReason] { AutoDetectReadiness.reasons(for: permissionSnapshot) }
+    /// When auto-detect last checked in: a launch, wake, foreground or re-arm with it on (F-CAP-14, from the core).
+    public var lastCheckIn: Date? { status.lastCheckIn }
     /// A trip the user is ending right now (Stop, passenger, Don't save): the outcome is theirs to set.
     private var ending: EndKind?
     /// The lock after a trip: from the trip's end until the phone has been calm for `DriveLock.calmInterval`.
@@ -122,6 +121,10 @@ public final class CaptureViewModel {
         apply(recorder.status)
     }
 
+    /// Tells the core whether the in-drive screen (S-DRV-01) is on screen (F-CAP-16: the core only uses it to decide
+    /// location batching, which is Android only; iOS reports it so both platforms share one contract).
+    func setInDriveScreenVisible(_ visible: Bool) { recorder.setInDriveScreenVisible(visible) }
+
     /// Observes the recorder for the lifetime of the calling view's `.task`.
     public func observe() async {
         await refreshReadiness()
@@ -138,9 +141,10 @@ public final class CaptureViewModel {
         }
     }
 
-    /// Re-reads the location permission behind the accessory's "needs attention" state. Call on every foreground.
+    /// Re-reads what auto-detect needs (location, Motion & Fitness, precise location, Background App Refresh) and the
+    /// last check-in. Call at launch and on every foreground.
     public func refreshReadiness() async {
-        location = await permissions.current().location
+        permissionSnapshot = await permissions.current()
     }
 
     func apply(_ next: RecorderStatus) {
@@ -176,18 +180,15 @@ public final class CaptureViewModel {
             return .recording(startedAt: tripStartedAt ?? now(), distanceM: status.distanceM)
         }
         guard status.autoDetectEnabled else { return .manual }
-        switch location {
-        case .always: return .ready
-        case .whenInUse: return .attention(.locationWhileUsing)
-        case .notDetermined, .denied, .restricted: return .attention(.locationDenied)
-        }
+        if let reason = attentionReasons.first { return .attention(reason) }
+        return .ready
     }
 
     /// Start (accessory, S-HOME-01): a `MANUAL` wake. Without location nothing records, not even manual trips
     /// (S-ONB-16).
     public func start() async {
         let current = await permissions.current()
-        location = current.location
+        permissionSnapshot = current
         guard current.location.canRecord else {
             startProblem = .locationDenied
             return

@@ -25,7 +25,8 @@ public final class SystemPermissions: NSObject, PermissionRequesting {
             location: Self.map(manager.authorizationStatus),
             preciseLocation: manager.accuracyAuthorization == .fullAccuracy,
             motion: Self.motionAccess(),
-            notifications: Self.map(notifications.authorizationStatus))
+            notifications: Self.map(notifications.authorizationStatus),
+            backgroundRefresh: Self.map(UIApplication.shared.backgroundRefreshStatus))
     }
 
     public func requestLocationWhenInUse() async -> PermissionSnapshot {
@@ -129,6 +130,15 @@ public final class SystemPermissions: NSObject, PermissionRequesting {
         case .denied: return .denied
         case .restricted: return .restricted
         default: return .notDetermined
+        }
+    }
+
+    static func map(_ status: UIBackgroundRefreshStatus) -> BackgroundRefreshAccess {
+        switch status {
+        case .available: .available
+        case .denied: .denied
+        case .restricted: .restricted
+        @unknown default: .available
         }
     }
 

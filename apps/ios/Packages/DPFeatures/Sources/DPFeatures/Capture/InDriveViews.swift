@@ -14,6 +14,8 @@ struct InDriveView: View {
         .background(DPColor.driveBg.ignoresSafeArea())
         .environment(\.colorScheme, .dark)
         .interactiveDismissDisabled()
+        .onAppear { capture.setInDriveScreenVisible(true) }
+        .onDisappear { capture.setInDriveScreenVisible(false) }
         .sheet(isPresented: $capture.isEndSheetPresented) {
             EndTripSheet(capture: capture)
         }

@@ -145,4 +145,15 @@ final class TripNotificationRouteTests: XCTestCase {
         XCTAssertNil(route(category: "", action: UNNotificationDismissActionIdentifier))
         XCTAssertNil(route(category: "", request: "trip-17"))
     }
+
+    func testWatchdogNotificationOpensTheStatusSheetWithoutATripID() {
+        let watchdog = TripNotificationRoute(
+            actionID: UNNotificationDefaultActionIdentifier, requestID: NotificationWatchdog.identifier,
+            category: NotificationWatchdog.category, tripID: "")
+        XCTAssertEqual(watchdog, .watchdog)
+        XCTAssertNil(
+            TripNotificationRoute(
+                actionID: UNNotificationDismissActionIdentifier, requestID: NotificationWatchdog.identifier,
+                category: NotificationWatchdog.category, tripID: ""))
+    }
 }

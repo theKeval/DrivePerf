@@ -25,6 +25,16 @@ final class CaptureViewModelTests: XCTestCase {
         XCTAssertTrue(recorder.wakes.isEmpty)
     }
 
+    func testTheInDriveScreenReportsWhenItShowsAndHides() {
+        let recorder = FakeRecorder()
+        let model = makeModel(recorder)
+
+        model.setInDriveScreenVisible(true)
+        model.setInDriveScreenVisible(false)
+
+        XCTAssertEqual(recorder.inDriveScreenVisible, [true, false])
+    }
+
     func testStartSendsAManualWakeStampedWithTheClock() async {
         let recorder = FakeRecorder()
         let permissions = FakePermissions()
@@ -152,7 +162,7 @@ final class CaptureViewModelTests: XCTestCase {
         let permissions = FakePermissions()
         let model = makeModel(permissions: permissions)
 
-        permissions.state.location = .always
+        permissions.state = Self.healthy
         await model.refreshReadiness()
         XCTAssertEqual(model.accessory, .ready)
 
@@ -164,6 +174,46 @@ final class CaptureViewModelTests: XCTestCase {
         manual.autoDetectEnabled = false
         model.apply(manual)
         XCTAssertEqual(model.accessory, .manual)
+    }
+
+    private static let healthy = PermissionSnapshot(
+        location: .always, preciseLocation: true, motion: .authorized, notifications: .authorized,
+        backgroundRefresh: .available)
+
+    func testAccessoryNeedsAttentionForMotionPreciseLocationAndBackgroundRefresh() async {
+        let permissions = FakePermissions()
+        let model = makeModel(permissions: permissions)
+
+        permissions.state = Self.healthy
+        permissions.state.motion = .denied
+        await model.refreshReadiness()
+        XCTAssertEqual(model.accessory, .attention(.motionOff))
+
+        permissions.state = Self.healthy
+        permissions.state.preciseLocation = false
+        await model.refreshReadiness()
+        XCTAssertEqual(model.accessory, .attention(.preciseLocationOff))
+
+        permissions.state = Self.healthy
+        permissions.state.backgroundRefresh = .denied
+        await model.refreshReadiness()
+        XCTAssertEqual(model.accessory, .attention(.backgroundRefreshOff))
+        XCTAssertEqual(model.attentionReasons, [.backgroundRefreshOff])
+
+        permissions.state = Self.healthy
+        await model.refreshReadiness()
+        XCTAssertEqual(model.accessory, .ready)
+        XCTAssertTrue(model.attentionReasons.isEmpty)
+    }
+
+    func testLastCheckInComesFromTheRecorderStatus() {
+        let model = makeModel()
+        XCTAssertNil(model.lastCheckIn)
+
+        var status = RecorderStatus.idle
+        status.lastCheckIn = Date(timeIntervalSince1970: 1_799_999_000)
+        model.apply(status)
+        XCTAssertEqual(model.lastCheckIn, Date(timeIntervalSince1970: 1_799_999_000))
     }
 
     func testShortTripBannerUnderFiveHundredMetresOrTwoMinutes() {

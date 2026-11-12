@@ -16,20 +16,29 @@ public enum NotificationAccess: String, Equatable, Sendable {
     case notDetermined, denied, authorized
 }
 
+/// Background App Refresh (Settings, DrivePerf). Off, or restricted by a profile or Screen Time, it can hold back the
+/// wakes automatic trips rely on (PRD EC-LPM, S-SET-05).
+public enum BackgroundRefreshAccess: String, Equatable, Sendable {
+    case available, denied, restricted
+}
+
 public struct PermissionSnapshot: Equatable, Sendable {
     public var location: LocationAccess
     public var preciseLocation: Bool
     public var motion: MotionAccess
     public var notifications: NotificationAccess
+    public var backgroundRefresh: BackgroundRefreshAccess
 
     public init(
         location: LocationAccess = .notDetermined, preciseLocation: Bool = false,
-        motion: MotionAccess = .notDetermined, notifications: NotificationAccess = .notDetermined
+        motion: MotionAccess = .notDetermined, notifications: NotificationAccess = .notDetermined,
+        backgroundRefresh: BackgroundRefreshAccess = .available
     ) {
         self.location = location
         self.preciseLocation = preciseLocation
         self.motion = motion
         self.notifications = notifications
+        self.backgroundRefresh = backgroundRefresh
     }
 }
 

@@ -1,5 +1,5 @@
 import CoreLocation
-import DPPlatform
+@testable import DPPlatform
 import DPSharedBridge
 import XCTest
 
@@ -265,4 +265,35 @@ private final class BatchLog: @unchecked Sendable {
 
     func record(onMain value: Bool) { lock.withLock { onMain.append(value) } }
     var threads: [Bool] { lock.withLock { onMain } }
+}
+
+/// F-CAP-16: what the core is told about power, and the rates it can ask the IMU for.
+final class PowerAndRateTests: XCTestCase {
+    func testThermalStatesMapOneToOne() {
+        XCTAssertEqual(SystemPowerState.thermal(.nominal), .nominal)
+        XCTAssertEqual(SystemPowerState.thermal(.fair), .fair)
+        XCTAssertEqual(SystemPowerState.thermal(.serious), .serious)
+        XCTAssertEqual(SystemPowerState.thermal(.critical), .critical)
+    }
+
+    func testUnknownBatteryLevelIsNilNotZero() {
+        XCTAssertNil(SystemPowerState.batteryReading(level: -1, state: .unknown).pct)
+        XCTAssertEqual(SystemPowerState.batteryReading(level: 0.146, state: .unplugged).pct, 15)
+        XCTAssertEqual(SystemPowerState.batteryReading(level: 1, state: .full).pct, 100)
+    }
+
+    func testChargingAndFullBothCountAsCharging() {
+        XCTAssertTrue(SystemPowerState.batteryReading(level: 0.5, state: .charging).charging)
+        XCTAssertTrue(SystemPowerState.batteryReading(level: 1, state: .full).charging)
+        XCTAssertFalse(SystemPowerState.batteryReading(level: 0.5, state: .unplugged).charging)
+    }
+
+    func testImuIntervalsForTheBackOffRates() {
+        XCTAssertEqual(CoreMotionSource.interval(forRateHz: 50), 0.02, accuracy: 1e-9)
+        XCTAssertEqual(CoreMotionSource.interval(forRateHz: 25), 0.04, accuracy: 1e-9)
+        XCTAssertEqual(CoreMotionSource.interval(forRateHz: 10), 0.1, accuracy: 1e-9)
+        // A zero or absurd request cannot stop the sensor or exceed the hardware.
+        XCTAssertEqual(CoreMotionSource.interval(forRateHz: 0), 1, accuracy: 1e-9)
+        XCTAssertEqual(CoreMotionSource.interval(forRateHz: 1_000), 0.01, accuracy: 1e-9)
+    }
 }

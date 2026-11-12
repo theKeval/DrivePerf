@@ -63,10 +63,15 @@ public final class SystemPowerState: PowerStateBridge, @unchecked Sendable {
     @MainActor
     private func readBattery() {
         let device = UIDevice.current
-        let level = device.batteryLevel
-        let pct = level < 0 ? nil : Int((level * 100).rounded())
-        let charging = device.batteryState == .charging || device.batteryState == .full
-        lock.withLock { battery = (pct, charging) }
+        let reading = Self.batteryReading(level: device.batteryLevel, state: device.batteryState)
+        lock.withLock { battery = reading }
+    }
+
+    /// `UIDevice` reports -1 when the level is unknown (the simulator, monitoring off); that becomes nil, not 0 %,
+    /// so the core never mistakes it for a nearly empty battery (F-CAP-16 backs off at 15 % or less).
+    static func batteryReading(level: Float, state: UIDevice.BatteryState) -> (pct: Int?, charging: Bool) {
+        let pct = level < 0 ? nil : min(100, Int((level * 100).rounded()))
+        return (pct, state == .charging || state == .full)
     }
 
     static func thermal(_ state: ProcessInfo.ThermalState) -> ThermalState {
