@@ -147,7 +147,24 @@ class CaptureBackoffTest {
         val boot = m.reduce(MachineState(), MachineEvent.Launch(ns(1.0), wallAt(1.0), true, parking, null, RearmReason.BOOT))
         assertNull(boot.state.parking, "EC-RBT: start at the first fix, no estimate")
         assertTrue(boot.effects.contains(MachineEffect.ArmParkedRegion(parking.point, cfg.parkedRadiusM)))
+        assertTrue(MachineEffect.DistrustParking in boot.effects, "kept across a process restart")
         val launch = m.reduce(MachineState(), MachineEvent.Launch(ns(1.0), wallAt(1.0), true, parking, null))
         assertEquals(parking, launch.state.parking)
+        val untrusted = MachineEvent.Launch(ns(1.0), wallAt(1.0), true, parking, null, parkingTrusted = false)
+        val restarted = m.reduce(MachineState(), untrusted)
+        assertNull(restarted.state.parking, "a restart after the reboot still distrusts it")
+        assertTrue(restarted.effects.contains(MachineEffect.ArmParkedRegion(parking.point, cfg.parkedRadiusM)))
+        val noSpot = m.reduce(MachineState(), MachineEvent.Launch(ns(1.0), wallAt(1.0), true, null, null, RearmReason.BOOT))
+        assertFalse(MachineEffect.DistrustParking in noSpot.effects)
+    }
+
+    @Test
+    fun theDriveScreenStateSurvivesTripStartsAndEnds() {
+        val visible = m.reduce(MachineState(parking = parking), MachineEvent.InDriveVisible(ns(0.0), true)).state
+        val w = WakeEvent(WakeKind.MANUAL, ns(0.0), wallAt(0.0))
+        val started = m.reduce(visible, MachineEvent.Wake(ns(0.0), wallAt(0.0), w, header(0.0, WakeKind.MANUAL))).state
+        assertTrue(started.inDriveVisible)
+        val finishing = m.reduce(started, MachineEvent.UserStop(ns(10.0))).state
+        assertTrue(m.reduce(finishing, MachineEvent.Finalised(ns(11.0), parking)).state.inDriveVisible)
     }
 }

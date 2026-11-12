@@ -131,5 +131,32 @@ class RecorderBackoffTest {
         runCurrent()
         val id = engine.status.value.tripId!!
         assertNull(log.read(id)?.header?.parking, "EC-RBT: no estimate and no parking bound")
+        assertFalse(store.parkingTrusted)
+    }
+
+    @Test
+    fun aRestartAfterTheRebootStillDistrustsTheOldSpotUntilATripEnds() = runTest {
+        store.parkingTrusted = false
+        val engine = engine()
+        engine.onLaunch()
+        engine.onWake(WakeEvent(WakeKind.MANUAL, clock.monotonicNs(), clock.wallMs(), "app"))
+        runCurrent()
+        assertNull(log.read(engine.status.value.tripId!!)?.header?.parking)
+        drive(200, 15.0)
+        engine.stop()
+        runCurrent()
+        assertTrue(store.parkingTrusted, "the trip end recorded a new, trusted spot")
+    }
+
+    @Test
+    fun theDriveScreenShownBeforeTheTripStartsKeepsLocationUnbatched() = runTest {
+        val engine = engine()
+        engine.onLaunch()
+        engine.setInDriveScreenVisible(true)
+        engine.onWake(WakeEvent(WakeKind.MANUAL, clock.monotonicNs(), clock.wallMs(), "app"))
+        runCurrent()
+        drive(70, 22.0)
+        assertEquals(25, motion.rateHz)
+        assertFalse(engine.status.value.mayBatchLocation)
     }
 }

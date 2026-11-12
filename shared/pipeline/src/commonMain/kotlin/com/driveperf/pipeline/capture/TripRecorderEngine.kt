@@ -200,6 +200,7 @@ public class TripRecorderEngine(
         if (recording != null && recovery == null) store.deleteNow(recording.id)
         return MachineEvent.Launch(
             now, clock.wallMs(), dbAvailable = true, parking = store.lastParking(), recovering = recovery, reason = reason,
+            parkingTrusted = store.isParkingTrusted(),
         )
     }
 
@@ -286,6 +287,7 @@ public class TripRecorderEngine(
             is MachineEffect.Track -> analytics?.track(effect.event)
             MachineEffect.CheckIn -> checkIn()
             MachineEffect.WatchdogOff -> watchdogOff()
+            MachineEffect.DistrustParking -> persistence.store.distrustParking()
             else -> Unit
         }
     }

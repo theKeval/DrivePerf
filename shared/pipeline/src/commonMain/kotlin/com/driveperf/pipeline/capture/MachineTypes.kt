@@ -146,6 +146,8 @@ internal sealed interface MachineEvent {
         val parking: Parking?,
         val recovering: Recovery?,
         val reason: RearmReason = RearmReason.LAUNCH,
+        /** False when the stored parking spot predates a reboot and no trip has ended since (EC-RBT). */
+        val parkingTrusted: Boolean = true,
     ) : MachineEvent
 
     /** The app came to the foreground (F-CAP-14 check-in). */
@@ -264,6 +266,9 @@ internal sealed interface MachineEffect {
 
     /** Sends a capture analytics event. */
     data class Track(val event: CaptureEvent) : MachineEffect
+
+    /** Marks the stored parking spot as predating a reboot (EC-RBT), until the next trip end replaces it. */
+    data object DistrustParking : MachineEffect
 
     /** A check-in (F-CAP-14): records the time and moves the watchdog notification ahead. */
     data object CheckIn : MachineEffect

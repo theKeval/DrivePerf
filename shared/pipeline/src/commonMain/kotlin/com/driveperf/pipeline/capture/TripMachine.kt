@@ -91,13 +91,16 @@ internal class TripMachine(private val cfg: CaptureConfig = CaptureConfig()) {
     /**
      * After a reboot the stored parking spot is not trusted (EC-RBT): the phone may have been off while the car moved.
      * The parked region is still armed there, as the best guess for a wake, but the next trip starts at its first fix
-     * with no estimated start (F-CAP-05) and no parking bound, until a trip end records a new spot.
+     * with no estimated start (F-CAP-05) and no parking bound, until a trip end records a new spot. The distrust is
+     * stored ([MachineEffect.DistrustParking]), so a process restart before that trip keeps it.
      */
     private fun onLaunch(s: MachineState, e: MachineEvent.Launch): Transition {
         val stored = e.parking ?: s.parking
-        val trusted = if (e.reason == RearmReason.BOOT) null else stored
+        val boot = e.reason == RearmReason.BOOT
+        val trusted = if (boot || !e.parkingTrusted) null else stored
         val base = s.copy(dbLocked = !e.dbAvailable, parking = trusted)
-        val arm = armAt(stored) + MachineEffect.Track(CaptureEvent.rearmed(e.reason)) + checkIn(base)
+        val distrust = if (boot && stored != null) listOf(MachineEffect.DistrustParking) else emptyList()
+        val arm = distrust + armAt(stored) + MachineEffect.Track(CaptureEvent.rearmed(e.reason)) + checkIn(base)
         val rec = e.recovering
         return when {
             s.phase != IDLE -> Transition(s)
@@ -599,6 +602,7 @@ internal class TripMachine(private val cfg: CaptureConfig = CaptureConfig()) {
         activity = s.activity,
         power = s.power,
         triggersAvailable = s.triggersAvailable,
+        inDriveVisible = s.inDriveVisible,
     )
 
     private fun sensorsOn(hz: Int): List<MachineEffect> = listOf(

@@ -105,7 +105,17 @@ public class InMemoryTripStore(public var parking: Parking? = null) : TripStore 
         finalised += result
     }
 
+    /** False after [distrustParking], until the next [setLastParking]. */
+    public var parkingTrusted: Boolean = true
+
+    override suspend fun isParkingTrusted(): Boolean = parkingTrusted
+
+    override suspend fun distrustParking() {
+        parkingTrusted = false
+    }
+
     override suspend fun setLastParking(parking: Parking) {
+        parkingTrusted = true
         this.parking = parking
     }
 }
