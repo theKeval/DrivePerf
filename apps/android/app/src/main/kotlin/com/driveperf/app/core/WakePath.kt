@@ -7,13 +7,18 @@ import com.driveperf.feature.onboarding.PermissionState
 import com.driveperf.platform.AndroidClock
 import com.driveperf.platform.capture.CaptureForegroundService
 import com.driveperf.platform.capture.CaptureStarter
+import com.driveperf.platform.location.FixWatch
 import com.driveperf.platform.wake.ActivityTransitions
 import com.driveperf.platform.wake.ForceStopHistory
 import com.driveperf.platform.wake.GeofenceParkedRegionMonitor
 import com.driveperf.platform.wake.WakeDispatcher
 import com.driveperf.platform.wake.WakeHealth
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
 
 /**
@@ -34,15 +39,29 @@ class WakePath(
 ) {
     private val health = WakeHealth(context.getSharedPreferences("wake_health", Context.MODE_PRIVATE), AndroidClock)
     val status = health.status
+    private val inDriveScreenVisible = MutableStateFlow(false)
 
     fun dismissForceStopNotice() = health.dismissForceStopNotice()
 
+    fun setInDriveScreenVisible(visible: Boolean) {
+        inDriveScreenVisible.value = visible
+        recorder.setInDriveScreenVisible(visible)
+    }
+
     /** Call once from `Application.onCreate`, after the core started and before `onLaunch`. */
-    fun install(permissions: PermissionState, scope: CoroutineScope) {
+    fun install(permissions: PermissionState, scope: CoroutineScope, location: FixWatch) {
         WakeDispatcher.setHandler { wake -> CaptureStarter.start(context, wake) }
         health.onLaunch(optedIn()) { sinceMs -> ForceStopHistory.detected(context, sinceMs) }
         parkedRegion.onRegistered = health::parkedRegionRegistered
         refresh(permissions)
+        recorder.status
+            .map { it.mayBatchLocation }
+            .distinctUntilChanged()
+            // Restore live delivery without waiting for the core to process the screen visibility change.
+            .combine(inDriveScreenVisible) { mayBatch, visible -> mayBatch && !visible }
+            .distinctUntilChanged()
+            .onEach(location::setBatchingEnabled)
+            .launchIn(scope)
         recorder.status.onEach { status ->
             if (status.state != RecorderState.IDLE && !CaptureForegroundService.running) resumeInForeground()
         }.launchIn(scope)

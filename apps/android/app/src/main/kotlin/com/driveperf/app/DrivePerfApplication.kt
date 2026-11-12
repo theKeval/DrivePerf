@@ -27,7 +27,11 @@ class DrivePerfApplication : Application() {
         koin.get<PrivacyChoices>().restore()
         // Every process start, including one caused by a wake or a reboot: start the shared core, re-arm the wake path,
         // then let the core recover a killed trip and re-arm the parked region (ADR-002 section 5, §1.7).
-        koin.get<WakePath>().install(koin.get<PermissionReader>().read(), koin.get<CoroutineScope>())
+        koin.get<WakePath>().install(
+            permissions = koin.get<PermissionReader>().read(),
+            scope = koin.get<CoroutineScope>(),
+            location = koin.get(),
+        )
         koin.get<TripRecorder>().onLaunch()
     }
 }

@@ -17,6 +17,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.LifecycleStartEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavHostController
@@ -32,6 +33,7 @@ import com.driveperf.feature.account.ProfileScreen
 import com.driveperf.feature.account.ProfileUiState
 import com.driveperf.feature.capture.CaptureUiState
 import com.driveperf.feature.capture.CaptureViewModel
+import com.driveperf.feature.capture.DriveCover
 import com.driveperf.feature.capture.DriveCoverHost
 import com.driveperf.feature.capture.InDriveActions
 import com.driveperf.feature.capture.PassengerActions
@@ -73,6 +75,13 @@ fun DrivePerfApp() {
     val actions = remember(captureViewModel) { captureViewModel.driveActions() }
 
     val current = cover
+    if (current is DriveCover.InDrive) {
+        val wakePath: WakePath = koinInject()
+        LifecycleStartEffect(wakePath) {
+            wakePath.setInDriveScreenVisible(true)
+            onStopOrDispose { wakePath.setInDriveScreenVisible(false) }
+        }
+    }
     if (current != null) {
         DriveCoverHost(current, actions)
     } else {
