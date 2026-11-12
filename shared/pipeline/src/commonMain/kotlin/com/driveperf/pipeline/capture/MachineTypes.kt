@@ -135,8 +135,11 @@ internal sealed interface MachineEvent {
     /** The platform reports whether its OS triggers can run. */
     data class TriggersAvailable(override val nowNs: Long, val available: Boolean) : MachineEvent
 
-    /** An R0 append for [tripId] failed (disk full or I/O error, EC-STO). */
-    data class AppendFailed(override val nowNs: Long, val tripId: String) : MachineEvent
+    /**
+     * An R0 append for [tripId] failed (disk full or I/O error, EC-STO). [hadMotion] when the batch held IMU samples:
+     * those may have been queued before the IMU was stopped, so their failure says nothing about GNSS writes.
+     */
+    data class AppendFailed(override val nowNs: Long, val tripId: String, val hadMotion: Boolean = false) : MachineEvent
 
     /** A wake. [newTrip] is the header to use if it starts a trip (ID, zone and parking filled in by the caller). */
     data class Wake(override val nowNs: Long, val nowWallMs: Long, val wake: WakeEvent, val newTrip: CaptureHeader) :

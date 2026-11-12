@@ -153,9 +153,11 @@ class AutoDetectionTest {
     fun aWriteThatStillFailsAfterTheImuStoppedEndsTheTripWithWhatItHas() {
         val recording = drive(wake(0.0, WakeKind.MANUAL).state, 1, 10, 10.0).state
         val id = recording.trip!!.id
-        val first = m.reduce(recording, MachineEvent.AppendFailed(ns(11.0), id))
+        val first = m.reduce(recording, MachineEvent.AppendFailed(ns(11.0), id, hadMotion = true))
         assertEquals(RecorderState.RECORDING, first.state.phase)
         assertTrue(MachineEffect.StopImu in first.effects)
+        val queuedImu = m.reduce(first.state, MachineEvent.AppendFailed(ns(11.5), id, hadMotion = true))
+        assertEquals(RecorderState.RECORDING, queuedImu.state.phase, "an IMU batch queued before the stop does not end it")
         val second = m.reduce(first.state, MachineEvent.AppendFailed(ns(12.0), id))
         assertEquals(RecorderState.FINISHING, second.state.phase)
         assertEquals(EndReason.STORAGE, second.effects.filterIsInstance<MachineEffect.Finalise>().single().reason)
