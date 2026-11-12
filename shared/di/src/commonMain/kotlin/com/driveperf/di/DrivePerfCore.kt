@@ -90,6 +90,7 @@ public object DrivePerfCore {
                 power = platform.power(),
                 parkedRegion = platform.parkedRegion(),
                 files = files,
+                watchdog = platform.watchdog(),
             ),
             persistence = CapturePersistence(
                 store,

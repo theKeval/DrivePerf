@@ -2,6 +2,8 @@ package com.driveperf.pipeline.capture
 
 import com.driveperf.domain.capture.ActivitySample
 import com.driveperf.domain.capture.ActivitySource
+import com.driveperf.domain.capture.AutoDetectHealth
+import com.driveperf.domain.capture.AutoDetectWatchdog
 import com.driveperf.domain.capture.CaptureBatch
 import com.driveperf.domain.capture.CaptureHeader
 import com.driveperf.domain.capture.CaptureLog
@@ -10,6 +12,7 @@ import com.driveperf.domain.capture.CaptureMarkType
 import com.driveperf.domain.capture.LocationSample
 import com.driveperf.domain.capture.LocationSource
 import com.driveperf.domain.capture.MotionSource
+import com.driveperf.domain.capture.NoOpAutoDetectWatchdog
 import com.driveperf.domain.capture.ParkedRegionMonitor
 import com.driveperf.domain.capture.PowerState
 import com.driveperf.domain.capture.PowerStatus
@@ -47,7 +50,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 
-/** The device ports the recorder drives. */
+/** The device ports the recorder drives. [watchdog] schedules the F-CAP-14 notification; the default does nothing. */
 public data class CapturePorts(
     val location: LocationSource,
     val motion: MotionSource,
@@ -55,6 +58,7 @@ public data class CapturePorts(
     val power: PowerState,
     val parkedRegion: ParkedRegionMonitor,
     val files: TripFileStore,
+    val watchdog: AutoDetectWatchdog = NoOpAutoDetectWatchdog,
 )
 
 /** Where the recorder persists. [previews] and [analysis] store preview tracks and R1 files; null skips them (tests). */
@@ -402,7 +406,11 @@ public class TripRecorderEngine(
         val trip = state.trip
         val phase = state.phase
         mutableStatus.value = if (trip == null || phase == RecorderState.IDLE) {
-            RecorderStatus.IDLE.copy(autoDetectEnabled = state.autoDetect, startFailed = state.startFailed)
+            RecorderStatus.IDLE.copy(
+                autoDetectEnabled = state.autoDetect,
+                startFailed = state.startFailed,
+                autoDetectHealth = health(),
+            )
         } else {
             RecorderStatus(
                 state = phase,
@@ -411,9 +419,12 @@ public class TripRecorderEngine(
                 elapsedS = (now - trip.header.startMonoNs).toDouble() / Units.NANOS_PER_SECOND,
                 distanceM = state.distanceM,
                 autoDetectEnabled = state.autoDetect,
+                autoDetectHealth = health(),
             )
         }
     }
+
+    private fun health(): AutoDetectHealth = if (state.autoDetect) AutoDetectHealth.ON else AutoDetectHealth.OFF
 
     private companion object {
         const val MS_PER_S = 1000.0
