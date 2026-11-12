@@ -7,3 +7,10 @@ DP_APP_ID_DEBUG = com.yourname.driveperf.dev
 DEVELOPMENT_TEAM = YOURTEAMID
 CODE_SIGN_STYLE = Automatic
 CODE_SIGN_IDENTITY = Apple Development
+
+// A free Personal Team cannot use App Groups, so signing fails on the App Group entitlement the widgets need.
+// These two lines swap in entitlements without it. The app and the widgets then run with no shared data: the widget
+// and Control Center control show their empty state and the app skips publishing the widget snapshot. Delete both lines
+// once the paid account exists; the committed Release and Debug config for com.driveperf.app is unchanged.
+DP_ENTITLEMENTS_APP = Config/DrivePerf.personal-team.entitlements
+DP_ENTITLEMENTS_WIDGETS = Config/DrivePerfWidgets.personal-team.entitlements
