@@ -17,7 +17,7 @@ struct CaptureStatusAccessory: View {
                     VStack(alignment: .leading, spacing: 0) {
                         Text(title).font(DPFont.bodySecondary.weight(.semibold)).foregroundStyle(DPColor.text)
                         if placement != .inline, let subtitle {
-                            Text(subtitle).font(DPFont.caption).foregroundStyle(DPColor.text2)
+                            subtitle.font(DPFont.caption).foregroundStyle(DPColor.text2)
                         }
                     }
                     .lineLimit(1)
@@ -57,15 +57,14 @@ struct CaptureStatusAccessory: View {
         }
     }
 
-    private var subtitle: String? {
+    private var subtitle: Text? {
         switch capture.accessory {
-        case .ready: "Starts when you drive off"
-        case .manual: "Auto-detect is off"
-        case .attention(let reason):
-            switch reason {
-            case .locationWhileUsing: "Location is set to While Using"
-            case .locationDenied: "Location is off"
-            }
+        case .ready:
+            // "Last check-in {n} min ago" (S-HOME-01 copy); the relative style keeps counting by itself.
+            if let lastCheckIn = capture.lastCheckIn { Text("Last check-in \(lastCheckIn, style: .relative) ago") }
+            else { Text("Starts when you drive off") }
+        case .manual: Text("Auto-detect is off")
+        case .attention(let reason): Text(reason.shortText)
         case .recording: nil
         }
     }
@@ -96,7 +95,13 @@ struct CaptureStatusSheet: View {
                         }
                     }
                     if isAttention {
+                        ForEach(capture.attentionReasons.dropFirst(), id: \.self) { reason in
+                            Text(reason.explanation).font(DPFont.bodySecondary).foregroundStyle(DPColor.text2)
+                        }
                         DPPrimaryButton("Open Settings", icon: .gear) { capture.openSettings() }
+                    }
+                    if capture.accessory != .manual {
+                        CheckInRow(lastCheckIn: capture.lastCheckIn)
                     }
                     Text("Checks run on this phone. Nothing is sent anywhere.")
                         .font(DPFont.meta).foregroundStyle(DPColor.text3)
@@ -110,6 +115,7 @@ struct CaptureStatusSheet: View {
             }
         }
         .presentationDetents([.medium, .large])
+        .task { await capture.refreshReadiness() }
     }
 
     private var isAttention: Bool {
@@ -131,9 +137,28 @@ struct CaptureStatusSheet: View {
             "Auto-detects most drives. The first few hundred metres may be estimated. Force-quitting pauses "
                 + "auto-detect."
         case .manual: "Tap Start when you set off and Stop when you park."
-        case .attention:
-            "Location access changed to \"While Using\". Automatic trips are paused. Two taps to fix it."
+        case .attention(let reason): reason.explanation
         }
+    }
+}
+
+/// "Last check-in" (S-HOME-02 state "last check-in time"): when auto-detect last armed itself or was woken (F-CAP-14).
+private struct CheckInRow: View {
+    let lastCheckIn: Date?
+
+    var body: some View {
+        HStack {
+            Text("Last check-in").font(DPFont.body).foregroundStyle(DPColor.text)
+            Spacer()
+            Group {
+                if let lastCheckIn { Text("\(lastCheckIn, style: .relative) ago") } else { Text("Not yet") }
+            }
+            .font(DPFont.body).foregroundStyle(DPColor.text2)
+        }
+        .padding(.horizontal, DPSpace.s4)
+        .frame(minHeight: DPLayout.touchMin)
+        .dpCard()
+        .accessibilityElement(children: .combine)
     }
 }
 

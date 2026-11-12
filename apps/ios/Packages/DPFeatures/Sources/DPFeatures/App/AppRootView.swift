@@ -98,6 +98,12 @@ struct ShellView: View {
         .sheet(isPresented: $isStatusPresented) {
             CaptureStatusSheet(capture: model.capture)
         }
+        // The watchdog notification opens the status sheet, which says what to fix (S-LIVE-10 → S-HOME-02).
+        .onChange(of: model.statusRequests.isPending, initial: true) { _, pending in
+            guard pending, capture.cover == nil else { return }
+            model.statusRequests.consume()
+            isStatusPresented = true
+        }
         .sheet(item: $capture.startProblem) { problem in
             StartProblemSheet(problem: problem, capture: model.capture)
         }

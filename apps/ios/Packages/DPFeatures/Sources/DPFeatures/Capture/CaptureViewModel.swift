@@ -2,11 +2,6 @@ import DPSharedBridge
 import Foundation
 import Observation
 
-/// Why automatic trips cannot run although they are on.
-public enum AttentionReason: String, Equatable, Sendable {
-    case locationWhileUsing, locationDenied
-}
-
 /// Capture status, manual Start/Stop and the in-drive gate (S-HOME-01 accessory, S-DRV-01, S-DRV-02, S-DRV-04).
 /// It reads the recorder's `RecorderStatus` (the Kotlin `TripRecorder` contract) and the trip list for the trip
 /// that just finished.
@@ -84,7 +79,11 @@ public final class CaptureViewModel {
     public var onOpenContent: ((HeldContent) -> Void)?
     /// The car's nickname for the chip on S-DRV-01 and S-DRV-04. Garage (DRIVE-173) fills it; until then nothing shows.
     public var carName: String?
-    private var location = LocationAccess.notDetermined
+    private var permissionSnapshot = PermissionSnapshot()
+    /// Everything that currently keeps automatic trips from running (F-CAP-02), most important first.
+    public var attentionReasons: [AttentionReason] { AutoDetectReadiness.reasons(for: permissionSnapshot) }
+    /// When auto-detect last checked in (F-CAP-14); nil before the first check-in or without a check-in source.
+    public private(set) var lastCheckIn: Date?
     /// A trip the user is ending right now (Stop, passenger, Don't save): the outcome is theirs to set.
     private var ending: EndKind?
     /// The lock after a trip: from the trip's end until the phone has been calm for `DriveLock.calmInterval`.
@@ -100,6 +99,7 @@ public final class CaptureViewModel {
     private let permissions: any PermissionRequesting
     private let clock: any ClockBridge
     private let movement: (any MovementMonitoring)?
+    private let checkIns: (any AutoDetectCheckIns)?
     private let now: @MainActor () -> Date
     /// How long to wait for a stopped trip to appear in the list before showing the done screen without it.
     private let finishTimeout: Duration
@@ -107,7 +107,7 @@ public final class CaptureViewModel {
 
     public init(
         recorder: any TripRecording, history: any TripHistory, permissions: any PermissionRequesting,
-        clock: any ClockBridge, movement: (any MovementMonitoring)? = nil,
+        clock: any ClockBridge, movement: (any MovementMonitoring)? = nil, checkIns: (any AutoDetectCheckIns)? = nil,
         now: @escaping @MainActor () -> Date = { Date() }, finishTimeout: Duration = .seconds(3),
         startTimeout: Duration = .seconds(5)
     ) {
@@ -116,6 +116,7 @@ public final class CaptureViewModel {
         self.permissions = permissions
         self.clock = clock
         self.movement = movement
+        self.checkIns = checkIns
         self.now = now
         self.finishTimeout = finishTimeout
         self.startTimeout = startTimeout
@@ -138,14 +139,22 @@ public final class CaptureViewModel {
         }
     }
 
-    /// Re-reads the location permission behind the accessory's "needs attention" state. Call on every foreground.
+    /// Re-reads what auto-detect needs (location, Motion & Fitness, precise location, Background App Refresh) and the
+    /// last check-in. Call at launch and on every foreground.
     public func refreshReadiness() async {
-        location = await permissions.current().location
+        permissionSnapshot = await permissions.current()
+        refreshCheckIn()
+    }
+
+    /// Re-reads the last check-in, which the platform records at every arm and wake, in the background too.
+    public func refreshCheckIn() {
+        lastCheckIn = checkIns?.lastCheckIn
     }
 
     func apply(_ next: RecorderStatus) {
         let previous = status
         status = next
+        refreshCheckIn()
         if let tripId = next.tripId, tripId != previous.tripId {
             tripStartedAt = now().addingTimeInterval(-next.elapsedS)
             // A new trip ends the hold of the last one (the lock applies to it anyway).
@@ -176,18 +185,15 @@ public final class CaptureViewModel {
             return .recording(startedAt: tripStartedAt ?? now(), distanceM: status.distanceM)
         }
         guard status.autoDetectEnabled else { return .manual }
-        switch location {
-        case .always: return .ready
-        case .whenInUse: return .attention(.locationWhileUsing)
-        case .notDetermined, .denied, .restricted: return .attention(.locationDenied)
-        }
+        if let reason = attentionReasons.first { return .attention(reason) }
+        return .ready
     }
 
     /// Start (accessory, S-HOME-01): a `MANUAL` wake. Without location nothing records, not even manual trips
     /// (S-ONB-16).
     public func start() async {
         let current = await permissions.current()
-        location = current.location
+        permissionSnapshot = current
         guard current.location.canRecord else {
             startProblem = .locationDenied
             return

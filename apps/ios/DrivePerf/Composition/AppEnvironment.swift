@@ -24,6 +24,8 @@ final class AppEnvironment {
     let motion = CoreMotionSource()
     let activity = CoreMotionActivitySource()
     let power = SystemPowerState()
+    /// F-CAP-14: remembers each check-in of automatic detection and keeps the "may be paused" notice 24 h ahead.
+    let watchdog = AutoDetectWatchdog()
     /// Its own activity source for the in-drive content hold: the core's `activity` keeps one sink and is stopped at
     /// the end of every trip.
     let movement = ActivityMovementMonitor(source: CoreMotionActivitySource())
@@ -66,6 +68,7 @@ final class AppEnvironment {
             runSelfTestOnLaunch: ProcessInfo.processInfo.arguments.contains("-selfTest"),
             movement: movement)
             .withTripCorrections(corrections)
+            .withAutoDetectStatus(checkIns: watchdog, requests: surfaceRouter.statusRequests)
     }
 
     /// Runs inside `didFinishLaunching`, synchronously: the Core Location sessions first, because a background
@@ -120,13 +123,23 @@ final class AppEnvironment {
         }
         if auto && always && files.isUnlockedSinceBoot() {
             if !triggersArmed {
-                triggers.startTriggers { [weak self] wake in self?.recorder.onWake(wake) }
+                triggers.startTriggers { [weak self] wake in
+                    // Any wake proves auto-detect is alive (F-CAP-14.1).
+                    self?.watchdog.checkIn()
+                    self?.recorder.onWake(wake)
+                }
                 triggersArmed = true
             }
             motion.recordAccelerometerHistory()
-        } else if triggersArmed {
-            triggers.stopTriggers()
-            triggersArmed = false
+            // Armed at launch, on every foreground and after onboarding: a check-in too (F-CAP-14.4).
+            watchdog.checkIn()
+        } else {
+            if triggersArmed {
+                triggers.stopTriggers()
+                triggersArmed = false
+            }
+            // Nothing is armed, so there is nothing to watch: no "may be paused" notice for an off switch.
+            watchdog.cancel()
         }
         recorder.setAutoDetect(enabled: auto)
         recorder.surfaceData?.updateLocation(canRecord: canRecord)
@@ -144,6 +157,16 @@ enum TripIntentHandler {
 }
 
 extension AppDependencies {
+    /// DRIVE-150: the last check-in for the status sheet, and the watchdog notification's way into that sheet.
+    fileprivate func withAutoDetectStatus(
+        checkIns: any AutoDetectCheckIns, requests: CaptureStatusRequests
+    ) -> AppDependencies {
+        var copy = self
+        copy.checkIns = checkIns
+        copy.statusRequests = requests
+        return copy
+    }
+
     /// DRIVE-100, DRIVE-172 (S2): trip corrections and the shared provenance catalogue for the Drives screens.
     fileprivate func withTripCorrections(_ corrections: CoreTripCorrections) -> AppDependencies {
         var copy = self

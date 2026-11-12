@@ -189,3 +189,8 @@ func makeDependencies(
         crashReporter: crash, selfTest: FakeSelfTest(), flags: BuildFlags(), coreInfo: FakeHello(),
         refreshCapture: {})
 }
+
+@MainActor
+final class FakeCheckIns: AutoDetectCheckIns {
+    var lastCheckIn: Date?
+}

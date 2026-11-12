@@ -26,6 +26,9 @@ public struct AppDependencies {
     // DRIVE-100, DRIVE-172 (S2): trip corrections and the provenance catalogue for the Drives screens.
     public var corrections: (any TripCorrecting)?
     public var provenance = ProvenanceCatalog()
+    // DRIVE-150 (T2): the auto-detect check-in time, and requests to open the capture status sheet from outside the UI.
+    public var checkIns: (any AutoDetectCheckIns)?
+    public var statusRequests: CaptureStatusRequests?
 
     public init(
         recorder: any TripRecording, history: any TripHistory, clock: any ClockBridge,
@@ -62,6 +65,7 @@ public final class AppModel {
     public let capture: CaptureViewModel
     public let trips: TripListViewModel
     public let profile: ProfileViewModel
+    public let statusRequests: CaptureStatusRequests
     public private(set) var onboarding: OnboardingViewModel?
     public var isSelfTestPresented: Bool
 
@@ -73,7 +77,8 @@ public final class AppModel {
         isSelfTestPresented = dependencies.runSelfTestOnLaunch
         capture = CaptureViewModel(
             recorder: dependencies.recorder, history: dependencies.history, permissions: dependencies.permissions,
-            clock: dependencies.clock, movement: dependencies.movement)
+            clock: dependencies.clock, movement: dependencies.movement, checkIns: dependencies.checkIns)
+        statusRequests = dependencies.statusRequests ?? CaptureStatusRequests()
         trips = TripListViewModel(
             history: dependencies.history, corrections: dependencies.corrections, catalog: dependencies.provenance)
         profile = ProfileViewModel(dependencies: dependencies)
