@@ -33,6 +33,7 @@ class FusedLocationSource(
 ) : LocationSource {
     private val client = LocationServices.getFusedLocationProviderClient(context.applicationContext)
     private var active: Session? = null
+    private var batchingEnabled = false
 
     @Synchronized
     override fun start(sink: LocationSink) {
@@ -49,14 +50,29 @@ class FusedLocationSource(
     override fun stop() {
         active?.let { client.removeLocationUpdates(it.callback) }
         active = null
+        batchingEnabled = false
+    }
+
+    @Synchronized
+    fun setBatchingEnabled(enabled: Boolean) {
+        val session = active ?: return
+        if (batchingEnabled == enabled) return
+        batchingEnabled = enabled
+        if (enabled) {
+            register(session)
+        } else {
+            // Deliver buffered fixes before replacing the request on the same callback.
+            client.flushLocations().addOnCompleteListener(callbackExecutor) {
+                synchronized(this) {
+                    if (active === session && !batchingEnabled) register(session)
+                }
+            }
+        }
     }
 
     @SuppressLint("MissingPermission") // Missing permission is caught below and reported as a typed failure.
     private fun register(session: Session): Boolean {
-        val request = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, intervalMs)
-            .setMinUpdateIntervalMillis(intervalMs / 2)
-            .setWaitForAccurateLocation(false)
-            .build()
+        val request = captureLocationRequest(intervalMs, batchingEnabled)
         return try {
             client.requestLocationUpdates(request, callbackExecutor, session.callback)
             true
@@ -76,8 +92,15 @@ class FusedLocationSource(
             }
         }
     }
-
-    private companion object {
-        const val DEFAULT_INTERVAL_MS = 1_000L
-    }
 }
+
+private const val DEFAULT_INTERVAL_MS = 1_000L
+private const val BATCH_DELAY_MS = 3_000L
+
+/** Sample at the same rate in both modes. A short delay keeps the batch inside the freshness window. */
+internal fun captureLocationRequest(intervalMs: Long = DEFAULT_INTERVAL_MS, batched: Boolean): LocationRequest =
+    LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, intervalMs)
+        .setMinUpdateIntervalMillis(intervalMs)
+        .setWaitForAccurateLocation(false)
+        .setMaxUpdateDelayMillis(if (batched) BATCH_DELAY_MS else 0L)
+        .build()

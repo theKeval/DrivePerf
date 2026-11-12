@@ -1,6 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="capture_toolbar_ready">Ready to record</string>
+    <string name="capture_auto_detect_off">Auto-detect is off</string>
+    <string name="capture_auto_detect_on">Auto-detect on · ready</string>
+    <string name="capture_auto_detect_attention">Auto-detect needs attention</string>
+    <string name="capture_last_check_in">Last check-in %1$s</string>
+    <string name="capture_force_stop_title">Auto-detect is back on</string>
+    <string name="capture_force_stop_rearmed">DrivePerf was force-stopped. Opening it switched auto-detect back on. Drives during the pause weren\'t recorded.</string>
+    <string name="capture_force_stop_paused">Force-stopping pauses automatic trips. Reopen DrivePerf to re-arm auto-detect.</string>
+    <string name="capture_force_stop_dismiss">Got it</string>
     <string name="capture_toolbar_needs_location">Location needed to record</string>
     <string name="capture_toolbar_recording">Recording · %1$s</string>
     <string name="capture_toolbar_failed">Recording stopped</string>

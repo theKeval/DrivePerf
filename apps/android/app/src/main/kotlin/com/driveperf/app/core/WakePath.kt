@@ -4,11 +4,14 @@ import android.content.Context
 import com.driveperf.domain.capture.RecorderState
 import com.driveperf.domain.capture.TripRecorder
 import com.driveperf.feature.onboarding.PermissionState
+import com.driveperf.platform.AndroidClock
 import com.driveperf.platform.capture.CaptureForegroundService
 import com.driveperf.platform.capture.CaptureStarter
 import com.driveperf.platform.wake.ActivityTransitions
+import com.driveperf.platform.wake.ForceStopHistory
 import com.driveperf.platform.wake.GeofenceParkedRegionMonitor
 import com.driveperf.platform.wake.WakeDispatcher
+import com.driveperf.platform.wake.WakeHealth
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
@@ -29,9 +32,16 @@ class WakePath(
     private val parkedRegion: GeofenceParkedRegionMonitor,
     private val optedIn: () -> Boolean,
 ) {
+    private val health = WakeHealth(context.getSharedPreferences("wake_health", Context.MODE_PRIVATE), AndroidClock)
+    val status = health.status
+
+    fun dismissForceStopNotice() = health.dismissForceStopNotice()
+
     /** Call once from `Application.onCreate`, after the core started and before `onLaunch`. */
     fun install(permissions: PermissionState, scope: CoroutineScope) {
         WakeDispatcher.setHandler { wake -> CaptureStarter.start(context, wake) }
+        health.onLaunch(optedIn()) { sinceMs -> ForceStopHistory.detected(context, sinceMs) }
+        parkedRegion.onRegistered = health::parkedRegionRegistered
         refresh(permissions)
         recorder.status.onEach { status ->
             if (status.state != RecorderState.IDLE && !CaptureForegroundService.running) resumeInForeground()
@@ -44,10 +54,12 @@ class WakePath(
      * location was granted in Settings after the last trip ended.
      */
     fun refresh(permissions: PermissionState) {
-        val automatic = automaticAllowed(permissions, optedIn())
+        val enabled = optedIn()
+        val automatic = automaticAllowed(permissions, enabled)
+        val attempt = health.refresh(enabled, automatic)
         recorder.setAutoDetect(automatic)
         if (automatic) {
-            transitions.arm()
+            transitions.arm { armed -> health.activityRegistrationFinished(attempt, armed) }
             parkedRegion.rearmIfNeeded()
         } else {
             transitions.disarm()

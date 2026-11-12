@@ -26,6 +26,7 @@ import androidx.navigation.compose.rememberNavController
 import com.driveperf.app.BuildConfig
 import com.driveperf.app.R
 import com.driveperf.app.bridge.PlatformCaptureController
+import com.driveperf.app.core.WakePath
 import com.driveperf.di.DrivePerfCore
 import com.driveperf.feature.account.ProfileScreen
 import com.driveperf.feature.account.ProfileUiState
@@ -167,6 +168,7 @@ private fun NavGraphBuilder.tabDestinations(env: AppEnv) {
                 selected = tab,
                 capture = env.capture,
                 callbacks = callbacks.copy(autoDetectOff = autoDetectOff),
+                wakePath = if (tab == Tab.Drives) koinInject<WakePath>() else null,
             ) { padding ->
                 TabContent(tab, padding, onSeeAll = { env.navController.navigate(Routes.ALL_DRIVES) })
             }
