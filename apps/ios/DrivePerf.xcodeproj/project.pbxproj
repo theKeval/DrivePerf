@@ -431,7 +431,7 @@
 					"$(SRCROOT)/../../shared/ios-export/build/xcode-frameworks/$(CONFIGURATION)/$(SDK_NAME)",
 				);
 				GENERATE_INFOPLIST_FILE = YES;
-				CODE_SIGN_ENTITLEMENTS = Config/DrivePerf.entitlements;
+				CODE_SIGN_ENTITLEMENTS = "$(DP_ENTITLEMENTS_APP)";
 				INFOPLIST_FILE = Config/DrivePerf-Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "DrivePerf Dev";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -466,7 +466,7 @@
 					"$(SRCROOT)/../../shared/ios-export/build/xcode-frameworks/$(CONFIGURATION)/$(SDK_NAME)",
 				);
 				GENERATE_INFOPLIST_FILE = YES;
-				CODE_SIGN_ENTITLEMENTS = Config/DrivePerf.entitlements;
+				CODE_SIGN_ENTITLEMENTS = "$(DP_ENTITLEMENTS_APP)";
 				INFOPLIST_FILE = Config/DrivePerf-Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = DrivePerf;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -533,7 +533,7 @@
 			buildSettings = {
 				CURRENT_PROJECT_VERSION = 1;
 				GENERATE_INFOPLIST_FILE = YES;
-				CODE_SIGN_ENTITLEMENTS = Config/DrivePerfWidgets.entitlements;
+				CODE_SIGN_ENTITLEMENTS = "$(DP_ENTITLEMENTS_WIDGETS)";
 				INFOPLIST_FILE = Config/Widgets-Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = DrivePerf;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -558,7 +558,7 @@
 				DEVELOPMENT_TEAM = "";
 				CURRENT_PROJECT_VERSION = 1;
 				GENERATE_INFOPLIST_FILE = YES;
-				CODE_SIGN_ENTITLEMENTS = Config/DrivePerfWidgets.entitlements;
+				CODE_SIGN_ENTITLEMENTS = "$(DP_ENTITLEMENTS_WIDGETS)";
 				INFOPLIST_FILE = Config/Widgets-Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = DrivePerf;
 				LD_RUNPATH_SEARCH_PATHS = (
