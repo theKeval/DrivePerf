@@ -33,13 +33,15 @@ class ActivityTransitions(context: Context) {
     private val appContext = context.applicationContext
     private val client = ActivityRecognition.getClient(appContext)
 
-    /** Registers the transitions. False when `ACTIVITY_RECOGNITION` is not granted. Calling it again replaces it. */
+    /** Registers the transitions. Calling it again replaces the registration for the same PendingIntent. */
     @SuppressLint("MissingPermission") // a missing permission throws SecurityException, caught below
-    fun arm(): Boolean = try {
-        client.requestActivityTransitionUpdates(ActivityTransitionRequest(TRANSITIONS), pendingIntent(appContext))
-        true
-    } catch (_: SecurityException) {
-        false
+    fun arm(onResult: (Boolean) -> Unit) {
+        try {
+            client.requestActivityTransitionUpdates(ActivityTransitionRequest(TRANSITIONS), pendingIntent(appContext))
+                .addOnCompleteListener { onResult(it.isSuccessful) }
+        } catch (_: SecurityException) {
+            onResult(false)
+        }
     }
 
     @SuppressLint("MissingPermission")

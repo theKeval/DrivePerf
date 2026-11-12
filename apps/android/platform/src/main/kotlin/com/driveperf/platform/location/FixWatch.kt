@@ -26,6 +26,10 @@ class FixWatch(private val delegate: LocationSource, private val clock: Clock) :
         delegate.stop()
     }
 
+    fun setBatchingEnabled(enabled: Boolean) {
+        (delegate as? FusedLocationSource)?.setBatchingEnabled(enabled)
+    }
+
     /** Searching until the first fix of this start, lost when the newest is older than [lostAfterNs]. */
     fun status(lostAfterNs: Long = LOST_AFTER_NS): GpsStatus {
         val last = lastFixMonoNs ?: return GpsStatus.SEARCHING

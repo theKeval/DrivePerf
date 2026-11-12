@@ -3,14 +3,23 @@ package com.driveperf.app.core
 import android.content.Context
 import com.driveperf.domain.capture.RecorderState
 import com.driveperf.domain.capture.TripRecorder
+import com.driveperf.domain.capture.WakeKind
 import com.driveperf.feature.onboarding.PermissionState
+import com.driveperf.platform.AndroidClock
 import com.driveperf.platform.capture.CaptureForegroundService
 import com.driveperf.platform.capture.CaptureStarter
+import com.driveperf.platform.location.FixWatch
 import com.driveperf.platform.wake.ActivityTransitions
+import com.driveperf.platform.wake.ForceStopHistory
 import com.driveperf.platform.wake.GeofenceParkedRegionMonitor
 import com.driveperf.platform.wake.WakeDispatcher
+import com.driveperf.platform.wake.WakeHealth
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
 
 /**
@@ -29,10 +38,38 @@ class WakePath(
     private val parkedRegion: GeofenceParkedRegionMonitor,
     private val optedIn: () -> Boolean,
 ) {
+    private val health = WakeHealth(context.getSharedPreferences("wake_health", Context.MODE_PRIVATE), AndroidClock)
+    val status = health.status
+    private val inDriveScreenVisible = MutableStateFlow(false)
+
+    /** Whether OS wakes may start a trip now: the opt-in and every permission behind it (see [automaticAllowed]). */
+    @Volatile private var automaticNow = false
+
+    fun dismissForceStopNotice() = health.dismissForceStopNotice()
+
+    fun setInDriveScreenVisible(visible: Boolean) {
+        inDriveScreenVisible.value = visible
+        recorder.setInDriveScreenVisible(visible)
+    }
+
     /** Call once from `Application.onCreate`, after the core started and before `onLaunch`. */
-    fun install(permissions: PermissionState, scope: CoroutineScope) {
-        WakeDispatcher.setHandler { wake -> CaptureStarter.start(context, wake) }
+    fun install(permissions: PermissionState, scope: CoroutineScope, location: FixWatch) {
+        WakeDispatcher.setHandler { wake ->
+            // The core keeps auto-detect on while a permission is missing, so it can report "needs attention" (F-CAP-14);
+            // OS wakes then stop here, as they did when the core itself had auto-detect off.
+            if (wake.kind == WakeKind.MANUAL || automaticNow) CaptureStarter.start(context, wake)
+        }
+        health.onLaunch(optedIn()) { sinceMs -> ForceStopHistory.detected(context, sinceMs) }
+        parkedRegion.onRegistered = health::parkedRegionRegistered
         refresh(permissions)
+        recorder.status
+            .map { it.mayBatchLocation }
+            .distinctUntilChanged()
+            // Restore live delivery without waiting for the core to process the screen visibility change.
+            .combine(inDriveScreenVisible) { mayBatch, visible -> mayBatch && !visible }
+            .distinctUntilChanged()
+            .onEach(location::setBatchingEnabled)
+            .launchIn(scope)
         recorder.status.onEach { status ->
             if (status.state != RecorderState.IDLE && !CaptureForegroundService.running) resumeInForeground()
         }.launchIn(scope)
@@ -44,10 +81,15 @@ class WakePath(
      * location was granted in Settings after the last trip ended.
      */
     fun refresh(permissions: PermissionState) {
-        val automatic = automaticAllowed(permissions, optedIn())
-        recorder.setAutoDetect(automatic)
+        val enabled = optedIn()
+        val automatic = automaticAllowed(permissions, enabled)
+        val attempt = health.refresh(enabled, automatic)
+        automaticNow = automatic
+        // As on iOS: auto-detect follows the user's choice, and missing permissions show as "needs attention".
+        recorder.setAutoDetect(enabled)
+        recorder.setTriggersAvailable(automaticAllowed(permissions, optedIn = true))
         if (automatic) {
-            transitions.arm()
+            transitions.arm { armed -> health.activityRegistrationFinished(attempt, armed) }
             parkedRegion.rearmIfNeeded()
         } else {
             transitions.disarm()

@@ -21,8 +21,12 @@ import androidx.compose.ui.res.stringResource
 import com.driveperf.app.R
 import com.driveperf.designsystem.DpAvatarButton
 import com.driveperf.designsystem.DpIcons
+import com.driveperf.feature.capture.CaptureAutoDetect
 import com.driveperf.feature.capture.CaptureToolbar
 import com.driveperf.feature.capture.CaptureUiState
+import com.driveperf.feature.capture.ForceStopNotice
+import com.driveperf.platform.wake.AutoDetectMode
+import com.driveperf.platform.wake.WakeStatus
 
 /**
  * The shell of a tab root (S-NAV-01): a short M3 Expressive navigation bar with the four tabs, the profile avatar at the
@@ -37,6 +41,8 @@ fun TabScaffold(
     modifier: Modifier = Modifier,
     content: @Composable (PaddingValues) -> Unit,
 ) {
+    val wake = callbacks.wakeStatus
+    val showForceStop = wake != null && wake.forceStopNotice && wake.mode != AutoDetectMode.OFF
     Scaffold(
         modifier = modifier,
         topBar = {
@@ -66,6 +72,7 @@ fun TabScaffold(
             if (selected == Tab.Drives) {
                 CaptureToolbar(
                     state = capture,
+                    autoDetect = wake?.toolbarStatus(),
                     onStart = callbacks.onStart,
                     onOpenDrive = callbacks.onOpenDrive,
                     onFixLocation = callbacks.onFixLocation,
@@ -75,10 +82,13 @@ fun TabScaffold(
         floatingActionButtonPosition = FabPosition.Center,
         content = { padding ->
             val autoDetectOff = callbacks.autoDetectOff
-            if (selected == Tab.Drives && autoDetectOff != null) {
+            if (selected == Tab.Drives && (autoDetectOff != null || showForceStop)) {
                 // F-ONB-04.6: Home says when automatic trips are off, above the tab's own content.
                 Column(modifier = Modifier.padding(top = padding.calculateTopPadding())) {
-                    AutoDetectNotice(autoDetectOff, onFix = callbacks.onFixAutoDetect)
+                    if (showForceStop) {
+                        ForceStopNotice(rearmed = wake.mode == AutoDetectMode.ON, onDismiss = callbacks.onDismissForceStop)
+                    }
+                    if (autoDetectOff != null) AutoDetectNotice(autoDetectOff, onFix = callbacks.onFixAutoDetect)
                     Box(modifier = Modifier.weight(1f)) { content(PaddingValues(bottom = padding.calculateBottomPadding())) }
                 }
             } else {
@@ -86,6 +96,12 @@ fun TabScaffold(
             }
         },
     )
+}
+
+private fun WakeStatus.toolbarStatus(): CaptureAutoDetect = when (mode) {
+    AutoDetectMode.OFF -> CaptureAutoDetect.off()
+    AutoDetectMode.ON -> CaptureAutoDetect.on(lastCheckInMs)
+    AutoDetectMode.NEEDS_ATTENTION -> CaptureAutoDetect.needsAttention(lastCheckInMs)
 }
 
 /** A pushed screen with a back arrow (Profile, All drives). */

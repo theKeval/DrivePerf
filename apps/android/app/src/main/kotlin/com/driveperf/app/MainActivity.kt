@@ -7,10 +7,12 @@ import androidx.activity.enableEdgeToEdge
 import com.driveperf.app.bridge.PlatformCaptureController
 import com.driveperf.app.navigation.DrivePerfApp
 import com.driveperf.designsystem.DrivePerfTheme
+import com.driveperf.domain.capture.TripRecorder
 import org.koin.android.ext.android.inject
 
 class MainActivity : ComponentActivity() {
     private val capture: PlatformCaptureController by inject()
+    private val recorder: TripRecorder by inject()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -21,5 +23,6 @@ class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         capture.refreshPermissions() // permissions can change in Settings while the app is in the background
+        recorder.onForeground() // a check-in (F-CAP-14): re-arms the parked region and records the time
     }
 }

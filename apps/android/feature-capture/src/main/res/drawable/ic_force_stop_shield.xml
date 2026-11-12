@@ -1,0 +1,13 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <!-- Path from DRIVE-150/android/assets/icon-shield.svg. -->
+    <path
+        android:pathData="M12,3l7.5,3v5.5c0,4.6 -3.2,8.2 -7.5,9.5 -4.3,-1.3 -7.5,-4.9 -7.5,-9.5V6z M9,12l2.2,2.2L15.5,10"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="1.8"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+</vector>

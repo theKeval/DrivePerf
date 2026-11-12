@@ -17,6 +17,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.LifecycleStartEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavHostController
@@ -26,11 +27,13 @@ import androidx.navigation.compose.rememberNavController
 import com.driveperf.app.BuildConfig
 import com.driveperf.app.R
 import com.driveperf.app.bridge.PlatformCaptureController
+import com.driveperf.app.core.WakePath
 import com.driveperf.di.DrivePerfCore
 import com.driveperf.feature.account.ProfileScreen
 import com.driveperf.feature.account.ProfileUiState
 import com.driveperf.feature.capture.CaptureUiState
 import com.driveperf.feature.capture.CaptureViewModel
+import com.driveperf.feature.capture.DriveCover
 import com.driveperf.feature.capture.DriveCoverHost
 import com.driveperf.feature.capture.InDriveActions
 import com.driveperf.feature.capture.PassengerActions
@@ -72,6 +75,13 @@ fun DrivePerfApp() {
     val actions = remember(captureViewModel) { captureViewModel.driveActions() }
 
     val current = cover
+    if (current is DriveCover.InDrive) {
+        val wakePath: WakePath = koinInject()
+        LifecycleStartEffect(wakePath) {
+            wakePath.setInDriveScreenVisible(true)
+            onStopOrDispose { wakePath.setInDriveScreenVisible(false) }
+        }
+    }
     if (current != null) {
         DriveCoverHost(current, actions)
     } else {
@@ -163,10 +173,16 @@ private fun NavGraphBuilder.tabDestinations(env: AppEnv) {
     for (tab in Tab.entries) {
         composable(tab.route) {
             val autoDetectOff = rememberAutoDetectOff(env.services.permissionReader, env.services.consent)
+            val wakePath = if (tab == Tab.Drives) koinInject<WakePath>() else null
+            val wakeStatus = wakePath?.status?.collectAsStateWithLifecycle()?.value
             TabScaffold(
                 selected = tab,
                 capture = env.capture,
-                callbacks = callbacks.copy(autoDetectOff = autoDetectOff),
+                callbacks = callbacks.copy(
+                    autoDetectOff = autoDetectOff,
+                    wakeStatus = wakeStatus,
+                    onDismissForceStop = { wakePath?.dismissForceStopNotice() },
+                ),
             ) { padding ->
                 TabContent(tab, padding, onSeeAll = { env.navController.navigate(Routes.ALL_DRIVES) })
             }
