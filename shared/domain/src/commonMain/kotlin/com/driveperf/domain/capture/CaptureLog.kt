@@ -176,9 +176,14 @@ public data class WatchdogState(
     val lastFiredWallMs: Long? = null,
 )
 
-/** Keeps [WatchdogState] across process starts. Implemented in `:shared:data:local`; not a platform port. */
+/**
+ * Keeps [WatchdogState] across process starts. Implemented in `:shared:data:local`; not a platform port. It never
+ * throws for storage errors (disk full, database unavailable): the watchdog is not worth stopping a recording for.
+ */
 public interface WatchdogStore {
+    /** The stored state; an empty one when there is none or it cannot be read. */
     public suspend fun read(): WatchdogState
 
-    public suspend fun write(state: WatchdogState)
+    /** Stores [state]. Returns false when it could not be written; the caller keeps it in memory. */
+    public suspend fun write(state: WatchdogState): Boolean
 }
