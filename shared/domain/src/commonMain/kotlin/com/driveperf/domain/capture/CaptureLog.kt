@@ -161,3 +161,24 @@ public interface PreviewStore {
 
     public suspend fun read(tripId: String): List<PreviewRow>?
 }
+
+/**
+ * The F-CAP-14 watchdog's bookkeeping. Timestamps only (PRD F-CAP-14 privacy), all UTC epoch milliseconds.
+ *
+ * @property lastCheckInWallMs the last launch, wake, foreground or re-arm seen with automatic detection on.
+ * @property dueWallMs when the scheduled watchdog notification fires if no check-in comes first; null when none is
+ *   scheduled (automatic detection off, or never checked in).
+ * @property lastFiredWallMs when the watchdog last came due without a check-in before it: the notification was shown.
+ */
+public data class WatchdogState(
+    val lastCheckInWallMs: Long? = null,
+    val dueWallMs: Long? = null,
+    val lastFiredWallMs: Long? = null,
+)
+
+/** Keeps [WatchdogState] across process starts. Implemented in `:shared:data:local`; not a platform port. */
+public interface WatchdogStore {
+    public suspend fun read(): WatchdogState
+
+    public suspend fun write(state: WatchdogState)
+}

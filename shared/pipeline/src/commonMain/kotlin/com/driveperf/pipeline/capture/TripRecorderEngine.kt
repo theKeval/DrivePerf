@@ -1,5 +1,6 @@
 package com.driveperf.pipeline.capture
 
+import com.driveperf.domain.analytics.Analytics
 import com.driveperf.domain.capture.ActivitySample
 import com.driveperf.domain.capture.ActivitySource
 import com.driveperf.domain.capture.AutoDetectHealth
@@ -9,6 +10,7 @@ import com.driveperf.domain.capture.CaptureHeader
 import com.driveperf.domain.capture.CaptureLog
 import com.driveperf.domain.capture.CaptureMark
 import com.driveperf.domain.capture.CaptureMarkType
+import com.driveperf.domain.capture.FinalisedTrip
 import com.driveperf.domain.capture.LocationSample
 import com.driveperf.domain.capture.LocationSource
 import com.driveperf.domain.capture.MotionSource
@@ -17,6 +19,7 @@ import com.driveperf.domain.capture.ParkedRegionMonitor
 import com.driveperf.domain.capture.PowerState
 import com.driveperf.domain.capture.PowerStatus
 import com.driveperf.domain.capture.PreviewStore
+import com.driveperf.domain.capture.RearmReason
 import com.driveperf.domain.capture.RecordedAccelSample
 import com.driveperf.domain.capture.RecorderState
 import com.driveperf.domain.capture.RecorderStatus
@@ -25,11 +28,12 @@ import com.driveperf.domain.capture.TripRecorder
 import com.driveperf.domain.capture.TripStore
 import com.driveperf.domain.capture.WakeEvent
 import com.driveperf.domain.capture.WakeKind
+import com.driveperf.domain.capture.WatchdogState
+import com.driveperf.domain.capture.WatchdogStore
 import com.driveperf.domain.trip.CaptureMeta
 import com.driveperf.domain.trip.Trip
 import com.driveperf.domain.trip.TripKind
 import com.driveperf.domain.trip.TripSource
-import com.driveperf.domain.capture.FinalisedTrip
 import com.driveperf.domain.trip.TripStatus
 import com.driveperf.domain.tripfile.AnalysisFileStore
 import com.driveperf.domain.tripfile.FileResult
@@ -61,13 +65,17 @@ public data class CapturePorts(
     val watchdog: AutoDetectWatchdog = NoOpAutoDetectWatchdog,
 )
 
-/** Where the recorder persists. [previews] and [analysis] store preview tracks and R1 files; null skips them (tests). */
+/**
+ * Where the recorder persists. [previews] and [analysis] store preview tracks and R1 files; null skips them (tests).
+ * [watchdog] keeps the F-CAP-14 check-in across process starts; null keeps it in memory only.
+ */
 public data class CapturePersistence(
     val store: TripStore,
     val log: CaptureLog,
     val finaliser: TripFinaliser,
     val previews: PreviewStore? = null,
     val analysis: AnalysisFileStore? = null,
+    val watchdog: WatchdogStore? = null,
 )
 
 /**
@@ -75,9 +83,10 @@ public data class CapturePersistence(
  * channel and is handled in order by a single coroutine in [scope], so callbacks may arrive on any thread. Pass a
  * scope on a single-threaded or `limitedParallelism(1)` dispatcher off the main thread.
  *
- * The engine itself never decides anything: guards and timings live in the reducer.
+ * The engine itself never decides anything: guards and timings live in the reducer, and the watchdog schedule in
+ * [WatchdogPolicy]. Capture analytics go to [analytics] (consent-gated by the caller); null sends none.
  */
-@Suppress("TooManyFunctions") // one executor per effect type
+@Suppress("TooManyFunctions", "LongParameterList") // one executor per effect type; one parameter per dependency
 public class TripRecorderEngine(
     private val ports: CapturePorts,
     private val persistence: CapturePersistence,
@@ -85,8 +94,13 @@ public class TripRecorderEngine(
     private val zones: TimeZoneProvider,
     private val scope: CoroutineScope,
     private val config: CaptureConfig = CaptureConfig(),
+    private val analytics: Analytics? = null,
 ) : TripRecorder {
     private val machine = TripMachine(config)
+    private val watchdogPolicy = WatchdogPolicy(config)
+
+    /** The F-CAP-14 bookkeeping, read once from [CapturePersistence.watchdog]. Touched only on the engine coroutine. */
+    private var watchdog: WatchdogState? = null
     private val inputs = Channel<Input>(Channel.UNLIMITED)
     private val mutableStatus = MutableStateFlow(RecorderStatus.IDLE)
     private val timers = mutableMapOf<TimerId, Job>()
@@ -104,7 +118,23 @@ public class TripRecorderEngine(
     }
 
     override fun onLaunch() {
-        inputs.trySend(Input.Launch)
+        onLaunch(RearmReason.LAUNCH)
+    }
+
+    override fun onLaunch(reason: RearmReason) {
+        inputs.trySend(Input.Launch(reason))
+    }
+
+    override fun onForeground() {
+        inputs.trySend(Input.Simple { MachineEvent.Foreground(it) })
+    }
+
+    override fun onWatchdogOpened() {
+        inputs.trySend(Input.Simple { MachineEvent.WatchdogOpened(it) })
+    }
+
+    override fun setTriggersAvailable(available: Boolean) {
+        inputs.trySend(Input.Simple { MachineEvent.TriggersAvailable(it, available) })
     }
 
     override fun onWake(event: WakeEvent) {
@@ -124,7 +154,7 @@ public class TripRecorderEngine(
     }
 
     private sealed interface Input {
-        data object Launch : Input
+        data class Launch(val reason: RearmReason) : Input
 
         data class Wake(val event: WakeEvent) : Input
 
@@ -136,7 +166,7 @@ public class TripRecorderEngine(
     private suspend fun handle(input: Input) {
         val now = clock.monotonicNs()
         val event = when (input) {
-            Input.Launch -> launchEvent(now)
+            is Input.Launch -> launchEvent(now, input.reason)
             is Input.Wake -> MachineEvent.Wake(now, clock.wallMs(), input.event, newHeader(input.event, now))
             is Input.Simple -> input.make(now)
             is Input.Backfill -> {
@@ -158,13 +188,14 @@ public class TripRecorderEngine(
         publishStatus(now)
     }
 
-    private suspend fun launchEvent(now: Long): MachineEvent.Launch {
+    private suspend fun launchEvent(now: Long, reason: RearmReason): MachineEvent.Launch {
+        watchdogState()
         val store = persistence.store
         val recording = store.recordingTrip()
         val recovery = recording?.let { recoveryFor(it) }
         if (recording != null && recovery == null) store.deleteNow(recording.id)
         return MachineEvent.Launch(
-            now, clock.wallMs(), dbAvailable = true, parking = store.lastParking(), recovering = recovery,
+            now, clock.wallMs(), dbAvailable = true, parking = store.lastParking(), recovering = recovery, reason = reason,
         )
     }
 
@@ -241,6 +272,16 @@ public class TripRecorderEngine(
             }
             is MachineEffect.Finalise -> finalise(effect)
             is MachineEffect.Discard -> discard(effect.tripId)
+            else -> executeDetection(effect)
+        }
+    }
+
+    /** Analytics and the F-CAP-14 check-ins. */
+    private suspend fun executeDetection(effect: MachineEffect) {
+        when (effect) {
+            is MachineEffect.Track -> analytics?.track(effect.event)
+            MachineEffect.CheckIn -> checkIn()
+            MachineEffect.WatchdogOff -> watchdogOff()
             else -> Unit
         }
     }
@@ -343,7 +384,7 @@ public class TripRecorderEngine(
             val free = ports.files.freeSpaceBytes()
             if (free < config.minFreeBytes) send { t -> MachineEvent.FreeSpace(t, free) }
         }
-        if (!ok) send { t -> MachineEvent.FreeSpace(t, 0L) }
+        if (!ok) send { t -> MachineEvent.AppendFailed(t, effect.tripId) }
     }
 
     private fun schedule(effect: MachineEffect.Schedule) {
@@ -355,6 +396,7 @@ public class TripRecorderEngine(
     }
 
     private suspend fun finalise(effect: MachineEffect.Finalise) {
+        val startedNs = clock.monotonicNs()
         val log = persistence.log
         awaitBackfill(effect.tripId)
         log.sync(effect.tripId)
@@ -371,6 +413,9 @@ public class TripRecorderEngine(
         finished.forEach { commit(it) }
         val parking = result?.parking
         if (parking != null) persistence.store.setLastParking(parking)
+        if (finished.isNotEmpty()) {
+            analytics?.track(CaptureEvent.finaliseMs((clock.monotonicNs() - startedNs) / Units.NANOS_PER_MILLI))
+        }
         send { now -> MachineEvent.Finalised(now, parking) }
     }
 
@@ -402,6 +447,27 @@ public class TripRecorderEngine(
         ports.files.deleteTrip(tripId)
     }
 
+    private suspend fun watchdogState(): WatchdogState =
+        watchdog ?: (persistence.watchdog?.read() ?: WatchdogState()).also { watchdog = it }
+
+    /** F-CAP-14: records the check-in and moves the notification ahead; reports a notification that came due. */
+    private suspend fun checkIn() {
+        val result = watchdogPolicy.checkIn(watchdogState(), clock.wallMs())
+        saveWatchdog(result.state)
+        result.state.dueWallMs?.let { ports.watchdog.schedule(it) }
+        if (result.fired) analytics?.track(CaptureEvent.watchdogFired)
+    }
+
+    private suspend fun watchdogOff() {
+        ports.watchdog.cancel()
+        saveWatchdog(watchdogPolicy.off(watchdogState()))
+    }
+
+    private suspend fun saveWatchdog(next: WatchdogState) {
+        watchdog = next
+        persistence.watchdog?.write(next)
+    }
+
     private fun publishStatus(now: Long) {
         val trip = state.trip
         val phase = state.phase
@@ -410,6 +476,7 @@ public class TripRecorderEngine(
                 autoDetectEnabled = state.autoDetect,
                 startFailed = state.startFailed,
                 autoDetectHealth = health(),
+                lastCheckInWallMs = watchdog?.lastCheckInWallMs,
             )
         } else {
             RecorderStatus(
@@ -420,11 +487,16 @@ public class TripRecorderEngine(
                 distanceM = state.distanceM,
                 autoDetectEnabled = state.autoDetect,
                 autoDetectHealth = health(),
+                lastCheckInWallMs = watchdog?.lastCheckInWallMs,
             )
         }
     }
 
-    private fun health(): AutoDetectHealth = if (state.autoDetect) AutoDetectHealth.ON else AutoDetectHealth.OFF
+    private fun health(): AutoDetectHealth = when {
+        !state.autoDetect -> AutoDetectHealth.OFF
+        !state.triggersAvailable -> AutoDetectHealth.NEEDS_ATTENTION
+        else -> AutoDetectHealth.ON
+    }
 
     private companion object {
         const val MS_PER_S = 1000.0

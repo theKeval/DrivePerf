@@ -1,9 +1,12 @@
 package com.driveperf.testing
 
+import com.driveperf.domain.analytics.Analytics
+import com.driveperf.domain.analytics.AnalyticsEvent
 import com.driveperf.domain.capture.ActivityHistoryCallback
 import com.driveperf.domain.capture.ActivitySample
 import com.driveperf.domain.capture.ActivitySink
 import com.driveperf.domain.capture.ActivitySource
+import com.driveperf.domain.capture.AutoDetectWatchdog
 import com.driveperf.domain.capture.GeoPoint
 import com.driveperf.domain.capture.LocationSample
 import com.driveperf.domain.capture.LocationSink
@@ -160,4 +163,41 @@ public class FakeParkedRegionMonitor : ParkedRegionMonitor {
     override fun disarm() {
         armed = null
     }
+}
+
+/** An [AutoDetectWatchdog] that remembers what is scheduled. */
+public class FakeAutoDetectWatchdog : AutoDetectWatchdog {
+    /** The pending notification time, or null when none is pending. */
+    public var scheduledAt: Long? = null
+        private set
+
+    /** Number of [cancel] calls. */
+    public var cancels: Int = 0
+        private set
+
+    override fun schedule(fireAtWallMs: Long) {
+        scheduledAt = fireAtWallMs
+    }
+
+    override fun cancel() {
+        scheduledAt = null
+        cancels++
+    }
+}
+
+/** An [Analytics] that records every tracked event, with consent assumed. */
+public class RecordingAnalytics : Analytics {
+    /** Tracked events, oldest first. */
+    public val events: MutableList<AnalyticsEvent> = mutableListOf()
+
+    /** Tracked events by name, with their properties. */
+    public fun named(name: String): List<Map<String, String>> = events.filter { it.name == name }.map { it.properties }
+
+    override fun track(event: AnalyticsEvent) {
+        events += event
+    }
+
+    override fun setUsageConsent(allowed: Boolean): Unit = Unit
+
+    override fun resetId(): Unit = Unit
 }

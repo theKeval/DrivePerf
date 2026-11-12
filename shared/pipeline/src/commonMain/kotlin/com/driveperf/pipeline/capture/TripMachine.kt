@@ -51,17 +51,42 @@ internal class TripMachine(private val cfg: CaptureConfig = CaptureConfig()) {
         is MachineEvent.Timer -> onTimer(s, e)
         is MachineEvent.UserStop -> if (s.isLive()) finish(s, e.nowNs, EndReason.USER_STOP) else Transition(s)
         is MachineEvent.Passenger -> onPassenger(s, e)
-        is MachineEvent.AutoDetect -> Transition(s.copy(autoDetect = e.enabled))
         is MachineEvent.Finalised -> onFinalised(s, e)
         is MachineEvent.LogFailed -> onLogFailed(s, e)
+        is MachineEvent.AppendFailed -> onAppendFailed(s, e)
+        else -> reduceDetection(s, e)
+    }
+
+    /** Automatic-detection controls and the F-CAP-14 check-ins. */
+    private fun reduceDetection(s: MachineState, e: MachineEvent): Transition = when (e) {
+        is MachineEvent.AutoDetect -> onAutoDetect(s, e)
+        is MachineEvent.Foreground -> {
+            val arm = if (s.phase == IDLE) armAt(s.parking) else emptyList()
+            Transition(s, arm + checkIn(s))
+        }
+        is MachineEvent.WatchdogOpened -> Transition(s, listOf(MachineEffect.Track(CaptureEvent.watchdogOpened)))
+        is MachineEvent.TriggersAvailable -> Transition(s.copy(triggersAvailable = e.available))
         else -> Transition(s)
     }
+
+    /** Turning detection on is a check-in and re-arms; turning it off removes the watchdog (F-CAP-15 AC2). */
+    private fun onAutoDetect(s: MachineState, e: MachineEvent.AutoDetect): Transition {
+        val next = s.copy(autoDetect = e.enabled)
+        return when {
+            e.enabled == s.autoDetect -> Transition(next)
+            e.enabled -> Transition(next, (if (s.phase == IDLE) armAt(s.parking) else emptyList()) + MachineEffect.CheckIn)
+            else -> Transition(next, listOf(MachineEffect.WatchdogOff))
+        }
+    }
+
+    /** A check-in when automatic detection is on (F-CAP-14 AC1, AC4). */
+    private fun checkIn(s: MachineState): List<MachineEffect> = if (s.autoDetect) listOf(MachineEffect.CheckIn) else emptyList()
 
     // ---- launch and recovery (§1.7) ----
 
     private fun onLaunch(s: MachineState, e: MachineEvent.Launch): Transition {
         val base = s.copy(dbLocked = !e.dbAvailable, parking = e.parking ?: s.parking)
-        val arm = armAt(base.parking)
+        val arm = armAt(base.parking) + MachineEffect.Track(CaptureEvent.rearmed(e.reason)) + checkIn(base)
         val rec = e.recovering
         return when {
             s.phase != IDLE -> Transition(s)
@@ -96,15 +121,17 @@ internal class TripMachine(private val cfg: CaptureConfig = CaptureConfig()) {
 
     // ---- wakes (§1.3, §1.4) ----
 
+    /** Every wake, even one that starts nothing, is a check-in: the app was woken (F-CAP-14 AC1). */
     private fun onWake(s: MachineState, e: MachineEvent.Wake): Transition {
         val manual = e.wake.kind == WakeKind.MANUAL
-        return when {
-            manual && s.phase == CANDIDATE -> promoteToManual(s, e.nowNs)
+        val t = when {
+            manual && s.phase == CANDIDATE -> promoteToManual(s, e)
             s.phase != IDLE || s.dbLocked -> Transition(s)
             manual -> startCapture(s, e, manual = true)
             !s.autoDetect || isStale(e) -> Transition(s)
             else -> startCapture(s, e, manual = false)
         }
+        return Transition(t.state, checkIn(s) + t.effects)
     }
 
     private fun isStale(e: MachineEvent.Wake): Boolean = e.nowNs - e.wake.tMonoNs > secondsNs(cfg.staleWakeS)
@@ -113,15 +140,7 @@ internal class TripMachine(private val cfg: CaptureConfig = CaptureConfig()) {
         val header = e.newTrip
         val trip = ActiveTrip(header, manual = manual, confirmed = manual)
         val hz = rateFor(s.power)
-        val next = MachineState(
-            phase = if (manual) RECORDING else CANDIDATE,
-            autoDetect = s.autoDetect,
-            parking = s.parking,
-            trip = trip,
-            activity = s.activity,
-            power = s.power,
-            imuHz = hz,
-        )
+        val next = idle(s, s.parking).copy(phase = if (manual) RECORDING else CANDIDATE, trip = trip, imuHz = hz)
         val historyFrom = historyStart(header)
         val fx = buildList {
             add(MachineEffect.CreateTrip(header, manual))
@@ -129,6 +148,11 @@ internal class TripMachine(private val cfg: CaptureConfig = CaptureConfig()) {
             add(Mark(trip.id, header.startMonoNs, CaptureMarkType.RECORDING_STARTED, e.wake.kind.name))
             add(MachineEffect.QueryActivityHistory(historyFrom, e.nowWallMs))
             if (!manual) add(Schedule(TimerId.CANDIDATE_TIMEOUT, secondsNs(cfg.candidateTimeoutS)))
+            add(
+                MachineEffect.Track(
+                    if (manual) CaptureEvent.manualStarted(e.wake.sourceDetail) else CaptureEvent.autoWake(e.wake.kind),
+                ),
+            )
         }
         return Transition(next, fx)
     }
@@ -139,7 +163,8 @@ internal class TripMachine(private val cfg: CaptureConfig = CaptureConfig()) {
         return maxOf(window, header.parking?.wallMs ?: window)
     }
 
-    private fun promoteToManual(s: MachineState, nowNs: Long): Transition {
+    private fun promoteToManual(s: MachineState, e: MachineEvent.Wake): Transition {
+        val nowNs = e.nowNs
         val trip = s.trip ?: return Transition(s)
         val next = s.copy(phase = RECORDING, trip = trip.copy(manual = true, confirmed = true))
         return Transition(
@@ -148,6 +173,7 @@ internal class TripMachine(private val cfg: CaptureConfig = CaptureConfig()) {
                 Cancel(TimerId.CANDIDATE_TIMEOUT),
                 MachineEffect.ConfirmTrip(trip.id, manual = true),
                 Mark(trip.id, nowNs, CaptureMarkType.CONFIRMED, WakeKind.MANUAL.name),
+                MachineEffect.Track(CaptureEvent.manualStarted(e.wake.sourceDetail)),
             ),
         )
     }
@@ -218,20 +244,33 @@ internal class TripMachine(private val cfg: CaptureConfig = CaptureConfig()) {
     // ---- candidate (§1.5) ----
 
     private fun decideCandidate(s: MachineState, nowNs: Long): Transition = when {
-        confirms(s, nowNs) -> confirm(s, nowNs)
-        rejects(s, nowNs) -> reject(s)
+        confirmsBySpeed(s) -> confirm(s, nowNs, byActivity = false)
+        confirmsByActivity(s, nowNs) -> confirm(s, nowNs, byActivity = true)
+        rejects(s, nowNs) -> reject(s, humanReason(s))
         else -> Transition(s)
     }
 
-    private fun confirms(s: MachineState, nowNs: Long): Boolean {
+    /** Over 25 km/h held for 20 s, unless the platform says cycling (§1.5). Needs one good fix (EC-GPS). */
+    private fun confirmsBySpeed(s: MachineState): Boolean {
         val fix = s.lastFix
         if (!s.goodFixSeen || fix == null) return false
         val held = s.fastSinceNs?.let { fix.tMonoNs - it >= secondsNs(cfg.confirmHoldS) } ?: false
-        val bySpeed = !s.activity.isAtLeastMedium(ActivityType.CYCLING) && held
+        return !s.activity.isAtLeastMedium(ActivityType.CYCLING) && held
+    }
+
+    /** Automotive at medium or high confidence and over 10 km/h on a fresh fix (§1.5). */
+    private fun confirmsByActivity(s: MachineState, nowNs: Long): Boolean {
+        val fix = s.lastFix
+        if (!s.goodFixSeen || fix == null) return false
         val fresh = nowNs - fix.tMonoNs <= secondsNs(cfg.activityConfirmFixAgeS)
-        val byActivity = s.activity.isAtLeastMedium(ActivityType.AUTOMOTIVE) &&
+        return s.activity.isAtLeastMedium(ActivityType.AUTOMOTIVE) &&
             (fix.speedMps ?: 0.0) >= cfg.activityConfirmSpeedMps && fresh
-        return bySpeed || byActivity
+    }
+
+    private fun humanReason(s: MachineState): RejectReason = when (s.activity?.type) {
+        ActivityType.RUNNING -> RejectReason.RUNNING
+        ActivityType.CYCLING -> RejectReason.CYCLING
+        else -> RejectReason.WALKING
     }
 
     private fun rejects(s: MachineState, nowNs: Long): Boolean {
@@ -239,22 +278,26 @@ internal class TripMachine(private val cfg: CaptureConfig = CaptureConfig()) {
         return s.humanPowered() && nowNs - start >= secondsNs(cfg.rejectAfterS) && s.maxSpeedMps < cfg.rejectMaxSpeedMps
     }
 
-    private fun confirm(s: MachineState, nowNs: Long): Transition {
+    private fun confirm(s: MachineState, nowNs: Long, byActivity: Boolean): Transition {
         val trip = s.trip ?: return Transition(s)
         val header = trip.header
         val fx = buildList {
             add(Cancel(TimerId.CANDIDATE_TIMEOUT))
             add(MachineEffect.ConfirmTrip(trip.id, manual = false))
             add(Mark(trip.id, nowNs, CaptureMarkType.CONFIRMED))
+            add(MachineEffect.Track(CaptureEvent.confirmed(byActivity)))
+            add(MachineEffect.Track(CaptureEvent.autoStarted(header.wakeKind)))
             if (header.parking != null) add(MachineEffect.RunBackfill(trip.id, historyStart(header), header.startWallMs))
         }
         return Transition(s.copy(phase = RECORDING, trip = trip.copy(confirmed = true)), fx)
     }
 
-    private fun reject(s: MachineState): Transition {
+    private fun reject(s: MachineState, reason: RejectReason): Transition {
         val trip = s.trip ?: return Transition(s)
         val arm = armAt(s.parking)
-        return Transition(idle(s, s.parking), sensorsOff() + Cancel(TimerId.CANDIDATE_TIMEOUT) + MachineEffect.Discard(trip.id) + arm)
+        val fx = sensorsOff() + Cancel(TimerId.CANDIDATE_TIMEOUT) + MachineEffect.Discard(trip.id) + arm +
+            MachineEffect.Track(CaptureEvent.rejected(reason))
+        return Transition(idle(s, s.parking), fx)
     }
 
     // ---- stationary, resume and stop (§1.6) ----
@@ -388,6 +431,20 @@ internal class TripMachine(private val cfg: CaptureConfig = CaptureConfig()) {
 
     private fun MachineState.isIdlingImu(): Boolean = phase == PAUSED && imuHz == cfg.imuIdleHz
 
+    /**
+     * EC-STO: the first failed write stops the IMU, which is most of the volume, and keeps GNSS. A write that still
+     * fails after that means nothing more can be kept: a trip ends with what R0 holds, a candidate is dropped.
+     */
+    private fun onAppendFailed(s: MachineState, e: MachineEvent.AppendFailed): Transition {
+        val trip = s.trip
+        return when {
+            trip == null || trip.id != e.tripId || !s.isActive() -> Transition(s)
+            !s.imuStoppedForSpace -> onFreeSpace(s, MachineEvent.FreeSpace(e.nowNs, 0L))
+            s.phase == CANDIDATE -> reject(s, RejectReason.STORAGE)
+            else -> finish(s, e.nowNs, EndReason.STORAGE)
+        }
+    }
+
     private fun onFreeSpace(s: MachineState, e: MachineEvent.FreeSpace): Transition {
         val trip = s.trip
         val needed = s.isActive() && !s.imuStoppedForSpace && e.bytes < cfg.minFreeBytes
@@ -405,7 +462,7 @@ internal class TripMachine(private val cfg: CaptureConfig = CaptureConfig()) {
         val timedOut = e.nowNs - trip.header.startMonoNs >= secondsNs(cfg.candidateTimeoutS) - TIMER_SLACK_NS
         val canIdle = s.phase == PAUSED && !s.imuStoppedForSpace && s.imuHz != cfg.imuIdleHz
         return when {
-            e.id == TimerId.CANDIDATE_TIMEOUT && s.phase == CANDIDATE && timedOut -> reject(s)
+            e.id == TimerId.CANDIDATE_TIMEOUT && s.phase == CANDIDATE && timedOut -> reject(s, RejectReason.TIMEOUT)
             e.id == TimerId.STOP && s.phase == PAUSED -> stopTimer(s, trip, e.nowNs)
             e.id == TimerId.IMU_IDLE && canIdle -> Transition(
                 s.copy(imuHz = cfg.imuIdleHz),
@@ -451,19 +508,25 @@ internal class TripMachine(private val cfg: CaptureConfig = CaptureConfig()) {
             MachineEffect.StopActivity,
             MachineEffect.StopPower,
         ) + allTimersOff() + MachineEffect.Finalise(trip.id, endNs, trip.kind, reason, interruption)
-        return Transition(s.copy(phase = FINISHING), fx)
+        val track = reason.analyticsKey?.let { listOf(MachineEffect.Track(CaptureEvent.ended(it))) }.orEmpty()
+        return Transition(s.copy(phase = FINISHING), track + fx)
     }
 
     private fun onFinalised(s: MachineState, e: MachineEvent.Finalised): Transition {
         if (s.phase != FINISHING) return Transition(s)
         val parking = e.parking ?: s.parking
-        return Transition(idle(s, parking), listOf(MachineEffect.StopGnss) + armAt(parking))
+        return Transition(idle(s, parking), listOf(MachineEffect.StopGnss) + armAt(parking) + checkIn(s))
     }
 
     // ---- helpers ----
 
-    private fun idle(s: MachineState, parking: Parking?): MachineState =
-        MachineState(autoDetect = s.autoDetect, parking = parking, activity = s.activity, power = s.power)
+    private fun idle(s: MachineState, parking: Parking?): MachineState = MachineState(
+        autoDetect = s.autoDetect,
+        parking = parking,
+        activity = s.activity,
+        power = s.power,
+        triggersAvailable = s.triggersAvailable,
+    )
 
     private fun sensorsOn(hz: Int): List<MachineEffect> = listOf(
         MachineEffect.StartGnss,

@@ -99,7 +99,7 @@ class TripMachineTest {
         assertEquals(RecorderState.RECORDING, promoted.state.phase)
         assertTrue(MachineEffect.Cancel(TimerId.CANDIDATE_TIMEOUT) in promoted.effects)
         assertTrue(promoted.effects.any { it is MachineEffect.ConfirmTrip && it.manual })
-        assertTrue(wake(10.0, s = manual.state).effects.isEmpty())
+        assertEquals(listOf<MachineEffect>(MachineEffect.CheckIn), wake(10.0, s = manual.state).effects, "a wake mid-trip only checks in")
     }
 
     @Test

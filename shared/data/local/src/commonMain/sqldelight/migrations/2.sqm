@@ -1,0 +1,8 @@
+-- Schema 2 → 3 (DRIVE-150, F-CAP-14): the auto-detect watchdog's check-in, due and last-fired times. A database
+-- from before has no row: the first check-in after the update creates it and schedules the watchdog.
+CREATE TABLE capture_watchdog (
+  id                INTEGER NOT NULL PRIMARY KEY CHECK (id = 1),
+  last_check_in_at  INTEGER,
+  due_at            INTEGER,
+  last_fired_at     INTEGER
+);

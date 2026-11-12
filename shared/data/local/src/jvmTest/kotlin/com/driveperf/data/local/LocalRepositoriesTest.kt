@@ -6,6 +6,7 @@ import com.driveperf.domain.capture.FinalisedTrip
 import com.driveperf.domain.capture.GeoPoint
 import com.driveperf.domain.capture.Parking
 import com.driveperf.domain.capture.WakeKind
+import com.driveperf.domain.capture.WatchdogState
 import com.driveperf.domain.route.IneligibleReason
 import com.driveperf.domain.route.MatchSource
 import com.driveperf.domain.route.Route
@@ -264,5 +265,15 @@ class LocalRepositoriesTest {
         val parking = Parking(GeoPoint(2.0, -27.5), 9_000L)
         store.setLastParking(parking)
         assertEquals(parking, store.lastParking())
+    }
+
+    @Test
+    fun theWatchdogStateSurvivesAParkingUpdate() = runTest {
+        val watchdog = LocalWatchdogStore(db, coroutineContext)
+        assertEquals(WatchdogState(), watchdog.read())
+        val state = WatchdogState(lastCheckInWallMs = 1_000L, dueWallMs = 2_000L, lastFiredWallMs = 500L)
+        watchdog.write(state)
+        LocalTripStore(db, "device-1", coroutineContext).setLastParking(Parking(GeoPoint(2.0, -27.5), 9_000L))
+        assertEquals(state, watchdog.read())
     }
 }
