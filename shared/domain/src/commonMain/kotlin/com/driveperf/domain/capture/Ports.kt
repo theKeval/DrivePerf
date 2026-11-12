@@ -109,3 +109,26 @@ public interface ParkedRegionMonitor {
     /** Removes it. */
     public fun disarm()
 }
+
+/**
+ * The auto-detect watchdog notification (F-CAP-14 AC1, DTS pattern, A3 §1.5): a local notification that fires only if
+ * the app is not woken again in time, saying "Auto-detect may be paused. Open DrivePerf to keep it on." The core
+ * decides when (24 h after the last check-in, at most once per 72 h, never while auto-detect is off); the adapter only
+ * schedules what it is told. iOS uses `UNUserNotificationCenter` with one fixed request identifier, so scheduling again
+ * replaces the pending request. Android needs none (force-stop and boot are handled at launch) and uses
+ * [NoOpAutoDetectWatchdog].
+ */
+public interface AutoDetectWatchdog {
+    /** Schedules the notification at [fireAtWallMs] (UTC), replacing any pending one. A past time fires at once. */
+    public fun schedule(fireAtWallMs: Long)
+
+    /** Removes the pending notification, if any. Safe to call when none is pending. */
+    public fun cancel()
+}
+
+/** A watchdog that schedules nothing: Android, tests and builds without notifications. */
+public object NoOpAutoDetectWatchdog : AutoDetectWatchdog {
+    override fun schedule(fireAtWallMs: Long): Unit = Unit
+
+    override fun cancel(): Unit = Unit
+}

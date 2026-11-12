@@ -9,6 +9,26 @@ public enum RecorderState: String, Equatable, Sendable, Codable {
     case idle, candidate, recording, paused, finishing
 }
 
+/// Kotlin `AutoDetectHealth`: what Home and Health Check show about automatic detection (F-CAP-14).
+public enum AutoDetectHealth: String, Equatable, Sendable, Codable {
+    /// On and checking in.
+    case on
+    /// Turned off or paused by the user.
+    case off
+    /// On, but the platform reported that triggers cannot run (a permission is missing).
+    case needsAttention
+}
+
+/// Kotlin `RearmReason`: why the app is starting the core (F-CAP-14 `rearmed {reason}`).
+public enum RearmReason: String, Equatable, Sendable, Codable {
+    /// An ordinary launch, including a Core Location relaunch.
+    case launch
+    /// The first launch after the device restarted.
+    case boot
+    /// Android only; never sent on iOS.
+    case forceStop
+}
+
 /// Kotlin `RecorderStatus`: what live surfaces may show. Elapsed time, distance and capture state only; no live
 /// score, event or coaching (SAF-02).
 public struct RecorderStatus: Equatable, Sendable {
@@ -25,10 +45,17 @@ public struct RecorderStatus: Equatable, Sendable {
     /// The last start was dropped because its trip file could not be created (before the first unlock, disk full).
     /// Cleared by the next start.
     public var startFailed: Bool
+    /// What Home and Health Check show about automatic detection (F-CAP-14).
+    public var autoDetectHealth: AutoDetectHealth
+    /// The last launch, wake, foreground or re-arm the core saw with auto-detect on: Health Check "Last check-in".
+    public var lastCheckIn: Date?
+    /// Location may be batched now (Android only; iOS ignores it).
+    public var mayBatchLocation: Bool
 
     public init(
         state: RecorderState, tripId: String?, isManual: Bool, elapsedS: Double, distanceM: Double,
-        autoDetectEnabled: Bool, startFailed: Bool = false
+        autoDetectEnabled: Bool, startFailed: Bool = false, autoDetectHealth: AutoDetectHealth? = nil,
+        lastCheckIn: Date? = nil, mayBatchLocation: Bool = false
     ) {
         self.state = state
         self.tripId = tripId
@@ -37,6 +64,9 @@ public struct RecorderStatus: Equatable, Sendable {
         self.distanceM = distanceM
         self.autoDetectEnabled = autoDetectEnabled
         self.startFailed = startFailed
+        self.autoDetectHealth = autoDetectHealth ?? (autoDetectEnabled ? .on : .off)
+        self.lastCheckIn = lastCheckIn
+        self.mayBatchLocation = mayBatchLocation
     }
 
     /// Kotlin `RecorderStatus.IDLE`.
@@ -64,6 +94,25 @@ public protocol TripRecording: AnyObject {
     func markPassenger(keep: Bool)
     /// Turns automatic detection on or off. Manual starts work either way.
     func setAutoDetect(enabled: Bool)
+    /// `onLaunch()` with the reason for this start: after a reboot the core re-arms and records why (F-CAP-14).
+    func onLaunch(reason: RearmReason)
+    /// The app came to the foreground: a check-in that moves the watchdog 24 h ahead (F-CAP-14).
+    func onForeground()
+    /// The user opened the app from the watchdog notification.
+    func onWatchdogOpened()
+    /// False when automatic detection cannot work (Always location or Motion & Fitness lost).
+    func setTriggersAvailable(_ available: Bool)
+    /// Whether the in-drive screen is visible.
+    func setInDriveScreenVisible(_ visible: Bool)
+}
+
+/// Defaults so existing fakes keep compiling; `CoreTripRecorder` forwards every call to the core.
+extension TripRecording {
+    public func onLaunch(reason: RearmReason) { onLaunch() }
+    public func onForeground() {}
+    public func onWatchdogOpened() {}
+    public func setTriggersAvailable(_ available: Bool) {}
+    public func setInDriveScreenVisible(_ visible: Bool) {}
 }
 
 // MARK: - History

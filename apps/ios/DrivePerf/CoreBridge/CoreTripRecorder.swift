@@ -55,6 +55,20 @@ protocol SharedCore: AnyObject {
     func stop()
     func markPassenger(keep: Bool)
     func setAutoDetect(enabled: Bool)
+    func onLaunch(reason: RearmReason)
+    func onForeground()
+    func onWatchdogOpened()
+    func setTriggersAvailable(_ available: Bool)
+    func setInDriveScreenVisible(_ visible: Bool)
+}
+
+/// Defaults so test fakes keep compiling; `KotlinCore` forwards each call to the Kotlin recorder.
+extension SharedCore {
+    func onLaunch(reason: RearmReason) { onLaunch() }
+    func onForeground() {}
+    func onWatchdogOpened() {}
+    func setTriggersAvailable(_ available: Bool) {}
+    func setInDriveScreenVisible(_ visible: Bool) {}
 }
 
 /// `TripRecording` and `TripHistory` for the features, on the shared core's recorder (DRIVE-206). The core decides
@@ -141,6 +155,16 @@ final class CoreTripRecorder: TripRecording, TripHistory {
     func stop() { core?.stop() }
 
     func markPassenger(keep: Bool) { core?.markPassenger(keep: keep) }
+
+    func onLaunch(reason: RearmReason) { core?.onLaunch(reason: reason) }
+
+    func onForeground() { core?.onForeground() }
+
+    func onWatchdogOpened() { core?.onWatchdogOpened() }
+
+    func setTriggersAvailable(_ available: Bool) { core?.setTriggersAvailable(available) }
+
+    func setInDriveScreenVisible(_ visible: Bool) { core?.setInDriveScreenVisible(visible) }
 
     func setAutoDetect(enabled: Bool) {
         autoDetect = enabled

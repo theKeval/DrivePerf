@@ -1,5 +1,6 @@
 package com.driveperf.pipeline.capture
 
+import com.driveperf.domain.capture.AutoDetectHealth
 import com.driveperf.domain.capture.ActivityType
 import com.driveperf.domain.capture.CaptureBatch
 import com.driveperf.domain.capture.CapturedTrip
@@ -217,6 +218,7 @@ class TripRecorderEngineTest {
         engine.setAutoDetect(false)
         runCurrent()
         assertFalse(engine.status.value.autoDetectEnabled)
+        assertEquals(AutoDetectHealth.OFF, engine.status.value.autoDetectHealth)
         engine.onWake(WakeEvent(WakeKind.PARKED_EXIT, clock.monotonicNs(), clock.wallMs()))
         runCurrent()
         assertEquals(RecorderState.IDLE, engine.status.value.state)

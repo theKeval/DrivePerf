@@ -40,6 +40,11 @@ final class KotlinCore: SharedCore {
     func stop() { services.recorder.stop() }
     func markPassenger(keep: Bool) { services.recorder.markPassenger(keep: keep) }
     func setAutoDetect(enabled: Bool) { services.recorder.setAutoDetect(enabled: enabled) }
+    func onLaunch(reason: DPSharedBridge.RearmReason) { services.recorder.onLaunch(reason: KotlinMapping.kotlin(reason)) }
+    func onForeground() { services.recorder.onForeground() }
+    func onWatchdogOpened() { services.recorder.onWatchdogOpened() }
+    func setTriggersAvailable(_ available: Bool) { services.recorder.setTriggersAvailable(available: available) }
+    func setInDriveScreenVisible(_ visible: Bool) { services.recorder.setInDriveScreenVisible(visible: visible) }
 }
 
 /// The DPPlatform adapters as `PlatformBindings` for `DrivePerfCore.start(platform:)` (ADR-002 §5). Each function is
@@ -51,13 +56,16 @@ final class CorePlatformBindings: NSObject, DrivePerfShared.PlatformBindings, @u
     )
     private let device: String
     private let analytics: any DrivePerfShared.AnalyticsSink = StubAnalyticsSink()
+    private let watchdogPort: any DrivePerfShared.AutoDetectWatchdog
 
+    /// `watchdog` is the F-CAP-14 notification adapter; without one the core schedules nothing.
     @MainActor
-    init(ports: CorePorts, deviceId: String) {
+    init(ports: CorePorts, deviceId: String, watchdog: (any AutoDetectWatchdogBridge)? = nil) {
         self.ports = (
             ports.clock, ports.location, ports.motion, ports.activity, ports.power, ports.parkedRegion, ports.tripFiles
         )
         device = deviceId
+        watchdogPort = watchdog.map { KotlinWatchdogPort($0) } ?? NoOpAutoDetectWatchdog.shared
     }
 
     func clock() -> any DrivePerfShared.Clock { ports.clock }
@@ -69,4 +77,17 @@ final class CorePlatformBindings: NSObject, DrivePerfShared.PlatformBindings, @u
     func tripFiles() -> any DrivePerfShared.TripFileStore { ports.tripFiles }
     func deviceId() -> String { device }
     func analyticsSink() -> any DrivePerfShared.AnalyticsSink { analytics }
+    func watchdog() -> any DrivePerfShared.AutoDetectWatchdog { watchdogPort }
+}
+
+/// `AutoDetectWatchdog`.
+final class KotlinWatchdogPort: NSObject, DrivePerfShared.AutoDetectWatchdog, Sendable {
+    private let watchdog: any AutoDetectWatchdogBridge
+
+    init(_ watchdog: any AutoDetectWatchdogBridge) {
+        self.watchdog = watchdog
+    }
+
+    func schedule(fireAtWallMs: Int64) { watchdog.schedule(fireAtWallMs: fireAtWallMs) }
+    func cancel() { watchdog.cancel() }
 }
