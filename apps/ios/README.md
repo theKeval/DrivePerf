@@ -108,7 +108,8 @@ Dependency rules (ADR-002 section 2): `DPFeatures` sees `DPDesignSystem` and `DP
 - **Power (F-CAP-16):** `SystemPowerState` feeds battery level, charging, Low Power Mode and `ProcessInfo.thermalState`
   to the core; the core's IMU rate (50, 25 or 10 Hz) is applied by `CoreMotionSource.setRate`. iOS has no location
   rate control worth using (`mayBatchLocation` is Android only), so GNSS stays at 1 Hz while recording and is off
-  while armed. No background task is added.
+  while armed. The in-drive screen reports `setInDriveScreenVisible` as it shows and hides, so both platforms share one
+  contract. No background task is added.
 - **Manual trips** start from the accessory's Start button and show a Live Activity. **Automatic trips never start a
   local Live Activity** (it fails in the background); they post a passive "Recording your drive" notification.
 - Trip files live under `Application Support/Capture/trips/<id>/`: R0 and R1 `completeUnlessOpen` (written while

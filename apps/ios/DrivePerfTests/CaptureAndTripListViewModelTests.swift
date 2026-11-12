@@ -25,6 +25,16 @@ final class CaptureViewModelTests: XCTestCase {
         XCTAssertTrue(recorder.wakes.isEmpty)
     }
 
+    func testTheInDriveScreenReportsWhenItShowsAndHides() {
+        let recorder = FakeRecorder()
+        let model = makeModel(recorder)
+
+        model.setInDriveScreenVisible(true)
+        model.setInDriveScreenVisible(false)
+
+        XCTAssertEqual(recorder.inDriveScreenVisible, [true, false])
+    }
+
     func testStartSendsAManualWakeStampedWithTheClock() async {
         let recorder = FakeRecorder()
         let permissions = FakePermissions()

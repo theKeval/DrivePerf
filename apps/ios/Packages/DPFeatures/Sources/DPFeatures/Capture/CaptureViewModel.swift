@@ -121,6 +121,10 @@ public final class CaptureViewModel {
         apply(recorder.status)
     }
 
+    /// Tells the core whether the in-drive screen (S-DRV-01) is on screen (F-CAP-16: the core only uses it to decide
+    /// location batching, which is Android only; iOS reports it so both platforms share one contract).
+    func setInDriveScreenVisible(_ visible: Bool) { recorder.setInDriveScreenVisible(visible) }
+
     /// Observes the recorder for the lifetime of the calling view's `.task`.
     public func observe() async {
         await refreshReadiness()

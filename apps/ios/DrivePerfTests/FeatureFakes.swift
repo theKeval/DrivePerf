@@ -24,6 +24,9 @@ final class FakeRecorder: TripRecording, TripHistory {
 
     func onLaunch() {}
 
+    private(set) var inDriveScreenVisible: [Bool] = []
+    func setInDriveScreenVisible(_ visible: Bool) { inDriveScreenVisible.append(visible) }
+
     /// True: the start is reported after `onWake` returns, as the shared core does.
     var startsLater = false
     /// With `startsLater`: the recorder reports `startFailed` instead of a trip.
