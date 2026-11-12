@@ -113,8 +113,17 @@ public interface TripStore {
      */
     public suspend fun saveFinalised(result: FinalisedTrip)
 
-    /** Remembers the parking spot (called at trip end, also for discarded trips that moved the car). */
+    /**
+     * Remembers the parking spot (called at trip end, also for discarded trips that moved the car). The new spot is
+     * trusted again.
+     */
     public suspend fun setLastParking(parking: Parking)
+
+    /** False when the stored spot predates a reboot and no trip has ended since (EC-RBT). True when there is none. */
+    public suspend fun isParkingTrusted(): Boolean
+
+    /** Marks the stored spot as predating a reboot, so no trip estimates its start from it (EC-RBT). */
+    public suspend fun distrustParking()
 }
 
 /**

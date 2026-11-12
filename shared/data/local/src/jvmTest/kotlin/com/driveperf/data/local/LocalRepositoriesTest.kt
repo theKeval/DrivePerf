@@ -266,6 +266,12 @@ class LocalRepositoriesTest {
         val parking = Parking(GeoPoint(2.0, -27.5), 9_000L)
         store.setLastParking(parking)
         assertEquals(parking, store.lastParking())
+        assertTrue(store.isParkingTrusted())
+        store.distrustParking()
+        assertFalse(store.isParkingTrusted())
+        assertEquals(parking, store.lastParking(), "the spot is kept for the parked region")
+        store.setLastParking(parking.copy(wallMs = 10_000L))
+        assertTrue(store.isParkingTrusted(), "a trip end trusts its new spot")
     }
 
     @Test

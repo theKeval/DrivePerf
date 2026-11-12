@@ -137,6 +137,10 @@ public class TripRecorderEngine(
         inputs.trySend(Input.Simple { MachineEvent.TriggersAvailable(it, available) })
     }
 
+    override fun setInDriveScreenVisible(visible: Boolean) {
+        inputs.trySend(Input.Simple { MachineEvent.InDriveVisible(it, visible) })
+    }
+
     override fun onWake(event: WakeEvent) {
         inputs.trySend(Input.Wake(event))
     }
@@ -196,6 +200,7 @@ public class TripRecorderEngine(
         if (recording != null && recovery == null) store.deleteNow(recording.id)
         return MachineEvent.Launch(
             now, clock.wallMs(), dbAvailable = true, parking = store.lastParking(), recovering = recovery, reason = reason,
+            parkingTrusted = store.isParkingTrusted(),
         )
     }
 
@@ -282,6 +287,7 @@ public class TripRecorderEngine(
             is MachineEffect.Track -> analytics?.track(effect.event)
             MachineEffect.CheckIn -> checkIn()
             MachineEffect.WatchdogOff -> watchdogOff()
+            MachineEffect.DistrustParking -> persistence.store.distrustParking()
             else -> Unit
         }
     }
@@ -416,6 +422,10 @@ public class TripRecorderEngine(
         if (finished.isNotEmpty()) {
             analytics?.track(CaptureEvent.finaliseMs((clock.monotonicNs() - startedNs) / Units.NANOS_PER_MILLI))
         }
+        val estimatedStartM = finished.firstOrNull()?.trip?.quality?.estimatedStartM
+        if (estimatedStartM != null && capture != null) {
+            analytics?.track(CaptureEvent.startBackfilled(estimatedStartM, capture.recordedAccel.isNotEmpty()))
+        }
         send { now -> MachineEvent.Finalised(now, parking) }
     }
 
@@ -489,6 +499,7 @@ public class TripRecorderEngine(
                 autoDetectEnabled = state.autoDetect,
                 autoDetectHealth = health(),
                 lastCheckInWallMs = watchdog?.lastCheckInWallMs,
+                mayBatchLocation = phase == RecorderState.RECORDING && state.cruise?.steady == true && !state.inDriveVisible,
             )
         }
     }

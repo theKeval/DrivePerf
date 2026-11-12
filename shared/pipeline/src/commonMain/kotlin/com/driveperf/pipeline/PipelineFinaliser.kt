@@ -11,6 +11,7 @@ import com.driveperf.domain.trip.CaptureMeta
 import com.driveperf.domain.trip.DriveContext
 import com.driveperf.domain.trip.Interruption
 import com.driveperf.domain.trip.QualityBadge
+import com.driveperf.domain.trip.Suspect
 import com.driveperf.domain.trip.Trip
 import com.driveperf.domain.trip.TripKind
 import com.driveperf.domain.trip.TripQuality
@@ -28,6 +29,7 @@ import com.driveperf.pipeline.coach.TipInputs
 import com.driveperf.pipeline.coach.TipSelector
 import com.driveperf.pipeline.route.PreviewTrack
 import com.driveperf.pipeline.route.RouteEngine
+import com.driveperf.pipeline.route.TransitTuning
 import com.driveperf.pipeline.score.Baselines
 import com.driveperf.pipeline.score.PriorHistory
 import com.driveperf.pipeline.score.R1Analyser
@@ -58,6 +60,7 @@ public class PipelineFinaliser(
     private val scoringConfig: ScoringConfig = ScoringConfig(),
 ) : TripFinaliser {
     private val routes = routeHistory?.let { RouteEngine(it) }
+    private val transit = routeHistory?.let { TransitTuning(it, signalConfig) }
     private val signal = SignalPipeline(signalConfig)
     private val analyser = R1Analyser(scoringConfig)
     private val scorer = TripScorer(scoringConfig)
@@ -100,7 +103,8 @@ public class PipelineFinaliser(
         var analysis = analyser.analyse(sig.trace, limited = false, still = sig.still)
         val estimatedEnd = sig.estimate?.let { sig.fixes.firstOrNull()?.tS ?: 0.0 }
         val gaps = spans.gnssGaps(sig.fixes, sig.still)
-        val allSpans = (sig.fixedSpans + gaps.spans + spans.excluded(sig.trace.quality, analysis.moving, estimatedEnd))
+        val excluded = spans.relabelThermal(spans.excluded(sig.trace.quality, analysis.moving, estimatedEnd), capture, sig.t0Ns)
+        val allSpans = (sig.fixedSpans + gaps.spans + excluded)
             .sortedWith(compareBy({ it.t0S }, { it.kind.name }))
         val m = metrics.compute(sig.fixes, analysis.moving)
         val distance = m.gatedDistanceM + (sig.estimate?.distanceM ?: 0.0) + gaps.chordM
@@ -132,14 +136,16 @@ public class PipelineFinaliser(
             spans = allSpans,
         )
         val cleanest = Stretches.cleanest(analysis)
-        val draft = trip(request, sig, quality, distance, m, suspect, analysis.context).copy(cleanest = cleanest)
+        val asked = trip(request, sig, quality, distance, m, suspect, analysis.context).copy(cleanest = cleanest)
         val scorable = request.kind == TripKind.DRIVER && b.badge != QualityBadge.UNSCORABLE && !short
-        val recent = priorHistory.recent(draft.startedAt)
+        val recent = priorHistory.recent(asked.startedAt)
         val preview = PreviewTrack.build(
             sig.trace.gnss, analysis.a3Lon, analysis.a3Lat, scoringConfig.fs, allSpans,
             sig.estimate?.let { h.parking?.point?.let { p -> p.lat to p.lng } },
             analysis.events.map { it.peak.toDouble() / scoringConfig.fs },
         )
+        val declined = transit?.declinedHere(asked, preview, recent) ?: false
+        val draft = if (declined) asked.copy(suspect = Suspect.NONE) else asked
         val engine = routes
         val route = engine?.match(draft, preview, recent, request.nowWallMs)
         val priors = priorHistory.priorsFor(draft.startedAt, analysis.context, route?.route?.id)
@@ -202,7 +208,7 @@ public class PipelineFinaliser(
         quality: TripQuality,
         distance: Double,
         m: com.driveperf.pipeline.signal.Metrics,
-        suspect: com.driveperf.domain.trip.Suspect,
+        suspect: Suspect,
         context: DriveContext,
     ): Trip {
         val h = r.capture.header
