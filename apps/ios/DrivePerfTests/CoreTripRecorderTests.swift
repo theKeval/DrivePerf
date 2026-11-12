@@ -120,12 +120,15 @@ final class CoreTripRecorderTests: XCTestCase {
 
     func testKotlinStatusMapsToTheSwiftMirror() {
         let kotlin = DrivePerfShared.RecorderStatus(
-            state: .paused, tripId: "t1", isManual: true, elapsedS: 61.7, distanceM: 1200, autoDetectEnabled: false,
-            startFailed: false)
+            state: .paused, tripId: "t1", isManual: true, elapsedS: 61.7, distanceM: 1200, autoDetectEnabled: true,
+            startFailed: false, autoDetectHealth: .needsAttention, lastCheckInWallMs: KotlinLong(value: 1_700_000_000_000),
+            mayBatchLocation: true)
         XCTAssertEqual(
             KotlinMapping.swift(kotlin),
             DPSharedBridge.RecorderStatus(
-                state: .paused, tripId: "t1", isManual: true, elapsedS: 61, distanceM: 1200, autoDetectEnabled: false))
+                state: .paused, tripId: "t1", isManual: true, elapsedS: 61, distanceM: 1200, autoDetectEnabled: true,
+                autoDetectHealth: .needsAttention, lastCheckIn: Date(timeIntervalSince1970: 1_700_000_000),
+                mayBatchLocation: true))
     }
 
     func testKotlinTripsMapToListRows() {

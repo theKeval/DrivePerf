@@ -66,6 +66,16 @@ public protocol ParkedRegionMonitorBridge: AnyObject, Sendable {
     func disarm()
 }
 
+/// Kotlin `AutoDetectWatchdog`: the F-CAP-14 local notification ("Auto-detect may be paused. Open DrivePerf to keep
+/// it on."). The core decides when; the adapter schedules one `UNUserNotificationCenter` request with a fixed
+/// identifier, so a new schedule replaces the pending one.
+public protocol AutoDetectWatchdogBridge: AnyObject, Sendable {
+    /// Schedules the notification at `fireAtWallMs` (UTC epoch ms), replacing any pending one.
+    func schedule(fireAtWallMs: Int64)
+    /// Removes the pending notification. Safe when none is pending.
+    func cancel()
+}
+
 // MARK: - Trip files
 
 /// Kotlin `TripFileKind` (data-model.md §2.1).

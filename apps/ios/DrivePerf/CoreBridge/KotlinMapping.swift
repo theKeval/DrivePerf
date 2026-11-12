@@ -95,6 +95,14 @@ enum KotlinMapping {
         DrivePerfShared.WakeEvent(kind: kotlin(w.kind), tMonoNs: w.tMonoNs, wallMs: w.wallMs, sourceDetail: w.sourceDetail)
     }
 
+    static func kotlin(_ r: DPSharedBridge.RearmReason) -> DrivePerfShared.RearmReason {
+        switch r {
+        case .launch: .launch
+        case .boot: .boot
+        case .forceStop: .forceStop
+        }
+    }
+
     static func kotlin(_ k: DPSharedBridge.WakeKind) -> DrivePerfShared.WakeKind {
         switch k {
         case .parkedExit: .parkedExit
@@ -135,7 +143,18 @@ enum KotlinMapping {
     static func swift(_ s: DrivePerfShared.RecorderStatus) -> DPSharedBridge.RecorderStatus {
         DPSharedBridge.RecorderStatus(
             state: swift(s.state), tripId: s.tripId, isManual: s.isManual, elapsedS: s.elapsedS.rounded(.down),
-            distanceM: s.distanceM, autoDetectEnabled: s.autoDetectEnabled, startFailed: s.startFailed)
+            distanceM: s.distanceM, autoDetectEnabled: s.autoDetectEnabled, startFailed: s.startFailed,
+            autoDetectHealth: swift(s.autoDetectHealth),
+            lastCheckIn: s.lastCheckInWallMs.map { Date(timeIntervalSince1970: Double($0.int64Value) / 1000) },
+            mayBatchLocation: s.mayBatchLocation)
+    }
+
+    static func swift(_ h: DrivePerfShared.AutoDetectHealth) -> DPSharedBridge.AutoDetectHealth {
+        switch h {
+        case .on: .on
+        case .off: .off
+        case .needsAttention: .needsAttention
+        }
     }
 
     static func swift(_ state: DrivePerfShared.RecorderState) -> DPSharedBridge.RecorderState {
