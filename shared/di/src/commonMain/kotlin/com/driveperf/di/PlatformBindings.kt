@@ -3,6 +3,8 @@ package com.driveperf.di
 import com.driveperf.domain.analytics.Analytics
 import com.driveperf.domain.analytics.AnalyticsSink
 import com.driveperf.domain.capture.ActivitySource
+import com.driveperf.domain.capture.AutoDetectWatchdog
+import com.driveperf.domain.capture.NoOpAutoDetectWatchdog
 import com.driveperf.domain.feedback.MarkEventNeeded
 import com.driveperf.domain.capture.LocationSource
 import com.driveperf.domain.capture.MotionSource
@@ -42,6 +44,12 @@ public interface PlatformBindings {
      * return `NoOpAnalyticsSink`. The sink does no consent logic: the core wraps it in the consent gate.
      */
     public fun analyticsSink(): AnalyticsSink
+
+    /**
+     * The auto-detect watchdog notification (F-CAP-14 AC1). iOS supplies its `UNUserNotificationCenter` adapter;
+     * Android keeps the default, which schedules nothing.
+     */
+    public fun watchdog(): AutoDetectWatchdog = NoOpAutoDetectWatchdog
 }
 
 /**
