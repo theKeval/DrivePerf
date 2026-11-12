@@ -502,14 +502,16 @@ internal class TripMachine(private val cfg: CaptureConfig = CaptureConfig()) {
     private fun MachineState.isIdlingImu(): Boolean = phase == PAUSED && imuHz == cfg.imuIdleHz
 
     /**
-     * EC-STO: the first failed write stops the IMU, which is most of the volume, and keeps GNSS. A write that still
-     * fails after that means nothing more can be kept: a trip ends with what R0 holds, a candidate is dropped.
+     * EC-STO: the first failed write stops the IMU, which is most of the volume, and keeps GNSS. A write without IMU
+     * samples that still fails after that means nothing more can be kept: a trip ends with what R0 holds, a candidate
+     * is dropped. A failed IMU batch after the stop was queued before it and is ignored.
      */
     private fun onAppendFailed(s: MachineState, e: MachineEvent.AppendFailed): Transition {
         val trip = s.trip
         return when {
             trip == null || trip.id != e.tripId || !s.isActive() -> Transition(s)
             !s.imuStoppedForSpace -> onFreeSpace(s, MachineEvent.FreeSpace(e.nowNs, 0L))
+            e.hadMotion -> Transition(s)
             s.phase == CANDIDATE -> reject(s, RejectReason.STORAGE)
             else -> finish(s, e.nowNs, EndReason.STORAGE)
         }

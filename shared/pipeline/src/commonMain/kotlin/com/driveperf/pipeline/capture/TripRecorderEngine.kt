@@ -388,7 +388,7 @@ public class TripRecorderEngine(
             val free = ports.files.freeSpaceBytes()
             if (free < config.minFreeBytes) send { t -> MachineEvent.FreeSpace(t, free) }
         }
-        if (!ok) send { t -> MachineEvent.AppendFailed(t, effect.tripId) }
+        if (!ok) send { t -> MachineEvent.AppendFailed(t, effect.tripId, hadMotion = effect.batch.motion.isNotEmpty()) }
     }
 
     private fun schedule(effect: MachineEffect.Schedule) {
