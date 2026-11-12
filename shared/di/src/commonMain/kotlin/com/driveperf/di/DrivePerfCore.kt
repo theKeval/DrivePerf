@@ -8,6 +8,7 @@ import com.driveperf.data.local.LocalTripCorrections
 import com.driveperf.data.local.LocalTripHistory
 import com.driveperf.data.local.LocalTripRepository
 import com.driveperf.data.local.LocalTripStore
+import com.driveperf.data.local.LocalWatchdogStore
 import com.driveperf.data.local.ProtoAnalysisFileStore
 import com.driveperf.data.local.ProtoCaptureLog
 import com.driveperf.data.local.ProtoPreviewStore
@@ -82,6 +83,7 @@ public object DrivePerfCore {
         val clock = platform.clock()
         val previews = ProtoPreviewStore(files, io)
         val history = LocalTripHistory(db, io)
+        val analytics = ConsentGatedAnalytics(platform.analyticsSink())
         val recorder = TripRecorderEngine(
             ports = CapturePorts(
                 location = platform.location(),
@@ -98,11 +100,13 @@ public object DrivePerfCore {
                 finaliser?.invoke(db) ?: PipelineFinaliser(history, LocalRouteHistory(db, previews, io)),
                 previews,
                 ProtoAnalysisFileStore(files, io),
+                LocalWatchdogStore(db, io),
             ),
             clock = clock,
             zones = SystemTimeZone(),
             scope = scope,
             config = capture,
+            analytics = analytics,
         )
         val trips = LocalTripRepository(db, files, io)
         val routes = LocalRouteRepository(db, io)
@@ -117,7 +121,7 @@ public object DrivePerfCore {
                 trips, routes, LocalEventFeedbackStore(db, io), FeedbackRescorer(history, previews), clock,
             ),
             corrections = corrections,
-            analytics = ConsentGatedAnalytics(platform.analyticsSink()),
+            analytics = analytics,
             onClose = {
                 scope.cancel()
                 driver.close()

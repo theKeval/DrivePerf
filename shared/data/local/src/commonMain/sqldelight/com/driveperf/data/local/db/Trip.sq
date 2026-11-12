@@ -141,6 +141,15 @@ CREATE TABLE capture_state (
   parked_at     INTEGER
 );
 
+-- F-CAP-14 watchdog bookkeeping (DRIVE-150): timestamps only, UTC epoch ms. Its own row so setParking's
+-- INSERT OR REPLACE on capture_state cannot clear it.
+CREATE TABLE capture_watchdog (
+  id                INTEGER NOT NULL PRIMARY KEY CHECK (id = 1),
+  last_check_in_at  INTEGER,
+  due_at            INTEGER,
+  last_fired_at     INTEGER
+);
+
 -- Upsert as insert-if-absent then update: INSERT OR REPLACE would delete the row first and cascade to its feedback
 -- and file rows, and Android 10's SQLite (3.22) has no ON CONFLICT DO UPDATE.
 insertTripIfAbsent:
@@ -284,3 +293,9 @@ SELECT parked_lat, parked_lng, parked_at FROM capture_state WHERE id = 1;
 
 setParking:
 INSERT OR REPLACE INTO capture_state(id, parked_lat, parked_lng, parked_at) VALUES (1, ?, ?, ?);
+
+watchdog:
+SELECT last_check_in_at, due_at, last_fired_at FROM capture_watchdog WHERE id = 1;
+
+setWatchdog:
+INSERT OR REPLACE INTO capture_watchdog(id, last_check_in_at, due_at, last_fired_at) VALUES (1, ?, ?, ?);

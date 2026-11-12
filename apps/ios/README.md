@@ -19,7 +19,8 @@ Needs Xcode 26+, an iOS simulator runtime (`xcodebuild -downloadPlatform iOS` if
 **Your iPhone (free Personal Team), temporary until the Apple Developer account exists (DRIVE-42):**
 
 1. Copy `Config/Local.xcconfig.example` to `Config/Local.xcconfig` (gitignored) and fill in your Team ID and a bundle
-   ID of your own, for example `com.thekeval.driveperf.dev`. The widget extension becomes `<that ID>.widgets`.
+   ID of your own, for example `com.thekeval.driveperf.dev`. The widget extension becomes `<that ID>.widgets`. Keep the
+   two `DP_ENTITLEMENTS_*` lines from the example too (see "No App Group on a Personal Team" below).
 2. Build and install:
 
    ```bash
@@ -36,6 +37,15 @@ Rules for the override:
 - **Never sign `com.driveperf.*` with a Personal Team.** It can claim those IDs and block the paid account. That is
   why `Local.xcconfig` must set both the bundle ID and the team, and why Release builds ignore the local team and stay
   on `com.driveperf.app`. The launch build is `com.driveperf.app`; the override disappears with DRIVE-42.
+- **No App Group on a Personal Team.** A free team cannot create `group.com.driveperf.app`, so signing fails on the
+  entitlement the widgets use (the F-CAP-10 widgets share a snapshot through it). `Local.xcconfig.example` therefore points
+  `DP_ENTITLEMENTS_APP` and `DP_ENTITLEMENTS_WIDGETS` at `Config/DrivePerf.personal-team.entitlements` and
+  `Config/DrivePerfWidgets.personal-team.entitlements`, which hold no App Group. The build settings default to the
+  shipping `DrivePerf.entitlements` and `DrivePerfWidgets.entitlements` in `Config/DrivePerf.xcconfig`, so the
+  committed Debug and Release config for `com.driveperf.*` is unchanged. Without the group the shared snapshot has no
+  container: the widget and the Control Center control show their empty state, the app skips writing the snapshot, and
+  nothing crashes. Everything else (capture, Live Activity, notifications) works as normal. Delete the two lines when
+  DRIVE-42 lands.
 - Personal Team profiles expire after 7 days: reinstall before then. Each new bundle ID uses one of the team's 10 App
   IDs per week.
 - `xcrun devicectl device list devices` gives the UDID.

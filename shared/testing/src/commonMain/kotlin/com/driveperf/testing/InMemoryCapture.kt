@@ -8,6 +8,8 @@ import com.driveperf.domain.capture.FinalisedTrip
 import com.driveperf.domain.capture.Parking
 import com.driveperf.domain.capture.TimeZoneProvider
 import com.driveperf.domain.capture.TripStore
+import com.driveperf.domain.capture.WatchdogState
+import com.driveperf.domain.capture.WatchdogStore
 import com.driveperf.domain.trip.Trip
 import com.driveperf.domain.trip.TripStatus
 
@@ -113,4 +115,16 @@ public class FixedTimeZone(private val id: String = "Etc/UTC", private val offse
     override fun zoneId(): String = id
 
     override fun offsetMinAt(wallMs: Long): Int = offsetMin
+}
+
+/** A [WatchdogStore] in memory. When [writable] is false, [write] fails as on a full disk. */
+public class InMemoryWatchdogStore(public var state: WatchdogState = WatchdogState()) : WatchdogStore {
+    public var writable: Boolean = true
+
+    override suspend fun read(): WatchdogState = state
+
+    override suspend fun write(state: WatchdogState): Boolean {
+        if (writable) this.state = state
+        return writable
+    }
 }

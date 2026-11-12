@@ -11,6 +11,11 @@ CODE_SIGN_STYLE = Manual
 CODE_SIGN_IDENTITY = -
 DEVELOPMENT_TEAM =
 
+// Entitlements per target. Local.xcconfig can point these at the *.personal-team.entitlements variants (no App
+// Group) so a free Personal Team can sign the build. The committed values are the shipping entitlements.
+DP_ENTITLEMENTS_APP = Config/DrivePerf.entitlements
+DP_ENTITLEMENTS_WIDGETS = Config/DrivePerfWidgets.entitlements
+
 // Crash reporting (ADR-007): Sentry EU DSN, injected at build time, never committed. Empty = stub only.
 DP_SENTRY_DSN =
 
