@@ -1,6 +1,7 @@
 package com.driveperf.app.navigation
 
 import com.driveperf.app.core.AutoDetectOff
+import com.driveperf.platform.wake.WakeStatus
 
 /** What the shell can ask the app to do, and the notices it shows ([autoDetectOff] is Home's "Auto-detect off", F-ONB-04.6). */
 data class ShellCallbacks(
@@ -12,4 +13,6 @@ data class ShellCallbacks(
     /** "Fix" on the Auto-detect off notice: Android's permission settings for DrivePerf. */
     val onFixAutoDetect: () -> Unit = {},
     val autoDetectOff: AutoDetectOff? = null,
+    val wakeStatus: WakeStatus? = null,
+    val onDismissForceStop: () -> Unit = {},
 )

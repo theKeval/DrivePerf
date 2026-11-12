@@ -18,9 +18,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.driveperf.app.R
-import com.driveperf.app.core.WakePath
 import com.driveperf.designsystem.DpAvatarButton
 import com.driveperf.designsystem.DpIcons
 import com.driveperf.feature.capture.CaptureAutoDetect
@@ -40,12 +38,13 @@ fun TabScaffold(
     selected: Tab,
     capture: CaptureUiState,
     callbacks: ShellCallbacks,
-    wakePath: WakePath? = null,
+    modifier: Modifier = Modifier,
     content: @Composable (PaddingValues) -> Unit,
 ) {
-    val wake = wakePath?.status?.collectAsStateWithLifecycle()?.value
+    val wake = callbacks.wakeStatus
     val showForceStop = wake != null && wake.forceStopNotice && wake.mode != AutoDetectMode.OFF
     Scaffold(
+        modifier = modifier,
         topBar = {
             TopAppBar(
                 title = { Text(stringResource(selected.label)) },
@@ -87,7 +86,7 @@ fun TabScaffold(
                 // F-ONB-04.6: Home says when automatic trips are off, above the tab's own content.
                 Column(modifier = Modifier.padding(top = padding.calculateTopPadding())) {
                     if (showForceStop) {
-                        ForceStopNotice(rearmed = wake.mode == AutoDetectMode.ON, onDismiss = wakePath::dismissForceStopNotice)
+                        ForceStopNotice(rearmed = wake.mode == AutoDetectMode.ON, onDismiss = callbacks.onDismissForceStop)
                     }
                     if (autoDetectOff != null) AutoDetectNotice(autoDetectOff, onFix = callbacks.onFixAutoDetect)
                     Box(modifier = Modifier.weight(1f)) { content(PaddingValues(bottom = padding.calculateBottomPadding())) }

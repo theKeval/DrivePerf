@@ -28,6 +28,7 @@ class WakeHealth(private val preferences: SharedPreferences, private val clock: 
     val status = mutableStatus.asStateFlow()
 
     private var registration = 0L
+    private var allowed = false
 
     fun onLaunch(optedIn: Boolean, wasForceStopped: (sinceMs: Long) -> Boolean) {
         val now = clock.wallMs()
@@ -42,6 +43,7 @@ class WakeHealth(private val preferences: SharedPreferences, private val clock: 
 
     /** Returns an ID so a late Play services callback cannot override newer settings. */
     fun refresh(optedIn: Boolean, allowed: Boolean): Long {
+        this.allowed = allowed
         val current = status.value
         val mode = when {
             !optedIn -> AutoDetectMode.OFF
@@ -53,12 +55,16 @@ class WakeHealth(private val preferences: SharedPreferences, private val clock: 
     }
 
     fun activityRegistrationFinished(attempt: Long, armed: Boolean) {
-        if (attempt != registration || status.value.mode == AutoDetectMode.OFF) return
-        if (armed) recordCheckIn() else mutableStatus.value = status.value.copy(mode = AutoDetectMode.NEEDS_ATTENTION)
+        if (attempt != registration || !allowed) return
+        if (armed) {
+            recordCheckIn(AutoDetectMode.ON)
+        } else {
+            mutableStatus.value = status.value.copy(mode = AutoDetectMode.NEEDS_ATTENTION)
+        }
     }
 
     fun parkedRegionRegistered() {
-        if (status.value.mode == AutoDetectMode.ON) recordCheckIn()
+        if (allowed) recordCheckIn(status.value.mode)
     }
 
     fun dismissForceStopNotice() {
@@ -66,10 +72,10 @@ class WakeHealth(private val preferences: SharedPreferences, private val clock: 
         mutableStatus.value = status.value.copy(forceStopNotice = false)
     }
 
-    private fun recordCheckIn() {
+    private fun recordCheckIn(mode: AutoDetectMode) {
         val now = clock.wallMs()
         preferences.edit { putLong(LAST_CHECK_IN, now) }
-        mutableStatus.value = status.value.copy(mode = AutoDetectMode.ON, lastCheckInMs = now)
+        mutableStatus.value = status.value.copy(mode = mode, lastCheckInMs = now)
     }
 
     private companion object {

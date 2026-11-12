@@ -164,11 +164,16 @@ private fun NavGraphBuilder.tabDestinations(env: AppEnv) {
     for (tab in Tab.entries) {
         composable(tab.route) {
             val autoDetectOff = rememberAutoDetectOff(env.services.permissionReader, env.services.consent)
+            val wakePath = if (tab == Tab.Drives) koinInject<WakePath>() else null
+            val wakeStatus = wakePath?.status?.collectAsStateWithLifecycle()?.value
             TabScaffold(
                 selected = tab,
                 capture = env.capture,
-                callbacks = callbacks.copy(autoDetectOff = autoDetectOff),
-                wakePath = if (tab == Tab.Drives) koinInject<WakePath>() else null,
+                callbacks = callbacks.copy(
+                    autoDetectOff = autoDetectOff,
+                    wakeStatus = wakeStatus,
+                    onDismissForceStop = { wakePath?.dismissForceStopNotice() },
+                ),
             ) { padding ->
                 TabContent(tab, padding, onSeeAll = { env.navController.navigate(Routes.ALL_DRIVES) })
             }

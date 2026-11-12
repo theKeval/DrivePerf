@@ -49,6 +49,21 @@ class WakeHealthTest {
     }
 
     @Test
+    fun `the parked wake can check in while the activity registration needs attention`() {
+        val attempt = health.refresh(optedIn = true, allowed = true)
+        health.activityRegistrationFinished(attempt, armed = false)
+        health.parkedRegionRegistered()
+        val status = health.status.value
+        assertEquals(AutoDetectMode.NEEDS_ATTENTION, status.mode)
+        assertEquals(clock.wallMs(), status.lastCheckInMs)
+
+        health.refresh(optedIn = true, allowed = false)
+        clock.advanceS(5.0)
+        health.parkedRegionRegistered()
+        assertEquals(status, health.status.value)
+    }
+
+    @Test
     fun `permission loss needs attention and opt-out is off even if an old registration succeeds`() {
         val first = health.refresh(optedIn = true, allowed = true)
         health.refresh(optedIn = true, allowed = false)
