@@ -40,6 +40,16 @@ internal data class CaptureEvent(override val name: String, override val propert
         /** `rearmed {reason: boot|force_stop|launch}`. */
         fun rearmed(reason: RearmReason): CaptureEvent = CaptureEvent("rearmed", mapOf("reason" to reason.name.lowercase()))
 
+        /** `imu_rate_changed {to, reason}` (F-CAP-16). */
+        fun imuRate(hz: Int, reason: RateReason): CaptureEvent =
+            CaptureEvent("imu_rate_changed", mapOf("to" to hz.toString(), "reason" to reason.key))
+
+        /** `start_backfilled {gap_m_bucket, imu_backfill}` (F-CAP-05). */
+        fun startBackfilled(gapM: Double, imuBackfill: Boolean): CaptureEvent = CaptureEvent(
+            "start_backfilled",
+            mapOf("gap_m_bucket" to gapBucket(gapM), "imu_backfill" to imuBackfill.toString()),
+        )
+
         val watchdogFired: CaptureEvent = CaptureEvent("watchdog_fired")
         val watchdogOpened: CaptureEvent = CaptureEvent("watchdog_opened")
     }
@@ -66,6 +76,30 @@ private fun finaliseBucket(ms: Long): String = when {
     ms < FINALISE_10S -> "3_10s"
     ms < FINALISE_30S -> "10_30s"
     else -> "gte_30s"
+}
+
+private const val GAP_250 = 250.0
+private const val GAP_500 = 500.0
+private const val GAP_1000 = 1_000.0
+private const val GAP_2000 = 2_000.0
+
+private fun gapBucket(m: Double): String = when {
+    m < GAP_250 -> "lt_250"
+    m < GAP_500 -> "250_500"
+    m < GAP_1000 -> "500_1000"
+    m < GAP_2000 -> "1000_2000"
+    else -> "gte_2000"
+}
+
+/** Why the IMU rate changed (`imu_rate_changed` reason, §2.7). */
+internal enum class RateReason(val key: String) {
+    NOMINAL("nominal"),
+    CRUISE("cruise"),
+    LOW_POWER("low_power"),
+    BATTERY("battery"),
+    THERMAL("thermal"),
+    STATIONARY("stationary"),
+    STORAGE("storage"),
 }
 
 /**

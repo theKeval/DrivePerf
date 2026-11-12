@@ -42,8 +42,17 @@ public class LocalTripStore(
         if (lat == null || lng == null || at == null) null else Parking(GeoPoint(lat, lng), at)
     }
 
+    /** `setParking` replaces the row, so `parked_trusted` returns to its default, 1. */
     override suspend fun setLastParking(parking: Parking): Unit = withContext(io) {
         trips.setParking(parking.point.lat, parking.point.lng, parking.wallMs)
+    }
+
+    override suspend fun isParkingTrusted(): Boolean = withContext(io) {
+        (trips.parkingTrusted().executeAsOneOrNull() ?: 1L) != 0L
+    }
+
+    override suspend fun distrustParking(): Unit = withContext(io) {
+        trips.distrustParking()
     }
 
     /** One transaction for the trip and everything derived from it (data-model.md §2.3 step 2). */

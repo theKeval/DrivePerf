@@ -71,4 +71,9 @@ public data class SignalConfig(
     // §1.6 trips longer than 12 h are split at their longest stop of more than 30 min
     val splitAfterS: Double = 43_200.0,
     val splitStopMinS: Double = 1_800.0,
+    // §1.8 per-user tuning (F-CAP-04 AC4): after this many "No" answers to "Was this a bus or train?" on trips that
+    // follow the same path (§7.2 endpoints, §7.3 Fréchet), the question is no longer asked on that path. Searched in
+    // the last transitDeclinedLookback finished trips.
+    val transitDeclinedToSuppress: Int = 2,
+    val transitDeclinedLookback: Int = 200,
 )

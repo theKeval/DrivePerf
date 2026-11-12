@@ -10,6 +10,7 @@ import com.driveperf.domain.capture.GeoPoint
 import com.driveperf.domain.capture.LocationSample
 import com.driveperf.domain.capture.Parking
 import com.driveperf.domain.capture.PowerStatus
+import com.driveperf.domain.capture.RearmReason
 import com.driveperf.domain.capture.RecorderState.CANDIDATE
 import com.driveperf.domain.capture.RecorderState.FINISHING
 import com.driveperf.domain.capture.RecorderState.IDLE
@@ -35,6 +36,8 @@ import com.driveperf.pipeline.geo.Geo
  */
 @Suppress("TooManyFunctions") // one small function per transition-table row keeps each rule readable
 internal class TripMachine(private val cfg: CaptureConfig = CaptureConfig()) {
+    private val cruiseRule = CruiseRule(cfg)
+
     fun reduce(s: MachineState, e: MachineEvent): Transition = when (e) {
         is MachineEvent.Fixes -> onFixes(s, e)
         is MachineEvent.Motion -> onMotion(s, e)
@@ -66,6 +69,7 @@ internal class TripMachine(private val cfg: CaptureConfig = CaptureConfig()) {
         }
         is MachineEvent.WatchdogOpened -> Transition(s, listOf(MachineEffect.Track(CaptureEvent.watchdogOpened)))
         is MachineEvent.TriggersAvailable -> Transition(s.copy(triggersAvailable = e.available))
+        is MachineEvent.InDriveVisible -> Transition(s.copy(inDriveVisible = e.visible))
         else -> Transition(s)
     }
 
@@ -84,9 +88,19 @@ internal class TripMachine(private val cfg: CaptureConfig = CaptureConfig()) {
 
     // ---- launch and recovery (§1.7) ----
 
+    /**
+     * After a reboot the stored parking spot is not trusted (EC-RBT): the phone may have been off while the car moved.
+     * The parked region is still armed there, as the best guess for a wake, but the next trip starts at its first fix
+     * with no estimated start (F-CAP-05) and no parking bound, until a trip end records a new spot. The distrust is
+     * stored ([MachineEffect.DistrustParking]), so a process restart before that trip keeps it.
+     */
     private fun onLaunch(s: MachineState, e: MachineEvent.Launch): Transition {
-        val base = s.copy(dbLocked = !e.dbAvailable, parking = e.parking ?: s.parking)
-        val arm = armAt(base.parking) + MachineEffect.Track(CaptureEvent.rearmed(e.reason)) + checkIn(base)
+        val stored = e.parking ?: s.parking
+        val boot = e.reason == RearmReason.BOOT
+        val trusted = if (boot || !e.parkingTrusted) null else stored
+        val base = s.copy(dbLocked = !e.dbAvailable, parking = trusted)
+        val distrust = if (boot && stored != null) listOf(MachineEffect.DistrustParking) else emptyList()
+        val arm = distrust + armAt(stored) + MachineEffect.Track(CaptureEvent.rearmed(e.reason)) + checkIn(base)
         val rec = e.recovering
         return when {
             s.phase != IDLE -> Transition(s)
@@ -207,7 +221,8 @@ internal class TripMachine(private val cfg: CaptureConfig = CaptureConfig()) {
             }
         }
         val appended = if (accepted.isEmpty()) emptyList() else listOf(Append(trip.id, CaptureBatch(fixes = accepted)))
-        return Transition(state, appended + fx)
+        val rate = applyRate(state, e.nowNs)
+        return Transition(rate.state, appended + fx + rate.effects)
     }
 
     private fun track(s: MachineState, fix: LocationSample): MachineState {
@@ -236,10 +251,51 @@ internal class TripMachine(private val cfg: CaptureConfig = CaptureConfig()) {
 
     private fun afterFix(s: MachineState, fix: LocationSample, nowNs: Long): Transition = when (s.phase) {
         CANDIDATE -> decideCandidate(s, nowNs)
-        RECORDING -> stationaryCheck(s, fix, nowNs)
+        RECORDING -> {
+            val t = stationaryCheck(s, fix, nowNs)
+            val cruise = if (t.state.phase == RECORDING) cruiseRule.next(s.cruise, fix) else null
+            Transition(t.state.copy(cruise = cruise), t.effects)
+        }
         PAUSED -> resumeCheck(s, fix, nowNs)
         else -> Transition(s)
     }
+
+    // ---- steady cruise (F-CAP-16 AC2–3) ----
+
+    /**
+     * The IMU rate the trip should run at, and why (§2.7, F-CAP-16 AC2): power and heat first, then steady cruise.
+     * The idle rate of a long stop and the disk stop are handled where they happen.
+     */
+    private fun targetRate(s: MachineState): Pair<Int, RateReason> {
+        val p = s.power
+        val battery = p?.batteryPct ?: FULL
+        return when {
+            p?.thermal == ThermalState.CRITICAL -> cfg.imuIdleHz to RateReason.THERMAL
+            p?.thermal == ThermalState.SERIOUS -> cfg.imuReducedHz to RateReason.THERMAL
+            p?.lowPowerMode == true -> cfg.imuReducedHz to RateReason.LOW_POWER
+            battery <= cfg.lowBatteryPct -> cfg.imuReducedHz to RateReason.BATTERY
+            s.phase == RECORDING && s.cruise?.steady == true -> cfg.imuReducedHz to RateReason.CRUISE
+            else -> cfg.imuNominalHz to RateReason.NOMINAL
+        }
+    }
+
+    /** Moves the IMU to [targetRate] when it differs, with a mark for the quality notes and `imu_rate_changed`. */
+    private fun applyRate(s: MachineState, nowNs: Long): Transition {
+        val trip = s.trip
+        val (hz, reason) = targetRate(s)
+        val fixed = !s.isActive() || s.imuStoppedForSpace || s.isIdlingImu()
+        return if (trip == null || fixed || hz == s.imuHz) {
+            Transition(s)
+        } else {
+            Transition(s.copy(imuHz = hz), rateEffects(trip, hz, reason, nowNs))
+        }
+    }
+
+    private fun rateEffects(trip: ActiveTrip, hz: Int, reason: RateReason, nowNs: Long): List<MachineEffect> = listOf(
+        MachineEffect.SetImuRate(hz),
+        Mark(trip.id, nowNs, CaptureMarkType.IMU_RATE, hz.toString()),
+        MachineEffect.Track(CaptureEvent.imuRate(hz, reason)),
+    )
 
     // ---- candidate (§1.5) ----
 
@@ -319,7 +375,7 @@ internal class TripMachine(private val cfg: CaptureConfig = CaptureConfig()) {
         val began = s.stoppingBeganAtNs ?: nowNs
         val stopAt = began + secondsNs(stopSeconds(trip))
         return Transition(
-            s.copy(phase = PAUSED, resumeFixes = 0),
+            s.copy(phase = PAUSED, resumeFixes = 0, cruise = null),
             listOf(
                 Mark(trip.id, began, CaptureMarkType.PAUSED),
                 Schedule(TimerId.STOP, maxOf(0L, stopAt - nowNs)),
@@ -339,8 +395,8 @@ internal class TripMachine(private val cfg: CaptureConfig = CaptureConfig()) {
 
     private fun resume(s: MachineState, nowNs: Long): Transition {
         val trip = s.trip ?: return Transition(s)
-        val hz = rateFor(s.power)
-        val rate = if (s.imuHz != hz && !s.imuStoppedForSpace) listOf(MachineEffect.SetImuRate(hz)) else emptyList()
+        val (hz, reason) = targetRate(s.copy(cruise = null))
+        val rate = if (s.imuHz != hz && !s.imuStoppedForSpace) rateEffects(trip, hz, reason, nowNs) else emptyList()
         val next = s.copy(
             phase = RECORDING, slowFixes = 0, slowSinceNs = null, stoppingBeganAtNs = null, resumeFixes = 0,
             imuHz = if (s.imuStoppedForSpace) s.imuHz else hz,
@@ -358,21 +414,25 @@ internal class TripMachine(private val cfg: CaptureConfig = CaptureConfig()) {
         if (!s.isActive() || trip == null) return Transition(s)
         var still = s.still
         var wakeImu = false
+        var manoeuvre = false
         for (m in e.samples) {
             still = Stillness.add(still, m, cfg)
-            if (s.isIdlingImu() && Stillness.magnitude(m.userAccelG) >= cfg.imuWakeG) wakeImu = true
+            val a = Stillness.magnitude(m.userAccelG)
+            if (s.isIdlingImu() && a >= cfg.imuWakeG) wakeImu = true
+            if (a >= cfg.cruiseExitAccelG) manoeuvre = true
         }
-        var state = s.copy(still = still)
+        var state = s.copy(still = still, cruise = if (manoeuvre) null else s.cruise)
         val fx = mutableListOf<MachineEffect>()
         if (!s.imuStoppedForSpace && e.samples.isNotEmpty()) fx += Append(trip.id, CaptureBatch(motion = e.samples))
         if (wakeImu) {
-            val hz = rateFor(s.power)
+            val (hz, reason) = targetRate(state)
             state = state.copy(imuHz = hz)
-            fx += listOf(MachineEffect.SetImuRate(hz), Mark(trip.id, e.nowNs, CaptureMarkType.IMU_RATE, hz.toString()))
+            fx += rateEffects(trip, hz, reason, e.nowNs)
             fx += Schedule(TimerId.IMU_IDLE, secondsNs(cfg.imuIdleAfterS))
         }
         val t = imuRules(state, e.nowNs)
-        return Transition(t.state, fx + t.effects)
+        val rate = applyRate(t.state, e.nowNs)
+        return Transition(rate.state, fx + t.effects + rate.effects)
     }
 
     private fun imuRules(s: MachineState, nowNs: Long): Transition {
@@ -413,18 +473,31 @@ internal class TripMachine(private val cfg: CaptureConfig = CaptureConfig()) {
     private fun onPower(s: MachineState, e: MachineEvent.Power): Transition {
         val state = s.copy(power = e.status)
         val trip = state.trip
-        val hz = rateFor(e.status)
-        val keepRate = hz == state.imuHz || state.isIdlingImu() || state.imuStoppedForSpace
         return when {
             !state.isActive() || trip == null -> Transition(state)
             state.isLive() && isFlat(e.status) ->
                 finish(state, e.nowNs, EndReason.LOW_BATTERY, interruption = InterruptionReason.LOW_BATTERY)
-            keepRate -> Transition(state)
-            else -> Transition(
-                state.copy(imuHz = hz),
-                listOf(MachineEffect.SetImuRate(hz), Mark(trip.id, e.nowNs, CaptureMarkType.IMU_RATE, hz.toString())),
-            )
+            else -> {
+                val noted = powerMarks(state, trip, e)
+                val rate = applyRate(noted.state, e.nowNs)
+                Transition(rate.state, noted.effects + rate.effects)
+            }
         }
+    }
+
+    /**
+     * Data-quality notes (F-CAP-16 AC2): a THERMAL mark whenever the thermal state changes during a trip (from the
+     * first non-nominal one), and one LOW_BATTERY mark when the battery first reaches the low level unplugged.
+     */
+    private fun powerMarks(s: MachineState, trip: ActiveTrip, e: MachineEvent.Power): Transition {
+        val p = e.status
+        val thermalChanged = p.thermal != (s.markedThermal ?: ThermalState.NOMINAL)
+        val low = !p.isCharging && (p.batteryPct ?: FULL) <= cfg.lowBatteryPct && !s.markedLowBattery
+        val fx = buildList {
+            if (thermalChanged) add(Mark(trip.id, e.nowNs, CaptureMarkType.THERMAL, p.thermal.name.lowercase()))
+            if (low) add(Mark(trip.id, e.nowNs, CaptureMarkType.LOW_BATTERY, p.batteryPct.toString()))
+        }
+        return Transition(s.copy(markedThermal = p.thermal, markedLowBattery = s.markedLowBattery || low), fx)
     }
 
     private fun isFlat(p: PowerStatus): Boolean = !p.isCharging && (p.batteryPct ?: FULL) <= cfg.endBatteryPct
@@ -453,7 +526,11 @@ internal class TripMachine(private val cfg: CaptureConfig = CaptureConfig()) {
         if (!needed || trip == null) return Transition(s)
         return Transition(
             s.copy(imuStoppedForSpace = true, imuHz = 0),
-            listOf(MachineEffect.StopImu, Mark(trip.id, e.nowNs, CaptureMarkType.IMU_STOPPED, "disk")),
+            listOf(
+                MachineEffect.StopImu,
+                Mark(trip.id, e.nowNs, CaptureMarkType.IMU_STOPPED, "disk"),
+                MachineEffect.Track(CaptureEvent.imuRate(0, RateReason.STORAGE)),
+            ),
         )
     }
 
@@ -468,10 +545,7 @@ internal class TripMachine(private val cfg: CaptureConfig = CaptureConfig()) {
             e.id == TimerId.STOP && s.phase == PAUSED -> stopTimer(s, trip, e.nowNs)
             e.id == TimerId.IMU_IDLE && canIdle -> Transition(
                 s.copy(imuHz = cfg.imuIdleHz),
-                listOf(
-                    MachineEffect.SetImuRate(cfg.imuIdleHz),
-                    Mark(trip.id, e.nowNs, CaptureMarkType.IMU_RATE, cfg.imuIdleHz.toString()),
-                ),
+                rateEffects(trip, cfg.imuIdleHz, RateReason.STATIONARY, e.nowNs),
             )
             else -> Transition(s)
         }
@@ -528,6 +602,7 @@ internal class TripMachine(private val cfg: CaptureConfig = CaptureConfig()) {
         activity = s.activity,
         power = s.power,
         triggersAvailable = s.triggersAvailable,
+        inDriveVisible = s.inDriveVisible,
     )
 
     private fun sensorsOn(hz: Int): List<MachineEffect> = listOf(

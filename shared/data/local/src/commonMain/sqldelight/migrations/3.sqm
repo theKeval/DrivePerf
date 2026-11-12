@@ -1,0 +1,3 @@
+-- Schema 3 → 4 (DRIVE-106, F-CAP-05 EC-RBT): whether the stored parking spot can anchor an estimated start. A
+-- database from before trusts its spot, as the app did then.
+ALTER TABLE capture_state ADD COLUMN parked_trusted INTEGER NOT NULL DEFAULT 1;
