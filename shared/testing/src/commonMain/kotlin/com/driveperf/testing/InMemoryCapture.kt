@@ -117,11 +117,14 @@ public class FixedTimeZone(private val id: String = "Etc/UTC", private val offse
     override fun offsetMinAt(wallMs: Long): Int = offsetMin
 }
 
-/** A [WatchdogStore] in memory. */
+/** A [WatchdogStore] in memory. When [writable] is false, [write] fails as on a full disk. */
 public class InMemoryWatchdogStore(public var state: WatchdogState = WatchdogState()) : WatchdogStore {
+    public var writable: Boolean = true
+
     override suspend fun read(): WatchdogState = state
 
-    override suspend fun write(state: WatchdogState) {
-        this.state = state
+    override suspend fun write(state: WatchdogState): Boolean {
+        if (writable) this.state = state
+        return writable
     }
 }

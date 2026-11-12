@@ -58,6 +58,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -275,5 +276,14 @@ class LocalRepositoriesTest {
         watchdog.write(state)
         LocalTripStore(db, "device-1", coroutineContext).setLastParking(Parking(GeoPoint(2.0, -27.5), 9_000L))
         assertEquals(state, watchdog.read())
+    }
+
+    @Test
+    fun aWatchdogStoreThatCannotWriteSaysSoInsteadOfThrowing() = runTest {
+        val driver = JvmDatabaseDriverFactory().create()
+        val broken = LocalWatchdogStore(openDatabase(driver), coroutineContext)
+        driver.close()
+        assertFalse(broken.write(WatchdogState(lastCheckInWallMs = 1L)))
+        assertEquals(WatchdogState(), broken.read())
     }
 }

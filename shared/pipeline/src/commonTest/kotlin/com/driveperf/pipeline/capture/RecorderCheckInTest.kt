@@ -2,6 +2,7 @@ package com.driveperf.pipeline.capture
 
 import com.driveperf.domain.capture.AutoDetectHealth
 import com.driveperf.domain.capture.RearmReason
+import com.driveperf.domain.capture.RecorderState
 import com.driveperf.domain.capture.WakeEvent
 import com.driveperf.domain.capture.WakeKind
 import com.driveperf.domain.capture.WatchdogState
@@ -103,6 +104,23 @@ class RecorderCheckInTest {
         runCurrent()
         assertEquals(AutoDetectHealth.ON, engine.status.value.autoDetectHealth)
         assertEquals(clock.wallMs() + 24 * hourMs, watchdog.scheduledAt)
+    }
+
+    @Test
+    fun aWatchdogStoreThatCannotWriteDoesNotStopRecording() = runTest {
+        watchdogStore.writable = false
+        val engine = engine()
+        engine.onLaunch()
+        engine.onWake(WakeEvent(WakeKind.MANUAL, clock.monotonicNs(), clock.wallMs(), "app"))
+        runCurrent()
+        engine.onForeground()
+        runCurrent()
+        assertEquals(clock.wallMs() + 24 * hourMs, watchdog.scheduledAt, "scheduled from the state kept in memory")
+        assertEquals(clock.wallMs(), engine.status.value.lastCheckInWallMs)
+        assertEquals(RecorderState.RECORDING, engine.status.value.state)
+        engine.stop()
+        runCurrent()
+        assertEquals(RecorderState.IDLE, engine.status.value.state, "the recorder still handles Stop")
     }
 
     @Test

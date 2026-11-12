@@ -463,6 +463,7 @@ public class TripRecorderEngine(
         saveWatchdog(watchdogPolicy.off(watchdogState()))
     }
 
+    /** Keeps [next] in memory even when the store cannot write it (full disk): recording must go on. */
     private suspend fun saveWatchdog(next: WatchdogState) {
         watchdog = next
         persistence.watchdog?.write(next)
