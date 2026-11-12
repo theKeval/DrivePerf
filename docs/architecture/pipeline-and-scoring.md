@@ -1011,7 +1011,7 @@ Every value here can change without changing the design. A change is recorded in
 | P-07 | Stationary < 2 km/h, resume ≥ 7.2 km/h, `PAUSED` after 30 s | §1.6 | `liveUpdates` stationary behaviour, GNSS speed noise at rest | **Spike 1** (the app ends trips on no movement ≥ 2 m/s) |
 | P-08 | Manual stop timer 900 s (F-CAP-01) | §1.6 | User behaviour | A19 (the spike app uses 1800 s for its own purposes) |
 | P-09 | Resume window after a kill 600 s | §1.7 | Relaunch time after jetsam, force-quit behaviour on iOS 26/27 | **Spike 1** kill test (Q14) |
-| P-10 | IMU back-off rates 25 / 10 Hz, delivery floors, 120 s idle timer, 0.03 g wake-up | §1.4, §2.7 | Delivered rate in the background, how fast a rate change takes effect | **Spike 1** Q13 · A19 |
+| P-10 | IMU back-off rates 25 / 10 Hz, delivery floors, 120 s idle timer, 0.03 g wake-up. Steady cruise (25 Hz, and the Android location-batching hint): fixes ≥ 16.7 m/s (60 km/h) within a 2.5 m/s band, turning ≤ 3 °/s, for 60 s; any user acceleration ≥ 0.10 g ends it at once (DRIVE-155) | §1.4, §2.7 | Delivered rate in the background, how fast a rate change takes effect, how often real cruising stays in band | **Spike 1** Q13 · A19 · Batch 3 drives |
 | P-11 | GNSS gate `hAcc` ≤ 30 m | §2.3 | Real accuracy reporting on iPhone and Android | **Spike 1** fix logs · A19 |
 | P-12 | GNSS gap limit 180 s, chord test 0.5–1.5 | §2.7 | Real tunnel and garage behaviour | A19 |
 | P-13 | IMU gap limit 200 ms | §2.6 | Callback jitter while backgrounded | **Spike 1** Q13 |

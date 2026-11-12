@@ -69,6 +69,31 @@ internal class Spans(private val cfg: SignalConfig) {
         return out
     }
 
+    /**
+     * §2.7: IMU at 10 Hz while moving is excluded "with THERMAL or LOW_IMU_RATE". A `LOW_IMU_RATE` span that overlaps
+     * a time the recorder marked the phone critically hot (THERMAL marks, F-CAP-16) becomes `THERMAL`, so the
+     * data-quality notes say why.
+     */
+    fun relabelThermal(spans: List<TripSegment>, capture: CapturedTrip, t0Ns: Long): List<TripSegment> {
+        val hot = mutableListOf<ClosedFloatingPointRange<Double>>()
+        var hotSince: Double? = null
+        for (m in capture.marks) {
+            if (m.type != CaptureMarkType.THERMAL) continue
+            val t = (m.tMonoNs - t0Ns) / NS
+            val critical = m.detail == CRITICAL
+            if (critical && hotSince == null) hotSince = t
+            if (!critical && hotSince != null) {
+                hot += hotSince..t
+                hotSince = null
+            }
+        }
+        hotSince?.let { hot += it..Double.MAX_VALUE }
+        return spans.map { span ->
+            val overlaps = hot.any { span.t0S < it.endInclusive && span.t1S > it.start }
+            if (span.reason == SegmentReason.LOW_IMU_RATE && overlaps) span.copy(reason = SegmentReason.THERMAL) else span
+        }
+    }
+
     /** `PAUSED` spans from the recorder's marks, and `APP_KILLED` gaps (§1.7), on the R1 time base. */
     fun fromMarks(capture: CapturedTrip, t0Ns: Long): List<TripSegment> {
         val out = mutableListOf<TripSegment>()
@@ -95,5 +120,6 @@ internal class Spans(private val cfg: SignalConfig) {
         const val HALF = 0.5
         const val MOVING_MPS = 1.0
         const val NS = 1e9
+        const val CRITICAL = "critical"
     }
 }

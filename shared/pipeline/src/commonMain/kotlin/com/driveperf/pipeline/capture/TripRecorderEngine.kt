@@ -137,6 +137,10 @@ public class TripRecorderEngine(
         inputs.trySend(Input.Simple { MachineEvent.TriggersAvailable(it, available) })
     }
 
+    override fun setInDriveScreenVisible(visible: Boolean) {
+        inputs.trySend(Input.Simple { MachineEvent.InDriveVisible(it, visible) })
+    }
+
     override fun onWake(event: WakeEvent) {
         inputs.trySend(Input.Wake(event))
     }
@@ -416,6 +420,10 @@ public class TripRecorderEngine(
         if (finished.isNotEmpty()) {
             analytics?.track(CaptureEvent.finaliseMs((clock.monotonicNs() - startedNs) / Units.NANOS_PER_MILLI))
         }
+        val estimatedStartM = finished.firstOrNull()?.trip?.quality?.estimatedStartM
+        if (estimatedStartM != null && capture != null) {
+            analytics?.track(CaptureEvent.startBackfilled(estimatedStartM, capture.recordedAccel.isNotEmpty()))
+        }
         send { now -> MachineEvent.Finalised(now, parking) }
     }
 
@@ -488,6 +496,7 @@ public class TripRecorderEngine(
                 autoDetectEnabled = state.autoDetect,
                 autoDetectHealth = health(),
                 lastCheckInWallMs = watchdog?.lastCheckInWallMs,
+                mayBatchLocation = phase == RecorderState.RECORDING && state.cruise?.steady == true && !state.inDriveVisible,
             )
         }
     }

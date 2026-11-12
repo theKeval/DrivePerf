@@ -11,6 +11,7 @@ import com.driveperf.domain.capture.Parking
 import com.driveperf.domain.capture.PowerStatus
 import com.driveperf.domain.capture.RearmReason
 import com.driveperf.domain.capture.RecorderState
+import com.driveperf.domain.capture.ThermalState
 import com.driveperf.domain.capture.Vec3
 import com.driveperf.domain.capture.WakeEvent
 import com.driveperf.domain.trip.InterruptionReason
@@ -84,6 +85,19 @@ internal data class Stillness(
     }
 }
 
+/**
+ * Steady cruise (F-CAP-16): since [sinceNs] every fix was at cruise speed, within the speed band and turning gently.
+ * [steady] once that has lasted [CaptureConfig.cruiseHoldS]. [lastCourseDeg] and [lastNs] are the previous fix's.
+ */
+internal data class Cruise(
+    val sinceNs: Long,
+    val minMps: Double,
+    val maxMps: Double,
+    val lastCourseDeg: Double?,
+    val lastNs: Long,
+    val steady: Boolean = false,
+)
+
 /** Everything the reducer knows. Immutable; one instance per transition. */
 internal data class MachineState(
     val phase: RecorderState = RecorderState.IDLE,
@@ -110,6 +124,14 @@ internal data class MachineState(
     val startFailed: Boolean = false,
     /** False while the platform reports that its OS triggers cannot run (F-CAP-14 health). */
     val triggersAvailable: Boolean = true,
+    /** The in-drive screen is visible: location is never batched then (F-CAP-16 AC3). */
+    val inDriveVisible: Boolean = false,
+    /** Steady cruise inside a confirmed trip; null otherwise. */
+    val cruise: Cruise? = null,
+    /** The thermal state last written as a THERMAL mark in this trip, for the data-quality notes. */
+    val markedThermal: ThermalState? = null,
+    /** A LOW_BATTERY mark was written in this trip. */
+    val markedLowBattery: Boolean = false,
 )
 
 /** Inputs to the reducer. Every event carries the monotonic time it is handled at, so the reducer reads no clock. */
@@ -131,6 +153,9 @@ internal sealed interface MachineEvent {
 
     /** The user opened the app from the watchdog notification. */
     data class WatchdogOpened(override val nowNs: Long) : MachineEvent
+
+    /** The in-drive screen appeared or disappeared. */
+    data class InDriveVisible(override val nowNs: Long, val visible: Boolean) : MachineEvent
 
     /** The platform reports whether its OS triggers can run. */
     data class TriggersAvailable(override val nowNs: Long, val available: Boolean) : MachineEvent
