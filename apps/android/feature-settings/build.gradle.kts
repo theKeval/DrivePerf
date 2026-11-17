@@ -1,5 +1,11 @@
 plugins {
     id("driveperf.android-library")
+    id("driveperf.compose")
+}
+
+android {
+    buildFeatures { compose = true }
+    testOptions { unitTests.isReturnDefaultValues = true }
 }
 
 // One module per PRD epic (ADR-002 section 1). Features see presentation, domain, foundation and
@@ -9,4 +15,11 @@ dependencies {
     implementation(projects.shared.domain)
     implementation(projects.shared.presentation)
     implementation(projects.apps.android.designsystem)
+
+    implementation(platform(libs.compose.bom))
+    implementation(libs.compose.ui)
+    implementation(libs.compose.foundation)
+    implementation(libs.compose.material3)
+    implementation(libs.compose.ui.tooling.preview)
+    debugImplementation(libs.compose.ui.tooling)
 }

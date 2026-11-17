@@ -4,6 +4,8 @@ import android.content.Context
 import com.driveperf.domain.capture.RecorderState
 import com.driveperf.domain.capture.TripRecorder
 import com.driveperf.domain.capture.WakeKind
+import com.driveperf.feature.capture.AutoDetectReadiness
+import com.driveperf.feature.capture.AutoDetectStatus
 import com.driveperf.feature.onboarding.PermissionState
 import com.driveperf.platform.AndroidClock
 import com.driveperf.platform.capture.CaptureForegroundService
@@ -16,6 +18,8 @@ import com.driveperf.platform.wake.WakeDispatcher
 import com.driveperf.platform.wake.WakeHealth
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.launchIn
@@ -29,7 +33,11 @@ import kotlinx.coroutines.flow.onEach
  *
  * Automatic detection needs **the user's opt-in** (S-ONB-08, F-ONB-04.2: off until they switch it on) and the
  * permissions behind it: without background location a wake could not record, and the transitions need activity
- * recognition. [optedIn] is read at every [refresh], so a change takes effect when the app next re-reads state.
+ * recognition. [optedIn] is read at every [refresh], so a change takes effect when the app next re-reads state; the
+ * Recording settings switch (S-SET-03) calls [refresh] at once.
+ *
+ * [autoDetect] is the one status Home, the capture status sheet and Recording settings show (F-CAP-02), with the shared
+ * core's last check-in (`RecorderStatus.lastCheckInWallMs`).
  */
 class WakePath(
     private val context: Context,
@@ -41,6 +49,12 @@ class WakePath(
     private val health = WakeHealth(context.getSharedPreferences("wake_health", Context.MODE_PRIVATE), AndroidClock)
     val status = health.status
     private val inDriveScreenVisible = MutableStateFlow(false)
+    private val permissionsNow = MutableStateFlow(PermissionState())
+    private val optedInNow = MutableStateFlow(false)
+    private val mutableAutoDetect = MutableStateFlow(
+        autoDetectStatus(optedIn = false, permissions = PermissionState(), wake = health.status.value, lastCheckInMs = null),
+    )
+    val autoDetect: StateFlow<AutoDetectStatus> = mutableAutoDetect.asStateFlow()
 
     /** Whether OS wakes may start a trip now: the opt-in and every permission behind it (see [automaticAllowed]). */
     @Volatile private var automaticNow = false
@@ -60,8 +74,15 @@ class WakePath(
             if (wake.kind == WakeKind.MANUAL || automaticNow) CaptureStarter.start(context, wake)
         }
         health.onLaunch(optedIn()) { sinceMs -> ForceStopHistory.detected(context, sinceMs) }
-        parkedRegion.onRegistered = health::parkedRegionRegistered
         refresh(permissions)
+        combine(
+            permissionsNow,
+            optedInNow,
+            health.status,
+            recorder.status.map { it.lastCheckInWallMs }.distinctUntilChanged(),
+        ) { granted, enabled, wake, checkIn -> autoDetectStatus(enabled, granted, wake, checkIn) }
+            .onEach { mutableAutoDetect.value = it }
+            .launchIn(scope)
         recorder.status
             .map { it.mayBatchLocation }
             .distinctUntilChanged()
@@ -83,8 +104,10 @@ class WakePath(
     fun refresh(permissions: PermissionState) {
         val enabled = optedIn()
         val automatic = automaticAllowed(permissions, enabled)
-        val attempt = health.refresh(enabled, automatic)
+        val attempt = health.refresh(automatic)
         automaticNow = automatic
+        permissionsNow.value = permissions
+        optedInNow.value = enabled
         // As on iOS: auto-detect follows the user's choice, and missing permissions show as "needs attention".
         recorder.setAutoDetect(enabled)
         recorder.setTriggersAvailable(automaticAllowed(permissions, optedIn = true))
@@ -106,8 +129,11 @@ class WakePath(
     }
 
     companion object {
-        /** Automatic trips run only when the user opted in (S-ONB-08) and every permission behind them is granted. */
+        /**
+         * Automatic trips run only when the user opted in (S-ONB-08) and nothing needs attention: location all the time,
+         * precise, and physical activity (the same rules the status shows, [AutoDetectReadiness]).
+         */
         fun automaticAllowed(p: PermissionState, optedIn: Boolean): Boolean =
-            optedIn && p.fineLocation && p.backgroundLocation && p.activityRecognition
+            optedIn && AutoDetectReadiness.reasons(p.forCapture()).isEmpty()
     }
 }

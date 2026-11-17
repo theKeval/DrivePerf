@@ -27,7 +27,6 @@ class GeofenceParkedRegionMonitor(context: Context) : ParkedRegionMonitor {
     private val appContext = context.applicationContext
     private val client = LocationServices.getGeofencingClient(appContext)
     private val memory = ParkedRegionMemory()
-    @Volatile var onRegistered: (() -> Unit)? = null
 
     override fun arm(center: GeoPoint, radiusM: Double) {
         memory.armed(center, radiusM)
@@ -51,9 +50,7 @@ class GeofenceParkedRegionMonitor(context: Context) : ParkedRegionMonitor {
         try {
             client.removeGeofences(listOf(REQUEST_ID))
             client.addGeofences(request, pendingIntent(appContext))
-                .addOnSuccessListener {
-                    if (memory.registered(center)) onRegistered?.invoke()
-                }
+                .addOnSuccessListener { memory.registered(center) }
                 .addOnFailureListener { memory.failed(center) }
         } catch (_: SecurityException) {
             // No location permission: remembered for rearmIfNeeded; the activity wake still works meanwhile.

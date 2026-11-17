@@ -5,6 +5,9 @@
     <string name="capture_auto_detect_on">Auto-detect on · ready</string>
     <string name="capture_auto_detect_attention">Auto-detect needs attention</string>
     <string name="capture_last_check_in">Last check-in %1$s</string>
+    <string name="check_in_just_now">just now</string>
+    <string name="check_in_minutes">%1$d min ago</string>
+    <string name="check_in_hours">%1$d h ago</string>
     <string name="capture_force_stop_title">Auto-detect is back on</string>
     <string name="capture_force_stop_rearmed">DrivePerf was force-stopped. Opening it switched auto-detect back on. Drives during the pause weren\'t recorded.</string>
     <string name="capture_force_stop_paused">Force-stopping pauses automatic trips. Reopen DrivePerf to re-arm auto-detect.</string>
@@ -68,4 +71,53 @@
     <string name="saved_back">Back to Drives</string>
     <string name="not_saved_title">Trip not saved</string>
     <string name="not_saved_body">Nothing was kept.</string>
+
+    <!-- F-CAP-02 (DRIVE-90): why auto-detect needs attention. Mirrors iOS AttentionReason in Android wording. -->
+    <string name="attention_no_location_short">Location is off</string>
+    <string name="attention_no_location_explanation">Location is off, so automatic trips can’t start. Allow location, then choose Allow all the time.</string>
+    <string name="attention_while_using_short">Location is set to While using the app</string>
+    <string name="attention_while_using_explanation">Location access is “While using the app”. Automatic trips are paused. Choose Allow all the time to fix it.</string>
+    <string name="attention_no_activity_short">Physical activity is off</string>
+    <string name="attention_no_activity_explanation">Physical activity is off. DrivePerf uses it to tell driving from walking, so automatic trips are paused.</string>
+    <string name="attention_no_precise_short">Precise location is off</string>
+    <string name="attention_no_precise_explanation">Precise location is off. Without it a drive’s start and route are too rough to measure.</string>
+    <string name="attention_registration_short">Activity updates didn’t start</string>
+    <string name="attention_registration_explanation">Google Play services couldn’t start activity updates. Reopen DrivePerf to try again.</string>
+    <string name="attention_banner_title">Auto-detect needs attention</string>
+    <string name="attention_fix">Fix</string>
+
+    <string name="check_location_title">Location: Allow all the time</string>
+    <string name="check_location_ok">Allowed all the time</string>
+    <string name="check_location_off">Not allowed</string>
+    <string name="check_location_while_using">While using the app only</string>
+    <string name="check_precise_title">Precise location</string>
+    <string name="check_precise_ok">On</string>
+    <string name="check_precise_off">Approximate only</string>
+    <string name="check_activity_title">Physical activity</string>
+    <string name="check_activity_ok">Allowed</string>
+    <string name="check_activity_off">Not allowed</string>
+    <string name="check_activity_failed">Allowed, but updates didn’t start</string>
+
+    <!-- S-HOME-02 capture status sheet -->
+    <string name="status_title">Capture status</string>
+    <string name="status_subtitle_ready">Automatic trips</string>
+    <string name="status_subtitle_attention">Automatic trips are paused</string>
+    <string name="status_subtitle_off">Automatic trips are off</string>
+    <string name="status_summary_ready">Automatic trips are ready.</string>
+    <string name="status_summary_ready_detail">Auto-detects most drives. The first few hundred metres may be estimated. Force-stopping pauses auto-detect.</string>
+    <string name="status_summary_attention">Auto-detect needs attention.</string>
+    <string name="status_summary_off">Automatic trips are off.</string>
+    <string name="status_summary_off_detail">Drives record only when you tap Start. Turn automatic trips on in Recording settings.</string>
+    <string name="status_last_check_in">Last check-in</string>
+    <string name="status_last_check_in_none">Not yet</string>
+    <string name="status_last_check_in_detail">DrivePerf checks in each time your phone wakes it: a drive, a restart, opening the app.</string>
+    <string name="status_checks_to_fix">%1$d to fix</string>
+    <string name="status_checks_all_ok">Checks · all %1$d OK</string>
+    <string name="status_recording_settings">Recording settings</string>
+    <string name="status_recording_settings_detail">Turn automatic trips on or off</string>
+    <string name="status_footer">Checks run on this phone. Nothing is sent anywhere.</string>
+    <string name="status_glyph_ok">OK</string>
+    <string name="status_glyph_fix">Needs fixing</string>
+    <string name="status_glyph_off">Off</string>
+    <string name="capture_open_status_description">Open capture status</string>
 </resources>
