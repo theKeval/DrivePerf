@@ -4,6 +4,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.Saver
+import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -31,11 +33,13 @@ import com.driveperf.platform.crash.ConsentSettings
 /**
  * Turning automatic trips on from Recording settings (F-SET-01 AC3): walks the missing permissions one at a time with the
  * onboarding steps, each at most once per attempt, so a refusal never loops. What is still missing afterwards shows as
- * "Needs attention", with Fix in the status sheet.
+ * "Needs attention", with Fix in the status sheet. Kept with [Saver] so the walk survives activity recreation while a
+ * permission dialog or App info is open.
  */
-class EnableAutoTrips {
-    private val attempted = mutableSetOf<AttentionReason>()
-    private var active = false
+class EnableAutoTrips private constructor(private var active: Boolean, attempted: Set<AttentionReason>) {
+    private val attempted = attempted.toMutableSet()
+
+    constructor() : this(active = false, attempted = emptySet())
 
     /** Starts the next step; set by the route to its [AutoDetectFixer]. */
     var fix: (AttentionReason) -> Unit = {}
@@ -63,6 +67,17 @@ class EnableAutoTrips {
     }
 
     companion object {
+        /** Saved as the attempt's state and the names of the reasons already tried. */
+        val Saver: Saver<EnableAutoTrips, Any> = listSaver(
+            save = { session -> listOf(session.active.toString()) + session.attempted.map { it.name } },
+            restore = { saved ->
+                EnableAutoTrips(
+                    active = saved.first().toBoolean(),
+                    attempted = saved.drop(1).mapNotNull { name -> AttentionReason.entries.firstOrNull { it.name == name } }.toSet(),
+                )
+            },
+        )
+
         fun nextReason(permissions: CapturePermissions, attempted: Set<AttentionReason>): AttentionReason? =
             AutoDetectReadiness.reasons(permissions).firstOrNull { it.fix != null && it !in attempted }
     }
@@ -86,7 +101,7 @@ fun RecordingSettingsRoute(deps: RecordingSettingsDeps, modifier: Modifier = Mod
     val status by deps.wakePath.autoDetect.collectAsStateWithLifecycle()
     var optedIn by remember { mutableStateOf(deps.consent.automaticTripsEnabled) }
     var showStatus by rememberSaveable { mutableStateOf(false) }
-    val session = remember { EnableAutoTrips() }
+    val session = rememberSaveable(saver = EnableAutoTrips.Saver) { EnableAutoTrips() }
     val fixer = rememberAutoDetectFixer(
         reader = deps.permissionReader,
         onPermissionsChanged = deps.captureController::refreshPermissions,

@@ -13,11 +13,13 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -72,10 +74,13 @@ enum class FixStep {
  * Fixes one [AttentionReason] at a time with the onboarding permission steps (F-ONB-04): the system dialog while Android
  * still shows it, otherwise DrivePerf's App info. [rememberAutoDetectFixer]'s `onFinished` runs once the user is back.
  * Render [AllTheTimeDialog] next to it: on Android 11+ "Allow all the time" is explained before App info opens.
+ *
+ * The open explanation and the App info step in progress are saved instance state, so a rotation or a process restart
+ * while the user is in a dialog or in Settings does not lose the step (its result then still reaches `onFinished`).
  */
 @Stable
-class AutoDetectFixer internal constructor() {
-    internal var explainingBackground by mutableStateOf(false)
+class AutoDetectFixer internal constructor(explaining: MutableState<Boolean>) {
+    internal var explainingBackground by explaining
     internal var start: (AttentionReason) -> Unit = {}
     internal var openBackgroundSettings: () -> Unit = {}
     internal var dismissBackground: () -> Unit = {}
@@ -93,8 +98,9 @@ fun rememberAutoDetectFixer(
     val activity = LocalActivity.current
     val changed by rememberUpdatedState(onPermissionsChanged)
     val finished by rememberUpdatedState(onFinished)
-    val fixer = remember { AutoDetectFixer() }
-    var awaitingSettings by remember { mutableStateOf<AttentionReason?>(null) }
+    val explaining = rememberSaveable { mutableStateOf(false) }
+    val fixer = remember(explaining) { AutoDetectFixer(explaining) }
+    var awaitingSettings by rememberSaveable { mutableStateOf<AttentionReason?>(null) }
 
     fun openAppSettings(reason: AttentionReason) {
         awaitingSettings = reason
