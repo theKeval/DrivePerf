@@ -81,6 +81,7 @@ struct CaptureStatusAccessory: View {
 /// S-HOME-02 Capture status sheet, reduced to the shell: the summary, the promise and the core checks.
 struct CaptureStatusSheet: View {
     let capture: CaptureViewModel
+    let recording: RecordingSettingsViewModel
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
@@ -103,6 +104,12 @@ struct CaptureStatusSheet: View {
                     if capture.accessory != .manual {
                         CheckInRow(lastCheckIn: capture.lastCheckIn)
                     }
+                    NavigationLink {
+                        RecordingSettingsView(model: recording)
+                    } label: {
+                        RecordingSettingsLinkRow(isOn: recording.autoTripsOn)
+                    }
+                    .buttonStyle(.plain)
                     Text("Checks run on this phone. Nothing is sent anywhere.")
                         .font(DPFont.meta).foregroundStyle(DPColor.text3)
                 }
@@ -159,6 +166,27 @@ private struct CheckInRow: View {
         .frame(minHeight: DPLayout.touchMin)
         .dpCard()
         .accessibilityElement(children: .combine)
+    }
+}
+
+/// The row into Recording settings (S-SET-03), where "Pause auto-detect" will sit once DRIVE-152 lands.
+private struct RecordingSettingsLinkRow: View {
+    let isOn: Bool
+
+    var body: some View {
+        HStack {
+            Text("Recording settings").font(DPFont.body).foregroundStyle(DPColor.text)
+            Spacer()
+            Text(isOn ? "Automatic trips on" : "Manual only").font(DPFont.bodySecondary).foregroundStyle(DPColor.text2)
+            DPIcon.chevronRight.image.resizable().scaledToFit().frame(width: 12, height: 12)
+                .foregroundStyle(DPColor.text3)
+        }
+        .padding(.horizontal, DPSpace.s4)
+        .frame(minHeight: DPLayout.touchMin)
+        .dpCard()
+        .contentShape(Rectangle())
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.isButton)
     }
 }
 
