@@ -63,35 +63,30 @@ struct RecordingSettingsView: View {
             if phase == .active { Task { await model.refresh() } }
         }
         .sheet(item: $model.explainer) { explainer in
-            AlwaysLocationExplainerSheet(model: model, canAsk: explainer.canAsk)
+            LocationAccessExplainerSheet(model: model, step: explainer)
         }
     }
 }
 
 /// Shown when automatic trips are switched on while location is not "Always". It follows onboarding's wording
-/// (S-ONB-08, S-ONB-16 alwaysDeclined): one iOS prompt when it can still appear, Settings otherwise.
-private struct AlwaysLocationExplainerSheet: View {
+/// (S-ONB-06, S-ONB-08, S-ONB-16 alwaysDeclined): the While Using prompt if location was never asked, then the one
+/// iOS Always prompt when it can still appear, otherwise Settings.
+private struct LocationAccessExplainerSheet: View {
     let model: RecordingSettingsViewModel
-    let canAsk: Bool
+    let step: RecordingSettingsViewModel.AlwaysExplainer
 
     var body: some View {
         VStack(alignment: .leading, spacing: DPSpace.s4) {
             HStack(spacing: DPSpace.s3) {
                 GlyphDisc(.gps, tone: .accent, size: 36)
-                Text("Allow location “Always”").font(DPFont.sheetTitle).foregroundStyle(DPColor.text)
+                Text(title).font(DPFont.sheetTitle).foregroundStyle(DPColor.text)
                     .accessibilityAddTraits(.isHeader)
                 Spacer()
             }
-            Text(
-                canAsk
-                    ? "To start drives on its own, DrivePerf needs location set to “Always”. iOS will ask once."
-                    : "Location is not set to “Always”, so DrivePerf can’t start drives on its own. Open Settings, "
-                        + "choose Location, then Always."
-            )
-            .font(DPFont.body).foregroundStyle(DPColor.text2)
+            Text(message).font(DPFont.body).foregroundStyle(DPColor.text2)
             Text("Automatic trips stay on, and the status shows “needs attention” until it is granted.")
                 .font(DPFont.meta).foregroundStyle(DPColor.text3)
-            DPPrimaryButton(canAsk ? "Continue" : "Open Settings", icon: canAsk ? nil : .gear) {
+            DPPrimaryButton(step == .settings ? "Open Settings" : "Continue", icon: step == .settings ? .gear : nil) {
                 Task { await model.confirmAlways() }
             }
             .disabled(model.isRequesting)
@@ -100,5 +95,22 @@ private struct AlwaysLocationExplainerSheet: View {
         .padding(DPSpace.s6)
         .presentationDetents([.medium])
         .presentationBackground(.regularMaterial)
+    }
+
+    private var title: String {
+        step == .initialAccess ? "Allow location" : "Allow location “Always”"
+    }
+
+    private var message: String {
+        switch step {
+        case .initialAccess:
+            "DrivePerf needs your location to record drives. iOS will ask first, then once more to allow “Always” so "
+                + "drives can start on their own."
+        case .alwaysUpgrade:
+            "To start drives on its own, DrivePerf needs location set to “Always”. iOS will ask once."
+        case .settings:
+            "Location is not set to “Always”, so DrivePerf can’t start drives on its own. Open Settings, choose "
+                + "Location, then Always."
+        }
     }
 }

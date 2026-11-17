@@ -9,12 +9,18 @@ import Observation
 @MainActor
 @Observable
 public final class RecordingSettingsViewModel {
-    /// The sheet that explains why automatic trips need "Always" location while it is missing.
-    public struct AlwaysExplainer: Equatable, Identifiable, Sendable {
-        /// True while iOS can still show its one-time "Change to Always Allow" prompt: location is While Using and
-        /// the prompt has not been shown before (F-ONB-04.3). Otherwise only Settings can grant it.
-        public let canAsk: Bool
-        public var id: String { canAsk ? "ask" : "settings" }
+    /// The sheet that explains what automatic trips need from location while "Always" is missing. One sheet, whose
+    /// content moves through the steps, so it never flickers between them.
+    public enum AlwaysExplainer: Equatable, Identifiable, Sendable {
+        /// Location was never asked (onboarding skipped it): iOS lists no location options in Settings until the app
+        /// has asked once, so ask for While Using first (S-ONB-06).
+        case initialAccess
+        /// While Using is granted and iOS can still show its one-time "Change to Always Allow" prompt (F-ONB-04.3).
+        case alwaysUpgrade
+        /// Only Settings can grant it: location denied or restricted, or the one-time prompt was already used.
+        case settings
+
+        public var id: String { "location-access" }
     }
 
     public private(set) var autoTripsOn: Bool
@@ -74,23 +80,27 @@ public final class RecordingSettingsViewModel {
             return
         }
         // The choice stays on while "Always" is missing: the status says "needs attention" until it is granted.
-        if permissions.location != .always {
-            explainer = AlwaysExplainer(canAsk: canAskForAlways)
-        }
+        explainer = nextExplainer()
     }
 
-    /// The explainer's "Continue": the one-time iOS prompt, or Settings once it has been used (F-ONB-04.3).
+    /// The explainer's "Continue": ask for While Using, or for the one-time Always upgrade, or open Settings
+    /// (F-ONB-04.3: the Always prompt is never shown again in-app).
     public func confirmAlways() async {
-        guard let explainer else { return }
-        if explainer.canAsk {
-            isRequesting = true
-            preferences.update { $0.alwaysPromptShown = true }
-            permissions = await permissionsPort.requestLocationAlways()
-            isRequesting = false
-            self.explainer = nil
+        guard let step = explainer else { return }
+        switch step {
+        case .initialAccess:
+            await request { await self.permissionsPort.requestLocationWhenInUse() }
             refreshCapture()
-        } else {
-            self.explainer = nil
+            // On to the Always upgrade when While Using was granted; denied goes to Settings, where DrivePerf now
+            // has location options.
+            explainer = nextExplainer()
+        case .alwaysUpgrade:
+            preferences.update { $0.alwaysPromptShown = true }
+            await request { await self.permissionsPort.requestLocationAlways() }
+            explainer = nil
+            refreshCapture()
+        case .settings:
+            explainer = nil
             permissionsPort.openSystemSettings()
         }
     }
@@ -103,7 +113,19 @@ public final class RecordingSettingsViewModel {
         permissionsPort.openSystemSettings()
     }
 
-    private var canAskForAlways: Bool {
-        permissions.location == .whenInUse && !preferences.preferences.alwaysPromptShown
+    /// What is still missing before automatic trips can run, as the next explainer step; nil when "Always" is held.
+    private func nextExplainer() -> AlwaysExplainer? {
+        switch permissions.location {
+        case .always: nil
+        case .notDetermined: .initialAccess
+        case .whenInUse: preferences.preferences.alwaysPromptShown ? .settings : .alwaysUpgrade
+        case .denied, .restricted: .settings
+        }
+    }
+
+    private func request(_ body: @MainActor () async -> PermissionSnapshot) async {
+        isRequesting = true
+        permissions = await body()
+        isRequesting = false
     }
 }

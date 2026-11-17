@@ -72,7 +72,7 @@ final class RecordingSettingsViewModelTests: XCTestCase {
         permissions.alwaysResult = .always
         let model = makeModel()
         await model.setAutoTrips(true)
-        XCTAssertEqual(model.explainer, .init(canAsk: true))
+        XCTAssertEqual(model.explainer, .alwaysUpgrade)
         XCTAssertTrue(preferences.preferences.autoTripsEnabled, "The choice is kept while Always is missing")
         XCTAssertEqual(model.statusText, "Auto-detect needs attention")
         XCTAssertEqual(model.statusDetail, AttentionReason.locationWhileUsing.shortText)
@@ -101,7 +101,7 @@ final class RecordingSettingsViewModelTests: XCTestCase {
         preferences.update { $0.alwaysPromptShown = true }
         let model = makeModel()
         await model.setAutoTrips(true)
-        XCTAssertEqual(model.explainer, .init(canAsk: false))
+        XCTAssertEqual(model.explainer, .settings)
         await model.confirmAlways()
         XCTAssertTrue(permissions.requests.isEmpty, "The Always prompt is never shown again in-app")
         XCTAssertEqual(permissions.openedSettings, 1)
@@ -112,8 +112,41 @@ final class RecordingSettingsViewModelTests: XCTestCase {
         permissions.state.location = .denied
         let model = makeModel()
         await model.setAutoTrips(true)
-        XCTAssertEqual(model.explainer, .init(canAsk: false))
+        XCTAssertEqual(model.explainer, .settings)
         XCTAssertEqual(model.attentionReasons.first, .locationDenied)
+    }
+
+    func testNeverAskedLocationRequestsWhileUsingFirstThenOffersTheAlwaysUpgrade() async {
+        permissions.state.location = .notDetermined
+        permissions.whenInUseResult = .whenInUse
+        let model = makeModel()
+        await model.setAutoTrips(true)
+        XCTAssertEqual(model.explainer, .initialAccess, "Settings has no location options before the first ask")
+        XCTAssertTrue(permissions.requests.isEmpty, "Nothing is asked before the explanation")
+
+        await model.confirmAlways()
+        XCTAssertEqual(permissions.requests, ["whenInUse"])
+        XCTAssertEqual(model.explainer, .alwaysUpgrade)
+        XCTAssertEqual(permissions.openedSettings, 0)
+        XCTAssertFalse(preferences.preferences.alwaysPromptShown, "The one-time Always prompt is still unused")
+
+        await model.confirmAlways()
+        XCTAssertEqual(permissions.requests, ["whenInUse", "always"])
+        XCTAssertNil(model.explainer)
+        XCTAssertEqual(model.statusText, "Auto-detect on · ready")
+        XCTAssertTrue(preferences.preferences.autoTripsEnabled)
+    }
+
+    func testNeverAskedLocationDeniedGoesToSettingsAndStaysOn() async {
+        permissions.state.location = .notDetermined
+        permissions.whenInUseResult = .denied
+        let model = makeModel()
+        await model.setAutoTrips(true)
+        await model.confirmAlways()
+        XCTAssertEqual(permissions.requests, ["whenInUse"])
+        XCTAssertEqual(model.explainer, .settings)
+        XCTAssertTrue(preferences.preferences.autoTripsEnabled)
+        XCTAssertEqual(model.statusText, "Auto-detect needs attention")
     }
 
     func testNotNowKeepsTheChoice() async {
