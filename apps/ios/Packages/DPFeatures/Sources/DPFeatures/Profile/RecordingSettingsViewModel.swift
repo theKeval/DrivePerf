@@ -53,8 +53,14 @@ public final class RecordingSettingsViewModel {
     /// Re-reads the saved choice and the permissions. Call when the screen opens and when the app returns from
     /// Settings, where the user may have granted "Always".
     public func refresh() async {
-        autoTripsOn = preferences.preferences.autoTripsEnabled
+        reloadChoice()
         permissions = await permissionsPort.current()
+    }
+
+    /// Re-reads only the saved choice. The model outlives onboarding, which saves it too, so the app calls this when
+    /// onboarding finishes and the status sheet calls it when it opens.
+    public func reloadChoice() {
+        autoTripsOn = preferences.preferences.autoTripsEnabled
     }
 
     /// The switch. Both directions save and refresh capture before anything else, so the app never lags behind it.

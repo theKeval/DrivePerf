@@ -102,6 +102,7 @@ public final class AppModel {
 
     private func finishOnboarding() {
         profile.refresh()
+        recordingSettings.reloadChoice()
         route = .shell
         onboarding = nil
     }

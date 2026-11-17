@@ -122,7 +122,10 @@ struct CaptureStatusSheet: View {
             }
         }
         .presentationDetents([.medium, .large])
-        .task { await capture.refreshReadiness() }
+        .task {
+            recording.reloadChoice()
+            await capture.refreshReadiness()
+        }
     }
 
     private var isAttention: Bool {

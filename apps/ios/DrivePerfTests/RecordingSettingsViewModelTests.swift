@@ -29,6 +29,14 @@ final class RecordingSettingsViewModelTests: XCTestCase {
         XCTAssertFalse(makeModel().autoTripsOn)
     }
 
+    func testReloadChoicePicksUpWhatOnboardingSaved() {
+        let model = makeModel()
+        XCTAssertFalse(model.autoTripsOn)
+        preferences.update { $0.autoTripsEnabled = true }
+        model.reloadChoice()
+        XCTAssertTrue(model.autoTripsOn)
+    }
+
     func testTurningOnWithAlwaysSavesAndRefreshesWithoutAsking() async {
         let model = makeModel()
         await model.setAutoTrips(true)
