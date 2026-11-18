@@ -63,14 +63,13 @@ class CaptureBackoffTest {
     }
 
     @Test
-    fun aManoeuvreRestoresTheFullRateAtOnce() {
+    fun aSustainedBrakeRestoresTheFullRateWithinOneSecond() {
         val cruising = cruise(recording(), 1, 62, { 20.0 }).state
-        val brake = m.reduce(cruising, MachineEvent.Motion(ns(62.5), listOf(motion(62.5, accel = 0.2))))
-        assertEquals(listOf(50), brake.rates())
-        assertEquals(CaptureEvent.imuRate(50, RateReason.NOMINAL), brake.tracked().single())
-        assertNull(brake.state.cruise)
-        val gentle = m.reduce(cruising, MachineEvent.Motion(ns(62.5), listOf(motion(62.5, accel = 0.05))))
-        assertTrue(gentle.rates().isEmpty(), "gentle motion keeps the cruise")
+        val brake = List(25) { motion(62.5 + it / 25.0, accel = -0.15) }
+        val t = m.reduce(cruising, MachineEvent.Motion(brake.last().tMonoNs, brake))
+        assertEquals(listOf(50), t.rates())
+        assertEquals(CaptureEvent.imuRate(50, RateReason.NOMINAL), t.tracked().single())
+        assertNull(t.state.cruise)
     }
 
     @Test
