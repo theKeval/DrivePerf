@@ -45,6 +45,8 @@ public data class CaptureMeta(
     val imuDeliveryPct: Double?,
     val batteryStartPct: Int?,
     val batteryEndPct: Int?,
+    /** `motion_history` or `distance_speed`; null for older trips and trips without an estimate. */
+    val startEstimateMethod: String? = null,
 )
 
 /** One row of the preview track (data-model.md §2.5). [quality] uses the fixture `q` codes: 0 observed, 1 estimated,

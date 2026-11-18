@@ -425,6 +425,20 @@ The 120 m parked geofence requests EXIT only, 0 ms loitering (no DWELL), 0 ms be
 initial EXIT when registered outside. Adding the same request ID replaces the region without a remove/add race.
 These settings cannot guarantee Q2 under Android background delivery limits; new device drives must measure it.
 
+**DRIVE-214, approved 18 Nov 2026:** motion-history timing stays first. A low-confidence automotive update can
+continue a run already established at medium/high confidence; it cannot establish a run on its own. Another activity
+ends the run. A run at the 15-minute query edge has an unknown departure time, not an onset at the query boundary.
+On iOS, when history cannot give a departure time (missing history or a run covering the whole window), use a distance/speed
+fallback. Take the first reliable gated fix and the median measured speed of reliable fixes in its first 30 seconds:
+hAcc ≤ 20 m, speed accuracy ≤ 2 m/s, nonnegative speed, no position-derived speeds, and at least three fixes.
+For an even sample count, average the two middle speeds. Set `tStart = tFirstReliableFix − d / medianSpeed`, where
+`d = haversine(parkingSpot, firstReliableFix)`. Drop earlier unreliable fixes from the processed track. Validate the
+same 5 km, 900 s and 60 m/s bounds; reject zero speed, a start before the parking time, or a start at/after the wake.
+Never clip an out-of-bounds result into the accepted range. A valid history time that fails plausibility is rejected,
+not replaced by a fallback. Persist `captureMeta.startEstimateMethod` as `motion_history` or `distance_speed`
+(null on older trips or no estimate). Android retains the DRIVE-212 geofence policy above; its projected estimates also record `distance_speed`.
+Both methods retain the ESTIMATED span, provenance and D6 scoring exclusions.
+
 The straight-line distance slightly understates the true path, and the "Estimated" label covers that. iOS writes `CMSensorRecorder` accelerometer data for the gap to R0 at negative chunk offsets, kept for later use. Per D6, **the estimated segment produces no events, no pins and no Smoothness**. Android has no IMU for the gap.
 
 ### 2.9 Data-quality badge (F-DQ-04)

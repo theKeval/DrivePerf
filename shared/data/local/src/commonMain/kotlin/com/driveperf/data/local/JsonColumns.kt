@@ -106,12 +106,13 @@ internal data class CaptureMetaJson(
     val imuDeliveryPct: Double? = null,
     val batteryStartPct: Int? = null,
     val batteryEndPct: Int? = null,
+    val startEstimateMethod: String? = null,
 ) {
-    fun toDomain(): CaptureMeta = CaptureMeta(wakeKind, startLatencyS, imuDeliveryPct, batteryStartPct, batteryEndPct)
+    fun toDomain(): CaptureMeta = CaptureMeta(wakeKind, startLatencyS, imuDeliveryPct, batteryStartPct, batteryEndPct, startEstimateMethod)
 
     companion object {
         fun of(m: CaptureMeta): CaptureMetaJson =
-            CaptureMetaJson(m.wakeKind, m.startLatencyS, m.imuDeliveryPct, m.batteryStartPct, m.batteryEndPct)
+            CaptureMetaJson(m.wakeKind, m.startLatencyS, m.imuDeliveryPct, m.batteryStartPct, m.batteryEndPct, m.startEstimateMethod)
     }
 }
 

@@ -260,7 +260,7 @@ Immutable fields are fixed when the trip is finalised. Mutable fields are user c
 | `pipelineVersion` | String | | S | ✓ | ✓ (reprocess) | A12 algorithm IDs, e.g. `pipe-1.0.0` |
 | `files` | List<TripFileRef> | | S | ✓ | ✓ | §1.17; `R0` refs never sync |
 | `rawState` | `FULL`/`ANALYSIS_ONLY`/`SUMMARY_ONLY` | | S | ✓ | ✓ | "Detailed data removed" when `SUMMARY_ONLY` (F-HIS-03.4) |
-| `captureMeta` | CaptureMeta | | O | — | — | Wake trigger, start latency, IMU delivery %, battery %/h, thermal flags: feeds F-ANA-02 buckets only |
+| `captureMeta` | CaptureMeta | | O | — | — | Wake trigger, start latency, IMU delivery %, battery %/h, thermal flags; optional `startEstimateMethod` (`motion_history` / `distance_speed`, DRIVE-214): device diagnostics only |
 
 ### 1.8 TripSegment (quality spans and capture states)
 

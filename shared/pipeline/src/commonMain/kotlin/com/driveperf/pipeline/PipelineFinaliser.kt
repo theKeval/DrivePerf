@@ -245,7 +245,7 @@ public class PipelineFinaliser(
             quality = quality,
             interrupted = r.interruption?.let { Interruption(sig.endS, it) },
             suspect = suspect,
-            captureMeta = CaptureMeta(h.wakeKind, null, sig.imuDelivery * PERCENT, null, null),
+            captureMeta = CaptureMeta(h.wakeKind, null, sig.imuDelivery * PERCENT, null, null, sig.estimate?.method),
             pipelineVersion = Versions.PIPELINE,
             createdAt = h.startWallMs,
             updatedAt = r.nowWallMs,

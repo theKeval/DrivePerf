@@ -59,7 +59,7 @@ class RealDriveDiagnostics {
         }
     }
 
-    /** DRIVE-212: start distance (Q2) and the estimated-start outcome per trip. */
+    /** DRIVE-212/214: start distance (Q2) and the estimated-start outcome per trip. */
     private fun startReplay(capture: CapturedTrip, trip: com.driveperf.domain.trip.Trip?) {
         val anchor = capture.header.parking?.point
         val firstAccurate = capture.fixes.firstOrNull { it.hAccM?.let { a -> a <= 20.0 } == true }
@@ -67,7 +67,10 @@ class RealDriveDiagnostics {
             com.driveperf.pipeline.geo.Geo.haversineM(anchor.lat, anchor.lng, firstAccurate.lat, firstAccurate.lng)
         } else null
         val backdateS = trip?.let { (capture.header.startWallMs - it.startedAt) / 1000.0 }
-        println("STARTREPLAY ${capture.header.tripId} Q2=${q2?.r()} estimated=${trip?.startEstimated} backdateS=$backdateS")
+        println(
+            "STARTREPLAY ${capture.header.tripId} Q2=${q2?.r()} estimated=${trip?.startEstimated} backdateS=$backdateS " +
+                "method=${trip?.captureMeta?.startEstimateMethod} estimatedStartM=${trip?.quality?.estimatedStartM}",
+        )
     }
 
     private fun variant(raw: CapturedTrip): CapturedTrip {
