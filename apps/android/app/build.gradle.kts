@@ -121,7 +121,7 @@ dependencies {
 // android.yml runs `:apps:android:app:detekt` and `:apps:android:app:testDevDebugUnitTest` only. Hooking the library
 // modules onto those two tasks keeps their checks and unit tests in CI without a workflow change.
 val libraryModules = listOf("designsystem", "platform") + listOf(
-    "capture", "drives", "routes", "insights", "garage", "account", "onboarding",
+    "capture", "drives", "routes", "insights", "garage", "account", "onboarding", "settings",
 ).map { "feature-$it" }
 tasks.named("detekt") {
     dependsOn(libraryModules.map { ":apps:android:$it:detekt" })

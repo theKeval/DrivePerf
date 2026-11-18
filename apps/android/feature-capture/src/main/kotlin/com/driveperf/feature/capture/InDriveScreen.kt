@@ -157,7 +157,7 @@ private fun DriveNumbers(state: CaptureUiState.Recording, modifier: Modifier = M
         )
         Text(text = state.elapsed, style = MaterialTheme.typography.displayLargeEmphasized)
         Text(
-            text = stringResource(R.string.drive_distance, state.distanceKm),
+            text = stringResource(R.string.drive_distance, state.distance),
             style = MaterialTheme.typography.titleLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )

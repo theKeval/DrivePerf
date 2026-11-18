@@ -23,5 +23,7 @@ object Routes {
     const val ONBOARDING = "onboarding"
     const val ALL_DRIVES = "all_drives"
     const val PROFILE = "profile"
+    const val SETTINGS = "settings"
+    const val UNITS_DISPLAY = "units_display"
     const val RECORDING_SETTINGS = "recording_settings"
 }

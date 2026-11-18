@@ -57,7 +57,7 @@ class InDriveUiTest {
         carName: String? = null,
     ) = CaptureUiState.Recording(
         elapsed = "24:05",
-        distanceKm = "12.4",
+        distance = "12.4 km",
         gps = gps,
         confirmingStop = confirming,
         startedAtLabel = "5:31 PM",
@@ -191,7 +191,7 @@ class InDriveUiTest {
 
     @Test
     fun `a saved drive shows its numbers and the timeout note when the timeout ended it`() {
-        show(DriveCover.Saved("t1", "12.4", 24, SavedKind.DRIVE, autoEnded = true))
+        show(DriveCover.Saved("t1", "12.4 km", 24, SavedKind.DRIVE, autoEnded = true))
         compose.onNodeWithText("Drive saved").assertIsDisplayed()
         compose.onNodeWithText("12.4 km · 24 min").assertIsDisplayed()
         compose.onNodeWithText("There was no movement for 15 minutes", substring = true).assertIsDisplayed()
@@ -201,7 +201,7 @@ class InDriveUiTest {
 
     @Test
     fun `a saved passenger trip says it is not scored, a deleted one says nothing was kept`() {
-        show(DriveCover.Saved("t1", "3.0", 8, SavedKind.PASSENGER, autoEnded = false))
+        show(DriveCover.Saved("t1", "3.0 km", 8, SavedKind.PASSENGER, autoEnded = false))
         compose.onNodeWithText("Passenger trip saved · not scored").assertIsDisplayed()
     }
 

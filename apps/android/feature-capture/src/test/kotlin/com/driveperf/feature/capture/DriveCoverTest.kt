@@ -111,7 +111,7 @@ class DriveCoverTest {
         passTime(1)
         val saved = vm.cover.value as DriveCover.Saved
         assertEquals("t1", saved.tripId)
-        assertEquals("12.4", saved.distanceKm)
+        assertEquals("12.4 km", saved.distance)
         assertEquals(10, saved.minutes)
         assertEquals(SavedKind.DRIVE, saved.kind)
         assertFalse("the user stopped it", saved.autoEnded)
@@ -165,7 +165,7 @@ class DriveCoverTest {
         controller.snapshot.value = CaptureSnapshot.Idle
         passTime(4_000)
         val saved = vm.cover.value as DriveCover.Saved
-        assertNull(saved.distanceKm)
+        assertNull(saved.distance)
         assertEquals("t1", saved.tripId)
     }
 

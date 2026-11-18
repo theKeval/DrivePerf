@@ -1,5 +1,7 @@
 package com.driveperf.feature.capture
 
+import com.driveperf.domain.settings.UnitSystem
+
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
@@ -19,7 +21,7 @@ class CaptureFormattingTest {
     }
 
     @Test fun `distance is kilometres with one decimal`() {
-        assertEquals("0.0", CaptureFormatting.distanceKm(0.0))
-        assertEquals("12.4", CaptureFormatting.distanceKm(12_449.0))
+        assertEquals("0.0 km", CaptureFormatting.distance(0.0, UnitSystem.METRIC))
+        assertEquals("12.4 km", CaptureFormatting.distance(12_449.0, UnitSystem.METRIC))
     }
 }

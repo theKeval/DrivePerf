@@ -1,5 +1,7 @@
 package com.driveperf.feature.capture
 
+import com.driveperf.domain.settings.UnitSystem
+
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -28,7 +30,7 @@ sealed interface CaptureUiState {
 
     data class Recording(
         val elapsed: String,
-        val distanceKm: String,
+        val distance: String,
         val gps: GpsHealth,
         val confirmingStop: Boolean,
         /** "Started by you" or "Started automatically". */
@@ -54,7 +56,7 @@ sealed interface CaptureUiState {
  * (F-CAP-07.4), the passenger escape (S-DRV-03) and the S-DRV-04 screens after the trip.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
-@Suppress("TooManyFunctions") // one function per user event
+@Suppress("TooManyFunctions", "LongParameterList") // user events, capture ports and injected test clocks
 class CaptureViewModel(
     private val controller: CaptureController,
     private val nowWallMs: () -> Long,
@@ -62,6 +64,7 @@ class CaptureViewModel(
     private val carName: () -> String? = { null },
     private val timeLabel: (Long) -> String = ::clockLabel,
     private val finishTimeoutMs: Long = FINISH_TIMEOUT_MS,
+    private val units: StateFlow<UnitSystem> = MutableStateFlow(UnitSystem.METRIC),
 ) : ViewModel() {
     /** How the trip that just ended came to end, which decides the screen and whether the lock holds on. */
     private enum class Intent { STOPPED_BY_USER, PASSENGER_KEPT, DISCARDED, ENDED_ITSELF }
@@ -89,28 +92,28 @@ class CaptureViewModel(
     /** Content that was held (or asked for while locked) and may open now. The navigation host collects it. */
     val released: SharedFlow<ContentTarget> = mutableReleased
 
-    val state: StateFlow<CaptureUiState> = combine(ticking, controller.canRecord, ui) { snapshot, canRecord, current ->
+    val state: StateFlow<CaptureUiState> = combine(ticking, controller.canRecord, ui, units) { snapshot, canRecord, current, unitSystem ->
         when (snapshot) {
             CaptureSnapshot.Idle -> if (canRecord) CaptureUiState.Ready else CaptureUiState.NeedsLocation
             CaptureSnapshot.Failed -> CaptureUiState.Failed
-            is CaptureSnapshot.Recording -> recordingState(snapshot, current)
+            is CaptureSnapshot.Recording -> recordingState(snapshot, current, unitSystem)
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), CaptureUiState.Ready)
 
     /** The cover over the whole app, or null when navigation is free. */
-    val cover: StateFlow<DriveCover?> = combine(ticking, ui) { snapshot, current ->
-        coverOf(snapshot, current)
+    val cover: StateFlow<DriveCover?> = combine(ticking, ui, units) { snapshot, current, unitSystem ->
+        coverOf(snapshot, current, unitSystem)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), null)
 
     init {
         viewModelScope.launch { controller.snapshot.collect(::onSnapshot) }
     }
 
-    private fun recordingState(snapshot: CaptureSnapshot.Recording, current: Ui): CaptureUiState.Recording {
+    private fun recordingState(snapshot: CaptureSnapshot.Recording, current: Ui, units: UnitSystem): CaptureUiState.Recording {
         val elapsedMs = nowWallMs() - snapshot.startedWallMs
         return CaptureUiState.Recording(
             elapsed = CaptureFormatting.elapsed(elapsedMs),
-            distanceKm = CaptureFormatting.distanceKm(snapshot.distanceM),
+            distance = CaptureFormatting.distance(snapshot.distanceM, units),
             gps = snapshot.gps,
             confirmingStop = current.confirmingStop,
             manual = snapshot.isManual,
@@ -121,14 +124,14 @@ class CaptureViewModel(
         )
     }
 
-    private fun coverOf(snapshot: CaptureSnapshot, current: Ui): DriveCover? {
+    private fun coverOf(snapshot: CaptureSnapshot, current: Ui, units: UnitSystem): DriveCover? {
         val recording = snapshot as? CaptureSnapshot.Recording
         val phase = current.phase
         val phaseApplies = phase != null && (recording == null || recording.tripId == phase.tripId)
         return when {
             recording != null && !phaseApplies -> current.held?.let {
                 DriveCover.Held(it.noun, current.passengerStep, canMarkPassenger = true)
-            } ?: DriveCover.InDrive(recordingState(recording, current))
+            } ?: DriveCover.InDrive(recordingState(recording, current, units))
             current.held != null && current.hold != null ->
                 DriveCover.Held(current.held.noun, PassengerStep.HIDDEN, canMarkPassenger = false)
             phase != null -> phase.result ?: DriveCover.Decoding(phase.tripId, phase.intent == Intent.PASSENGER_KEPT)
@@ -206,7 +209,7 @@ class CaptureViewModel(
         if (trip == null && !phase.manual && phase.intent == Intent.ENDED_ITSELF) return DriveCover.NotSaved
         return DriveCover.Saved(
             tripId = phase.tripId,
-            distanceKm = trip?.let { CaptureFormatting.distanceKm(it.distanceM) },
+            distance = trip?.let { CaptureFormatting.distance(it.distanceM, units.value) },
             minutes = trip?.let { maxOf(1, ((it.durationS + HALF_MINUTE_S) / SECONDS_PER_MINUTE).toInt()) },
             kind = kind,
             autoEnded = trip != null && TripEnd.endedByTimeout(trip, phase.intent == Intent.STOPPED_BY_USER, nowWallMs()),
