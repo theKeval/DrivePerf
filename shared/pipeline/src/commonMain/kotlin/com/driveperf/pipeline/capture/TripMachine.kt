@@ -217,7 +217,8 @@ internal class TripMachine(private val cfg: CaptureConfig = CaptureConfig()) {
         val trip = ActiveTrip(rec.header, rec.manual, rec.confirmed)
         val hz = rateFor(base.power, base.batterySaverRecording)
         val resumed = base.copy(phase = if (rec.confirmed) RECORDING else CANDIDATE, trip = trip, imuHz = hz)
-        val fx = arm + sensorsOn(hz) + Mark(trip.id, e.nowNs, CaptureMarkType.APP_KILLED, ageS.toString())
+        val fx = arm + sensorsOn(hz) + Mark(trip.id, e.nowNs, CaptureMarkType.APP_KILLED, ageS.toString()) +
+            Mark(trip.id, e.nowNs, CaptureMarkType.IMU_RATE, hz.toString())
         val timeout = if (rec.confirmed) emptyList() else listOf(Schedule(TimerId.CANDIDATE_TIMEOUT, secondsNs(cfg.candidateTimeoutS)))
         return Transition(resumed, fx + timeout)
     }
@@ -251,6 +252,7 @@ internal class TripMachine(private val cfg: CaptureConfig = CaptureConfig()) {
         val fx = buildList {
             add(MachineEffect.CreateTrip(header, manual))
             addAll(sensorsOn(hz))
+            if (hz != header.nominalImuHz) add(Mark(trip.id, header.startMonoNs, CaptureMarkType.IMU_RATE, hz.toString()))
             add(Mark(trip.id, header.startMonoNs, CaptureMarkType.RECORDING_STARTED, e.wake.kind.name))
             add(MachineEffect.QueryActivityHistory(historyFrom, e.nowWallMs))
             if (!manual) add(Schedule(TimerId.CANDIDATE_TIMEOUT, secondsNs(cfg.candidateTimeoutS)))
