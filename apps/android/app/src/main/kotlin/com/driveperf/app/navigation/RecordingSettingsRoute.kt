@@ -1,5 +1,15 @@
 package com.driveperf.app.navigation
 
+import com.driveperf.domain.settings.SettingChanged
+import com.driveperf.domain.settings.SettingKey
+import com.driveperf.domain.analytics.Analytics
+import com.driveperf.feature.settings.SettingsViewModel
+import org.koin.compose.viewmodel.koinViewModel
+import org.koin.compose.koinInject
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.Text
+
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -27,6 +37,7 @@ import com.driveperf.feature.capture.health
 import com.driveperf.feature.capture.label
 import com.driveperf.feature.onboarding.PermissionReader
 import com.driveperf.feature.settings.RecordingPauseLine
+import com.driveperf.feature.settings.RecordingSettingsActions
 import com.driveperf.feature.settings.RecordingSettingsScreen
 import com.driveperf.feature.settings.RecordingSettingsUiState
 import com.driveperf.feature.settings.RecordingStatusLine
@@ -99,7 +110,13 @@ class RecordingSettingsDeps(
  * screen. Turning it on asks for whatever is missing ([EnableAutoTrips]).
  */
 @Composable
-fun RecordingSettingsRoute(deps: RecordingSettingsDeps, modifier: Modifier = Modifier) {
+fun RecordingSettingsRoute(
+    deps: RecordingSettingsDeps, modifier: Modifier = Modifier, onGarage: () -> Unit = {},
+) {
+    val settings: SettingsViewModel = koinViewModel()
+    val preferences by settings.state.collectAsStateWithLifecycle()
+    val cars by settings.cars.collectAsStateWithLifecycle()
+    val analytics: Analytics = koinInject()
     val status by deps.wakePath.autoDetect.collectAsStateWithLifecycle()
     var optedIn by remember { mutableStateOf(deps.consent.automaticTripsEnabled) }
     var showStatus by rememberSaveable { mutableStateOf(false) }
@@ -115,17 +132,24 @@ fun RecordingSettingsRoute(deps: RecordingSettingsDeps, modifier: Modifier = Mod
     AllTheTimeDialog(fixer)
 
     RecordingSettingsScreen(
-        state = RecordingSettingsUiState(automaticTrips = optedIn, status = statusLine(status), pause = pauseLine(status)),
+        state = RecordingSettingsUiState(automaticTrips = optedIn, status = statusLine(status), pause = pauseLine(status),
+            preferences = preferences, cars = cars),
+        modifier = modifier,
+        actions = RecordingSettingsActions(
         onAutomaticTripsChanged = { on ->
+            if (optedIn != on) analytics.track(SettingChanged(SettingKey.AUTO_DETECT))
             optedIn = on
             deps.consent.automaticTripsEnabled = on
             deps.captureController.refreshPermissions() // WakePath.refresh: the core follows at once
             if (on) session.begin(deps.permissionReader.read().forCapture()) else session.cancel()
         },
         onStatusClick = { showStatus = true },
-        modifier = modifier,
         onPauseClick = { showPause = true },
+        onPreferencesChanged = settings::change,
+        onGarageClick = onGarage,
+        ),
     )
+    SettingsSaveError(settings)
     if (showStatus) {
         CaptureStatusSheet(
             status = status,
@@ -167,5 +191,41 @@ private fun statusLine(status: AutoDetectStatus): RecordingStatusLine? {
         healthLabel = health.label(),
         title = stringResource(status.mode.label),
         detail = autoDetectDetail(status),
+    )
+}
+
+/** Health Check is the existing status sheet until DRIVE-156 supplies its full destination. */
+@Composable
+fun SettingsHealthSheet(deps: RecordingSettingsDeps, onDismiss: () -> Unit, onRecording: () -> Unit) {
+    val status by deps.wakePath.autoDetect.collectAsStateWithLifecycle()
+    val fixer = rememberAutoDetectFixer(deps.permissionReader, deps.captureController::refreshPermissions)
+    var showPause by rememberSaveable { mutableStateOf(false) }
+    AllTheTimeDialog(fixer)
+    // One sheet at a time, as on Recording settings: Pause replaces the status sheet and closes Health Check.
+    val pauseOpen = showPause && status.mode != AutoDetectMode.Off
+    if (!pauseOpen) {
+        CaptureStatusSheet(status, CaptureStatusActions(
+            onDismiss = onDismiss,
+            onFix = fixer::fix,
+            onOpenRecordingSettings = { onDismiss(); onRecording() },
+            onOpenPause = { showPause = true },
+        ))
+    } else {
+        PauseSheet(status, rememberPauseCallbacks(deps.wakePath), onDismiss = {
+            showPause = false
+            onDismiss()
+        })
+    }
+}
+
+@Composable
+internal fun SettingsSaveError(settings: SettingsViewModel) {
+    val failed by settings.saveFailed.collectAsStateWithLifecycle()
+    if (failed) AlertDialog(
+        onDismissRequest = { settings.dismissError() },
+        text = { Text(stringResource(com.driveperf.feature.settings.R.string.save_failed)) },
+        confirmButton = { TextButton(onClick = { settings.dismissError() }) {
+            Text(stringResource(android.R.string.ok))
+        } },
     )
 }

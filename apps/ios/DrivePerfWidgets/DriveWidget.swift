@@ -114,7 +114,7 @@ private struct DriveWidgetView: View {
                 Text("Recording").font(.caption.bold())
                 HStack(spacing: 3) {
                     Text(timerInterval: active.startedAt...Date.distantFuture, countsDown: false).monospacedDigit()
-                    distance(active.distanceM)
+                    distance(snapshot.recordingDistance)
                 }
                 .font(.caption2)
             } else if let latest = idleDrive {
@@ -145,7 +145,7 @@ private struct DriveWidgetView: View {
                     Text(timerInterval: active.startedAt...Date.distantFuture, countsDown: false)
                         .dpNumeral(.l)
                         .multilineTextAlignment(.leading)
-                    distance(active.distanceM).font(DPFont.caption)
+                    distance(snapshot.recordingDistance).font(DPFont.caption)
                 } else if snapshot.canRecord == false {
                     Label("Location needed", systemImage: "location.slash")
                         .font(DPFont.cardTitle)
@@ -155,7 +155,7 @@ private struct DriveWidgetView: View {
                     if showsScore, let score = latest.smoothness {
                         Text("Smoothness \(score)").font(DPFont.caption)
                     } else {
-                        distance(latest.distanceM).font(DPFont.caption)
+                        distance(snapshot.latestDistance).font(DPFont.caption)
                     }
                     if let delta = latest.delta {
                         comparison(delta, compact: false)
@@ -206,8 +206,8 @@ private struct DriveWidgetView: View {
             .accessibilityLabel("\(change) compared with your usual Smoothness")
     }
 
-    private func distance(_ metres: Int) -> Text {
-        Text("\((Double(metres) / 1000).formatted(.number.precision(.fractionLength(1)))) km")
+    private func distance(_ formatted: String?) -> Text {
+        Text(formatted ?? "—")
     }
 
     @ViewBuilder

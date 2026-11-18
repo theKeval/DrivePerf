@@ -73,26 +73,35 @@ internal data class Stillness(
     val maxGyroDps: Double = 0.0,
     /** Since when every closed window was still; null while moving or unknown. */
     val stillSinceNs: Long? = null,
+    /** Since when closed windows have been non-still; unknown is neither still nor moving. */
+    val nonStillSinceNs: Long? = null,
+    val nonStillThroughNs: Long? = null,
+    val lastSampleNs: Long? = null,
 ) {
     companion object {
         /** Adds one sample; closes the window once it spans [CaptureConfig.stillWindowS]. */
         fun add(w: Stillness, m: MotionSample, cfg: CaptureConfig): Stillness {
-            val start = w.windowStartNs ?: m.tMonoNs
+            val current = if (w.lastSampleNs?.let { m.tMonoNs - it > secondsNs(cfg.stillWindowS) } == true) Stillness() else w
+            val start = current.windowStartNs ?: m.tMonoNs
             val a = magnitude(m.userAccelG)
             val gyro = magnitude(m.rotRateDps)
-            val open = w.copy(
+            val open = current.copy(
                 windowStartNs = start,
-                n = w.n + 1,
-                sum = w.sum + a,
-                sumSq = w.sumSq + a * a,
-                maxGyroDps = maxOf(w.maxGyroDps, gyro),
+                lastSampleNs = m.tMonoNs,
+                n = current.n + 1,
+                sum = current.sum + a,
+                sumSq = current.sumSq + a * a,
+                maxGyroDps = maxOf(current.maxGyroDps, gyro),
             )
             if (m.tMonoNs - start < secondsNs(cfg.stillWindowS)) return open
             val mean = open.sum / open.n
             val variance = maxOf(0.0, open.sumSq / open.n - mean * mean)
             val still = sqrt(variance) < cfg.stillAccelStdG && open.maxGyroDps < cfg.stillGyroDps
             return Stillness(
-                stillSinceNs = if (still) w.stillSinceNs ?: start else null,
+                lastSampleNs = m.tMonoNs,
+                stillSinceNs = if (still) current.stillSinceNs ?: start else null,
+                nonStillSinceNs = if (still) null else current.nonStillSinceNs ?: start,
+                nonStillThroughNs = if (still) null else m.tMonoNs,
             )
         }
 
@@ -119,6 +128,7 @@ internal data class MachineState(
     val imuHz: Int = 0,
     val imuStoppedForSpace: Boolean = false,
     val power: PowerStatus? = null,
+    val batterySaverRecording: Boolean = false,
     val still: Stillness = Stillness(),
     val distanceM: Double = 0.0,
     val distanceFix: LocationSample? = null,
@@ -140,6 +150,8 @@ internal data class MachineState(
 
 /** Inputs to the reducer. Every event carries the monotonic time it is handled at, so the reducer reads no clock. */
 internal sealed interface MachineEvent {
+    data class BatterySaver(override val nowNs: Long, val enabled: Boolean) : MachineEvent
+
     val nowNs: Long
 
     /** Process start. [recovering] is the trip still `RECORDING` after a kill (§1.7). */

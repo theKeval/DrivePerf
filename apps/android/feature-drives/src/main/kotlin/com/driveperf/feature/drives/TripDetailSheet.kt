@@ -20,7 +20,6 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.RichTooltip
 import androidx.compose.material3.Surface
@@ -30,9 +29,6 @@ import androidx.compose.material3.TooltipAnchorPosition
 import androidx.compose.material3.TooltipBox
 import androidx.compose.material3.TooltipDefaults
 import androidx.compose.material3.TooltipScope
-import androidx.compose.material3.SheetState
-import androidx.compose.material3.SheetValue
-import androidx.compose.material3.rememberBottomSheetState
 import androidx.compose.material3.rememberTooltipState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -59,6 +55,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.driveperf.designsystem.DpEstimated
+import com.driveperf.designsystem.DpModalBottomSheet
 import com.driveperf.designsystem.DpProvenance
 import com.driveperf.designsystem.DpProvenanceGlyph
 import com.driveperf.designsystem.DpQuality
@@ -87,9 +84,8 @@ internal fun DrivesSheets(state: DrivesUiState, onAction: (DrivesAction) -> Unit
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun TripDetailSheet(detail: TripDetailUi, canCorrect: Boolean, onAction: (DrivesAction) -> Unit) {
-    ModalBottomSheet(
+    DpModalBottomSheet(
         onDismissRequest = { onAction(DrivesAction.CloseDetail) },
-        sheetState = fullHeightSheetState(),
     ) {
         Column(
             modifier = Modifier
@@ -235,12 +231,6 @@ internal fun TooltipScope.ProvenanceTooltip(value: ProvenancedValue) {
         Text(listOf(value.provenance.meaning, value.meaning).filter { it.isNotEmpty() }.joinToString("\n"))
     }
 }
-
-/** A modal sheet that opens fully expanded (no half-height stop): S-DQ-01 and the trip sheet are full height. */
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-internal fun fullHeightSheetState(): SheetState =
-    rememberBottomSheetState(initialValue = SheetValue.Hidden, enabledValues = setOf(SheetValue.Hidden, SheetValue.Expanded))
 
 internal fun QualityBadge.dp(): DpQuality = when (this) {
     QualityBadge.GOOD -> DpQuality.GOOD

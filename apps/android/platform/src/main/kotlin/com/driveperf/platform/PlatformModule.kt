@@ -1,5 +1,8 @@
 package com.driveperf.platform
 
+import com.driveperf.domain.settings.SettingsRepository
+import java.util.Locale
+
 import android.os.UserManager
 import com.driveperf.domain.capture.ActivitySource
 import com.driveperf.domain.capture.LocationSource
@@ -43,5 +46,9 @@ val platformModule = module {
         val users = androidContext().getSystemService(UserManager::class.java)
         FileTripStore(File(androidContext().filesDir, "trips"), isUnlocked = users::isUserUnlocked)
     }
-    single { CaptureNotifications(androidContext()) }
+    single {
+        CaptureNotifications(androidContext()) {
+            get<SettingsRepository>().state.value.effectiveUnits(Locale.getDefault().country)
+        }
+    }
 }

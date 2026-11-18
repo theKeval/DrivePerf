@@ -19,11 +19,11 @@ struct ProfileSheet: View {
                 } footer: {
                     Text("Your trips stay on your phone unless you turn on backup.")
                 }
-                Section("Recording") {
+                Section("Settings") {
                     NavigationLink {
-                        RecordingSettingsView(model: recording)
+                        SettingsHubView(display: recording.display, recording: recording)
                     } label: {
-                        LabeledContent("Automatic trips", value: recording.autoTripsOn ? "On" : "Off")
+                        Label("Settings", systemImage: "gearshape")
                     }
                 }
                 Section("Analytics and diagnostics") {

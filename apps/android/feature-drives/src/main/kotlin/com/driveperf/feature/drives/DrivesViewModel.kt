@@ -1,5 +1,7 @@
 package com.driveperf.feature.drives
 
+import com.driveperf.domain.settings.UnitSystem
+
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.driveperf.domain.trip.QualityBadge
@@ -85,9 +87,9 @@ class DrivesViewModel(
     locale: Locale = Locale.getDefault(),
     today: () -> LocalDate = { LocalDate.now(zone) },
     private val corrector: TripCorrector? = null,
+    units: StateFlow<UnitSystem> = MutableStateFlow(UnitSystem.METRIC),
 ) : ViewModel() {
     private val formatting = TripFormatting(zone, locale, today)
-    private val presenter = TripPresenter(zone, locale)
     private val selection = MutableStateFlow(Selection())
 
     private data class Selection(
@@ -101,12 +103,15 @@ class DrivesViewModel(
         source.trips,
         corrector?.notDrives ?: flowOf(emptyList()),
         selection,
-    ) { trips, notDrives, sel ->
+        units,
+    ) { trips, notDrives, sel, unitSystem ->
+        val units = unitSystem
+        val presenter = TripPresenter(zone, locale, units)
         val byId = (trips + notDrives).associateBy { it.id }
         DrivesUiState(
             loaded = true,
-            trips = trips.map(::row),
-            notDrives = notDrives.map(::row),
+            trips = trips.map { row(it, units) },
+            notDrives = notDrives.map { row(it, units) },
             // With no drives left, All drives opens on the trips marked as not a drive.
             filter = sel.filter ?: if (trips.isEmpty() && notDrives.isNotEmpty()) DrivesFilter.NOT_DRIVES else DrivesFilter.DRIVES,
             canCorrect = corrector != null,
@@ -127,10 +132,10 @@ class DrivesViewModel(
         }
     }
 
-    private fun row(trip: RecordedTrip) = TripRowUi(
+    private fun row(trip: RecordedTrip, units: UnitSystem) = TripRowUi(
         id = trip.id,
         start = formatting.start(trip.startedWallMs),
-        summary = "${formatting.duration(trip.durationS)} · ${formatting.distance(trip.distanceM)}",
+        summary = "${formatting.duration(trip.durationS)} · ${formatting.distance(trip.distanceM, units)}",
         quality = trip.quality?.badge,
         interrupted = trip.status == RecordedStatus.INTERRUPTED,
         short = trip.status == RecordedStatus.SHORT,

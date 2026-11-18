@@ -135,12 +135,18 @@ extension KotlinMapping {
     }
 
     /// The shared provenance catalogue (Kotlin `Metric`, `Provenance`), mapped once.
-    static func provenanceCatalog() -> ProvenanceCatalog {
-        let metrics = DrivePerfShared.Metric.allCases.map { m in
-            MetricInfo(
+    static func provenanceCatalog(units: UnitSystem = .metric) -> ProvenanceCatalog {
+        let metrics: [MetricInfo] = DrivePerfShared.Metric.allCases.map { m -> MetricInfo in
+            let unit: DisplayUnit? = m.unit.map { units.display(unit: $0) }
+            var formatter: (@Sendable (Double) -> String)?
+            if let unit {
+                let safe = UncheckedSendable(unit)
+                formatter = { si in safe.value.format(si: si) }
+            }
+            return MetricInfo(
                 key: m.key, provenance: swift(m.provenance(includesEstimate: false)), meaning: m.meaning,
-                unit: m.unit?.symbol, decimals: Int(m.unit?.decimals ?? 0), perSi: m.unit?.perSi ?? 1,
-                partlyEstimated: m.partlyEstimated)
+                unit: unit?.symbol, decimals: Int(unit?.decimals ?? 0), perSi: unit?.perSi ?? 1,
+                partlyEstimated: m.partlyEstimated, numberFormatter: formatter)
         }
         let legend = Dictionary(
             uniqueKeysWithValues: DrivePerfShared.Provenance.allCases.map { (swift($0), $0.meaning) })

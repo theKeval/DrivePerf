@@ -150,6 +150,10 @@ public class TripRecorderEngine(
         inputs.trySend(Input.Simple { MachineEvent.TriggersAvailable(it, available) })
     }
 
+    override fun setBatterySaverRecording(enabled: Boolean) {
+        inputs.trySend(Input.Simple { MachineEvent.BatterySaver(it, enabled) })
+    }
+
     override fun setInDriveScreenVisible(visible: Boolean) {
         inputs.trySend(Input.Simple { MachineEvent.InDriveVisible(it, visible) })
     }

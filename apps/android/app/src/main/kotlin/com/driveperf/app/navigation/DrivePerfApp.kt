@@ -1,6 +1,21 @@
 package com.driveperf.app.navigation
 
+import com.driveperf.domain.settings.UnitSystem
+import com.driveperf.feature.settings.SettingsViewModel
+import com.driveperf.feature.settings.UnitsAndDisplayScreen
+import com.driveperf.feature.settings.SettingsHubScreen
+import com.driveperf.feature.settings.unitName
+import com.driveperf.feature.settings.appearanceName
+import java.util.Locale
+import androidx.compose.material3.Text
+import androidx.compose.runtime.saveable.rememberSaveable
+
 import android.Manifest
+import android.app.Activity
+import androidx.compose.runtime.SideEffect
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.ui.graphics.luminance
+import androidx.core.view.WindowCompat
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.PaddingValues
@@ -100,7 +115,7 @@ private fun CaptureViewModel.driveActions() = InDriveActions(
 )
 
 /** Everything the destinations share, gathered once so each destination stays small. */
-private class AppEnv(
+internal class AppEnv(
     val navController: NavHostController,
     val captureViewModel: CaptureViewModel,
     val capture: CaptureUiState,
@@ -109,7 +124,7 @@ private class AppEnv(
 )
 
 /** The app-level singletons the destinations talk to. */
-private class AppServices(
+internal class AppServices(
     val consent: ConsentStore,
     val crashReporter: CrashReporter,
     val privacy: PrivacyChoices,
@@ -123,6 +138,16 @@ private fun AppNavHost(navController: NavHostController, captureViewModel: Captu
     val captureController: PlatformCaptureController = koinInject()
     val permissionReader: PermissionReader = koinInject()
     val context = LocalContext.current
+    val dark = MaterialTheme.colorScheme.surface.luminance() < 0.5f
+    // The in-drive cover sets its own light icons; normal navigation follows the chosen appearance.
+    SideEffect {
+        (context as? Activity)?.window?.let { window ->
+            WindowCompat.getInsetsController(window, window.decorView).apply {
+                isAppearanceLightStatusBars = !dark
+                isAppearanceLightNavigationBars = !dark
+            }
+        }
+    }
     val requestLocation = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
         captureController.refreshPermissions()
         // Refused again (or "don't ask again"): the system dialog will not show, so send the user to Settings.
@@ -139,6 +164,7 @@ private fun AppNavHost(navController: NavHostController, captureViewModel: Captu
         tabDestinations(env)
         allDrivesDestination(env)
         profileDestination(env)
+        settingsDestinations(env)
         recordingSettingsDestination(env)
     }
 }
@@ -146,8 +172,10 @@ private fun AppNavHost(navController: NavHostController, captureViewModel: Captu
 private fun NavGraphBuilder.onboardingDestination(env: AppEnv) {
     composable(Routes.ONBOARDING) {
         val viewModel: OnboardingViewModel = koinViewModel()
+        val units by koinInject<kotlinx.coroutines.flow.StateFlow<UnitSystem>>().collectAsStateWithLifecycle()
         OnboardingRoute(
             viewModel = viewModel,
+            units = units,
             permissionReader = env.services.permissionReader,
             onFinished = {
                 env.services.consent.onboardingCompleted = true
@@ -223,19 +251,8 @@ private fun NavGraphBuilder.profileDestination(env: AppEnv) {
                     env.services.privacy.setCrashReports(it)
                 },
                 modifier = Modifier.padding(padding),
-                onOpenRecording = { env.navController.navigate(Routes.RECORDING_SETTINGS) },
+                onOpenRecording = { env.navController.navigate(Routes.SETTINGS) },
             )
-        }
-    }
-}
-
-private fun NavGraphBuilder.recordingSettingsDestination(env: AppEnv) {
-    composable(Routes.RECORDING_SETTINGS) {
-        val services = env.services
-        val deps = RecordingSettingsDeps(koinInject(), services.consent, services.captureController, services.permissionReader)
-        val title = stringResource(R.string.recording_settings_title)
-        DetailScaffold(title = title, onBack = { env.navController.popBackStack() }) { padding ->
-            RecordingSettingsRoute(deps, Modifier.padding(padding))
         }
     }
 }
@@ -261,7 +278,7 @@ private fun TabContent(tab: Tab, padding: PaddingValues, onSeeAll: () -> Unit) {
     }
 }
 
-private fun NavHostController.navigateToTab(tab: Tab) {
+internal fun NavHostController.navigateToTab(tab: Tab) {
     navigate(tab.route) {
         popUpTo(Tab.Drives.route) { saveState = true }
         launchSingleTop = true

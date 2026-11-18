@@ -49,7 +49,7 @@ sealed interface DriveCover {
      */
     data class Saved(
         val tripId: String?,
-        val distanceKm: String?,
+        val distance: String?,
         val minutes: Int?,
         val kind: SavedKind,
         val autoEnded: Boolean,

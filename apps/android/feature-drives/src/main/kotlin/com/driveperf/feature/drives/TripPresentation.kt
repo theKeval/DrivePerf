@@ -1,5 +1,8 @@
 package com.driveperf.feature.drives
 
+import com.driveperf.domain.settings.UnitSystem
+import com.driveperf.domain.trip.DisplayUnit
+
 import com.driveperf.designsystem.DpEstimated
 import com.driveperf.domain.trip.Metric
 import com.driveperf.domain.trip.NotDrives
@@ -81,7 +84,14 @@ data class QualitySheetUi(
 )
 
 /** Builds the sheets' content from a [RecordedTrip]. */
-internal class TripPresenter(private val zone: ZoneId, private val locale: Locale) {
+internal class TripPresenter(
+    private val zone: ZoneId, private val locale: Locale,
+    private val units: UnitSystem = UnitSystem.METRIC,
+) {
+    private fun distanceText(metres: Double): String {
+        val unit = units.display(DisplayUnit.KILOMETRES)
+        return "${unit.format(metres)} ${unit.symbol}"
+    }
     private val time = DateTimeFormatter.ofLocalizedTime(FormatStyle.SHORT).withLocale(locale).withZone(zone)
     private val date = DateTimeFormatter.ofLocalizedDate(FormatStyle.LONG).withLocale(locale).withZone(zone)
 
@@ -111,7 +121,7 @@ internal class TripPresenter(private val zone: ZoneId, private val locale: Local
             RecordedStatus.INTERRUPTED -> add(TripBannerUi(interruptedText(trip), attention = true))
             RecordedStatus.SHORT -> add(
                 TripBannerUi(
-                    "Short drive · ${km(trip.distanceM)} km. Short drives give the score less to work with, so expect " +
+                    "Short drive · ${distanceText(trip.distanceM)}. Short drives give the score less to work with, so expect " +
                         "it to move more from drive to drive.",
                 ),
             )
@@ -150,7 +160,7 @@ internal class TripPresenter(private val zone: ZoneId, private val locale: Local
         val estimatedPart = trip.estimatedDistanceM > 0
         add(
             value(Metric.DISTANCE, "Distance", trip.distanceM, estimatedPart).copy(
-                note = if (estimatedPart) DpEstimated.text("${km(trip.estimatedDistanceM)} km estimated") else null,
+                note = if (estimatedPart) DpEstimated.text("${distanceText(trip.estimatedDistanceM)} estimated") else null,
             ),
         )
         add(minutes(Metric.DURATION, "Duration", trip.durationS.toDouble()))
@@ -173,7 +183,7 @@ internal class TripPresenter(private val zone: ZoneId, private val locale: Local
             title = "${badgeWord(q.badge)} data",
             hero = hero(q, gapS),
             estimatedStart = q.estimatedStartM?.takeIf { it > 0 }?.let {
-                "The first ${DpEstimated.PREFIX}${km(it)} km is estimated. Automatic trips start a moment after you set off. " +
+                "The first ${DpEstimated.PREFIX}${distanceText(it)} is estimated. Automatic trips start a moment after you set off. " +
                     "We fill in the start from your phone’s location history and draw it dashed. It’s never scored and never " +
                     "gets event pins."
             },
@@ -228,7 +238,8 @@ internal class TripPresenter(private val zone: ZoneId, private val locale: Local
     fun value(metric: Metric, label: String, si: Double, includesEstimate: Boolean = false): ProvenancedValue {
         val provenance = metric.provenance(includesEstimate)
         return ProvenancedValue(
-            metric.key, label, metric.unit?.format(si) ?: si.toString(), metric.unit?.symbol.orEmpty(), provenance,
+            metric.key, label, metric.unit?.let(units::display)?.format(si) ?: si.toString(),
+            metric.unit?.let(units::display)?.symbol.orEmpty(), provenance,
             metric.meaning,
         )
     }
@@ -313,8 +324,6 @@ private const val SECONDS_PER_MINUTE = 60.0
 
 private fun wholeMinutes(seconds: Double): Int = (maxOf(seconds, 0.0) / SECONDS_PER_MINUTE).roundToInt()
 
-/** Distance in km at the catalogue's 0.1 km. */
-private fun km(metres: Double): String = Metric.DISTANCE.unit?.format(metres).orEmpty()
 
 private fun hero(q: TripQuality, gapS: Double): String = when (q.badge) {
     QualityBadge.GOOD -> "Everything we needed, the whole way. Scores and events are as reliable as a phone gets."

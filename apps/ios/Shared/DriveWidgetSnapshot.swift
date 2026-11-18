@@ -29,6 +29,8 @@ struct DriveWidgetSnapshot: Codable, Equatable, Sendable {
         case start, showLive(String), stop(String), fixLocation
     }
 
+    var recordingDistance: String?
+    var latestDistance: String?
     var canRecord: Bool?
     var recording: Recording?
     var latestDrive: LatestDrive?
