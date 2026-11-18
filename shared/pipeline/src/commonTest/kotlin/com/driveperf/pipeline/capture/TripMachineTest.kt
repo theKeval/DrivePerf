@@ -349,6 +349,16 @@ class TripMachineTest {
     }
 
     @Test
+    fun anUnconfirmedCandidateKilledAndNotResumedIsDiscardedNotKept() {
+        val rec = Recovery(header(0.0), manual = false, confirmed = false, lastSampleWallMs = wallAt(50.0), wasMoving = false)
+        val t = m.reduce(MachineState(), MachineEvent.Launch(ns(200.0), wallAt(200.0), true, parking, rec))
+        assertEquals(RecorderState.IDLE, t.state.phase)
+        assertTrue(MachineEffect.Discard(rec.header.tripId) in t.effects)
+        assertTrue(t.effects.none { it is MachineEffect.Finalise })
+        assertTrue(MachineEffect.ArmParkedRegion(parking.point, 120.0) in t.effects)
+    }
+
+    @Test
     fun withoutGnssImuStillnessPausesAndMotionWithAutomotiveResumes() {
         val s = drive(recording(), 1, 5, 10.0).state
         val still = m.reduce(s, MachineEvent.Motion(ns(40.0), motionRun(6.0, 34.0, noisy = false)))

@@ -1,0 +1,20 @@
+{
+  "fixture": "rec-ios-commute-01",
+  "pipelineVersion": "pipe-1.0.0",
+  "algorithmVersion": "smooth-1.0.0",
+  "priorTrips": [],
+  "expect": {
+    "badge": "GOOD",
+    "context": "CITY",
+    "smoothness": 81,
+    "calibrating": { "k": 1, "of": 3 },
+    "distanceM": 2877.3,
+    "ledger": { "T": 364.2, "brake": 20.44, "accel": 12.16, "corner": 16.54 },
+    "events": [
+      { "type": "ACCEL", "tPeakS": 117.48, "peakG": 0.307, "confidence": "MEDIUM" }
+    ],
+    "spans": [],
+    "tip": { "tipId": "accel_first_second", "category": "ACCELERATION" }
+  },
+  "tolerance": { "ledger": 0.02, "tPeakS": 0.04, "peakG": 0.002, "distanceM": 1.0 }
+}

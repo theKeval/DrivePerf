@@ -1,0 +1,20 @@
+{
+  "fixture": "rec-android-commute-01",
+  "pipelineVersion": "pipe-1.0.0",
+  "algorithmVersion": "smooth-1.0.0",
+  "priorTrips": [],
+  "expect": {
+    "badge": "UNSCORABLE",
+    "context": "CITY",
+    "smoothness": null,
+    "calibrating": null,
+    "distanceM": 3724.0,
+    "ledger": null,
+    "events": [],
+    "spans": [
+      { "kind": "EXCLUDED", "t0S": 0.00, "t1S": 479.96, "reason": "NOT_ALIGNED" }
+    ],
+    "tip": null
+  },
+  "tolerance": { "ledger": 0.02, "tPeakS": 0.04, "peakG": 0.002, "distanceM": 1.0 }
+}

@@ -12,14 +12,17 @@ import com.driveperf.domain.capture.MotionSample
 import com.driveperf.domain.capture.MotionSink
 import com.driveperf.domain.capture.MotionSource
 import com.driveperf.domain.capture.RecordedAccelCallback
+import com.driveperf.domain.capture.Vec3
 import com.driveperf.foundation.Clock
 import com.driveperf.foundation.DomainError
+import com.driveperf.foundation.Units
 import com.driveperf.platform.FreshnessFilter
 import com.driveperf.platform.capture.CaptureFailureBus
 
 /**
- * [MotionSource] on `SensorManager`: linear acceleration, gravity, gyroscope and the game rotation vector. No
- * magnetometer is used.
+ * [MotionSource] on `SensorManager`: the raw accelerometer, gyroscope and the game rotation vector, combined by
+ * [MotionAssembler]. No magnetometer is used. The fused `TYPE_GRAVITY` and `TYPE_LINEAR_ACCELERATION` are not used: on
+ * some devices they absorb sustained car acceleration (DRIVE-160).
  *
  * All sensor callbacks run on one private [HandlerThread], and the [MotionAssembler], the freshness gate and the
  * [MotionBatcher] are only touched from it (spike 1 change 6). The sink is called on that thread and must return
@@ -48,9 +51,7 @@ class SensorMotionSource(
     @Synchronized
     override fun start(rateHz: Int, sink: MotionSink) {
         stop()
-        val primary = sensorManager.getDefaultSensor(
-            if (capability.hasGyroscope) Sensor.TYPE_LINEAR_ACCELERATION else Sensor.TYPE_ACCELEROMETER,
-        )
+        val primary = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
         if (primary == null) {
             failures.report(DomainError.Capture.SensorUnavailable)
             return
@@ -62,11 +63,10 @@ class SensorMotionSource(
         val deliver: (MotionSample) -> Unit = { sample ->
             if (gate.accept(sample.tMonoNs, clock.monotonicNs())) batcher.add(sample)
         }
-        val listener = if (capability.hasGyroscope) FullListener(deliver) else NoGyroListener(deliver)
+        val listener = if (capability.hasGyroscope) FullListener(clock, deliver) else NoGyroListener(deliver)
         val sensors = if (capability.hasGyroscope) {
             listOfNotNull(
                 primary,
-                sensorManager.getDefaultSensor(Sensor.TYPE_GRAVITY),
                 sensorManager.getDefaultSensor(Sensor.TYPE_GYROSCOPE),
                 sensorManager.getDefaultSensor(Sensor.TYPE_GAME_ROTATION_VECTOR),
             )
@@ -108,7 +108,7 @@ class SensorMotionSource(
     }
 
     private fun maxRate(): Int {
-        val minDelayUs = sensorManager.getDefaultSensor(Sensor.TYPE_LINEAR_ACCELERATION)?.minDelay ?: 0
+        val minDelayUs = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)?.minDelay ?: 0
         return if (minDelayUs > 0) MICROS_PER_SECOND / minDelayUs else DEFAULT_MAX_RATE_HZ
     }
 
@@ -119,21 +119,22 @@ class SensorMotionSource(
         val sensors: List<Sensor>,
     )
 
-    /** Four-sensor path. Runs only on the sensor thread. */
-    private class FullListener(private val deliver: (MotionSample) -> Unit) : SensorEventListener {
-        private val assembler = MotionAssembler()
+    /** Three-sensor path. Runs only on the sensor thread. */
+    private class FullListener(clock: Clock, private val deliver: (MotionSample) -> Unit) : SensorEventListener {
+        private val assembler = MotionAssembler(clock::monotonicNs)
 
         override fun onSensorChanged(event: SensorEvent) {
             val v = event.values
             when (event.sensor.type) {
-                Sensor.TYPE_GRAVITY -> assembler.onGravity(v[0].toDouble(), v[1].toDouble(), v[2].toDouble())
-                Sensor.TYPE_GYROSCOPE -> assembler.onGyro(v[0].toDouble(), v[1].toDouble(), v[2].toDouble())
+                Sensor.TYPE_GYROSCOPE -> assembler
+                    .onGyro(event.timestamp, v[0].toDouble(), v[1].toDouble(), v[2].toDouble())
+                    .forEach(deliver)
                 Sensor.TYPE_GAME_ROTATION_VECTOR -> assembler.onRotation(
                     v[0].toDouble(), v[1].toDouble(), v[2].toDouble(), if (v.size > 3) v[3].toDouble() else null,
                 )
-                Sensor.TYPE_LINEAR_ACCELERATION -> assembler
-                    .onLinearAcceleration(event.timestamp, v[0].toDouble(), v[1].toDouble(), v[2].toDouble())
-                    ?.let(deliver)
+                Sensor.TYPE_ACCELEROMETER -> assembler
+                    .onAccelerometer(event.timestamp, v[0].toDouble(), v[1].toDouble(), v[2].toDouble())
+                    .forEach(deliver)
             }
         }
 
@@ -143,16 +144,21 @@ class SensorMotionSource(
     /** `NO_GYRO` path: raw accelerometer, gravity by low-pass, zero rotation rate. Runs only on the sensor thread. */
     private class NoGyroListener(private val deliver: (MotionSample) -> Unit) : SensorEventListener {
         private val estimator = GravityEstimator()
-        private val assembler = MotionAssembler()
 
         override fun onSensorChanged(event: SensorEvent) {
             val v = event.values
             val g = estimator.update(event.timestamp, v[0].toDouble(), v[1].toDouble(), v[2].toDouble())
-            assembler.onGravity(g[0], g[1], g[2])
-            assembler.onGyro(0.0, 0.0, 0.0)
-            assembler
-                .onLinearAcceleration(event.timestamp, v[0] - g[0], v[1] - g[1], v[2] - g[2])
-                ?.let(deliver)
+            val norm = estimator.magnitude()
+            if (norm <= 0.0) return
+            deliver(
+                MotionSample(
+                    tMonoNs = event.timestamp,
+                    userAccelG = Vec3((v[0] - g[0]) / Units.G, (v[1] - g[1]) / Units.G, (v[2] - g[2]) / Units.G),
+                    gravityUp = Vec3(g[0] / norm, g[1] / norm, g[2] / norm),
+                    rotRateDps = Vec3(0.0, 0.0, 0.0),
+                    attitude = null,
+                ),
+            )
         }
 
         override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) = Unit

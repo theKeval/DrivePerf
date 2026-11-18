@@ -22,6 +22,15 @@ internal data class EpochAlignment(
     val settledS: Double?,
 )
 
+/** What one epoch's solve saw: 1 Hz pairs built, pairs kept for excitation, coherence ρ, RMS GNSS excitation, φ. */
+internal data class AlignmentDiagnostics(
+    val pairs: Int,
+    val kept: Int,
+    val coherence: Double,
+    val excitationRmsG: Double,
+    val phiDeg: Double,
+)
+
 /**
  * §2.5 alignment: one constant rotation per mount epoch, estimated in batch from GNSS longitudinal and centripetal
  * acceleration and applied retroactively. The GNSS speed sign resolves the 180° ambiguity.
@@ -29,7 +38,14 @@ internal data class EpochAlignment(
 internal class Alignment(private val cfg: SignalConfig) {
     private data class Pair1Hz(val tS: Double, val p1: Double, val p2: Double, val l: Double, val c: Double)
 
-    fun align(sig: DeviceSignal, epoch: IntRange, gnss: List<GatedFix>, lagS: Double): EpochAlignment {
+    fun align(sig: DeviceSignal, epoch: IntRange, gnss: List<GatedFix>, lagS: Double): EpochAlignment =
+        run(sig, epoch, gnss, lagS).first
+
+    /** [align] with the counts behind its verdict, for the real-drive diagnostics (DRIVE-160). */
+    fun diagnose(sig: DeviceSignal, epoch: IntRange, gnss: List<GatedFix>, lagS: Double): AlignmentDiagnostics =
+        run(sig, epoch, gnss, lagS).second
+
+    private fun run(sig: DeviceSignal, epoch: IntRange, gnss: List<GatedFix>, lagS: Double): Pair<EpochAlignment, AlignmentDiagnostics> {
         var up = V3.ZERO
         for (k in epoch) up += sig.gravity[k]
         val eU = up.unit()
@@ -46,10 +62,11 @@ internal class Alignment(private val cfg: SignalConfig) {
         val converged = solution != null && solution.converged && longEnough
         val bLon = bias(kept.map { (it.p1 * cos(phi) + it.p2 * sin(phi)) - it.l })
         val bLat = bias(kept.map { (-it.p1 * sin(phi) + it.p2 * cos(phi)) - it.c })
-        return EpochAlignment(epoch, converged, eF, eL, eU, bLon, bLat, if (converged) settled(kept, phi) else null)
+        val result = EpochAlignment(epoch, converged, eF, eL, eU, bLon, bLat, if (converged) settled(kept, phi) else null)
+        return result to AlignmentDiagnostics(pairs.size, kept.size, solution?.rho ?: 0.0, solution?.excitationG ?: 0.0, phi * RAD_TO_DEG)
     }
 
-    private data class Solution(val phi: Double, val converged: Boolean)
+    private data class Solution(val phi: Double, val converged: Boolean, val rho: Double, val excitationG: Double)
 
     private fun solve(kept: List<Pair1Hz>): Solution? {
         if (kept.isEmpty()) return null
@@ -65,7 +82,8 @@ internal class Alignment(private val cfg: SignalConfig) {
         }
         val rho = if (pp > 0 && lc > 0) sqrt(sc * sc + ss * ss) / sqrt(pp * lc) else 0.0
         val excited = lc >= cfg.alignMinKept * cfg.alignExcitationFloorG * cfg.alignExcitationFloorG
-        return Solution(atan2(ss, sc), kept.size >= cfg.alignMinKept && rho >= cfg.alignMinCoherence && excited)
+        val converged = kept.size >= cfg.alignMinKept && rho >= cfg.alignMinCoherence && excited
+        return Solution(atan2(ss, sc), converged, rho, sqrt(lc / kept.size))
     }
 
     /** First kept time from which every running solution is converged and within 5° of the final φ. */

@@ -106,6 +106,8 @@ internal class TripMachine(private val cfg: CaptureConfig = CaptureConfig()) {
             s.phase != IDLE -> Transition(s)
             !e.dbAvailable || rec == null -> Transition(base, arm)
             canResume(rec, e) -> resumeAfterKill(base, rec, e, arm)
+            // A candidate never confirmed is not a trip (§1.5): a kill does not make it one (DRIVE-160).
+            !rec.confirmed -> Transition(base, arm + MachineEffect.Discard(rec.header.tripId))
             else -> {
                 val trip = ActiveTrip(rec.header, rec.manual, rec.confirmed)
                 val end = MachineEffect.Finalise(

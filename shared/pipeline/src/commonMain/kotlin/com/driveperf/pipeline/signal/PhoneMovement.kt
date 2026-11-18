@@ -28,7 +28,7 @@ internal class PhoneMovement(private val cfg: SignalConfig) {
     }
 
     /** Hit A: rotation out of the vertical of at least 45 °/s held for 0.25 s. */
-    private fun offAxisHits(sig: DeviceSignal): List<Int> {
+    internal fun offAxisHits(sig: DeviceSignal): List<Int> {
         val hold = (cfg.offAxisHoldS * cfg.fs).toInt()
         val hits = mutableListOf<Int>()
         var run = 0
@@ -43,7 +43,7 @@ internal class PhoneMovement(private val cfg: SignalConfig) {
     }
 
     /** Hit B: gravity direction at least 20° from its mean over `[t − 5, t − 1]` s. */
-    private fun tiltHits(sig: DeviceSignal): List<Int> {
+    internal fun tiltHits(sig: DeviceSignal): List<Int> {
         val fs = cfg.fs
         val hits = mutableListOf<Int>()
         val prefix = Array(sig.size + 1) { V3.ZERO }
@@ -59,7 +59,7 @@ internal class PhoneMovement(private val cfg: SignalConfig) {
     }
 
     /** Hit C: a shock of at least 1.2 g while GNSS says the car changed speed by under 0.25 g within ±1 s. */
-    private fun shockHits(sig: DeviceSignal, gnss: List<GatedFix>): List<Int> {
+    internal fun shockHits(sig: DeviceSignal, gnss: List<GatedFix>): List<Int> {
         val hits = mutableListOf<Int>()
         for (k in 0 until sig.size) {
             if (sig.accel[k].norm() < cfg.shockG) continue
