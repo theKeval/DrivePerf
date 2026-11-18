@@ -405,12 +405,25 @@ Only for `AUTO` trips with a known parking spot. After a reboot there is none, s
 
 ```
 tStart  = iOS:     beginning of the automotive activity run in motion history
-          Android: timestamp of the IN_VEHICLE transition
+          Android: beginning of the ongoing IN_VEHICLE run in retained Play transition history.
+                   For a geofence wake preceding that transition, use the parked anchor and the
+                   first gated, measured driving speed to project tStart = tFirstFix − d / speed.
+                   Require AUTOMOTIVE ≥ MEDIUM as the first activity within 180 s of the wake;
+                   reject projection before the last parking or at/after the wake.
 d       = haversine(parkingSpot, firstGatedFix)
 Reject the estimate if d > 5000 m, or d / (tFirstFix − tStart) > 60 m/s, or tFirstFix − tStart > 900 s.
 Otherwise: startedAt = tStart (provenance E), estimatedStartM = d (provenance E),
            span ESTIMATED [0, t(firstGatedFix)), reason ESTIMATED_START
 ```
+
+Android retains up to 256 Play transition samples for 15 minutes across process death, clearing them on reboot.
+The geofence-only projection applies to Android `sourceDetail=geofence`; actual pre-wake automotive history takes
+priority. It is a constant-speed straight-line estimate, not a measured departure time, and it uses the same 5 km,
+60 m/s and 900 s plausibility limits above. A missing/low-confidence/human-powered first activity, missing measured
+driving speed (≥ 3 m/s), or unknown parking leaves the start unestimated. No synthetic activity is written to R0.
+The 120 m parked geofence requests EXIT only, 0 ms loitering (no DWELL), 0 ms best-effort responsiveness (the SDK minimum/default) and an
+initial EXIT when registered outside. Adding the same request ID replaces the region without a remove/add race.
+These settings cannot guarantee Q2 under Android background delivery limits; new device drives must measure it.
 
 The straight-line distance slightly understates the true path, and the "Estimated" label covers that. iOS writes `CMSensorRecorder` accelerometer data for the gap to R0 at negative chunk offsets, kept for later use. Per D6, **the estimated segment produces no events, no pins and no Smoothness**. Android has no IMU for the gap.
 

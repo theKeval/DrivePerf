@@ -59,6 +59,17 @@ class RealDriveDiagnostics {
         }
     }
 
+    /** DRIVE-212: start distance (Q2) and the estimated-start outcome per trip. */
+    private fun startReplay(capture: CapturedTrip, trip: com.driveperf.domain.trip.Trip?) {
+        val anchor = capture.header.parking?.point
+        val firstAccurate = capture.fixes.firstOrNull { it.hAccM?.let { a -> a <= 20.0 } == true }
+        val q2 = if (anchor != null && firstAccurate != null) {
+            com.driveperf.pipeline.geo.Geo.haversineM(anchor.lat, anchor.lng, firstAccurate.lat, firstAccurate.lng)
+        } else null
+        val backdateS = trip?.let { (capture.header.startWallMs - it.startedAt) / 1000.0 }
+        println("STARTREPLAY ${capture.header.tripId} Q2=${q2?.r()} estimated=${trip?.startEstimated} backdateS=$backdateS")
+    }
+
     private fun variant(raw: CapturedTrip): CapturedTrip {
         val variant = System.getenv(VARIANT_ENV)?.takeIf { it.isNotBlank() } ?: return raw
         val motion = if (variant.startsWith(TRACKER)) {
@@ -77,6 +88,7 @@ class RealDriveDiagnostics {
         println("DIAG $id placement=${q?.placement}")
         println("DIAG $id imu ${imuStats(capture.motion)}")
         val trip = result.trips.firstOrNull()?.trip
+        startReplay(capture, trip)
         val bySpan = trip?.quality?.spans.orEmpty().groupBy { "${it.kind}/${it.reason}" }
             .mapValues { (_, v) -> v.sumOf { it.t1S - it.t0S }.toInt() }
         println("DIAG $id spansS $bySpan")
@@ -283,7 +295,7 @@ class RealDriveDiagnostics {
         val parking = meta["parking"]?.split(' ')?.let { p -> Parking(GeoPoint(p[0].toDouble(), p[1].toDouble()), WALL0 + p[2].toLong()) }
         meta["start_wall_ms"]?.let { startWall[meta.getValue("id")] = it.toLong() }
         val header = CaptureHeader(
-            meta.getValue("id"), START, WALL0, 0, "UTC", WakeKind.valueOf(meta["wake_kind"] ?: "MANUAL"), null,
+            meta.getValue("id"), START, WALL0, 0, "UTC", WakeKind.valueOf(meta["wake_kind"] ?: "MANUAL"), meta["source_detail"],
             meta["imu_hz"]?.toInt() ?: NOMINAL_HZ, parking,
         )
         return CapturedTrip(header, fixes, motion, activity, emptyList(), marks)

@@ -51,6 +51,36 @@ class WakePathMappingTest {
     }
 
     @Test
+    fun `parked geofence requests prompt exit including when already outside`() {
+        val request = GeofenceParkedRegionMonitor.request(com.driveperf.domain.capture.GeoPoint(2.0, -27.5), 120.0)
+        assertEquals(com.google.android.gms.location.GeofencingRequest.INITIAL_TRIGGER_EXIT, request.initialTrigger)
+        val fence = request.geofences.single()
+        assertEquals(120.0f, fence.radius)
+        assertEquals(0, fence.notificationResponsiveness)
+        assertEquals(0, fence.loiteringDelay)
+        assertEquals(com.google.android.gms.location.Geofence.GEOFENCE_TRANSITION_EXIT, fence.transitionTypes)
+        assertEquals(com.google.android.gms.location.Geofence.NEVER_EXPIRE, fence.expirationTime)
+    }
+
+    @Test
+    fun `transition history survives a new instance but expires and resets at reboot`() {
+        val context = org.robolectric.RuntimeEnvironment.getApplication()
+        context.getSharedPreferences("wake_activity_history", android.content.Context.MODE_PRIVATE).edit().clear().commit()
+        android.provider.Settings.Global.putInt(context.contentResolver, android.provider.Settings.Global.BOOT_COUNT, 42)
+        val sample = com.driveperf.domain.capture.ActivitySample(1L, 1_000_000L, ActivityType.AUTOMOTIVE, ActivityConfidence.HIGH)
+        TransitionHistory(context).add(listOf(sample), 1_000_000L)
+        assertEquals(listOf(sample), TransitionHistory(context).read(1_000_001L))
+        assertEquals(emptyList<Any>(), TransitionHistory(context).read(1_900_001L))
+        val prefs = context.getSharedPreferences("wake_activity_history", android.content.Context.MODE_PRIVATE)
+        val corrupt = setOf("bad", "x,1000000,AUTOMOTIVE", "1,x,AUTOMOTIVE", "1,1000000,OTHER", "-1,1000000,AUTOMOTIVE")
+        prefs.edit().putStringSet("samples", corrupt).commit()
+        assertEquals(emptyList<Any>(), TransitionHistory(context).read(1_000_001L))
+        TransitionHistory(context).add(listOf(sample), 1_000_000L)
+        android.provider.Settings.Global.putInt(context.contentResolver, android.provider.Settings.Global.BOOT_COUNT, 43)
+        assertEquals(emptyList<Any>(), TransitionHistory(context).read(1_000_001L))
+    }
+
+    @Test
     fun `a parked-region exit wakes at the triggering fix, or now without one`() {
         assertEquals(
             WakeEvent(WakeKind.PARKED_EXIT, 42L, 7L, "geofence"),
@@ -105,6 +135,8 @@ class WakePathMappingTest {
         assertEquals("a result for an older region does not count", expected, memory.pending())
         memory.registered(spot)
         assertNull("registered: nothing to redo", memory.pending())
+        org.junit.Assert.assertFalse("same region must not trigger EXIT again after a rejected candidate", memory.armed(spot, 120.0))
+        org.junit.Assert.assertTrue("a new radius must replace the region", memory.armed(spot, 150.0))
         memory.disarmed()
         assertNull(memory.pending())
     }
