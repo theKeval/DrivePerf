@@ -64,6 +64,7 @@ public final class AppModel {
     public let capture: CaptureViewModel
     public let trips: TripListViewModel
     public let profile: ProfileViewModel
+    public let recordingSettings: RecordingSettingsViewModel
     public let statusRequests: CaptureStatusRequests
     public private(set) var onboarding: OnboardingViewModel?
     public var isSelfTestPresented: Bool
@@ -81,6 +82,14 @@ public final class AppModel {
         trips = TripListViewModel(
             history: dependencies.history, corrections: dependencies.corrections, catalog: dependencies.provenance)
         profile = ProfileViewModel(dependencies: dependencies)
+        // The accessory and the status sheet read permissions on their own, so re-read them after every change here.
+        let capture = capture
+        recordingSettings = RecordingSettingsViewModel(
+            preferences: dependencies.preferences, permissions: dependencies.permissions,
+            refreshCapture: {
+                dependencies.refreshCapture()
+                Task { await capture.refreshReadiness() }
+            })
         if route == .onboarding { onboarding = makeOnboarding() }
     }
 
@@ -93,6 +102,7 @@ public final class AppModel {
 
     private func finishOnboarding() {
         profile.refresh()
+        recordingSettings.reloadChoice()
         route = .shell
         onboarding = nil
     }

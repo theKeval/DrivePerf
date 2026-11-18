@@ -99,10 +99,10 @@ struct ShellView: View {
             CaptureStatusAccessory(capture: model.capture, onOpenStatus: { isStatusPresented = true })
         }
         .sheet(isPresented: $isProfilePresented) {
-            ProfileSheet(model: model.profile)
+            ProfileSheet(model: model.profile, recording: model.recordingSettings)
         }
         .sheet(isPresented: $isStatusPresented) {
-            CaptureStatusSheet(capture: model.capture)
+            CaptureStatusSheet(capture: model.capture, recording: model.recordingSettings)
         }
         // The watchdog notification opens the status sheet, which says what to fix (S-LIVE-10 → S-HOME-02).
         // A request made under a drive's cover waits and opens when the cover closes.

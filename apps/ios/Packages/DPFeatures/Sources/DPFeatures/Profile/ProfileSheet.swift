@@ -5,6 +5,7 @@ import SwiftUI
 /// Profile (S-ACC-01) in local mode, as a large sheet with its own navigation stack (S-NAV-01).
 struct ProfileSheet: View {
     let model: ProfileViewModel
+    let recording: RecordingSettingsViewModel
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
@@ -17,6 +18,13 @@ struct ProfileSheet: View {
                     }
                 } footer: {
                     Text("Your trips stay on your phone unless you turn on backup.")
+                }
+                Section("Recording") {
+                    NavigationLink {
+                        RecordingSettingsView(model: recording)
+                    } label: {
+                        LabeledContent("Automatic trips", value: recording.autoTripsOn ? "On" : "Off")
+                    }
                 }
                 Section("Analytics and diagnostics") {
                     Toggle(
@@ -44,6 +52,7 @@ struct ProfileSheet: View {
         }
         .presentationDetents([.large])
         .onAppear { model.refresh() }
+        .task { await recording.refresh() }
     }
 
     private static var version: String {
