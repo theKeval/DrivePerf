@@ -20,6 +20,7 @@ import com.driveperf.domain.hello.GetHelloMessage
 import com.driveperf.domain.hello.HelloMessage
 import com.driveperf.foundation.platformDescription
 import com.driveperf.pipeline.PipelineFinaliser
+import com.driveperf.pipeline.QualityAnalyticsFinaliser
 import com.driveperf.pipeline.capture.CapturePersistence
 import com.driveperf.pipeline.capture.CaptureConfig
 import com.driveperf.pipeline.capture.CapturePorts
@@ -99,7 +100,10 @@ public object DrivePerfCore {
             persistence = CapturePersistence(
                 store,
                 ProtoCaptureLog(files, io),
-                finaliser?.invoke(db) ?: PipelineFinaliser(history, LocalRouteHistory(db, previews, io)),
+                QualityAnalyticsFinaliser(
+                    finaliser?.invoke(db) ?: PipelineFinaliser(history, LocalRouteHistory(db, previews, io)),
+                    analytics,
+                ),
                 previews,
                 ProtoAnalysisFileStore(files, io),
                 LocalWatchdogStore(db, io),

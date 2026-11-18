@@ -12,7 +12,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -20,12 +19,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.driveperf.designsystem.DpModalBottomSheet
 
 /** The sheets over a page: S-ONB-05 How it works, S-ONB-11 precise location, S-ONB-16 denied and manual mode. */
 @Composable
 fun OnboardingSheets(state: OnboardingUiState, actions: OnboardingActions) {
     val sheet = state.sheet ?: return
-    ModalBottomSheet(onDismissRequest = actions.onDismissSheet) {
+    DpModalBottomSheet(onDismissRequest = actions.onDismissSheet) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()

@@ -18,7 +18,14 @@ internal data class BadgeInputs(
     val noGyro: Boolean,
 )
 
-internal data class BadgeResult(val badge: QualityBadge, val reason: QualityReason?, val excludedS: Double, val scoredS: Double)
+/** [share] is f: scored time ÷ (total − estimated start), §2.9. */
+internal data class BadgeResult(
+    val badge: QualityBadge,
+    val reason: QualityReason?,
+    val excludedS: Double,
+    val scoredS: Double,
+    val share: Double,
+)
 
 /** §2.9: evaluated top to bottom; the first match wins and sets `reason`. */
 internal class Badge(private val cfg: SignalConfig) {
@@ -27,7 +34,10 @@ internal class Badge(private val cfg: SignalConfig) {
         val notScored = setOf(SegmentKind.EXCLUDED, SegmentKind.ESTIMATED, SegmentKind.INTERRUPTED)
         val excluded = unionLength(i.spans.filter { it.kind in notScored }).coerceAtMost(i.totalS)
         val scored = i.totalS - excluded
-        val f = if (i.totalS > 0) scored / i.totalS else 0.0
+        // The estimated start is never scorable by design (D6), so it is in neither the numerator nor the denominator.
+        val estimated = unionLength(i.spans.filter { it.kind == SegmentKind.ESTIMATED }).coerceAtMost(i.totalS)
+        val scorable = i.totalS - estimated
+        val f = if (scorable > 0) (scored / scorable).coerceIn(0.0, 1.0) else 0.0
         val gnss = i.gnssCoveragePct / PERCENT
         val (badge, reason) = when {
             !i.hasImu -> QualityBadge.UNSCORABLE to QualityReason.NO_IMU
@@ -43,7 +53,7 @@ internal class Badge(private val cfg: SignalConfig) {
             i.imuDelivery < cfg.usableImu -> QualityBadge.USABLE to QualityReason.LOW_IMU_RATE
             else -> QualityBadge.GOOD to null
         }
-        return BadgeResult(badge, reason, excluded, scored)
+        return BadgeResult(badge, reason, excluded, scored, f)
     }
 
     /** Total length of the union of half-open spans. */

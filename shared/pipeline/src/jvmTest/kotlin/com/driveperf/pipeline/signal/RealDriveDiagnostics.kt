@@ -87,6 +87,11 @@ class RealDriveDiagnostics {
         val bySpan = trip?.quality?.spans.orEmpty().groupBy { "${it.kind}/${it.reason}" }
             .mapValues { (_, v) -> v.sumOf { it.t1S - it.t0S }.toInt() }
         println("DIAG $id spansS $bySpan")
+        val events = result.trips.firstOrNull()?.events.orEmpty()
+        println(
+            "DIAG $id events n=${events.size} " +
+                events.joinToString(" ") { "${it.type}@${"%.2f".format(it.tPeakS)}:${it.peakG.r()}:${it.confidence}" },
+        )
         if (q != null) whatIf(id, capture, endNs, q)
 
         val gate = GnssGate(cfg)
@@ -128,21 +133,15 @@ class RealDriveDiagnostics {
 
     /**
      * The badge under alternative thresholds, as evidence for tuning reports only; the shipped [SignalConfig] is not
-     * changed here. `noEstimated` takes the estimated start out of the share's numerator and denominator.
+     * changed here. f is the §2.9 share: scored ÷ (total − estimated start); since DRIVE-164 stops are never excluded.
      */
     private suspend fun whatIf(id: String, capture: CapturedTrip, endNs: Long?, base: com.driveperf.domain.trip.TripQuality) {
         val estimated = base.spans.filter { it.kind == com.driveperf.domain.trip.SegmentKind.ESTIMATED }.sumOf { it.t1S - it.t0S }
-        val share = { qq: com.driveperf.domain.trip.TripQuality -> qq.scoredS / qq.totalS }
-        val noEst = base.scoredS / (base.totalS - estimated)
-        val paused = base.spans.filter { it.kind == com.driveperf.domain.trip.SegmentKind.PAUSED }
-        val stoppedExcluded = base.spans.filter { it.kind == com.driveperf.domain.trip.SegmentKind.EXCLUDED }.sumOf { e ->
-            paused.sumOf { p -> maxOf(0.0, minOf(e.t1S, p.t1S) - maxOf(e.t0S, p.t0S)) }
+        val share = { qq: com.driveperf.domain.trip.TripQuality ->
+            val e = qq.spans.filter { it.kind == com.driveperf.domain.trip.SegmentKind.ESTIMATED }.sumOf { it.t1S - it.t0S }
+            qq.scoredS / (qq.totalS - e)
         }
-        println(
-            "DIAG $id excludedWhileStoppedS=${stoppedExcluded.toInt()} f if stops never excluded=" +
-                ((base.scoredS + stoppedExcluded) / base.totalS).r() + " and without estimated start=" +
-                ((base.scoredS + stoppedExcluded) / (base.totalS - estimated)).r(),
-        )
+        println("DIAG $id share f=${share(base).r()} estimatedS=${estimated.r()} excludedS=${base.excludedS.r()}")
         val variants = listOf(
             "minKept10" to SignalConfig(alignMinKept = 10),
             "tilt30" to SignalConfig(tiltDeg = 30.0),
@@ -154,7 +153,7 @@ class RealDriveDiagnostics {
             val qq = trip?.trip?.quality
             "$name=${qq?.badge}(f=${qq?.let { share(it).r() }})"
         }
-        println("DIAG $id whatIf base=${base.badge}(f=${share(base).r()}) noEstimated(f=${noEst.r()}) ${out.joinToString(" ")}")
+        println("DIAG $id whatIf base=${base.badge}(f=${share(base).r()}) ${out.joinToString(" ")}")
     }
 
     /**
