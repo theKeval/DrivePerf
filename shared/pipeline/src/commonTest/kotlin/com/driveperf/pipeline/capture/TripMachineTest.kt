@@ -274,6 +274,22 @@ class TripMachineTest {
     }
 
     @Test
+    fun aShortPhoneMovementAndAnOpenWindowDoNotSatisfyTheTunnelHold() {
+        var state = drive(autoRecording(), 31, 65, 0.0, startNorth = 200.0).state
+            .copy(activity = activity(66.0, ActivityType.AUTOMOTIVE))
+        for (i in 0..220) {
+            val at = 100.0 + i * 0.02
+            val accel = if (i <= 100 && i % 2 == 0) 0.05 else 0.0
+            val t = m.reduce(state, MachineEvent.Motion(ns(at), listOf(CaptureFixtures.motion(at, accel = accel))))
+            assertEquals(RecorderState.PAUSED, t.state.phase, "one closed non-still window plus unclassified time")
+            assertFalse(MachineEffect.Cancel(TimerId.STOP) in t.effects)
+            state = t.state
+        }
+        val timer = m.reduce(state, MachineEvent.Timer(ns(271.0), TimerId.STOP))
+        assertEquals(ns(31.0), timer.effects.filterIsInstance<MachineEffect.Finalise>().single().endNs)
+    }
+
+    @Test
     fun tunnelFallbackRequiresStalenessSustainedMotionAndMediumAutomotive() {
         val queued = drive(autoRecording(), 31, 65, 0.0, startNorth = 200.0).state
         fun noisy(s: MachineState, atS: Double) = m.reduce(s, MachineEvent.Motion(ns(atS), motionRun(atS - 6.0, 6.0, noisy = true)))

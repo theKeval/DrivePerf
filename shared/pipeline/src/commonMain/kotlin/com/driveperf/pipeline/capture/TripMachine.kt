@@ -543,7 +543,9 @@ internal class TripMachine(private val cfg: CaptureConfig = CaptureConfig()) {
         val stale = nowNs - fixAt >= secondsNs(cfg.tunnelResumeFixAgeS)
         val sampleAt = s.still.lastSampleNs ?: nowNs
         val freshMotion = nowNs - sampleAt in 0L..secondsNs(cfg.stillWindowS)
-        val moving = s.still.nonStillSinceNs?.let { sampleAt - it >= secondsNs(cfg.tunnelResumeMotionS) } == true
+        val through = s.still.nonStillThroughNs
+        val since = s.still.nonStillSinceNs
+        val moving = through != null && since != null && through - since >= secondsNs(cfg.tunnelResumeMotionS)
         val automotiveMotion = moving && s.activity.isAtLeastMedium(ActivityType.AUTOMOTIVE)
         return stale && freshMotion && automotiveMotion
     }

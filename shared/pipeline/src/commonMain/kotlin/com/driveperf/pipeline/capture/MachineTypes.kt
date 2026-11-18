@@ -75,6 +75,7 @@ internal data class Stillness(
     val stillSinceNs: Long? = null,
     /** Since when closed windows have been non-still; unknown is neither still nor moving. */
     val nonStillSinceNs: Long? = null,
+    val nonStillThroughNs: Long? = null,
     val lastSampleNs: Long? = null,
 ) {
     companion object {
@@ -100,6 +101,7 @@ internal data class Stillness(
                 lastSampleNs = m.tMonoNs,
                 stillSinceNs = if (still) current.stillSinceNs ?: start else null,
                 nonStillSinceNs = if (still) null else current.nonStillSinceNs ?: start,
+                nonStillThroughNs = if (still) null else m.tMonoNs,
             )
         }
 
