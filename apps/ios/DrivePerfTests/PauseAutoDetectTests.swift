@@ -12,6 +12,10 @@ final class PauseAutoDetectTests: XCTestCase {
     }
     private let english = Locale(identifier: "en_US")
 
+    /// Date formatting puts a narrow no-break space (U+202F) before AM/PM; the app keeps it, the expectations use a
+    /// plain space.
+    private func plain(_ text: String) -> String { text.replacingOccurrences(of: "\u{202F}", with: " ") }
+
     private func at(_ year: Int, _ month: Int, _ day: Int, _ hour: Int, _ minute: Int = 0) -> Date {
         toronto.date(from: DateComponents(year: year, month: month, day: day, hour: hour, minute: minute))!
     }
@@ -36,19 +40,23 @@ final class PauseAutoDetectTests: XCTestCase {
 
     func testTheEndIsNamedByItsDay() {
         let now = at(2026, 11, 18, 19, 30)
-        func phrase(_ until: Date?) -> String { PauseRules.untilPhrase(until, now: now, calendar: toronto, locale: english) }
+        func phrase(_ until: Date?) -> String {
+            plain(PauseRules.untilPhrase(until, now: now, calendar: toronto, locale: english))
+        }
         XCTAssertEqual(phrase(at(2026, 11, 18, 20, 30)), "until 8:30 PM")
         XCTAssertEqual(phrase(at(2026, 11, 19, 6)), "until 6:00 AM tomorrow")
         XCTAssertEqual(phrase(at(2026, 11, 21, 6)), "until Saturday 6:00 AM")
         XCTAssertEqual(phrase(nil), "until you turn it back on")
         XCTAssertEqual(
-            PauseRules.untilLine(at(2026, 11, 19, 6), now: now, calendar: toronto, locale: english), "Until 6:00 AM tomorrow")
+            plain(PauseRules.untilLine(at(2026, 11, 19, 6), now: now, calendar: toronto, locale: english)),
+            "Until 6:00 AM tomorrow")
     }
 
     func testOptionLinesAndButtonsFollowTheChoice() {
         let now = at(2026, 11, 20, 19, 30)
-        XCTAssertEqual(PauseRules.detail(.oneHour, now: now, calendar: toronto, locale: english), "Until 8:30 PM")
-        XCTAssertEqual(PauseRules.detail(.untilMorning, now: now, calendar: toronto, locale: english), "Saturday, 6:00 AM")
+        XCTAssertEqual(plain(PauseRules.detail(.oneHour, now: now, calendar: toronto, locale: english)), "Until 8:30 PM")
+        XCTAssertEqual(
+            plain(PauseRules.detail(.untilMorning, now: now, calendar: toronto, locale: english)), "Saturday, 6:00 AM")
         XCTAssertEqual(PauseRules.detail(.untilResumed, now: now, calendar: toronto, locale: english), "Manual drives still work")
         XCTAssertEqual(PauseRules.button(.untilMorning), "Pause until tomorrow")
         XCTAssertEqual(PauseRules.button(.oneHour), "Pause for 1 hour")
