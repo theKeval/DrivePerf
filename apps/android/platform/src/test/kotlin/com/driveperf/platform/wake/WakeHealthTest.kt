@@ -6,9 +6,7 @@ import android.app.ApplicationStartInfo
 import android.content.Context
 import android.os.Process
 import com.driveperf.testing.TestClock
-import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
-import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -30,48 +28,35 @@ class WakeHealthTest {
     private val health = WakeHealth(preferences, clock)
 
     @Test
-    fun `only successful current registrations advance the persisted check-in`() {
-        val first = health.refresh(optedIn = true, allowed = true)
+    fun `only the current registration attempt reports a failure`() {
+        val first = health.refresh(allowed = true)
+        assertFalse("optimistic until Play services answers", health.status.value.registrationFailed)
         health.activityRegistrationFinished(first, armed = false)
-        assertEquals(AutoDetectMode.NEEDS_ATTENTION, health.status.value.mode)
-        assertNull(health.status.value.lastCheckInMs)
+        assertTrue(health.status.value.registrationFailed)
 
-        val second = health.refresh(optedIn = true, allowed = true)
+        val second = health.refresh(allowed = true)
+        assertTrue("the failure stays until the new attempt reports", health.status.value.registrationFailed)
         health.activityRegistrationFinished(first, armed = true)
-        assertNull(health.status.value.lastCheckInMs)
+        assertTrue("a stale callback is ignored", health.status.value.registrationFailed)
         health.activityRegistrationFinished(second, armed = true)
-        assertEquals(AutoDetectMode.ON, health.status.value.mode)
-        assertEquals(clock.wallMs(), health.status.value.lastCheckInMs)
-
-        clock.advanceS(30.0)
-        health.parkedRegionRegistered()
-        assertEquals(clock.wallMs(), WakeHealth(preferences, clock).status.value.lastCheckInMs)
+        assertFalse(health.status.value.registrationFailed)
     }
 
     @Test
-    fun `the parked wake can check in while the activity registration needs attention`() {
-        val attempt = health.refresh(optedIn = true, allowed = true)
+    fun `without permission there is no registration to fail`() {
+        val attempt = health.refresh(allowed = true)
         health.activityRegistrationFinished(attempt, armed = false)
-        health.parkedRegionRegistered()
-        val status = health.status.value
-        assertEquals(AutoDetectMode.NEEDS_ATTENTION, status.mode)
-        assertEquals(clock.wallMs(), status.lastCheckInMs)
-
-        health.refresh(optedIn = true, allowed = false)
-        clock.advanceS(5.0)
-        health.parkedRegionRegistered()
-        assertEquals(status, health.status.value)
+        health.refresh(allowed = false)
+        assertFalse(health.status.value.registrationFailed)
+        health.activityRegistrationFinished(attempt, armed = false)
+        assertFalse(health.status.value.registrationFailed)
     }
 
     @Test
-    fun `permission loss needs attention and opt-out is off even if an old registration succeeds`() {
-        val first = health.refresh(optedIn = true, allowed = true)
-        health.refresh(optedIn = true, allowed = false)
-        assertEquals(AutoDetectMode.NEEDS_ATTENTION, health.status.value.mode)
-        health.refresh(optedIn = false, allowed = false)
-        health.activityRegistrationFinished(first, armed = true)
-        assertEquals(AutoDetectMode.OFF, health.status.value.mode)
-        assertNull(health.status.value.lastCheckInMs)
+    fun `the old duplicate check-in timestamp is removed at launch`() {
+        preferences.edit().putLong("last_check_in_ms", 42L).commit()
+        health.onLaunch(optedIn = true) { false }
+        assertFalse(preferences.contains("last_check_in_ms"))
     }
 
     @Test

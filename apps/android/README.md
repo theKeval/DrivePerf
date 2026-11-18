@@ -22,8 +22,9 @@ Native Compose app on the shared Kotlin core. Minimum Android 10 (minSdk 29), ta
 - **Wake path (DRIVE-206):** Activity Recognition transitions (`IN_VEHICLE` enter → `ACTIVITY_VEHICLE`) and the parked
   region geofence (exit → `PARKED_EXIT`) reach manifest receivers through PendingIntents, also after the app was
   killed, and start the capture service. Transitions are re-registered at every process start; `BootReceiver` causes
-  one after a reboot, and the core re-arms the geofence in `onLaunch`. Automatic trips are on while fine and background
-  location and activity recognition are granted.
+  one after a reboot, and the core re-arms the geofence in `onLaunch`. Automatic trips run while the user opted in
+  (onboarding or Recording settings) and precise, background location and activity recognition are granted; otherwise
+  Home shows "Auto-detect off" or names what needs attention (DRIVE-90, DRIVE-153).
 - Crash reporting is Sentry (EU) behind consent, never Crashlytics (ADR-007). See "Crash reporting" below.
 
 Failures the callback ports cannot return (missing permission or sensor) go to `CaptureFailureBus` as
@@ -53,12 +54,13 @@ for i in $(seq 0 30); do adb emu geo fix $(python3 -c "print(-30.0 + $i*0.00015)
 | `app` | Composition root: Koin wiring, navigation, bridges from feature interfaces to platform adapters; flavors `dev` (`com.driveperf.app.dev`) and `prod` (`com.driveperf.app`) |
 | `designsystem` | Theme, tokens (generated), type, shapes, icons, small components |
 | `platform` | Sensors, foreground service, Live Update notification, consent store, Sentry adapter |
-| `feature-capture` | Capture state holder, floating toolbar, locked in-drive screen |
+| `feature-capture` | Capture state holder, floating toolbar, locked in-drive screen, auto-detect rules (`AutoDetectReadiness`), needs-attention banner and capture status sheet (S-HOME-02) |
+| `feature-settings` | Recording settings (S-SET-03): the Automatic trips switch |
 | `feature-onboarding` | Onboarding flow and permission requests |
 | `feature-drives` | Drives home and All drives (trip list) |
 | `feature-account` | Profile and privacy switches |
 | `feature-routes`, `feature-insights`, `feature-garage` | Tab roots, empty states until their tickets |
-| `feature-replay`, `feature-privacy`, `feature-paywall`, `feature-settings` | Empty until their tickets |
+| `feature-replay`, `feature-privacy`, `feature-paywall` | Empty until their tickets |
 
 Features see `:shared:presentation`, `:shared:domain`, `:shared:foundation` and `designsystem` only; `assertModuleGraph` fails
 CI on any other edge. Features declare the interfaces they need (`CaptureController`, `TripListSource`) and the app

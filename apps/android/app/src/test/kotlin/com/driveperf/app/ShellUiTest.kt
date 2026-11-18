@@ -6,11 +6,16 @@ import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.material3.Text
 import com.driveperf.app.navigation.ShellCallbacks
 import com.driveperf.app.navigation.Tab
 import com.driveperf.app.navigation.TabScaffold
 import com.driveperf.designsystem.DrivePerfTheme
+import com.driveperf.feature.capture.AttentionReason
+import com.driveperf.feature.capture.AutoDetectReadiness
+import com.driveperf.feature.capture.AutoDetectStatus
+import com.driveperf.feature.capture.CapturePermissions
 import com.driveperf.feature.capture.CaptureUiState
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -29,8 +34,14 @@ class ShellUiTest {
     private var profileClicks = 0
     private var starts = 0
     private var locationFixes = 0
+    private val fixed = mutableListOf<AttentionReason>()
+    private var recordingSettingsOpened = 0
 
-    private fun show(tab: Tab = Tab.Drives, capture: CaptureUiState = CaptureUiState.Ready) {
+    private fun show(
+        tab: Tab = Tab.Drives,
+        capture: CaptureUiState = CaptureUiState.Ready,
+        autoDetect: AutoDetectStatus? = null,
+    ) {
         compose.setContent {
             DrivePerfTheme(darkTheme = true) {
                 TabScaffold(
@@ -42,6 +53,9 @@ class ShellUiTest {
                         onStart = { starts++ },
                         onOpenDrive = {},
                         onFixLocation = { locationFixes++ },
+                        onFixReason = { fixed += it },
+                        onOpenRecordingSettings = { recordingSettingsOpened++ },
+                        autoDetect = autoDetect,
                     ),
                 ) { Text("tab content") }
             }
@@ -98,5 +112,41 @@ class ShellUiTest {
         compose.onNodeWithContentDescription("Allow location to record").performClick()
         assertEquals(1, locationFixes)
         assertEquals(0, starts)
+    }
+
+    @Test
+    fun `needs attention names the reason on the toolbar and the banner, and Fix opens the status sheet`() {
+        val whileUsing = AutoDetectReadiness.status(optedIn = true, permissions = CapturePermissions.ALL.copy(background = false))
+        show(autoDetect = whileUsing)
+        compose.onNodeWithText("Location is set to While using the app").assertIsDisplayed()
+        assertEquals("toolbar and banner", 2, compose.onAllNodesWithText("Auto-detect needs attention").fetchSemanticsNodes().size)
+        compose.onNodeWithText("Fix").performClick()
+
+        compose.onNodeWithText("Capture status").assertIsDisplayed()
+        compose.onNodeWithText("1 to fix").assertExists()
+        compose.onNodeWithText("While using the app only").assertExists()
+        compose.onAllNodesWithText("Fix")[1].performClick() // [0] is the banner's
+        assertEquals(listOf(AttentionReason.NoBackgroundLocation), fixed)
+    }
+
+    @Test
+    fun `the toolbar opens the status sheet, which links to Recording settings`() {
+        val now = System.currentTimeMillis()
+        val ready = AutoDetectReadiness.status(optedIn = true, permissions = CapturePermissions.ALL, lastCheckInMs = now)
+        show(autoDetect = ready)
+        compose.onNodeWithText("Last check-in just now").assertIsDisplayed()
+        compose.onNodeWithText("Auto-detect on · ready").performClick()
+        compose.onNodeWithText("Checks · all 3 OK").assertExists()
+        compose.onNodeWithText("Recording settings").performScrollTo().performClick()
+        assertEquals(1, recordingSettingsOpened)
+    }
+
+    @Test
+    fun `manual trips say auto-detect is off and offer Turn on, not a permission fix`() {
+        show(autoDetect = AutoDetectReadiness.status(optedIn = false, permissions = CapturePermissions.ALL))
+        compose.onNodeWithText("Auto-detect off").assertIsDisplayed()
+        assertEquals(0, compose.onAllNodesWithText("Fix").fetchSemanticsNodes().size)
+        compose.onNodeWithText("Turn on").performClick()
+        assertEquals(1, recordingSettingsOpened)
     }
 }

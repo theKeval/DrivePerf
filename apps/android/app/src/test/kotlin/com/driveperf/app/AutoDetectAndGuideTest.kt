@@ -1,17 +1,24 @@
 package com.driveperf.app
 
 import android.content.Context
+import android.os.Build
 import android.provider.Settings
 import androidx.test.core.app.ApplicationProvider
-import com.driveperf.app.core.AutoDetectOff
+import com.driveperf.app.core.autoDetectStatus
+import com.driveperf.app.core.forCapture
+import com.driveperf.app.navigation.EnableAutoTrips
+import com.driveperf.app.navigation.FixStep
+import com.driveperf.feature.capture.AttentionReason
+import com.driveperf.feature.capture.AutoDetectMode
+import com.driveperf.feature.capture.CapturePermissions
 import com.driveperf.feature.onboarding.GuideLauncher
 import com.driveperf.feature.onboarding.GuideLink
 import com.driveperf.feature.onboarding.InAppBrowser
 import com.driveperf.feature.onboarding.OnboardingLinks
 import com.driveperf.feature.onboarding.PermissionState
+import com.driveperf.platform.wake.WakeStatus
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
-import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -24,22 +31,66 @@ class AutoDetectAndGuideTest {
     private val all = PermissionState(fineLocation = true, backgroundLocation = true, activityRecognition = true)
 
     @Test
-    fun `auto-detect is on only with the opt-in and every permission`() {
-        assertNull(AutoDetectOff.of(all, optedIn = true))
+    fun `onboarding permissions map onto the capture rules`() {
+        assertEquals(CapturePermissions.ALL, all.forCapture())
+        val approximate = all.copy(fineLocation = false, approximateOnly = true).forCapture()
+        assertEquals(CapturePermissions(location = true, precise = false, background = true, activity = true), approximate)
+        assertEquals(false, PermissionState().forCapture().location)
     }
 
     @Test
-    fun `auto-detect off says why`() {
-        assertEquals(AutoDetectOff.OptedOut, AutoDetectOff.of(all, optedIn = false))
-        assertEquals(AutoDetectOff.NoLocation, AutoDetectOff.of(all.copy(fineLocation = false), optedIn = true))
-        assertEquals(AutoDetectOff.NoBackgroundLocation, AutoDetectOff.of(all.copy(backgroundLocation = false), optedIn = true))
-        assertEquals(AutoDetectOff.NoActivityRecognition, AutoDetectOff.of(all.copy(activityRecognition = false), optedIn = true))
+    fun `one rule set decides both the status and whether wakes may start a trip`() {
+        val status = autoDetectStatus(true, all.copy(activityRecognition = false), WakeStatus(false, false), lastCheckInMs = 7L)
+        assertEquals(AutoDetectMode.NeedsAttention, status.mode)
+        assertEquals(listOf(AttentionReason.NoActivityRecognition), status.reasons)
+        assertEquals(7L, status.lastCheckInMs)
+        assertEquals(AutoDetectMode.Ready, autoDetectStatus(true, all, WakeStatus(false, false), null).mode)
+        assertEquals(AutoDetectMode.Off, autoDetectStatus(false, all, WakeStatus(false, false), null).mode)
     }
 
     @Test
-    fun `only permission reasons have a fix in settings`() {
-        assertFalse(AutoDetectOff.OptedOut.fixableInSettings)
-        assertTrue(AutoDetectOff.NoBackgroundLocation.fixableInSettings)
+    fun `each reason uses its onboarding step, the dialog while Android shows it`() {
+        assertEquals(FixStep.LocationDialog, FixStep.of(AttentionReason.NoLocation, Build.VERSION_CODES.S))
+        assertEquals(FixStep.LocationDialog, FixStep.of(AttentionReason.NoPreciseLocation, Build.VERSION_CODES.S))
+        assertEquals(FixStep.BackgroundSettings, FixStep.of(AttentionReason.NoBackgroundLocation, Build.VERSION_CODES.S))
+        assertEquals(FixStep.BackgroundDialog, FixStep.of(AttentionReason.NoBackgroundLocation, Build.VERSION_CODES.Q))
+        assertEquals(FixStep.ActivityDialog, FixStep.of(AttentionReason.NoActivityRecognition, Build.VERSION_CODES.S))
+        assertEquals(FixStep.None, FixStep.of(AttentionReason.ActivityUpdatesFailed, Build.VERSION_CODES.S))
+    }
+
+    @Test
+    fun `App info opens only when the permission is still missing and Android will not ask again`() {
+        assertTrue(FixStep.needsAppSettings(stillMissing = true, systemWouldAskAgain = false))
+        assertFalse(FixStep.needsAppSettings(stillMissing = true, systemWouldAskAgain = true))
+        assertFalse(FixStep.needsAppSettings(stillMissing = false, systemWouldAskAgain = false))
+    }
+
+    @Test
+    fun `turning automatic trips on walks the missing permissions once each, then stops`() {
+        val tried = mutableListOf<AttentionReason>()
+        val session = EnableAutoTrips().apply { fix = { tried += it } }
+        val missing = CapturePermissions(location = true, precise = true, background = false, activity = false)
+
+        session.begin(missing)
+        assertEquals(listOf(AttentionReason.NoBackgroundLocation), tried)
+        session.continueWith(missing) // refused in Settings: move on, never ask again in this attempt
+        assertEquals(listOf(AttentionReason.NoBackgroundLocation, AttentionReason.NoActivityRecognition), tried)
+        session.continueWith(missing)
+        session.continueWith(missing)
+        assertEquals(2, tried.size)
+    }
+
+    @Test
+    fun `nothing is asked when everything is granted, or after the switch is turned off`() {
+        val tried = mutableListOf<AttentionReason>()
+        val session = EnableAutoTrips().apply { fix = { tried += it } }
+        session.begin(CapturePermissions.ALL)
+        assertTrue(tried.isEmpty())
+
+        session.begin(CapturePermissions.ALL.copy(activity = false, precise = false))
+        session.cancel()
+        session.continueWith(CapturePermissions.ALL.copy(activity = false, precise = false))
+        assertEquals(listOf(AttentionReason.NoActivityRecognition), tried)
     }
 
     @Test

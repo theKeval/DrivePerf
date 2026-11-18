@@ -1,18 +1,23 @@
 package com.driveperf.app.navigation
 
-import com.driveperf.app.core.AutoDetectOff
-import com.driveperf.platform.wake.WakeStatus
+import com.driveperf.feature.capture.AttentionReason
+import com.driveperf.feature.capture.AutoDetectStatus
 
-/** What the shell can ask the app to do, and the notices it shows ([autoDetectOff] is Home's "Auto-detect off", F-ONB-04.6). */
+/**
+ * What the shell can ask the app to do, and what it shows about automatic trips: [autoDetect] drives the toolbar, the
+ * Home banner and the capture status sheet (F-CAP-02); [forceStopNotice] is Android's re-arm notice (F-CAP-14).
+ */
 data class ShellCallbacks(
     val onTabSelected: (Tab) -> Unit,
     val onProfile: () -> Unit,
     val onStart: () -> Unit,
     val onOpenDrive: () -> Unit,
     val onFixLocation: () -> Unit,
-    /** "Fix" on the Auto-detect off notice: Android's permission settings for DrivePerf. */
-    val onFixAutoDetect: () -> Unit = {},
-    val autoDetectOff: AutoDetectOff? = null,
-    val wakeStatus: WakeStatus? = null,
+    /** "Fix" on a failing check in the capture status sheet. */
+    val onFixReason: (AttentionReason) -> Unit = {},
+    /** S-SET-03, from the sheet and from the manual-mode notice's "Turn on". */
+    val onOpenRecordingSettings: () -> Unit = {},
+    val autoDetect: AutoDetectStatus? = null,
+    val forceStopNotice: Boolean = false,
     val onDismissForceStop: () -> Unit = {},
 )

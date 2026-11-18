@@ -91,6 +91,7 @@ class CoreBridgeTest {
         assertFalse(WakePath.automaticAllowed(all.copy(backgroundLocation = false), optedIn = true))
         assertFalse(WakePath.automaticAllowed(all.copy(activityRecognition = false), optedIn = true))
         assertFalse(WakePath.automaticAllowed(all.copy(fineLocation = false), optedIn = true))
+        assertFalse(WakePath.automaticAllowed(all.copy(fineLocation = false, approximateOnly = true), optedIn = true))
     }
 
     @Test

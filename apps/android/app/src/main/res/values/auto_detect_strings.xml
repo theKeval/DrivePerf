@@ -1,9 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- F-ONB-04.6: Home says so when automatic trips are off, and why. -->
+    <!-- F-ONB-04.6: Home says so when the user chose manual trips, and offers Recording settings (S-SET-03). -->
     <string name="auto_detect_off_title">Auto-detect off</string>
     <string name="auto_detect_off_manual">You’re on manual trips. Tap Start when you set off.</string>
-    <string name="auto_detect_off_location">Allow location all the time so drives can start on their own.</string>
-    <string name="auto_detect_off_activity">Allow physical activity so drives can start on their own.</string>
-    <string name="auto_detect_fix">Fix</string>
+    <string name="auto_detect_turn_on">Turn on</string>
+
+    <!-- Turning automatic trips on from Recording settings or Fix (S-ONB-09 wording): background location is granted in Settings. -->
+    <string name="auto_detect_all_the_time_open">Open settings</string>
+    <string name="auto_detect_all_the_time_not_now">Not now</string>
 </resources>

@@ -1,9 +1,6 @@
 package com.driveperf.app.navigation
 
 import android.Manifest
-import android.content.Intent
-import android.net.Uri
-import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.PaddingValues
@@ -43,6 +40,7 @@ import com.driveperf.feature.drives.DrivesHomeScreen
 import com.driveperf.feature.drives.DrivesViewModel
 import com.driveperf.feature.garage.GarageScreen
 import com.driveperf.feature.insights.InsightsScreen
+import com.driveperf.feature.onboarding.GuideLauncher
 import com.driveperf.feature.onboarding.OnboardingRoute
 import com.driveperf.feature.onboarding.OnboardingViewModel
 import com.driveperf.feature.onboarding.PermissionReader
@@ -108,7 +106,6 @@ private class AppEnv(
     val capture: CaptureUiState,
     val services: AppServices,
     val fixLocation: () -> Unit,
-    val fixAutoDetect: () -> Unit,
 )
 
 /** The app-level singletons the destinations talk to. */
@@ -129,13 +126,12 @@ private fun AppNavHost(navController: NavHostController, captureViewModel: Captu
     val requestLocation = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
         captureController.refreshPermissions()
         // Refused again (or "don't ask again"): the system dialog will not show, so send the user to Settings.
-        if (!permissionReader.read().fineLocation) context.startActivity(appSettingsIntent(context.packageName))
+        if (!permissionReader.read().fineLocation) context.startActivity(GuideLauncher.appDetails(context))
     }
     val services = AppServices(consent, koinInject(), koinInject(), captureController, permissionReader)
     val env = AppEnv(
         navController, captureViewModel, capture, services,
         fixLocation = { requestLocation.launch(LOCATION_PERMISSIONS) },
-        fixAutoDetect = { context.startActivity(appSettingsIntent(context.packageName)) },
     )
     val start = if (consent.onboardingCompleted) Tab.Drives.route else Routes.ONBOARDING
     NavHost(navController = navController, startDestination = start) {
@@ -143,6 +139,7 @@ private fun AppNavHost(navController: NavHostController, captureViewModel: Captu
         tabDestinations(env)
         allDrivesDestination(env)
         profileDestination(env)
+        recordingSettingsDestination(env)
     }
 }
 
@@ -168,20 +165,23 @@ private fun NavGraphBuilder.tabDestinations(env: AppEnv) {
         onStart = env.captureViewModel::onStart,
         onOpenDrive = {}, // while recording, the in-drive gate already shows the drive screen
         onFixLocation = env.fixLocation,
-        onFixAutoDetect = env.fixAutoDetect,
+        onOpenRecordingSettings = { env.navController.navigate(Routes.RECORDING_SETTINGS) },
     )
     for (tab in Tab.entries) {
         composable(tab.route) {
-            val autoDetectOff = rememberAutoDetectOff(env.services.permissionReader, env.services.consent)
-            val wakePath = if (tab == Tab.Drives) koinInject<WakePath>() else null
-            val wakeStatus = wakePath?.status?.collectAsStateWithLifecycle()?.value
+            val wakePath = koinInject<WakePath>()
+            val autoDetect by wakePath.autoDetect.collectAsStateWithLifecycle()
+            val wakeStatus by wakePath.status.collectAsStateWithLifecycle()
+            val fixer = rememberAutoDetectFixer(env.services.permissionReader, env.services.captureController::refreshPermissions)
+            AllTheTimeDialog(fixer)
             TabScaffold(
                 selected = tab,
                 capture = env.capture,
                 callbacks = callbacks.copy(
-                    autoDetectOff = autoDetectOff,
-                    wakeStatus = wakeStatus,
-                    onDismissForceStop = { wakePath?.dismissForceStopNotice() },
+                    onFixReason = fixer::fix,
+                    autoDetect = autoDetect.takeIf { tab == Tab.Drives },
+                    forceStopNotice = wakeStatus.forceStopNotice,
+                    onDismissForceStop = wakePath::dismissForceStopNotice,
                 ),
             ) { padding ->
                 TabContent(tab, padding, onSeeAll = { env.navController.navigate(Routes.ALL_DRIVES) })
@@ -222,7 +222,19 @@ private fun NavGraphBuilder.profileDestination(env: AppEnv) {
                     env.services.privacy.setCrashReports(it)
                 },
                 modifier = Modifier.padding(padding),
+                onOpenRecording = { env.navController.navigate(Routes.RECORDING_SETTINGS) },
             )
+        }
+    }
+}
+
+private fun NavGraphBuilder.recordingSettingsDestination(env: AppEnv) {
+    composable(Routes.RECORDING_SETTINGS) {
+        val services = env.services
+        val deps = RecordingSettingsDeps(koinInject(), services.consent, services.captureController, services.permissionReader)
+        val title = stringResource(R.string.recording_settings_title)
+        DetailScaffold(title = title, onBack = { env.navController.popBackStack() }) { padding ->
+            RecordingSettingsRoute(deps, Modifier.padding(padding))
         }
     }
 }
@@ -255,6 +267,3 @@ private fun NavHostController.navigateToTab(tab: Tab) {
         restoreState = true
     }
 }
-
-private fun appSettingsIntent(packageName: String) =
-    Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", packageName, null))

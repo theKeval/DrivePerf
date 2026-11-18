@@ -15,18 +15,25 @@ import androidx.compose.material3.ShortNavigationBarItem
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import com.driveperf.app.R
 import com.driveperf.designsystem.DpAvatarButton
 import com.driveperf.designsystem.DpIcons
-import com.driveperf.feature.capture.CaptureAutoDetect
+import com.driveperf.feature.capture.AttentionBanner
+import com.driveperf.feature.capture.AutoDetectMode
+import com.driveperf.feature.capture.AutoDetectStatus
+import com.driveperf.feature.capture.CaptureStatusActions
+import com.driveperf.feature.capture.CaptureStatusSheet
 import com.driveperf.feature.capture.CaptureToolbar
+import com.driveperf.feature.capture.CaptureToolbarActions
 import com.driveperf.feature.capture.CaptureUiState
 import com.driveperf.feature.capture.ForceStopNotice
-import com.driveperf.platform.wake.AutoDetectMode
-import com.driveperf.platform.wake.WakeStatus
 
 /**
  * The shell of a tab root (S-NAV-01): a short M3 Expressive navigation bar with the four tabs, the profile avatar at the
@@ -41,8 +48,8 @@ fun TabScaffold(
     modifier: Modifier = Modifier,
     content: @Composable (PaddingValues) -> Unit,
 ) {
-    val wake = callbacks.wakeStatus
-    val showForceStop = wake != null && wake.forceStopNotice && wake.mode != AutoDetectMode.OFF
+    val autoDetect = callbacks.autoDetect
+    var showStatus by rememberSaveable { mutableStateOf(false) }
     Scaffold(
         modifier = modifier,
         topBar = {
@@ -72,23 +79,21 @@ fun TabScaffold(
             if (selected == Tab.Drives) {
                 CaptureToolbar(
                     state = capture,
-                    autoDetect = wake?.toolbarStatus(),
-                    onStart = callbacks.onStart,
-                    onOpenDrive = callbacks.onOpenDrive,
-                    onFixLocation = callbacks.onFixLocation,
+                    autoDetect = autoDetect,
+                    actions = CaptureToolbarActions(
+                        onStart = callbacks.onStart,
+                        onOpenDrive = callbacks.onOpenDrive,
+                        onFixLocation = callbacks.onFixLocation,
+                        onOpenStatus = { showStatus = true },
+                    ),
                 )
             }
         },
         floatingActionButtonPosition = FabPosition.Center,
         content = { padding ->
-            val autoDetectOff = callbacks.autoDetectOff
-            if (selected == Tab.Drives && (autoDetectOff != null || showForceStop)) {
-                // F-ONB-04.6: Home says when automatic trips are off, above the tab's own content.
+            if (selected == Tab.Drives && autoDetect != null) {
                 Column(modifier = Modifier.padding(top = padding.calculateTopPadding())) {
-                    if (showForceStop) {
-                        ForceStopNotice(rearmed = wake.mode == AutoDetectMode.ON, onDismiss = callbacks.onDismissForceStop)
-                    }
-                    if (autoDetectOff != null) AutoDetectNotice(autoDetectOff, onFix = callbacks.onFixAutoDetect)
+                    HomeBanners(autoDetect, callbacks, onOpenStatus = { showStatus = true })
                     Box(modifier = Modifier.weight(1f)) { content(PaddingValues(bottom = padding.calculateBottomPadding())) }
                 }
             } else {
@@ -96,12 +101,40 @@ fun TabScaffold(
             }
         },
     )
+    if (showStatus && selected == Tab.Drives && autoDetect != null) {
+        StatusSheet(autoDetect, callbacks, onDismiss = { showStatus = false })
+    }
 }
 
-private fun WakeStatus.toolbarStatus(): CaptureAutoDetect = when (mode) {
-    AutoDetectMode.OFF -> CaptureAutoDetect.off()
-    AutoDetectMode.ON -> CaptureAutoDetect.on(lastCheckInMs)
-    AutoDetectMode.NEEDS_ATTENTION -> CaptureAutoDetect.needsAttention(lastCheckInMs)
+@Composable
+private fun StatusSheet(autoDetect: AutoDetectStatus, callbacks: ShellCallbacks, onDismiss: () -> Unit) {
+    CaptureStatusSheet(
+        status = autoDetect,
+        actions = CaptureStatusActions(
+            onDismiss = onDismiss,
+            onFix = callbacks.onFixReason,
+            onOpenRecordingSettings = {
+                onDismiss()
+                callbacks.onOpenRecordingSettings()
+            },
+        ),
+    )
+}
+
+/**
+ * The Drives tab's banner slot (S-HOME-01): the force-stop notice, then the needs-attention banner naming the first reason
+ * (its Fix opens the capture status sheet, as on iOS) or "Auto-detect off" when the user chose manual trips.
+ */
+@Composable
+private fun HomeBanners(autoDetect: AutoDetectStatus, callbacks: ShellCallbacks, onOpenStatus: () -> Unit) {
+    if (callbacks.forceStopNotice && autoDetect.mode != AutoDetectMode.Off) {
+        ForceStopNotice(rearmed = autoDetect.mode == AutoDetectMode.Ready, onDismiss = callbacks.onDismissForceStop)
+    }
+    when (autoDetect.mode) {
+        AutoDetectMode.NeedsAttention -> autoDetect.reasons.firstOrNull()?.let { AttentionBanner(it, onFix = onOpenStatus) }
+        AutoDetectMode.Off -> AutoDetectNotice(onTurnOn = callbacks.onOpenRecordingSettings)
+        AutoDetectMode.Ready -> Unit
+    }
 }
 
 /** A pushed screen with a back arrow (Profile, All drives). */

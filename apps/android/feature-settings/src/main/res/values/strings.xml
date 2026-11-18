@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- S-SET-03 Recording settings (DRIVE-153, F-SET-01 AC3) -->
+    <string name="recording_capture_section">Capture</string>
+    <string name="recording_auto_title">Automatic trips</string>
+    <string name="recording_auto_on">DrivePerf notices when you set off and stops when you park</string>
+    <string name="recording_auto_off">Off. Drives record only when you tap Start</string>
+    <string name="recording_manual_banner">Manual mode. Tap Start in the app when you set off.</string>
+    <string name="recording_promise">Auto-detects most drives. The first few hundred metres may be estimated. Force-stopping pauses auto-detect.</string>
+</resources>
