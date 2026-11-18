@@ -11,12 +11,12 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.driveperf.designsystem.DpModalBottomSheet
 
 /**
  * S-DRV-03: the one-tap escape for a passenger. "Keep the trip as a passenger trip" saves it without a score and lifts
@@ -26,7 +26,7 @@ import androidx.compose.ui.unit.dp
 @Composable
 internal fun PassengerSheet(step: PassengerStep, actions: InDriveActions) {
     if (step == PassengerStep.HIDDEN) return
-    ModalBottomSheet(onDismissRequest = actions.passenger.onDismissed) {
+    DpModalBottomSheet(onDismissRequest = actions.passenger.onDismissed) {
         Column(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp).padding(bottom = 24.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),

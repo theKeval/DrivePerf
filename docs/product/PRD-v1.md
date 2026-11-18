@@ -627,7 +627,7 @@ Goal: phone-only data is noisy. Be honest about it, exclude what we can't trust,
 - **Acceptance criteria:**
   1. Given the phone is picked up, dropped or re-seated during a trip, when the pipeline detects re-orientation (A12), then the span (with margins) is excluded from Smoothness and events, and alignment restarts.
   2. Given ≥ 1 excluded span, when the Story shows, then it says e.g. "Your phone moved around for about 3 minutes, so we left that part out of the score."
-  3. Given more than 50% of the trip is excluded, when finalised, then the trip is "Unscorable" (F-STY-04).
+  3. Given more than 50% of the trip is excluded, when finalised, then the trip is "Unscorable" (F-STY-04). Only moving time can be excluded, and the estimated start is not part of the trip for this share (A12 §2.9, DRIVE-164).
 - **Platform notes:** same (shared core).
 - **Analytics:** `segment_excluded {reason: phone_moved, minutes_bucket}`
 - **Edge cases:** EC-MOV.
@@ -651,7 +651,7 @@ Goal: phone-only data is noisy. Be honest about it, exclude what we can't trust,
 - **Story:** As a data-minded driver, I want a clear quality label on every trip, so that I know how much to trust its numbers.
 - **Screens:** S-DQ-01, S-TRP-01, S-STY-01, S-RPL-01, S-ANL-01
 - **Acceptance criteria:**
-  1. Given a finalised trip, when shown, then it carries one badge: **Good**, **Usable**, **Limited** or **Unscorable** (A12 defines thresholds on coverage, sample delivery, alignment and exclusions).
+  1. Given a finalised trip, when shown, then it carries one badge: **Good**, **Usable**, **Limited** or **Unscorable** (A12 defines thresholds on coverage, sample delivery, alignment and exclusions). Time while the car is stopped and the estimated start never count against the scored share (DRIVE-164).
   2. Given the user taps the badge, when S-DQ-01 opens, then it shows: phone state (mounted / loose / moved), delivered IMU rate (e.g. "50 Hz"), GNSS coverage %, excluded minutes with reasons, estimated start distance, and the provenance legend.
   3. Given WDD, when counted, then only Good and Usable trips count.
 - **Platform notes:** same.
