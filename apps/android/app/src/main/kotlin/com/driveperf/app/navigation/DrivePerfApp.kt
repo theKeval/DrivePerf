@@ -172,8 +172,10 @@ private fun AppNavHost(navController: NavHostController, captureViewModel: Captu
 private fun NavGraphBuilder.onboardingDestination(env: AppEnv) {
     composable(Routes.ONBOARDING) {
         val viewModel: OnboardingViewModel = koinViewModel()
+        val units by koinInject<kotlinx.coroutines.flow.StateFlow<UnitSystem>>().collectAsStateWithLifecycle()
         OnboardingRoute(
             viewModel = viewModel,
+            units = units,
             permissionReader = env.services.permissionReader,
             onFinished = {
                 env.services.consent.onboardingCompleted = true

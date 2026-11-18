@@ -83,21 +83,26 @@ private fun DriveContent(state: CaptureUiState.Recording, actions: InDriveAction
             PassengerButton(actions.passenger.onRequested)
         }
     }
-    if (state.confirmingStop) StopDialog(state.shortTrip, actions)
+    if (state.confirmingStop) StopDialog(state, actions)
     PassengerSheet(state.passengerStep, actions)
 }
 
 @Composable
-private fun StopDialog(shortTrip: Boolean, actions: InDriveActions) {
+private fun StopDialog(state: CaptureUiState.Recording, actions: InDriveActions) {
     AlertDialog(
         onDismissRequest = actions.stop.onDismissed,
         title = { Text(stringResource(R.string.drive_stop_title)) },
         text = {
-            Text(stringResource(if (shortTrip) R.string.drive_stop_body_short else R.string.drive_stop_body))
+            val text = if (state.shortTrip) {
+                stringResource(R.string.drive_stop_body_short, CaptureFormatting.distance(TripEnd.SHORT_DISTANCE_M, state.units))
+            } else {
+                stringResource(R.string.drive_stop_body)
+            }
+            Text(text)
         },
         confirmButton = {
             TextButton(onClick = actions.stop.onConfirmed, modifier = Modifier.heightIn(min = DriveTouchMin)) {
-                Text(stringResource(if (shortTrip) R.string.drive_stop_confirm_short else R.string.drive_stop_confirm))
+                Text(stringResource(if (state.shortTrip) R.string.drive_stop_confirm_short else R.string.drive_stop_confirm))
             }
         },
         dismissButton = {

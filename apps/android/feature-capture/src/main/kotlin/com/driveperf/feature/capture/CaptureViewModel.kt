@@ -42,6 +42,7 @@ sealed interface CaptureUiState {
         /** Under 500 m or 2 minutes: the End sheet says it is kept as a short trip, without a score (F-CAP-17). */
         val shortTrip: Boolean = false,
         val passengerStep: PassengerStep = PassengerStep.HIDDEN,
+        val units: UnitSystem = UnitSystem.METRIC,
     ) : CaptureUiState
 
     data object Failed : CaptureUiState
@@ -114,6 +115,7 @@ class CaptureViewModel(
         return CaptureUiState.Recording(
             elapsed = CaptureFormatting.elapsed(elapsedMs),
             distance = CaptureFormatting.distance(snapshot.distanceM, units),
+            units = units,
             gps = snapshot.gps,
             confirmingStop = current.confirmingStop,
             manual = snapshot.isManual,

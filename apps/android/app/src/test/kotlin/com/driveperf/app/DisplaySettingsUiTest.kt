@@ -1,5 +1,13 @@
 package com.driveperf.app
 
+import com.driveperf.feature.onboarding.OnboardingActions
+
+import com.driveperf.feature.onboarding.OnboardingStep
+
+import com.driveperf.feature.onboarding.OnboardingUiState
+
+import com.driveperf.feature.onboarding.OnboardingScreen
+
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -80,6 +88,16 @@ class DisplaySettingsUiTest {
         compose.onNodeWithText("My car").performScrollTo().performClick().assertIsSelected()
         compose.onNodeWithText("Battery saver recording").performScrollTo().performClick().assertIsOn()
         compose.runOnIdle { assertEquals("car", latest.defaultVehicleId); assertEquals(true, latest.batterySaverRecording) }
+    }
+
+    @Test fun onboardingNotificationPreviewFollowsImperialUnits() {
+        compose.setContent { DrivePerfTheme {
+            OnboardingScreen(
+                OnboardingUiState(step = OnboardingStep.Notifications),
+                OnboardingActions(), units = UnitSystem.IMPERIAL,
+            )
+        } }
+        compose.onNodeWithText("4 drives · 39.1 mi").performScrollTo().assertIsDisplayed()
     }
 
     @Test fun emptyGarageOffersItsDestination() {

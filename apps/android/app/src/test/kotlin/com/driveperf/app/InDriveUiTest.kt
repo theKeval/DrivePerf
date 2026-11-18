@@ -1,5 +1,7 @@
 package com.driveperf.app
 
+import com.driveperf.domain.settings.UnitSystem
+
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
@@ -133,6 +135,12 @@ class InDriveUiTest {
         show(recording(confirming = true, shortTrip = true))
         compose.onNodeWithText("End anyway").assertIsDisplayed()
         compose.onNodeWithText("Short trip", substring = true).assertIsDisplayed()
+    }
+
+    @Test
+    fun `the short trip threshold follows imperial units`() {
+        show(recording(confirming = true, shortTrip = true).copy(units = UnitSystem.IMPERIAL))
+        compose.onNodeWithText("under about 0.3 mi", substring = true).assertIsDisplayed()
     }
 
     // ---- passenger sheet (S-DRV-03) ----
