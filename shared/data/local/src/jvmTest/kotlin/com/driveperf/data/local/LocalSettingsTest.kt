@@ -35,10 +35,14 @@ class LocalSettingsTest {
         assertEquals("My car", repo.vehicles().single().name)
         assertTrue(repo.update(repo.state.value.copy(defaultVehicleId = "car")))
         assertEquals("car", repository().state.value.defaultVehicleId)
+        driver.execute(null, "UPDATE vehicle SET is_active = 0 WHERE id = 'car'", 0)
+        assertTrue(repo.update(repo.state.value.copy(appearance = Appearance.LIGHT)))
+        assertEquals(null, repository().state.value.defaultVehicleId)
+        driver.execute(null, "UPDATE vehicle SET is_active = 1 WHERE id = 'car'", 0)
         assertTrue(db.profileQueries.localSettings().executeAsOne().capture_json.contains("\"autoDetect\":true"))
         assertTrue(repo.update(Settings()))
         assertEquals(null, repository().state.value.defaultVehicleId)
-        assertEquals(listOf("default_car", "default_car"), events.map { it.properties.getValue("key") })
+        assertEquals(listOf("default_car", "appearance", "appearance", "default_car"), events.map { it.properties.getValue("key") })
     }
 
     @Test fun choicesSurviveRecreationAndOnlyChangesEmitKeys() = runTest {

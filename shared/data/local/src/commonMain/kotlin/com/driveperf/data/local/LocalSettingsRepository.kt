@@ -36,7 +36,8 @@ public class LocalSettingsRepository(
     override val state: StateFlow<Settings> = mutableState.asStateFlow()
 
     private fun read(): Settings {
-        val row = db.profileQueries.localSettings().executeAsOneOrNull() ?: return Settings()
+        val garageDefault = db.vehicleQueries.defaultSettingsVehicle().executeAsOneOrNull()
+        val row = db.profileQueries.localSettings().executeAsOneOrNull() ?: return Settings(defaultVehicleId = garageDefault)
         val capture = json.decodeFromString<CaptureChoices>(row.capture_json)
         val display = json.decodeFromString<DisplayChoices>(row.units_json)
         return Settings(
@@ -44,7 +45,7 @@ public class LocalSettingsRepository(
             appearance = Appearance.entries.firstOrNull { it.name.equals(row.appearance, ignoreCase = true) }
                 ?: Appearance.SYSTEM,
             batterySaverRecording = capture.batterySaverRecording,
-            defaultVehicleId = capture.defaultVehicleId,
+            defaultVehicleId = garageDefault,
             dynamicColour = display.dynamicColour,
         )
     }
@@ -53,7 +54,9 @@ public class LocalSettingsRepository(
         mutex.withLock {
             val old = state.value
             if (old == settings) return@withLock true
-            if (settings.defaultVehicleId != null && vehicles().none { it.id == settings.defaultVehicleId }) {
+            if (settings.defaultVehicleId != old.defaultVehicleId && settings.defaultVehicleId != null &&
+                vehicles().none { it.id == settings.defaultVehicleId }
+            ) {
                 return@withLock false
             }
             val written = write(settings)
