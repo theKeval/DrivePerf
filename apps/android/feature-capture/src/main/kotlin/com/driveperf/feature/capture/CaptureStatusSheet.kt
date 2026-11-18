@@ -15,8 +15,10 @@ import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.rememberBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -41,11 +43,21 @@ import com.driveperf.designsystem.DrivePerfTheme
 fun CaptureStatusSheet(status: AutoDetectStatus, actions: CaptureStatusActions) {
     ModalBottomSheet(
         onDismissRequest = actions.onDismiss,
+        sheetState = rememberBottomSheetState(initialValue = SheetValue.Hidden, enabledValues = StatusSheetValues),
         containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
     ) {
         CaptureStatusContent(status, actions)
     }
 }
+
+/**
+ * Where the status sheet can settle: fully expanded or hidden, with no partially expanded stop. The content is taller
+ * than the medium detent anyway, and with that stop a tap on the scrim while a swipe was still settling the sheet could
+ * leave M3's ModalBottomSheet stuck "animating": it then took every touch as a drag and no button in it responded
+ * (OnePlus 7T, DRIVE-90).
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+internal val StatusSheetValues: Set<SheetValue> = setOf(SheetValue.Hidden, SheetValue.Expanded)
 
 @Composable
 internal fun CaptureStatusContent(status: AutoDetectStatus, actions: CaptureStatusActions, modifier: Modifier = Modifier) {
