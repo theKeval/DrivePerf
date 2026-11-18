@@ -56,7 +56,7 @@ class WakePathMappingTest {
         assertEquals(com.google.android.gms.location.GeofencingRequest.INITIAL_TRIGGER_EXIT, request.initialTrigger)
         val fence = request.geofences.single()
         assertEquals(120.0f, fence.radius)
-        assertEquals(5_000, fence.notificationResponsiveness)
+        assertEquals(0, fence.notificationResponsiveness)
         assertEquals(0, fence.loiteringDelay)
         assertEquals(com.google.android.gms.location.Geofence.GEOFENCE_TRANSITION_EXIT, fence.transitionTypes)
         assertEquals(com.google.android.gms.location.Geofence.NEVER_EXPIRE, fence.expirationTime)

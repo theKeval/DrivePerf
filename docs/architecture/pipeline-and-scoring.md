@@ -410,7 +410,7 @@ The geofence-only projection applies to Android `sourceDetail=geofence`; actual 
 priority. It is a constant-speed straight-line estimate, not a measured departure time, and it uses the same 5 km,
 60 m/s and 900 s plausibility limits above. A missing/low-confidence/human-powered first activity, missing measured
 driving speed (≥ 3 m/s), or unknown parking leaves the start unestimated. No synthetic activity is written to R0.
-The 120 m parked geofence requests EXIT only, 0 ms loitering (no DWELL), 5000 ms best-effort responsiveness and an
+The 120 m parked geofence requests EXIT only, 0 ms loitering (no DWELL), 0 ms best-effort responsiveness (the SDK minimum/default) and an
 initial EXIT when registered outside. Adding the same request ID replaces the region without a remove/add race.
 These settings cannot guarantee Q2 under Android background delivery limits; new device drives must measure it.
 

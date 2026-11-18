@@ -69,7 +69,7 @@ class GeofenceParkedRegionMonitor(context: Context) : ParkedRegionMonitor {
                 .setExpirationDuration(Geofence.NEVER_EXPIRE)
                 .setTransitionTypes(Geofence.GEOFENCE_TRANSITION_EXIT)
                 .setLoiteringDelay(0) // Exit-only: no dwell delay belongs on the departure path.
-                .setNotificationResponsiveness(5_000) // Best effort: 125 m at 25 m/s plus the 120 m radius.
+                .setNotificationResponsiveness(0) // Keep the SDK minimum explicit; background delivery is still best effort.
                 .build()
             return GeofencingRequest.Builder()
                 .setInitialTrigger(GeofencingRequest.INITIAL_TRIGGER_EXIT)
