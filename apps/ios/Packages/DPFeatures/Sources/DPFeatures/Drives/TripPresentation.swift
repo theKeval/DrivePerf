@@ -34,6 +34,9 @@ public struct ProvenancedValue: Identifiable, Equatable, Sendable {
         switch unit {
         case "km": "kilometres"
         case "km/h": "kilometres per hour"
+        case "mi": "miles"
+        case "mph": "miles per hour"
+        case "ft": "feet"
         case "m": "metres"
         case "min": "minutes"
         case "%": "percent"
@@ -142,7 +145,7 @@ public struct TripPresenter: Sendable {
             out.append(
                 TripBanner(
                     tone: .info,
-                    text: "Short drive · \(km(trip.distanceM)) km. Short drives give the score less to work with, so "
+                    text: "Short drive · \(distanceText(trip.distanceM)). Short drives give the score less to work with, so "
                         + "expect it to move more from drive to drive.",
                     action: nil))
         case .finalised:
@@ -194,7 +197,7 @@ public struct TripPresenter: Sendable {
         let estimatedPart = s.estimatedDistanceM > 0
         var distance = value("distance", "Distance", trip.distanceM, includesEstimate: estimatedPart)
         if estimatedPart {
-            distance.note = DPEstimated.prefix + "\(km(s.estimatedDistanceM)) km estimated"
+            distance.note = DPEstimated.prefix + "\(distanceText(s.estimatedDistanceM)) estimated"
         }
         out.append(distance)
         out.append(duration("duration", "Duration", trip.duration))
@@ -260,7 +263,7 @@ public struct TripPresenter: Sendable {
     }
 
     func estimatedStartText(_ metres: Double) -> String {
-        "The first \(DPEstimated.prefix)\(km(metres)) km is estimated. Automatic trips start a moment after you set "
+        "The first \(DPEstimated.prefix)\(distanceText(metres)) is estimated. Automatic trips start a moment after you set "
             + "off. We fill in the start from your phone’s location history and draw it dashed. It’s never scored and "
             + "never gets event pins."
     }
@@ -397,8 +400,8 @@ public struct TripPresenter: Sendable {
     func minutes(_ seconds: Double) -> Int { Int((max(seconds, 0) / 60).rounded(.toNearestOrAwayFromZero)) }
 
     /// Distance in km at 0.1 km, the catalogue's precision.
-    func km(_ metres: Double) -> String {
+    func distanceText(_ metres: Double) -> String {
         (catalog["distance"] ?? MetricInfo(key: "distance", provenance: .derived, meaning: "", unit: "km", decimals: 1, perSi: 0.001))
-            .format(metres)
+            .format(metres) + " " + (catalog["distance"]?.unit ?? "km")
     }
 }

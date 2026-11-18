@@ -12,6 +12,8 @@ struct RecordingActivityAttributes: ActivityAttributes {
         /// True after Stop: "Drive decoded." until the activity is dismissed.
         var ended: Bool
         var carName: String? = nil
+        var distanceValue: String? = nil
+        var distanceUnit: String? = nil
     }
 
     var tripId: String

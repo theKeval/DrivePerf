@@ -230,8 +230,8 @@ final class CaptureViewModelTests: XCTestCase {
         XCTAssertEqual(DriveFormat.elapsed(864), "14:24")
         XCTAssertEqual(DriveFormat.elapsed(3729), "1:02:09")
         XCTAssertEqual(DriveFormat.elapsed(-5), "0:00")
-        XCTAssertEqual(DriveFormat.kilometres(9_649), "9.6")
-        XCTAssertEqual(DriveFormat.kilometres(0), "0.0")
+        XCTAssertEqual(DisplaySettingsModel().distance(9_649), "9.6 km")
+        XCTAssertEqual(DisplaySettingsModel().distance(0), "0.0 km")
     }
 }
 

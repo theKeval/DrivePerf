@@ -58,10 +58,14 @@ public final class TripListViewModel {
     private let calendar: Calendar
     private let now: @MainActor () -> Date
     private let locale: Locale
-    public let presenter: TripPresenter
+    private let display: DisplaySettingsModel
+    private let catalog: ProvenanceCatalog
+    public var presenter: TripPresenter {
+        TripPresenter(catalog: display.catalogue.metrics.isEmpty ? catalog : display.catalogue, calendar: calendar, locale: locale)
+    }
 
     public init(
-        history: any TripHistory, corrections: (any TripCorrecting)? = nil, catalog: ProvenanceCatalog = ProvenanceCatalog(),
+        history: any TripHistory, corrections: (any TripCorrecting)? = nil, catalog: ProvenanceCatalog = ProvenanceCatalog(), display: DisplaySettingsModel? = nil,
         calendar: Calendar = .current, locale: Locale = .current, now: @escaping @MainActor () -> Date = { Date() }
     ) {
         self.history = history
@@ -69,7 +73,8 @@ public final class TripListViewModel {
         self.calendar = calendar
         self.locale = locale
         self.now = now
-        presenter = TripPresenter(catalog: catalog, calendar: calendar, locale: locale)
+        self.display = display ?? DisplaySettingsModel()
+        self.catalog = catalog
     }
 
     /// Drives and not-drives together, for as long as the app runs: a trip corrected from its detail moves from one list
@@ -171,7 +176,7 @@ public final class TripListViewModel {
         var timeStyle = Date.FormatStyle(date: .omitted, time: .shortened, locale: locale, calendar: calendar)
         timeStyle.timeZone = calendar.timeZone
         let minutes = max(Int((trip.duration / 60).rounded()), trip.duration > 0 ? 1 : 0)
-        let km = "\(DriveFormat.kilometres(trip.distanceM)) km"
+        let km = display.distance(trip.distanceM)
         let note: String? =
             switch trip.status {
             case .short: "Short trip · not scored"

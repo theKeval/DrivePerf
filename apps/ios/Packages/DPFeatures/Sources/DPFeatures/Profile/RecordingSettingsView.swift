@@ -1,4 +1,5 @@
 import DPDesignSystem
+import DPSharedBridge
 import SwiftUI
 
 /// S-SET-03 Recording settings: the "Automatic trips" switch (DRIVE-153) and Pause auto-detect (DRIVE-152). Reached
@@ -10,6 +11,7 @@ struct RecordingSettingsView: View {
 
     var body: some View {
         List {
+            Group {
             if !model.autoTripsOn {
                 Section {
                     Text("Manual mode. Tap Start in the app, Control Center or the widget when you set off.")
@@ -63,13 +65,52 @@ struct RecordingSettingsView: View {
                     "Auto-detect catches most drives. The first few hundred metres may be estimated, and "
                         + "force-quitting the app pauses auto-detect. Checks run on this phone.")
             }
+            Section("Default car") {
+                if model.display.cars.isEmpty {
+                    Text("No cars yet").foregroundStyle(DPColor.text2)
+                    Button("Add a car in Garage", action: model.onGarage)
+                } else {
+                    Picker("Default car", selection: Binding(get: { model.display.preferences.defaultVehicleId }, set: { value in
+                        Task { await model.display.change { $0.defaultVehicleId = value } }
+                    })) {
+                        Text("No default car").tag(String?.none)
+                        ForEach(model.display.cars) { car in Text(car.name).tag(Optional(car.id)) }
+                    }
+                    Button("Manage cars in Garage", action: model.onGarage)
+                }
+            }
+            Section {
+                Toggle("Battery saver recording", isOn: Binding(get: { model.display.preferences.batterySaverRecording }, set: { on in
+                    Task { await model.display.change { $0.batterySaverRecording = on } }
+                })).accessibilityIdentifier("settings.batterySaver")
+                Text("Records motion at 25 Hz on every drive. Uses less battery; braking and cornering detail is a little coarser.")
+                    .font(DPFont.meta).foregroundStyle(DPColor.text2)
+                if model.display.preferences.batterySaverRecording {
+                    Text("Drives may show Usable data").font(DPFont.meta).foregroundStyle(DPColor.text2)
+                }
+            } header: { Text("Battery") } footer: {
+                Text("DrivePerf already drops to 25 Hz on its own when your phone is hot, low on battery or in Low Power Mode.")
+            }
+            Section { Button("Health Check") { model.openHealthCheck() } }
+            }
+            .listRowBackground(DPColor.surface)
+            .listRowSeparatorTint(DPColor.separator)
         }
+        .scrollContentBackground(.hidden)
+        .background(DPColor.bgGrouped)
+        .environment(\.defaultMinListRowHeight, 52)
         .tint(DPColor.accent)
         .navigationTitle("Recording")
         .navigationBarTitleDisplayMode(.inline)
-        .task { await model.refresh() }
+        .task { await model.refresh(); await model.display.loadCars() }
         .onChange(of: scenePhase) { _, phase in
             if phase == .active { Task { await model.refresh() } }
+        }
+        .sheet(isPresented: $model.isHealthPresented) {
+            if let capture = model.capture { CaptureStatusSheet(capture: capture, recording: model) }
+        }
+        .alert("Could not save settings", isPresented: Binding(get: { model.display.saveFailed }, set: { model.display.saveFailed = $0 })) {
+            Button("OK", role: .cancel) {}
         }
         .sheet(item: $model.explainer) { explainer in
             LocationAccessExplainerSheet(model: model, step: explainer)

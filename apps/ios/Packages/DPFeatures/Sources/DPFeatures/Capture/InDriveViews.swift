@@ -53,8 +53,8 @@ struct InDriveView: View {
                 // DRIVE-62 as a possible additive field).
                 Metric(label: "DISTANCE") {
                     HStack(alignment: .firstTextBaseline, spacing: DPSpace.s1) {
-                        Text(DriveFormat.kilometres(status.distanceM)).dpNumeral(.xl)
-                        Text("km").dpNumeral(.m).foregroundStyle(Color(rgba: 0xA3AA_B6FF))
+                        Text(capture.display.metric("distance").format(status.distanceM)).dpNumeral(.xl)
+                        Text(capture.display.metric("distance").unit ?? "").dpNumeral(.m).foregroundStyle(Color(rgba: 0xA3AA_B6FF))
                     }
                 }
             }
@@ -112,7 +112,7 @@ struct EndTripSheet: View {
                 if let startedAt {
                     Text(
                         "\(DriveFormat.elapsed(context.date.timeIntervalSince(startedAt))) · "
-                            + "\(DriveFormat.kilometres(capture.status.distanceM)) km"
+                            + "\(capture.display.distance(capture.status.distanceM))"
                     )
                     .font(.system(size: 22, weight: .semibold).width(.expanded))
                     .monospacedDigit()
@@ -362,6 +362,7 @@ struct DecodingDriveView: View {
 /// (DRIVE-62) arrive later, so this is a "Drive saved" placeholder with no score and no "Watch your Story" yet. The
 /// real "Decoding your drive" steps wait for the pipeline; the core finalises in the moment the Stop returns.
 struct DriveFinishedView: View {
+    var display: DisplaySettingsModel = DisplaySettingsModel()
     let outcome: CaptureViewModel.TripOutcome
     var carName: String?
     let onDone: () -> Void
@@ -405,7 +406,7 @@ struct DriveFinishedView: View {
 
     private var facts: String? {
         guard let summary else { return nil }
-        return "\(DriveFormat.kilometres(summary.distanceM)) km · \(max(Int((summary.duration / 60).rounded()), 1)) min"
+        return "\(display.distance(summary.distanceM)) · \(max(Int((summary.duration / 60).rounded()), 1)) min"
     }
 
     private var note: String {
