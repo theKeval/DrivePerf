@@ -201,13 +201,21 @@ fun SettingsHealthSheet(deps: RecordingSettingsDeps, onDismiss: () -> Unit, onRe
     val fixer = rememberAutoDetectFixer(deps.permissionReader, deps.captureController::refreshPermissions)
     var showPause by rememberSaveable { mutableStateOf(false) }
     AllTheTimeDialog(fixer)
-    CaptureStatusSheet(status, CaptureStatusActions(
-        onDismiss = onDismiss,
-        onFix = fixer::fix,
-        onOpenRecordingSettings = { onDismiss(); onRecording() },
-        onOpenPause = { showPause = true },
-    ))
-    if (showPause) PauseSheet(status, rememberPauseCallbacks(deps.wakePath), onDismiss = { showPause = false })
+    // One sheet at a time, as on Recording settings: Pause replaces the status sheet and closes Health Check.
+    val pauseOpen = showPause && status.mode != AutoDetectMode.Off
+    if (!pauseOpen) {
+        CaptureStatusSheet(status, CaptureStatusActions(
+            onDismiss = onDismiss,
+            onFix = fixer::fix,
+            onOpenRecordingSettings = { onDismiss(); onRecording() },
+            onOpenPause = { showPause = true },
+        ))
+    } else {
+        PauseSheet(status, rememberPauseCallbacks(deps.wakePath), onDismiss = {
+            showPause = false
+            onDismiss()
+        })
+    }
 }
 
 @Composable
