@@ -71,6 +71,7 @@ internal class TripMachine(private val cfg: CaptureConfig = CaptureConfig()) {
         }
         is MachineEvent.WatchdogOpened -> Transition(s, listOf(MachineEffect.Track(CaptureEvent.watchdogOpened)))
         is MachineEvent.TriggersAvailable -> Transition(s.copy(triggersAvailable = e.available))
+        is MachineEvent.BatterySaver -> applyRate(s.copy(batterySaverRecording = e.enabled), e.nowNs)
         is MachineEvent.InDriveVisible -> Transition(s.copy(inDriveVisible = e.visible))
         else -> reducePause(s, e)
     }
@@ -214,9 +215,10 @@ internal class TripMachine(private val cfg: CaptureConfig = CaptureConfig()) {
     private fun resumeAfterKill(base: MachineState, rec: Recovery, e: MachineEvent.Launch, arm: List<MachineEffect>): Transition {
         val ageS = ((e.nowWallMs - rec.lastSampleWallMs) / MS_PER_S).toLong()
         val trip = ActiveTrip(rec.header, rec.manual, rec.confirmed)
-        val hz = rateFor(base.power)
+        val hz = rateFor(base.power, base.batterySaverRecording)
         val resumed = base.copy(phase = if (rec.confirmed) RECORDING else CANDIDATE, trip = trip, imuHz = hz)
-        val fx = arm + sensorsOn(hz) + Mark(trip.id, e.nowNs, CaptureMarkType.APP_KILLED, ageS.toString())
+        val fx = arm + sensorsOn(hz) + Mark(trip.id, e.nowNs, CaptureMarkType.APP_KILLED, ageS.toString()) +
+            Mark(trip.id, e.nowNs, CaptureMarkType.IMU_RATE, hz.toString())
         val timeout = if (rec.confirmed) emptyList() else listOf(Schedule(TimerId.CANDIDATE_TIMEOUT, secondsNs(cfg.candidateTimeoutS)))
         return Transition(resumed, fx + timeout)
     }
@@ -244,12 +246,13 @@ internal class TripMachine(private val cfg: CaptureConfig = CaptureConfig()) {
     private fun startCapture(s: MachineState, e: MachineEvent.Wake, manual: Boolean): Transition {
         val header = e.newTrip
         val trip = ActiveTrip(header, manual = manual, confirmed = manual)
-        val hz = rateFor(s.power)
+        val hz = rateFor(s.power, s.batterySaverRecording)
         val next = idle(s, s.parking).copy(phase = if (manual) RECORDING else CANDIDATE, trip = trip, imuHz = hz)
         val historyFrom = historyStart(header)
         val fx = buildList {
             add(MachineEffect.CreateTrip(header, manual))
             addAll(sensorsOn(hz))
+            if (hz != header.nominalImuHz) add(Mark(trip.id, header.startMonoNs, CaptureMarkType.IMU_RATE, hz.toString()))
             add(Mark(trip.id, header.startMonoNs, CaptureMarkType.RECORDING_STARTED, e.wake.kind.name))
             add(MachineEffect.QueryActivityHistory(historyFrom, e.nowWallMs))
             if (!manual) add(Schedule(TimerId.CANDIDATE_TIMEOUT, secondsNs(cfg.candidateTimeoutS)))
@@ -362,6 +365,7 @@ internal class TripMachine(private val cfg: CaptureConfig = CaptureConfig()) {
         val battery = p?.batteryPct ?: FULL
         return when {
             p?.thermal == ThermalState.CRITICAL -> cfg.imuIdleHz to RateReason.THERMAL
+            s.batterySaverRecording -> cfg.imuReducedHz to RateReason.BATTERY_SAVER
             p?.thermal == ThermalState.SERIOUS -> cfg.imuReducedHz to RateReason.THERMAL
             p?.lowPowerMode == true -> cfg.imuReducedHz to RateReason.LOW_POWER
             battery <= cfg.lowBatteryPct -> cfg.imuReducedHz to RateReason.BATTERY
@@ -699,6 +703,7 @@ internal class TripMachine(private val cfg: CaptureConfig = CaptureConfig()) {
         parking = parking,
         activity = s.activity,
         power = s.power,
+        batterySaverRecording = s.batterySaverRecording,
         triggersAvailable = s.triggersAvailable,
         inDriveVisible = s.inDriveVisible,
     )
@@ -720,9 +725,10 @@ internal class TripMachine(private val cfg: CaptureConfig = CaptureConfig()) {
     private fun allTimersOff(): List<MachineEffect> = TimerId.trip.map { Cancel(it) }
 
     /** §2.7: 10 Hz when thermal is critical; 25 Hz in Low Power Mode, at ≤ 15 % battery or thermal serious. */
-    fun rateFor(p: PowerStatus?): Int = when {
+    fun rateFor(p: PowerStatus?, batterySaver: Boolean = false): Int = when {
+        p?.thermal == ThermalState.CRITICAL -> cfg.imuIdleHz
+        batterySaver -> cfg.imuReducedHz
         p == null -> cfg.imuNominalHz
-        p.thermal == ThermalState.CRITICAL -> cfg.imuIdleHz
         p.lowPowerMode || p.thermal == ThermalState.SERIOUS || (p.batteryPct ?: FULL) <= cfg.lowBatteryPct -> cfg.imuReducedHz
         else -> cfg.imuNominalHz
     }

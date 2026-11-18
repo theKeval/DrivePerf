@@ -155,6 +155,9 @@ public interface TripRecorder {
      */
     public fun setInDriveScreenVisible(visible: Boolean) {}
 
+    /** S-SET-03: caps recording motion at 25 Hz; thermal critical and stationary protection still take precedence. */
+    public fun setBatterySaverRecording(enabled: Boolean) {}
+
     /**
      * Pauses automatic detection (F-CAP-15, S-HOME-03) until [untilWallMs] (UTC), or until [resumeAutoDetect] when it
      * is null. While paused no automatic trip starts, the watchdog is off and the platform's resume notice

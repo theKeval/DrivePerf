@@ -4,6 +4,7 @@ import com.driveperf.data.local.DatabaseDriverFactory
 import com.driveperf.data.local.LocalEventFeedbackStore
 import com.driveperf.data.local.LocalRouteHistory
 import com.driveperf.data.local.LocalRouteRepository
+import com.driveperf.data.local.LocalSettingsRepository
 import com.driveperf.data.local.LocalTripCorrections
 import com.driveperf.data.local.LocalTripHistory
 import com.driveperf.data.local.LocalTripRepository
@@ -129,11 +130,21 @@ public object DrivePerfCore {
             ),
             corrections = corrections,
             analytics = analytics,
+            settings = LocalSettingsRepository(db, io, clock, analytics).also { scope.followBatterySaver(it, recorder) },
             onClose = {
                 scope.cancel()
                 driver.close()
             },
         )
+    }
+
+    /** S-SET-03: the recorder follows the saved battery-saver choice from start-up onwards. */
+    private fun CoroutineScope.followBatterySaver(
+        settings: com.driveperf.domain.settings.SettingsRepository,
+        recorder: TripRecorderEngine,
+    ) {
+        recorder.setBatterySaverRecording(settings.state.value.batterySaverRecording)
+        launch { settings.state.collect { recorder.setBatterySaverRecording(it.batterySaverRecording) } }
     }
 
     /** Forgets the started core. Tests only. */

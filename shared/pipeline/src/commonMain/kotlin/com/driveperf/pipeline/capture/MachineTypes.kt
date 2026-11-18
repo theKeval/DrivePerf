@@ -128,6 +128,7 @@ internal data class MachineState(
     val imuHz: Int = 0,
     val imuStoppedForSpace: Boolean = false,
     val power: PowerStatus? = null,
+    val batterySaverRecording: Boolean = false,
     val still: Stillness = Stillness(),
     val distanceM: Double = 0.0,
     val distanceFix: LocationSample? = null,
@@ -149,6 +150,8 @@ internal data class MachineState(
 
 /** Inputs to the reducer. Every event carries the monotonic time it is handled at, so the reducer reads no clock. */
 internal sealed interface MachineEvent {
+    data class BatterySaver(override val nowNs: Long, val enabled: Boolean) : MachineEvent
+
     val nowNs: Long
 
     /** Process start. [recovering] is the trip still `RECORDING` after a kill (§1.7). */

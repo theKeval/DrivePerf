@@ -48,6 +48,7 @@ class R0ExportTool {
         appendLine("# private: real R0 export, never commit")
         appendLine("# id: ${h.tripId}")
         appendLine("# platform: $platform")
+        appendLine("# units: distance=m, speed=m/s, elevation=m, acceleration=g, rotation=deg/s, time=ms")
         appendLine("# imu_hz: ${h.nominalImuHz}")
         appendLine("# wake_kind: ${h.wakeKind.name}")
         appendLine("# start_wall_ms: ${h.startWallMs}")

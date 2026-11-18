@@ -45,3 +45,13 @@ CREATE TABLE consent (
   schema_version   INTEGER NOT NULL DEFAULT 1
 );
 CREATE INDEX consent_kind_at ON consent(kind, at DESC);
+
+localSettings:
+SELECT units_json, appearance, capture_json, notifications_json FROM profile WHERE id = 'local';
+
+ensureLocalProfile:
+INSERT OR IGNORE INTO profile(id, region, units_json, install_at, capture_json, notifications_json, created_at, updated_at)
+VALUES ('local', '', '{}', ?, '{}', '{}', ?, ?);
+
+saveLocalSettings:
+UPDATE profile SET units_json = ?, capture_json = ?, appearance = ?, updated_at = ? WHERE id = 'local';

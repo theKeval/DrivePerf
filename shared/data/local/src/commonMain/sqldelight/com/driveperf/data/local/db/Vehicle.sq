@@ -20,3 +20,12 @@ CREATE TABLE vehicle (
   origin_device_id TEXT NOT NULL,
   field_clock      TEXT NOT NULL DEFAULT '{}'
 );
+
+settingsVehicles:
+SELECT id, nickname, make, model FROM vehicle WHERE deleted_at IS NULL AND is_active = 1 ORDER BY added_at;
+
+setDefaultVehicle:
+UPDATE vehicle SET is_default = CASE WHEN id = ? THEN 1 ELSE 0 END WHERE deleted_at IS NULL;
+
+defaultSettingsVehicle:
+SELECT id FROM vehicle WHERE deleted_at IS NULL AND is_active = 1 AND is_default = 1 LIMIT 1;

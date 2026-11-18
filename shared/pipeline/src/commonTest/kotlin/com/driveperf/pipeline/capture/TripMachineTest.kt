@@ -386,6 +386,25 @@ class TripMachineTest {
     }
 
     @Test
+    fun batterySaverAppliesNowAndSurvivesTheNextTrip() {
+        val on = m.reduce(recording(), MachineEvent.BatterySaver(ns(1.0), true))
+        assertEquals(25, on.state.imuHz)
+        assertTrue(MachineEffect.SetImuRate(25) in on.effects)
+        val off = m.reduce(on.state, MachineEvent.BatterySaver(ns(2.0), false))
+        assertEquals(50, off.state.imuHz)
+        val armed = m.reduce(idle, MachineEvent.BatterySaver(0, true)).state
+        val started = wake(1.0, WakeKind.MANUAL, s = armed)
+        assertEquals(25, started.state.imuHz)
+        assertTrue(started.effects.any { it is MachineEffect.Mark && it.type == CaptureMarkType.IMU_RATE && it.detail == "25" })
+        val recovery = Recovery(header(0.0), manual = true, confirmed = true, lastSampleWallMs = wallAt(1.0), wasMoving = true)
+        val resumed = m.reduce(armed, MachineEvent.Launch(ns(2.0), wallAt(2.0), true, parking, recovery))
+        assertEquals(25, resumed.state.imuHz)
+        assertTrue(resumed.effects.any { it is MachineEffect.Mark && it.type == CaptureMarkType.IMU_RATE && it.detail == "25" })
+        assertEquals(25, m.rateFor(null, true))
+        assertEquals(10, m.rateFor(PowerStatus(50, false, false, ThermalState.CRITICAL), true))
+    }
+
+    @Test
     fun rateFollowsSection27() {
         assertEquals(50, m.rateFor(null))
         assertEquals(25, m.rateFor(PowerStatus(15, false, false, ThermalState.NOMINAL)))

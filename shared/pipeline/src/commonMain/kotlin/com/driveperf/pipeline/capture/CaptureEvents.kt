@@ -117,6 +117,7 @@ internal enum class RateReason(val key: String) {
     NOMINAL("nominal"),
     CRUISE("cruise"),
     LOW_POWER("low_power"),
+    BATTERY_SAVER("battery_saver_recording"),
     BATTERY("battery"),
     THERMAL("thermal"),
     STATIONARY("stationary"),
