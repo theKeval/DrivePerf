@@ -246,6 +246,70 @@ class TripMachineTest {
     }
 
     @Test
+    fun tunnelQueueThenDriveOnWithoutAFixKeepsOneTrip() {
+        val queued = drive(autoRecording(), 31, 65, 0.0, startNorth = 200.0).state
+        val car = m.reduce(queued, MachineEvent.Activity(ns(66.0), listOf(activity(66.0, ActivityType.AUTOMOTIVE)))).state
+        val still = m.reduce(car, MachineEvent.Motion(ns(200.0), motionRun(66.0, 134.0, noisy = false))).state
+        assertEquals(RecorderState.PAUSED, still.phase)
+        val moving = m.reduce(still, MachineEvent.Motion(ns(206.0), motionRun(200.0, 6.0, noisy = true)))
+        assertEquals(RecorderState.RECORDING, moving.state.phase)
+        assertEquals(queued.trip, moving.state.trip)
+        assertTrue(MachineEffect.Cancel(TimerId.STOP) in moving.effects)
+        assertEquals(RecorderState.RECORDING, m.reduce(moving.state, MachineEvent.Timer(ns(271.0), TimerId.STOP)).state.phase)
+    }
+
+    @Test
+    fun freshFixesAndLingeringAutomotiveNeverResumeFromImuMotion() {
+        var state = drive(autoRecording(), 31, 65, 0.0, startNorth = 200.0).state
+        state = m.reduce(state, MachineEvent.Activity(ns(66.0), listOf(activity(66.0, ActivityType.AUTOMOTIVE)))).state
+        for (i in 66..270) {
+            state = state.fixes(fix(i.toDouble(), 0.0, 200.0)).state
+            val t = m.reduce(state, MachineEvent.Motion(ns(i + 1.0), motionRun(i.toDouble(), 1.0, noisy = true)))
+            assertEquals(RecorderState.PAUSED, t.state.phase)
+            assertFalse(MachineEffect.Cancel(TimerId.STOP) in t.effects)
+            state = t.state
+        }
+        val timer = m.reduce(state, MachineEvent.Timer(ns(271.0), TimerId.STOP))
+        assertEquals(ns(31.0), timer.effects.filterIsInstance<MachineEffect.Finalise>().single().endNs)
+    }
+
+    @Test
+    fun aShortPhoneMovementAndAnOpenWindowDoNotSatisfyTheTunnelHold() {
+        var state = drive(autoRecording(), 31, 65, 0.0, startNorth = 200.0).state
+            .copy(activity = activity(66.0, ActivityType.AUTOMOTIVE))
+        for (i in 0..220) {
+            val at = 100.0 + i * 0.02
+            val accel = if (i <= 100 && i % 2 == 0) 0.05 else 0.0
+            val t = m.reduce(state, MachineEvent.Motion(ns(at), listOf(CaptureFixtures.motion(at, accel = accel))))
+            assertEquals(RecorderState.PAUSED, t.state.phase, "one closed non-still window plus unclassified time")
+            assertFalse(MachineEffect.Cancel(TimerId.STOP) in t.effects)
+            state = t.state
+        }
+        val timer = m.reduce(state, MachineEvent.Timer(ns(271.0), TimerId.STOP))
+        assertEquals(ns(31.0), timer.effects.filterIsInstance<MachineEffect.Finalise>().single().endNs)
+    }
+
+    @Test
+    fun tunnelFallbackRequiresStalenessSustainedMotionAndMediumAutomotive() {
+        val queued = drive(autoRecording(), 31, 65, 0.0, startNorth = 200.0).state
+        fun noisy(s: MachineState, atS: Double) = m.reduce(s, MachineEvent.Motion(ns(atS), motionRun(atS - 6.0, 6.0, noisy = true)))
+        for (a in listOf(null, activity(66.0, ActivityType.AUTOMOTIVE, ActivityConfidence.LOW), activity(66.0, ActivityType.WALKING))) {
+            assertEquals(RecorderState.PAUSED, noisy(queued.copy(activity = a), 100.0).state.phase)
+        }
+        val car = queued.copy(activity = activity(66.0, ActivityType.AUTOMOTIVE))
+        assertEquals(RecorderState.PAUSED, noisy(car, 94.9).state.phase)
+        assertEquals(RecorderState.RECORDING, noisy(car, 95.0).state.phase)
+        val short = m.reduce(car, MachineEvent.Motion(ns(100.0), motionRun(98.0, 2.0, noisy = true)))
+        assertEquals(RecorderState.PAUSED, short.state.phase)
+        val gap = m.reduce(short.state, MachineEvent.Motion(ns(200.0), listOf(CaptureFixtures.motion(200.0, accel = 0.1))))
+        assertEquals(RecorderState.PAUSED, gap.state.phase)
+        val delayed = m.reduce(car, MachineEvent.Motion(ns(200.0), motionRun(100.0, 6.0, noisy = true)))
+        assertEquals(RecorderState.PAUSED, delayed.state.phase)
+        val still = m.reduce(car, MachineEvent.Motion(ns(100.0), motionRun(94.0, 6.0, noisy = false)))
+        assertEquals(RecorderState.PAUSED, still.state.phase)
+    }
+
+    @Test
     fun aFreshAccuratePullAwayBeforeTheTimerContinuesTheSameTrip() {
         val stopped = drive(autoRecording(), 31, 65, 0.0, startNorth = 200.0).state
         val old = stopped.fixes(fix(77.0, 4.0, 210.0), nowS = 85.0)
@@ -395,13 +459,13 @@ class TripMachineTest {
     }
 
     @Test
-    fun withoutGnssImuStillnessPausesAndResumeWaitsForAFix() {
+    fun withoutGnssImuStillnessPausesAndAutomotiveMotionResumes() {
         val s = drive(recording(), 1, 5, 10.0).state
         val still = m.reduce(s, MachineEvent.Motion(ns(40.0), motionRun(6.0, 34.0, noisy = false)))
         assertEquals(RecorderState.PAUSED, still.state.phase)
         val car = m.reduce(still.state, MachineEvent.Activity(ns(40.5), listOf(activity(40.5, ActivityType.AUTOMOTIVE)))).state
         val moving = m.reduce(car, MachineEvent.Motion(ns(47.0), motionRun(41.0, 6.0, noisy = true)))
-        assertEquals(RecorderState.PAUSED, moving.state.phase)
+        assertEquals(RecorderState.RECORDING, moving.state.phase)
         assertEquals(RecorderState.RECORDING, moving.state.fixes(fix(48.0, 3.0)).state.phase)
     }
 
