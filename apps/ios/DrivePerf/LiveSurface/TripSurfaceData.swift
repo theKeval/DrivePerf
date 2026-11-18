@@ -9,6 +9,14 @@ final class TripSurfaceData {
     private let trips: UncheckedSendable<any TripRepository>
     private let logger = Logger(subsystem: "com.driveperf.app", category: "WidgetSnapshot")
     private var snapshot = DriveWidgetSnapshot.read()
+    var distanceFormatter: (Double) -> String = { "\(DisplayUnit.kilometres.format(si: $0)) km" }
+
+    func refreshUnits() {
+        var next = snapshot
+        next.recordingDistance = next.recording.map { distanceFormatter(Double($0.distanceM)) }
+        next.latestDistance = next.latestDrive.map { distanceFormatter(Double($0.distanceM)) }
+        publish(next)
+    }
     private var lastDistanceUpdate = Date.distantPast
 
     init(trips: any TripRepository) { self.trips = UncheckedSendable(trips) }
@@ -85,7 +93,10 @@ final class TripSurfaceData {
             baseline: score?.baseline.map { Int(truncating: $0) })
     }
 
-    private func publish(_ next: DriveWidgetSnapshot) {
+    private func publish(_ incoming: DriveWidgetSnapshot) {
+        var next = incoming
+        next.recordingDistance = next.recording.map { distanceFormatter(Double($0.distanceM)) }
+        next.latestDistance = next.latestDrive.map { distanceFormatter(Double($0.distanceM)) }
         guard next != snapshot, let url = DriveWidgetSnapshot.fileURL else { return }
         do {
             try next.write(to: url)

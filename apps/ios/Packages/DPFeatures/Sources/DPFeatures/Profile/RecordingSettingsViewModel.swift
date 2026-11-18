@@ -9,6 +9,10 @@ import Observation
 @MainActor
 @Observable
 public final class RecordingSettingsViewModel {
+    public let display: DisplaySettingsModel
+    public let capture: CaptureViewModel?
+    public var onGarage: () -> Void = {}
+
     /// The sheet that explains what automatic trips need from location while "Always" is missing. One sheet, whose
     /// content moves through the steps, so it never flickers between them.
     public enum AlwaysExplainer: Equatable, Identifiable, Sendable {
@@ -37,8 +41,10 @@ public final class RecordingSettingsViewModel {
 
     public init(
         preferences: any PreferencesStoring, permissions: any PermissionRequesting,
-        refreshCapture: @escaping @MainActor () -> Void, pause: PauseAutoDetectViewModel? = nil
+        refreshCapture: @escaping @MainActor () -> Void, pause: PauseAutoDetectViewModel? = nil, display: DisplaySettingsModel? = nil, capture: CaptureViewModel? = nil
     ) {
+        self.display = display ?? DisplaySettingsModel()
+        self.capture = capture
         self.preferences = preferences
         permissionsPort = permissions
         self.refreshCapture = refreshCapture
@@ -77,6 +83,7 @@ public final class RecordingSettingsViewModel {
 
     /// The switch. Both directions save and refresh capture before anything else, so the app never lags behind it.
     public func setAutoTrips(_ on: Bool) async {
+        if autoTripsOn != on { display.trackAutomaticTripsChange() }
         autoTripsOn = on
         preferences.update { $0.autoTripsEnabled = on }
         refreshCapture()

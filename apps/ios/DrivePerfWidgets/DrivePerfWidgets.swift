@@ -112,10 +112,10 @@ private struct DistanceText: View {
     var body: some View {
         if state.hasFix {
             HStack(alignment: .firstTextBaseline, spacing: 4) {
-                Text(String(format: "%.1f", state.distanceKm))
+                Text(state.distanceValue ?? "—")
                     .font(.system(size: size, weight: .semibold).width(.expanded))
                     .monospacedDigit()
-                Text("km").font(.system(size: size * 0.5, weight: .medium)).opacity(0.65)
+                Text(state.distanceUnit ?? "").font(.system(size: size * 0.5, weight: .medium)).opacity(0.65)
             }
         } else {
             Text("Finding GPS…").font(.subheadline).opacity(0.7)

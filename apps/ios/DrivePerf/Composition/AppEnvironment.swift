@@ -13,6 +13,7 @@ final class AppEnvironment {
     static let shared = AppEnvironment()
 
     let preferences = UserDefaultsPreferences()
+    let displaySettings = CoreDisplaySettings()
     let permissions = SystemPermissions()
     let crashReporter = ConsentGatedCrashReporter()
     let usageAnalytics = CoreUsageAnalytics()
@@ -30,6 +31,7 @@ final class AppEnvironment {
     /// Its own activity source for the in-drive content hold: the core's `activity` keeps one sink and is stopped at
     /// the end of every trip.
     let movement = ActivityMovementMonitor(source: CoreMotionActivitySource())
+    let liveActivity = LiveActivityController()
     let recorder: CoreTripRecorder
     let surfaceRouter = TripSurfaceRouter()
     let corrections = CoreTripCorrections()
@@ -47,7 +49,7 @@ final class AppEnvironment {
 
     private init() {
         recorder = CoreTripRecorder(
-            liveSurface: LiveActivityController(),
+            liveSurface: liveActivity,
             notifier: NotificationAdapter(),
             assertions: UIKitBackgroundAssertions(),
             autoDetectEnabled: preferences.preferences.autoTripsEnabled)
@@ -70,6 +72,7 @@ final class AppEnvironment {
             movement: movement)
             .withTripCorrections(corrections)
             .withStatusRequests(surfaceRouter.statusRequests)
+            .withDisplaySettings(displaySettings)
     }
 
     /// Runs inside `didFinishLaunching`, synchronously: the Core Location sessions first, because a background
@@ -84,8 +87,11 @@ final class AppEnvironment {
         let services = DrivePerfCore.shared.start(
             platform: CorePlatformBindings(
                 ports: corePorts, deviceId: DeviceIdentity.current(), watchdog: watchdog, resumeNotice: resumeNotice))
+        displaySettings.attach(services)
         recorder.attach(KotlinCore(services))
         recorder.surfaceData = TripSurfaceData(trips: services.trips)
+        displaySettings.onChange = { [weak self] in self?.refreshDisplaySurfaces() }
+        refreshDisplaySurfaces()
         recorder.surfaceData?.updateLocation(canRecord: canRecordFromSystemSurface)
         corrections.attach(services.corrections)
         // The first launch after a restart re-arms the triggers and says why (F-CAP-14.3).
@@ -98,6 +104,15 @@ final class AppEnvironment {
         if preferences.preferences.onboardingCompleted {
             usageAnalytics.setUsageConsent(preferences.preferences.shareUsageStatistics)
         }
+    }
+
+    private func refreshDisplaySurfaces() {
+        let system: UnitSystem = displaySettings.current.units == .imperial ? .imperial : .metric
+        let unit = system.display(unit: .kilometres)
+        liveActivity.displayUnit = unit
+        liveActivity.refreshUnits()
+        recorder.surfaceData?.distanceFormatter = { "\(unit.format(si: $0)) \(unit.symbol)" }
+        recorder.surfaceData?.refreshUnits()
     }
 
     /// Every unlock: the first one after a reboot launches; later ones compress R0 files that a finalisation while
@@ -171,6 +186,12 @@ enum TripIntentHandler {
 }
 
 extension AppDependencies {
+    fileprivate func withDisplaySettings(_ settings: CoreDisplaySettings) -> AppDependencies {
+        var copy = self
+        copy.displaySettings = settings
+        return copy
+    }
+
     /// DRIVE-150: the watchdog notification's way into the capture status sheet.
     fileprivate func withStatusRequests(_ requests: CaptureStatusRequests) -> AppDependencies {
         var copy = self

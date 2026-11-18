@@ -192,10 +192,11 @@ public struct MetricInfo: Equatable, Sendable {
     public var perSi: Double
     /// Becomes Estimated when the trip's value includes estimated data.
     public var partlyEstimated: Bool
+    public var numberFormatter: (@Sendable (Double) -> String)?
 
     public init(
         key: String, provenance: Provenance, meaning: String, unit: String?, decimals: Int, perSi: Double,
-        partlyEstimated: Bool = false
+        partlyEstimated: Bool = false, numberFormatter: (@Sendable (Double) -> String)? = nil
     ) {
         self.key = key
         self.provenance = provenance
@@ -204,6 +205,7 @@ public struct MetricInfo: Equatable, Sendable {
         self.decimals = decimals
         self.perSi = perSi
         self.partlyEstimated = partlyEstimated
+        self.numberFormatter = numberFormatter
     }
 
     public func provenance(includesEstimate: Bool) -> Provenance {
@@ -211,7 +213,14 @@ public struct MetricInfo: Equatable, Sendable {
     }
 
     /// The value at this metric's precision, rounded half away from zero, with a real minus sign: "39.0", "0.42".
+    public static func == (lhs: Self, rhs: Self) -> Bool {
+        lhs.key == rhs.key && lhs.provenance == rhs.provenance && lhs.meaning == rhs.meaning
+            && lhs.unit == rhs.unit && lhs.decimals == rhs.decimals && lhs.perSi == rhs.perSi
+            && lhs.partlyEstimated == rhs.partlyEstimated
+    }
+
     public func format(_ si: Double) -> String {
+        if let numberFormatter { return numberFormatter(si) }
         let scale = pow(10, Double(decimals))
         let rounded = (si * perSi * scale).rounded(.toNearestOrAwayFromZero) / scale
         let text = String(format: "%.\(decimals)f", abs(rounded))

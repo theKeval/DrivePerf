@@ -20,6 +20,10 @@ public struct AppRootView: View {
                 ShellView(model: model)
             }
         }
+        .task { await model.display.observe() }
+        .task { await model.display.loadCars() }
+        .onChange(of: model.display.carName, initial: true) { model.capture.carName = model.display.carName }
+        .preferredColorScheme(model.display.colorScheme)
         .task { await model.capture.observe() }
         .task { await model.capture.observeMovement() }
         .task(id: model.capture.heldContent) {
@@ -118,10 +122,16 @@ struct ShellView: View {
             case .held: HeldContentView(capture: model.capture)
             case .decoding: DecodingDriveView(carName: capture.carName, onBack: capture.dismissFinished)
             case .finished(let outcome):
-                DriveFinishedView(outcome: outcome, carName: capture.carName, onDone: capture.dismissFinished)
+                DriveFinishedView(display: model.display, outcome: outcome, carName: capture.carName, onDone: capture.dismissFinished)
             }
         }
-        .preferredColorScheme(.dark)
+        .onAppear {
+            model.recordingSettings.onGarage = {
+                isProfilePresented = false
+                isStatusPresented = false
+                selection = .garage
+            }
+        }
     }
 }
 

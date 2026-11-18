@@ -54,7 +54,7 @@ struct CaptureStatusAccessory: View {
         case .attention: "Auto-detect needs attention"
         case .paused: "Auto-detect paused"
         case .recording(let startedAt, let distanceM):
-            "Recording · \(Int(Date().timeIntervalSince(startedAt) / 60)) min · \(DriveFormat.kilometres(distanceM)) km"
+            "Recording · \(Int(Date().timeIntervalSince(startedAt) / 60)) min · \(capture.display.distance(distanceM))"
         }
     }
 
