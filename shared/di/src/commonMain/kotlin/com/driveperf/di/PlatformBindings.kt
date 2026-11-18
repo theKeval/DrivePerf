@@ -3,7 +3,9 @@ package com.driveperf.di
 import com.driveperf.domain.analytics.Analytics
 import com.driveperf.domain.analytics.AnalyticsSink
 import com.driveperf.domain.capture.ActivitySource
+import com.driveperf.domain.capture.AutoDetectResumeNotice
 import com.driveperf.domain.capture.AutoDetectWatchdog
+import com.driveperf.domain.capture.NoOpAutoDetectResumeNotice
 import com.driveperf.domain.capture.NoOpAutoDetectWatchdog
 import com.driveperf.domain.feedback.MarkEventNeeded
 import com.driveperf.domain.capture.LocationSource
@@ -21,6 +23,7 @@ import com.driveperf.foundation.Clock
  * The natively implemented ports (ADR-002 section 5). Swift supplies its adapters at app launch; Android supplies
  * them from `:apps:android:platform`. Each function is called once, at start.
  */
+@Suppress("TooManyFunctions") // one function per native port
 public interface PlatformBindings {
     public fun clock(): Clock
 
@@ -50,6 +53,12 @@ public interface PlatformBindings {
      * Android keeps the default, which schedules nothing.
      */
     public fun watchdog(): AutoDetectWatchdog = NoOpAutoDetectWatchdog
+
+    /**
+     * The "Auto-detect is back on" notification at the end of a pause (F-CAP-15 AC1). iOS supplies its
+     * `UNUserNotificationCenter` adapter, Android an `AlarmManager` one. The default schedules nothing.
+     */
+    public fun resumeNotice(): AutoDetectResumeNotice = NoOpAutoDetectResumeNotice
 }
 
 /**

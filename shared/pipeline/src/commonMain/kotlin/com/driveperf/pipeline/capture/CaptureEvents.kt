@@ -1,16 +1,18 @@
 package com.driveperf.pipeline.capture
 
 import com.driveperf.domain.analytics.AnalyticsEvent
+import com.driveperf.domain.capture.AutoDetectPauseLength
 import com.driveperf.domain.capture.RearmReason
 import com.driveperf.domain.capture.WakeKind
 
 /**
- * Capture analytics (PRD F-CAP-02, F-CAP-03, F-CAP-05, F-CAP-14, F-CAP-16; ADR-007). Names and values are fixed keys or
+ * Capture analytics (PRD F-CAP-02, F-CAP-03, F-CAP-05, F-CAP-14, F-CAP-15, F-CAP-16; ADR-007). Names and values are fixed keys or
  * buckets: no coordinates, speeds, times or free text. The reducer emits them as [MachineEffect.Track], so the rules
  * that decide them stay in one place; the engine sends them through the consent-gated `Analytics` port.
  */
 internal data class CaptureEvent(override val name: String, override val properties: Map<String, String> = emptyMap()) :
     AnalyticsEvent {
+    @Suppress("TooManyFunctions") // one factory per PRD capture event
     companion object {
         /** `auto_wake {trigger}`: an OS trigger started a candidate. */
         fun autoWake(kind: WakeKind): CaptureEvent = CaptureEvent("auto_wake", mapOf("trigger" to kind.key()))
@@ -49,6 +51,25 @@ internal data class CaptureEvent(override val name: String, override val propert
             "start_backfilled",
             mapOf("gap_m_bucket" to gapBucket(gapM), "imu_backfill" to imuBackfill.toString()),
         )
+
+        /** `auto_paused {duration: 1h|until_morning|indefinite}` (F-CAP-15). */
+        fun autoPaused(length: AutoDetectPauseLength): CaptureEvent = CaptureEvent(
+            "auto_paused",
+            mapOf(
+                "duration" to when (length) {
+                    AutoDetectPauseLength.ONE_HOUR -> "1h"
+                    AutoDetectPauseLength.UNTIL_MORNING -> "until_morning"
+                    AutoDetectPauseLength.UNTIL_RESUMED -> "indefinite"
+                },
+            ),
+        )
+
+        /** `auto_resumed {by: user|timer}` (F-CAP-15). */
+        fun autoResumed(byTimer: Boolean): CaptureEvent =
+            CaptureEvent("auto_resumed", mapOf("by" to if (byTimer) "timer" else "user"))
+
+        /** `auto_pause_undone`: Undo on the pause confirmation (S-HOME-03). */
+        val autoPauseUndone: CaptureEvent = CaptureEvent("auto_pause_undone")
 
         val watchdogFired: CaptureEvent = CaptureEvent("watchdog_fired")
         val watchdogOpened: CaptureEvent = CaptureEvent("watchdog_opened")

@@ -182,6 +182,7 @@ private fun NavGraphBuilder.tabDestinations(env: AppEnv) {
                     autoDetect = autoDetect.takeIf { tab == Tab.Drives },
                     forceStopNotice = wakeStatus.forceStopNotice,
                     onDismissForceStop = wakePath::dismissForceStopNotice,
+                    pause = rememberPauseCallbacks(wakePath),
                 ),
             ) { padding ->
                 TabContent(tab, padding, onSeeAll = { env.navController.navigate(Routes.ALL_DRIVES) })

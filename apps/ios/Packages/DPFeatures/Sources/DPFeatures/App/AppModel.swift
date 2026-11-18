@@ -65,6 +65,8 @@ public final class AppModel {
     public let trips: TripListViewModel
     public let profile: ProfileViewModel
     public let recordingSettings: RecordingSettingsViewModel
+    /// S-HOME-03 (F-CAP-15), shared by the capture status sheet and Recording settings.
+    public let pause: PauseAutoDetectViewModel
     public let statusRequests: CaptureStatusRequests
     public private(set) var onboarding: OnboardingViewModel?
     public var isSelfTestPresented: Bool
@@ -84,12 +86,15 @@ public final class AppModel {
         profile = ProfileViewModel(dependencies: dependencies)
         // The accessory and the status sheet read permissions on their own, so re-read them after every change here.
         let capture = capture
+        // It reads the capture model's status, so the views that show the pause update with it.
+        pause = PauseAutoDetectViewModel(recorder: dependencies.recorder, status: { capture.status })
         recordingSettings = RecordingSettingsViewModel(
             preferences: dependencies.preferences, permissions: dependencies.permissions,
             refreshCapture: {
                 dependencies.refreshCapture()
                 Task { await capture.refreshReadiness() }
-            })
+            },
+            pause: pause)
         if route == .onboarding { onboarding = makeOnboarding() }
     }
 

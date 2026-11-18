@@ -52,6 +52,7 @@ struct CaptureStatusAccessory: View {
         case .ready: "Auto-detect on · ready"
         case .manual: "Manual mode"
         case .attention: "Auto-detect needs attention"
+        case .paused: "Auto-detect paused"
         case .recording(let startedAt, let distanceM):
             "Recording · \(Int(Date().timeIntervalSince(startedAt) / 60)) min · \(DriveFormat.kilometres(distanceM)) km"
         }
@@ -65,6 +66,7 @@ struct CaptureStatusAccessory: View {
             else { Text("Starts when you drive off") }
         case .manual: Text("Auto-detect is off")
         case .attention(let reason): Text(reason.shortText)
+        case .paused(let until): Text(PauseRules.untilLine(until, now: Date()))
         case .recording: nil
         }
     }
@@ -72,7 +74,7 @@ struct CaptureStatusAccessory: View {
     private var dotColor: Color {
         switch capture.accessory {
         case .ready, .recording: DPColor.live
-        case .manual: DPColor.text3
+        case .manual, .paused: DPColor.text3
         case .attention: DPColor.warning
         }
     }
@@ -83,13 +85,14 @@ struct CaptureStatusSheet: View {
     let capture: CaptureViewModel
     let recording: RecordingSettingsViewModel
     @Environment(\.dismiss) private var dismiss
+    @State private var isPausePresented = false
 
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: DPSpace.s4) {
                     HStack(alignment: .top, spacing: DPSpace.s3) {
-                        GlyphDisc(isAttention ? .info : .check, tone: isAttention ? .warning : .positive, size: 36)
+                        GlyphDisc(glyph, tone: tone, size: 36)
                         VStack(alignment: .leading, spacing: DPSpace.s1) {
                             Text(summary).font(DPFont.cardTitle).foregroundStyle(DPColor.text)
                             Text(promise).font(DPFont.bodySecondary).foregroundStyle(DPColor.text2)
@@ -103,6 +106,19 @@ struct CaptureStatusSheet: View {
                     }
                     if capture.accessory != .manual {
                         CheckInRow(lastCheckIn: capture.lastCheckIn)
+                    }
+                    if let pause = recording.pause, pause.isAvailable {
+                        // S-HOME-03 opens as a sheet over this one (S-HOME-02 interactions).
+                        Button {
+                            pause.prepare()
+                            isPausePresented = true
+                        } label: {
+                            PauseAutoDetectRow(isPaused: pause.isPaused)
+                                .padding(.horizontal, DPSpace.s4)
+                                .frame(minHeight: DPLayout.touchMin)
+                                .dpCard()
+                        }
+                        .buttonStyle(.plain)
                     }
                     NavigationLink {
                         RecordingSettingsView(model: recording)
@@ -126,6 +142,25 @@ struct CaptureStatusSheet: View {
             recording.reloadChoice()
             await capture.refreshReadiness()
         }
+        .sheet(isPresented: $isPausePresented) {
+            if let pause = recording.pause { PauseAutoDetectSheet(model: pause) }
+        }
+    }
+
+    private var glyph: DPIcon {
+        switch capture.accessory {
+        case .attention: .info
+        case .paused: .pause
+        default: .check
+        }
+    }
+
+    private var tone: GlyphDisc.Tone {
+        switch capture.accessory {
+        case .attention: .warning
+        case .paused: .neutral
+        default: .positive
+        }
     }
 
     private var isAttention: Bool {
@@ -138,6 +173,7 @@ struct CaptureStatusSheet: View {
         case .ready, .recording: "Automatic trips are ready."
         case .manual: "Manual trips."
         case .attention: "Auto-detect needs attention."
+        case .paused(let until): "Auto-detect is paused \(PauseRules.untilPhrase(until, now: Date()))."
         }
     }
 
@@ -148,6 +184,7 @@ struct CaptureStatusSheet: View {
                 + "auto-detect."
         case .manual: "Tap Start when you set off and Stop when you park."
         case .attention(let reason): reason.explanation
+        case .paused: "No drives start on their own. You can still tap Start."
         }
     }
 }
@@ -172,7 +209,7 @@ private struct CheckInRow: View {
     }
 }
 
-/// The row into Recording settings (S-SET-03), where "Pause auto-detect" will sit once DRIVE-152 lands.
+/// The row into Recording settings (S-SET-03).
 private struct RecordingSettingsLinkRow: View {
     let isOn: Bool
 

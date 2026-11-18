@@ -34,6 +34,10 @@
         <receiver
             android:name=".wake.GeofenceReceiver"
             android:exported="false" />
+        <!-- F-CAP-15: the end of a pause of automatic trips (a windowed alarm, so no exact-alarm permission). -->
+        <receiver
+            android:name=".wake.ResumeNoticeReceiver"
+            android:exported="false" />
         <receiver
             android:name=".wake.BootReceiver"
             android:exported="false">

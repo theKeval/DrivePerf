@@ -122,13 +122,25 @@ final class CoreTripRecorderTests: XCTestCase {
         let kotlin = DrivePerfShared.RecorderStatus(
             state: .paused, tripId: "t1", isManual: true, elapsedS: 61.7, distanceM: 1200, autoDetectEnabled: true,
             startFailed: false, autoDetectHealth: .needsAttention, lastCheckInWallMs: KotlinLong(value: 1_700_000_000_000),
-            mayBatchLocation: true)
+            mayBatchLocation: true, autoDetectPausedUntilWallMs: nil)
         XCTAssertEqual(
             KotlinMapping.swift(kotlin),
             DPSharedBridge.RecorderStatus(
                 state: .paused, tripId: "t1", isManual: true, elapsedS: 61, distanceM: 1200, autoDetectEnabled: true,
                 autoDetectHealth: .needsAttention, lastCheckIn: Date(timeIntervalSince1970: 1_700_000_000),
                 mayBatchLocation: true))
+    }
+
+    func testAPauseMapsWithItsEnd() {
+        let kotlin = DrivePerfShared.RecorderStatus(
+            state: .idle, tripId: nil, isManual: false, elapsedS: 0, distanceM: 0, autoDetectEnabled: true,
+            startFailed: false, autoDetectHealth: .paused, lastCheckInWallMs: nil, mayBatchLocation: false,
+            autoDetectPausedUntilWallMs: KotlinLong(value: 1_800_000_000_000))
+        let swift = KotlinMapping.swift(kotlin)
+        XCTAssertEqual(swift.autoDetectHealth, .paused)
+        XCTAssertEqual(swift.autoDetectPausedUntil, Date(timeIntervalSince1970: 1_800_000_000))
+        XCTAssertEqual(KotlinMapping.kotlin(DPSharedBridge.AutoDetectPauseLength.untilMorning), .untilMorning)
+        XCTAssertEqual(KotlinMapping.kotlin(DPSharedBridge.AutoDetectPauseLength.untilResumed), .untilResumed)
     }
 
     func testKotlinTripsMapToListRows() {

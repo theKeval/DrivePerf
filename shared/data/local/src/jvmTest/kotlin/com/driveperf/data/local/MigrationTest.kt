@@ -74,7 +74,9 @@ class MigrationTest {
             val store = LocalTripStore(db, "device", Dispatchers.Unconfined)
             assertEquals("${p}recording", store.recordingTrip()?.id, "a trip recording during the update resumes")
             assertNotNull(store.lastParking())
-            assertEquals(version < 4, store.isParkingTrusted(), "v$version: only the v4 fixture stored a reboot")
+            assertEquals(version < 4, store.isParkingTrusted(), "v$version: only the v4 and v5 fixtures stored a reboot")
+            val pause = LocalAutoDetectPauseStore(db, Dispatchers.Unconfined).read()
+            assertEquals(if (version >= 5) 1_762_524_000_000L else null, pause?.untilWallMs, "v$version: a pause survives")
         }
     }
 

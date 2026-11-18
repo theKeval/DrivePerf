@@ -3,6 +3,7 @@ package com.driveperf.pipeline.capture
 import com.driveperf.domain.capture.ActivityConfidence
 import com.driveperf.domain.capture.ActivitySample
 import com.driveperf.domain.capture.ActivityType
+import com.driveperf.domain.capture.AutoDetectPause
 import com.driveperf.domain.capture.CaptureBatch
 import com.driveperf.domain.capture.CaptureHeader
 import com.driveperf.domain.capture.CaptureMarkType
@@ -20,6 +21,7 @@ import com.driveperf.domain.capture.ThermalState
 import com.driveperf.domain.capture.WakeKind
 import com.driveperf.domain.trip.InterruptionReason
 import com.driveperf.domain.trip.TripKind
+import com.driveperf.foundation.Units
 import com.driveperf.pipeline.capture.MachineEffect.Append
 import com.driveperf.pipeline.capture.MachineEffect.Cancel
 import com.driveperf.pipeline.capture.MachineEffect.Mark
@@ -70,21 +72,108 @@ internal class TripMachine(private val cfg: CaptureConfig = CaptureConfig()) {
         is MachineEvent.WatchdogOpened -> Transition(s, listOf(MachineEffect.Track(CaptureEvent.watchdogOpened)))
         is MachineEvent.TriggersAvailable -> Transition(s.copy(triggersAvailable = e.available))
         is MachineEvent.InDriveVisible -> Transition(s.copy(inDriveVisible = e.visible))
+        else -> reducePause(s, e)
+    }
+
+    // ---- pause (F-CAP-15) ----
+
+    private fun reducePause(s: MachineState, e: MachineEvent): Transition = when (e) {
+        is MachineEvent.PauseRestored -> onPauseRestored(s, e)
+        is MachineEvent.PauseAutoDetect -> onPause(s, e)
+        is MachineEvent.ResumeAutoDetect -> endPause(s, e.by)
+        is MachineEvent.PauseCheck -> onPauseCheck(s, e.nowWallMs)
         else -> Transition(s)
     }
 
-    /** Turning detection on is a check-in and re-arms; turning it off removes the watchdog (F-CAP-15 AC2). */
+    /**
+     * The stored pause after a restart (EC-RBT). One that ended while the app was not running ends now; otherwise its
+     * timer and resume notice are set again (Android alarms do not survive a reboot) and the watchdog stays off.
+     */
+    private fun onPauseRestored(s: MachineState, e: MachineEvent.PauseRestored): Transition {
+        val pause = e.pause ?: return Transition(s)
+        val paused = s.copy(pause = pause)
+        return if (pause.isOver(e.nowWallMs)) {
+            endPause(paused, ResumedBy.TIMER)
+        } else {
+            Transition(paused, listOf(MachineEffect.WatchdogOff) + pauseTimer(pause, e.nowWallMs))
+        }
+    }
+
+    /**
+     * No automatic trip starts while paused: an automatic candidate being checked is dropped, the watchdog is removed
+     * and the resume notice set (AC1, AC2). A confirmed trip keeps recording; manual starts still work.
+     */
+    private fun onPause(s: MachineState, e: MachineEvent.PauseAutoDetect): Transition {
+        val until = e.untilWallMs
+        if (!s.autoDetect || (until != null && until <= e.nowWallMs)) return Transition(s)
+        val pause = AutoDetectPause(e.length, e.nowWallMs, until)
+        val dropped = if (s.phase == CANDIDATE && s.trip?.manual == false) reject(s, reason = null) else Transition(s)
+        val fx = listOf(MachineEffect.SavePause(pause), MachineEffect.WatchdogOff) +
+            (if (until == null) listOf(Cancel(TimerId.PAUSE_END), MachineEffect.CancelResumeNotice) else emptyList()) +
+            pauseTimer(pause, e.nowWallMs) + MachineEffect.Track(CaptureEvent.autoPaused(e.length))
+        return Transition(dropped.state.copy(pause = pause), dropped.effects + fx)
+    }
+
+    /** A pause whose end has passed ends before the input that follows; one still running keeps its timer. */
+    private fun onPauseCheck(s: MachineState, nowWallMs: Long): Transition {
+        val pause = s.pause ?: return Transition(s)
+        return if (pause.isOver(nowWallMs)) endPause(s, ResumedBy.TIMER) else Transition(s, pauseTimer(pause, nowWallMs))
+    }
+
+    /**
+     * Ends the pause and re-arms the triggers with a check-in, which schedules the watchdog again (AC2). The resume
+     * notice is removed when the user ended it early; at the timer it has fired, or is about to, and stays.
+     */
+    private fun endPause(s: MachineState, by: ResumedBy): Transition {
+        if (s.pause == null) return Transition(s)
+        val next = s.copy(pause = null)
+        val event = when (by) {
+            ResumedBy.UNDO -> CaptureEvent.autoPauseUndone
+            ResumedBy.USER -> CaptureEvent.autoResumed(byTimer = false)
+            ResumedBy.TIMER -> CaptureEvent.autoResumed(byTimer = true)
+        }
+        val fx = buildList {
+            add(MachineEffect.SavePause(null))
+            add(Cancel(TimerId.PAUSE_END))
+            if (by != ResumedBy.TIMER) add(MachineEffect.CancelResumeNotice)
+            if (s.phase == IDLE) addAll(armAt(s.parking))
+            addAll(checkIn(next))
+            add(MachineEffect.Track(event))
+        }
+        return Transition(next, fx)
+    }
+
+    private fun pauseTimer(pause: AutoDetectPause, nowWallMs: Long): List<MachineEffect> {
+        val until = pause.untilWallMs ?: return emptyList()
+        return listOf(
+            MachineEffect.ScheduleResumeNotice(until),
+            Schedule(TimerId.PAUSE_END, (until - nowWallMs) * Units.NANOS_PER_MILLI),
+        )
+    }
+
+    private fun AutoDetectPause.isOver(nowWallMs: Long): Boolean = untilWallMs?.let { it <= nowWallMs } ?: false
+
+    /**
+     * Turning detection on is a check-in and re-arms; turning it off removes the watchdog. Turning it off also ends a
+     * pause, silently: a later switch-on means on, not "still paused" (F-CAP-15). The resume notice is removed on every
+     * switch-off, paused or not: a pause that just ended on time may still have its notice pending (Android delivers the
+     * alarm within a 10-minute window), and "Auto-detect is back on" must not follow a switch-off.
+     */
     private fun onAutoDetect(s: MachineState, e: MachineEvent.AutoDetect): Transition {
         val next = s.copy(autoDetect = e.enabled)
         return when {
             e.enabled == s.autoDetect -> Transition(next)
             e.enabled -> Transition(next, (if (s.phase == IDLE) armAt(s.parking) else emptyList()) + MachineEffect.CheckIn)
-            else -> Transition(next, listOf(MachineEffect.WatchdogOff))
+            else -> {
+                val endPause = if (s.pause != null) listOf(MachineEffect.SavePause(null), Cancel(TimerId.PAUSE_END)) else emptyList()
+                Transition(next.copy(pause = null), listOf(MachineEffect.WatchdogOff, MachineEffect.CancelResumeNotice) + endPause)
+            }
         }
     }
 
-    /** A check-in when automatic detection is on (F-CAP-14 AC1, AC4). */
-    private fun checkIn(s: MachineState): List<MachineEffect> = if (s.autoDetect) listOf(MachineEffect.CheckIn) else emptyList()
+    /** A check-in when automatic detection is on and not paused (F-CAP-14 AC1, AC4; F-CAP-15 AC2). */
+    private fun checkIn(s: MachineState): List<MachineEffect> =
+        if (s.autoDetect && s.pause == null) listOf(MachineEffect.CheckIn) else emptyList()
 
     // ---- launch and recovery (§1.7) ----
 
@@ -144,7 +233,7 @@ internal class TripMachine(private val cfg: CaptureConfig = CaptureConfig()) {
             manual && s.phase == CANDIDATE -> promoteToManual(s, e)
             s.phase != IDLE || s.dbLocked -> Transition(s)
             manual -> startCapture(s, e, manual = true)
-            !s.autoDetect || isStale(e) -> Transition(s)
+            !s.autoDetect || s.pause != null || isStale(e) -> Transition(s)
             else -> startCapture(s, e, manual = false)
         }
         return Transition(t.state, checkIn(s) + t.effects)
@@ -350,11 +439,12 @@ internal class TripMachine(private val cfg: CaptureConfig = CaptureConfig()) {
         return Transition(s.copy(phase = RECORDING, trip = trip.copy(confirmed = true)), fx)
     }
 
-    private fun reject(s: MachineState, reason: RejectReason): Transition {
+    /** Drops the candidate; [reason] null when the user paused automatic detection (no `auto_candidate`). */
+    private fun reject(s: MachineState, reason: RejectReason?): Transition {
         val trip = s.trip ?: return Transition(s)
         val arm = armAt(s.parking)
         val fx = sensorsOff() + Cancel(TimerId.CANDIDATE_TIMEOUT) + MachineEffect.Discard(trip.id) + arm +
-            MachineEffect.Track(CaptureEvent.rejected(reason))
+            listOfNotNull(reason?.let { MachineEffect.Track(CaptureEvent.rejected(it)) })
         return Transition(idle(s, s.parking), fx)
     }
 
@@ -600,6 +690,7 @@ internal class TripMachine(private val cfg: CaptureConfig = CaptureConfig()) {
 
     private fun idle(s: MachineState, parking: Parking?): MachineState = MachineState(
         autoDetect = s.autoDetect,
+        pause = s.pause,
         parking = parking,
         activity = s.activity,
         power = s.power,
@@ -621,7 +712,7 @@ internal class TripMachine(private val cfg: CaptureConfig = CaptureConfig()) {
         MachineEffect.StopPower,
     )
 
-    private fun allTimersOff(): List<MachineEffect> = TimerId.entries.map { Cancel(it) }
+    private fun allTimersOff(): List<MachineEffect> = TimerId.trip.map { Cancel(it) }
 
     /** §2.7: 10 Hz when thermal is critical; 25 Hz in Low Power Mode, at ≤ 15 % battery or thermal serious. */
     fun rateFor(p: PowerStatus?): Int = when {

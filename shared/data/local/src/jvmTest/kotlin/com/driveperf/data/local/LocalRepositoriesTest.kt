@@ -2,6 +2,8 @@ package com.driveperf.data.local
 
 import com.driveperf.data.local.db.Event_feedback
 import com.driveperf.data.local.db.Trip_file
+import com.driveperf.domain.capture.AutoDetectPause
+import com.driveperf.domain.capture.AutoDetectPauseLength
 import com.driveperf.domain.capture.FinalisedTrip
 import com.driveperf.domain.capture.GeoPoint
 import com.driveperf.domain.capture.Parking
@@ -291,5 +293,29 @@ class LocalRepositoriesTest {
         driver.close()
         assertFalse(broken.write(WatchdogState(lastCheckInWallMs = 1L)))
         assertEquals(WatchdogState(), broken.read())
+    }
+
+    @Test
+    fun aPauseSurvivesAParkingUpdateAndClears() = runTest {
+        val pauses = LocalAutoDetectPauseStore(db, coroutineContext)
+        assertNull(pauses.read())
+        val pause = AutoDetectPause(AutoDetectPauseLength.UNTIL_MORNING, pausedAtWallMs = 1_000L, untilWallMs = 9_000L)
+        assertTrue(pauses.write(pause))
+        LocalTripStore(db, "device-1", coroutineContext).setLastParking(Parking(GeoPoint(2.0, -27.5), 9_000L))
+        assertEquals(pause, pauses.read())
+        val indefinite = AutoDetectPause(AutoDetectPauseLength.UNTIL_RESUMED, pausedAtWallMs = 2_000L, untilWallMs = null)
+        pauses.write(indefinite)
+        assertEquals(indefinite, pauses.read(), "pausing again replaces the pause")
+        assertTrue(pauses.write(null))
+        assertNull(pauses.read())
+    }
+
+    @Test
+    fun aPauseStoreThatCannotWriteSaysSoInsteadOfThrowing() = runTest {
+        val driver = JvmDatabaseDriverFactory().create()
+        val broken = LocalAutoDetectPauseStore(openDatabase(driver), coroutineContext)
+        driver.close()
+        assertFalse(broken.write(AutoDetectPause(AutoDetectPauseLength.ONE_HOUR, 1L, 2L)))
+        assertNull(broken.read())
     }
 }

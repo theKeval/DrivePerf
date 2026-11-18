@@ -47,16 +47,23 @@ data class RecordingStatusLine(
     val detail: String?,
 )
 
-/** What S-SET-03 draws. [status] is shown only while automatic trips are on. */
+/**
+ * The Pause auto-detect row (F-CAP-15): "Pause auto-detect", or "Resume auto-detect" while [paused]. It opens S-HOME-03;
+ * the status row above it says until when.
+ */
+data class RecordingPauseLine(val paused: Boolean, val title: String, val detail: String)
+
+/** What S-SET-03 draws. [status] and [pause] are shown only while automatic trips are on. */
 data class RecordingSettingsUiState(
     val automaticTrips: Boolean,
     val status: RecordingStatusLine?,
+    val pause: RecordingPauseLine? = null,
 )
 
 /**
  * S-SET-03 Recording settings (F-SET-01 AC3), reached from Profile: the Automatic trips switch and, while it is on, the
- * auto-detect status row that opens the capture status sheet. Default car, Battery saver recording, Health Check and
- * Pause auto-detect (DRIVE-152) are not part of this screen yet.
+ * auto-detect status row that opens the capture status sheet and the Pause auto-detect row (F-CAP-15). Default car,
+ * Battery saver recording and Health Check are not part of this screen yet.
  */
 @Composable
 fun RecordingSettingsScreen(
@@ -64,6 +71,7 @@ fun RecordingSettingsScreen(
     onAutomaticTripsChanged: (Boolean) -> Unit,
     onStatusClick: () -> Unit,
     modifier: Modifier = Modifier,
+    onPauseClick: () -> Unit = {},
 ) {
     Column(
         modifier = modifier
@@ -88,6 +96,11 @@ fun RecordingSettingsScreen(
             if (state.automaticTrips && status != null) {
                 HorizontalDivider(color = MaterialTheme.colorScheme.surface)
                 StatusRow(status, onStatusClick)
+            }
+            val pause = state.pause
+            if (state.automaticTrips && pause != null) {
+                HorizontalDivider(color = MaterialTheme.colorScheme.surface)
+                PauseRow(pause, onPauseClick)
             }
         }
         if (state.automaticTrips) {
@@ -153,6 +166,18 @@ private fun StatusRow(status: RecordingStatusLine, onClick: () -> Unit) {
     ) { Text(status.title) }
 }
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun PauseRow(pause: RecordingPauseLine, onClick: () -> Unit) {
+    ListItem(
+        onClick = onClick,
+        colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+        leadingContent = { Icon(painterResource(if (pause.paused) DpIcons.Play else DpIcons.Pause), contentDescription = null) },
+        supportingContent = { Text(pause.detail) },
+        trailingContent = { Icon(painterResource(DpIcons.ChevronRight), contentDescription = null) },
+    ) { Text(pause.title) }
+}
+
 @Preview
 @Composable
 private fun RecordingSettingsOnPreview() {
@@ -161,6 +186,7 @@ private fun RecordingSettingsOnPreview() {
             RecordingSettingsUiState(
                 automaticTrips = true,
                 status = RecordingStatusLine(DpHealth.Ok, "OK", "Auto-detect on · ready", "Last check-in 18 min ago"),
+                pause = RecordingPauseLine(paused = false, "Pause auto-detect", "Stop automatic trips for a while"),
             ),
             onAutomaticTripsChanged = {},
             onStatusClick = {},

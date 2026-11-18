@@ -56,6 +56,8 @@ public final class CaptureViewModel {
     /// The bottom-accessory capsule (S-HOME-01 copy).
     public enum Accessory: Equatable {
         case ready, manual, attention(AttentionReason), recording(startedAt: Date, distanceM: Double)
+        /// The user paused automatic trips (F-CAP-15) until `until`, or until they resume (nil).
+        case paused(until: Date?)
     }
 
     public enum StartProblem: String, Identifiable, Sendable {
@@ -180,6 +182,8 @@ public final class CaptureViewModel {
             return .recording(startedAt: tripStartedAt ?? now(), distanceM: status.distanceM)
         }
         guard status.autoDetectEnabled else { return .manual }
+        // As the core's health: a pause shows over a missing permission, which the status sheet still lists.
+        if status.autoDetectHealth == .paused { return .paused(until: status.autoDetectPausedUntil) }
         if let reason = attentionReasons.first { return .attention(reason) }
         return .ready
     }
@@ -371,6 +375,11 @@ public final class CaptureViewModel {
 
     public func openSettings() {
         permissions.openSystemSettings()
+    }
+
+    /// Resume on the Home banner (F-CAP-15): the core ends the pause and re-arms.
+    public func resumeAutoDetect() {
+        recorder.resumeAutoDetect()
     }
 
     /// S-DRV-02 short-trip banner: under 500 m or 2 minutes (F-CAP-17).

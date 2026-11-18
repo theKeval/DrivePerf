@@ -33,8 +33,8 @@ import com.driveperf.designsystem.DrivePerfTheme
 
 /**
  * S-HOME-02: answers "will my next drive be recorded?" from the floating toolbar. A ModalBottomSheet with the summary,
- * "Last check-in" (the shared core's), the checks (failing rows first, each with a tonal Fix, then the passing ones), and a
- * row to Recording settings (F-CAP-02, F-SET-02).
+ * "Last check-in" (the shared core's), the checks (failing rows first, each with a tonal Fix, then the passing ones), the
+ * Pause auto-detect row to S-HOME-03 (F-CAP-15) and a row to Recording settings (F-CAP-02, F-SET-02).
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -61,6 +61,7 @@ internal fun CaptureStatusContent(status: AutoDetectStatus, actions: CaptureStat
         Summary(status)
         CheckInCard(status.lastCheckInMs)
         Checks(status, actions.onFix)
+        if (status.mode != AutoDetectMode.Off) PauseRow(status, actions.onOpenPause)
         RecordingSettingsRow(actions.onOpenRecordingSettings)
         Text(
             text = stringResource(R.string.status_footer),
@@ -82,6 +83,7 @@ private fun Header(mode: AutoDetectMode) {
             AutoDetectMode.Ready -> R.string.status_subtitle_ready
             AutoDetectMode.NeedsAttention -> R.string.status_subtitle_attention
             AutoDetectMode.Off -> R.string.status_subtitle_off
+            AutoDetectMode.Paused -> R.string.status_subtitle_paused
         }
         Text(stringResource(subtitle), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
@@ -94,6 +96,8 @@ private fun Summary(status: AutoDetectStatus) {
         AutoDetectMode.NeedsAttention -> stringResource(R.string.status_summary_attention) to
             status.reasons.firstOrNull()?.let { stringResource(it.explanation) }
         AutoDetectMode.Off -> stringResource(R.string.status_summary_off) to stringResource(R.string.status_summary_off_detail)
+        AutoDetectMode.Paused -> stringResource(R.string.status_summary_paused, pausedUntilPhrase(status.pausedUntilMs)) to
+            stringResource(R.string.status_summary_paused_detail)
     }
     Row(
         horizontalArrangement = Arrangement.spacedBy(16.dp),
@@ -175,6 +179,23 @@ private fun CheckRow(check: CaptureCheck, onFix: (AttentionReason) -> Unit) {
             if (fix != null) FilledTonalButton(onClick = { onFix(fix) }) { Text(stringResource(R.string.attention_fix)) }
         },
     ) { Text(stringResource(check.kind.title)) }
+}
+
+/** S-HOME-02's pause row (F-CAP-15): Pause auto-detect, or Resume auto-detect while paused. Both open S-HOME-03. */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun PauseRow(status: AutoDetectStatus, onClick: () -> Unit) {
+    val paused = status.mode == AutoDetectMode.Paused
+    ListItem(
+        onClick = onClick,
+        modifier = Modifier.clip(MaterialTheme.shapes.large),
+        colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+        leadingContent = { Icon(painterResource(if (paused) DpIcons.Play else DpIcons.Pause), contentDescription = null) },
+        supportingContent = {
+            Text(stringResource(if (paused) R.string.status_resume_detail else R.string.status_pause_detail))
+        },
+        trailingContent = { Icon(painterResource(DpIcons.ChevronRight), contentDescription = null) },
+    ) { Text(stringResource(if (paused) R.string.status_resume else R.string.status_pause)) }
 }
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
