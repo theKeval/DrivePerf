@@ -33,18 +33,24 @@ internal class EstimatedStart(private val cfg: SignalConfig) {
             windowStart == windowFromBound
         return if (runStart != null && !atEdge) {
             check(capture, parking, first, (runStart - h.startWallMs) / MS, "motion_history")
-        } else if (h.sourceDetail == "geofence") {
-            // Keep DRIVE-212's Android geofence policy; the robust fallback below is for iOS wakes.
-            if (runStart == null) geofenceRunStart(capture, gatedFromWake)?.let {
-                check(capture, parking, first, (it - h.startWallMs) / MS, "distance_speed")
-            } else null
-        } else if (h.sourceDetail == null && h.wakeKind != WakeKind.ACTIVITY_VEHICLE &&
-            (history.isEmpty() || history.last().type == ActivityType.AUTOMOTIVE)
-        ) {
-            distanceSpeed(capture, parking, gatedFromWake)
         } else {
-            null
+            fallback(capture, parking, gatedFromWake, history, runStart)
         }
+    }
+
+    private fun fallback(
+        capture: CapturedTrip, parking: Parking, fixes: List<GatedFix>, history: List<ActivitySample>, runStart: Long?,
+    ): StartEstimate? {
+        val h = capture.header
+        val noOtherActivity = history.isEmpty() || history.last().type == ActivityType.AUTOMOTIVE
+        return if (h.sourceDetail == "geofence") {
+            // Keep DRIVE-212's Android geofence policy; the robust fallback below is for iOS wakes.
+            if (runStart == null) geofenceRunStart(capture, fixes)?.let {
+                check(capture, parking, fixes.first(), (it - h.startWallMs) / MS, "distance_speed")
+            } else null
+        } else if (h.sourceDetail == null && h.wakeKind != WakeKind.ACTIVITY_VEHICLE && noOtherActivity) {
+            distanceSpeed(capture, parking, fixes)
+        } else null
     }
 
     private fun distanceSpeed(capture: CapturedTrip, parking: Parking, fixes: List<GatedFix>): StartEstimate? {
