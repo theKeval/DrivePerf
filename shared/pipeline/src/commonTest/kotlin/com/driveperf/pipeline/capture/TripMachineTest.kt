@@ -322,6 +322,19 @@ class TripMachineTest {
     }
 
     @Test
+    fun batterySaverAppliesNowAndSurvivesTheNextTrip() {
+        val on = m.reduce(recording(), MachineEvent.BatterySaver(ns(1.0), true))
+        assertEquals(25, on.state.imuHz)
+        assertTrue(MachineEffect.SetImuRate(25) in on.effects)
+        val off = m.reduce(on.state, MachineEvent.BatterySaver(ns(2.0), false))
+        assertEquals(50, off.state.imuHz)
+        val armed = m.reduce(idle, MachineEvent.BatterySaver(0, true)).state
+        assertEquals(25, wake(1.0, WakeKind.MANUAL, s = armed).state.imuHz)
+        assertEquals(25, m.rateFor(null, true))
+        assertEquals(10, m.rateFor(PowerStatus(50, false, false, ThermalState.CRITICAL), true))
+    }
+
+    @Test
     fun rateFollowsSection27() {
         assertEquals(50, m.rateFor(null))
         assertEquals(25, m.rateFor(PowerStatus(15, false, false, ThermalState.NOMINAL)))

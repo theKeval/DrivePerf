@@ -111,6 +111,9 @@ public object DrivePerfCore {
             config = capture,
             analytics = analytics,
         )
+        val settings = com.driveperf.data.local.LocalSettingsRepository(db, io, clock, analytics)
+        recorder.setBatterySaverRecording(settings.state.value.batterySaverRecording)
+        scope.launch { settings.state.collect { recorder.setBatterySaverRecording(it.batterySaverRecording) } }
         val trips = LocalTripRepository(db, files, io)
         val routes = LocalRouteRepository(db, io)
         // DRIVE-100: trips corrected to not-a-drive more than 30 days ago are deleted once per start.
@@ -125,6 +128,7 @@ public object DrivePerfCore {
             ),
             corrections = corrections,
             analytics = analytics,
+            settings = settings,
             onClose = {
                 scope.cancel()
                 driver.close()

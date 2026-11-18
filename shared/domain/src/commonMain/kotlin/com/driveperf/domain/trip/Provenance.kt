@@ -40,6 +40,10 @@ public enum class DisplayUnit(public val symbol: String, public val decimals: In
     /** Speed from m/s, as an integer. */
     KM_PER_HOUR("km/h", 0, 3.6),
 
+    MILES("mi", 1, 1.0 / 1609.344),
+    MILES_PER_HOUR("mph", 0, 3600.0 / 1609.344),
+    FEET("ft", 0, 1.0 / 0.3048),
+
     /** Acceleration in g, to 0.01. */
     G("g", 2, 1.0),
 
