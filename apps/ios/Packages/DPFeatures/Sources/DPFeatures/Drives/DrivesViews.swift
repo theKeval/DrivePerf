@@ -16,6 +16,12 @@ struct DrivesHomeView: View {
                     if case .attention(let reason) = capture.accessory {
                         AutoDetectAttentionBanner(reason: reason, onFix: onCaptureStatus)
                     }
+                    if case .paused(let until) = capture.accessory {
+                        AutoDetectPausedBanner(untilPhrase: PauseRules.untilPhrase(until, now: Date())) {
+                            capture.resumeAutoDetect()
+                            AccessibilityNotification.Announcement("Auto-detect resumed").post()
+                        }
+                    }
                     if trips.trips.isEmpty {
                         EmptyDrivesCard(onHowItWorks: onCaptureStatus)
                         if !trips.notDrives.isEmpty {

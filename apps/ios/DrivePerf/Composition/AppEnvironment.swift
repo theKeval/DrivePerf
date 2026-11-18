@@ -26,6 +26,7 @@ final class AppEnvironment {
     let power = SystemPowerState()
     /// F-CAP-14: schedules the "may be paused" notice the core asks for.
     let watchdog = NotificationWatchdog()
+    let resumeNotice = NotificationResumeNotice()
     /// Its own activity source for the in-drive content hold: the core's `activity` keeps one sink and is stopped at
     /// the end of every trip.
     let movement = ActivityMovementMonitor(source: CoreMotionActivitySource())
@@ -81,7 +82,8 @@ final class AppEnvironment {
         launched = true
         refreshCapture()
         let services = DrivePerfCore.shared.start(
-            platform: CorePlatformBindings(ports: corePorts, deviceId: DeviceIdentity.current(), watchdog: watchdog))
+            platform: CorePlatformBindings(
+                ports: corePorts, deviceId: DeviceIdentity.current(), watchdog: watchdog, resumeNotice: resumeNotice))
         recorder.attach(KotlinCore(services))
         recorder.surfaceData = TripSurfaceData(trips: services.trips)
         recorder.surfaceData?.updateLocation(canRecord: canRecordFromSystemSurface)

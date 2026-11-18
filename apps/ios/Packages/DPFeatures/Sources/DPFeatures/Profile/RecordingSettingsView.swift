@@ -1,11 +1,12 @@
 import DPDesignSystem
 import SwiftUI
 
-/// S-SET-03 Recording settings: the "Automatic trips" switch (DRIVE-153). Reached from Profile and from the capture
-/// status sheet (S-HOME-02).
+/// S-SET-03 Recording settings: the "Automatic trips" switch (DRIVE-153) and Pause auto-detect (DRIVE-152). Reached
+/// from Profile and from the capture status sheet (S-HOME-02).
 struct RecordingSettingsView: View {
     @Bindable var model: RecordingSettingsViewModel
     @Environment(\.scenePhase) private var scenePhase
+    @State private var isPausePresented = false
 
     var body: some View {
         List {
@@ -35,8 +36,7 @@ struct RecordingSettingsView: View {
                 .sensoryFeedback(.selection, trigger: model.autoTripsOn)
                 if model.autoTripsOn {
                     HStack(spacing: DPSpace.s3) {
-                        Circle().fill(model.attentionReasons.isEmpty ? DPColor.live : DPColor.warning)
-                            .frame(width: 10, height: 10)
+                        Circle().fill(statusColor).frame(width: 10, height: 10)
                         VStack(alignment: .leading, spacing: 0) {
                             Text(model.statusText).font(DPFont.body)
                             if let detail = model.statusDetail {
@@ -47,6 +47,15 @@ struct RecordingSettingsView: View {
                     .accessibilityElement(children: .combine)
                     if !model.attentionReasons.isEmpty {
                         Button("Open Settings") { model.openSettings() }
+                    }
+                    if let pause = model.pause, pause.isAvailable {
+                        Button {
+                            pause.prepare()
+                            isPausePresented = true
+                        } label: {
+                            PauseAutoDetectRow(isPaused: pause.isPaused)
+                        }
+                        .buttonStyle(.plain)
                     }
                 }
             } footer: {
@@ -65,6 +74,14 @@ struct RecordingSettingsView: View {
         .sheet(item: $model.explainer) { explainer in
             LocationAccessExplainerSheet(model: model, step: explainer)
         }
+        .sheet(isPresented: $isPausePresented) {
+            if let pause = model.pause { PauseAutoDetectSheet(model: pause) }
+        }
+    }
+
+    private var statusColor: Color {
+        if model.pause?.isPaused == true { return DPColor.text3 }
+        return model.attentionReasons.isEmpty ? DPColor.live : DPColor.warning
     }
 }
 

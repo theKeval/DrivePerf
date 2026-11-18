@@ -60,6 +60,9 @@ protocol SharedCore: AnyObject {
     func onWatchdogOpened()
     func setTriggersAvailable(_ available: Bool)
     func setInDriveScreenVisible(_ visible: Bool)
+    func pauseAutoDetect(_ length: AutoDetectPauseLength, until: Date?)
+    func resumeAutoDetect()
+    func undoPauseAutoDetect()
 }
 
 /// Defaults so test fakes keep compiling; `KotlinCore` forwards each call to the Kotlin recorder.
@@ -69,6 +72,9 @@ extension SharedCore {
     func onWatchdogOpened() {}
     func setTriggersAvailable(_ available: Bool) {}
     func setInDriveScreenVisible(_ visible: Bool) {}
+    func pauseAutoDetect(_ length: AutoDetectPauseLength, until: Date?) {}
+    func resumeAutoDetect() {}
+    func undoPauseAutoDetect() {}
 }
 
 /// `TripRecording` and `TripHistory` for the features, on the shared core's recorder (DRIVE-206). The core decides
@@ -165,6 +171,12 @@ final class CoreTripRecorder: TripRecording, TripHistory {
     func setTriggersAvailable(_ available: Bool) { core?.setTriggersAvailable(available) }
 
     func setInDriveScreenVisible(_ visible: Bool) { core?.setInDriveScreenVisible(visible) }
+
+    func pauseAutoDetect(_ length: AutoDetectPauseLength, until: Date?) { core?.pauseAutoDetect(length, until: until) }
+
+    func resumeAutoDetect() { core?.resumeAutoDetect() }
+
+    func undoPauseAutoDetect() { core?.undoPauseAutoDetect() }
 
     func setAutoDetect(enabled: Bool) {
         autoDetect = enabled

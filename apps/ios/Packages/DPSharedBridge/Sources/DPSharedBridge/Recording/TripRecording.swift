@@ -13,10 +13,23 @@ public enum RecorderState: String, Equatable, Sendable, Codable {
 public enum AutoDetectHealth: String, Equatable, Sendable, Codable {
     /// On and checking in.
     case on
-    /// Turned off or paused by the user.
+    /// Turned off by the user (the Automatic trips switch).
     case off
     /// On, but the platform reported that triggers cannot run (a permission is missing).
     case needsAttention
+    /// Paused by the user for a while (F-CAP-15): no automatic trip starts until `autoDetectPausedUntil`, or until they
+    /// resume it.
+    case paused
+}
+
+/// Kotlin `AutoDetectPauseLength`: what the user picked on S-HOME-03 (F-CAP-15 `auto_paused {duration}`).
+public enum AutoDetectPauseLength: String, Equatable, Sendable, CaseIterable, Codable {
+    /// For 1 hour.
+    case oneHour
+    /// Until tomorrow morning, 06:00 local time.
+    case untilMorning
+    /// Until the user turns it back on.
+    case untilResumed
 }
 
 /// Kotlin `RearmReason`: why the app is starting the core (F-CAP-14 `rearmed {reason}`).
@@ -40,7 +53,7 @@ public struct RecorderStatus: Equatable, Sendable {
     public var elapsedS: Double
     /// Gated distance so far.
     public var distanceM: Double
-    /// False while the user has paused automatic detection.
+    /// The user's Automatic trips switch. A pause (F-CAP-15) leaves it on and shows as `autoDetectHealth == .paused`.
     public var autoDetectEnabled: Bool
     /// The last start was dropped because its trip file could not be created (before the first unlock, disk full).
     /// Cleared by the next start.
@@ -51,11 +64,14 @@ public struct RecorderStatus: Equatable, Sendable {
     public var lastCheckIn: Date?
     /// Location may be batched now (Android only; iOS ignores it).
     public var mayBatchLocation: Bool
+    /// While paused (F-CAP-15): when auto-detect comes back on by itself. Nil when not paused, or paused until the user
+    /// turns it back on.
+    public var autoDetectPausedUntil: Date?
 
     public init(
         state: RecorderState, tripId: String?, isManual: Bool, elapsedS: Double, distanceM: Double,
         autoDetectEnabled: Bool, startFailed: Bool = false, autoDetectHealth: AutoDetectHealth? = nil,
-        lastCheckIn: Date? = nil, mayBatchLocation: Bool = false
+        lastCheckIn: Date? = nil, mayBatchLocation: Bool = false, autoDetectPausedUntil: Date? = nil
     ) {
         self.state = state
         self.tripId = tripId
@@ -67,6 +83,7 @@ public struct RecorderStatus: Equatable, Sendable {
         self.autoDetectHealth = autoDetectHealth ?? (autoDetectEnabled ? .on : .off)
         self.lastCheckIn = lastCheckIn
         self.mayBatchLocation = mayBatchLocation
+        self.autoDetectPausedUntil = autoDetectPausedUntil
     }
 
     /// Kotlin `RecorderStatus.IDLE`.
@@ -104,6 +121,13 @@ public protocol TripRecording: AnyObject {
     func setTriggersAvailable(_ available: Bool)
     /// Whether the in-drive screen is visible.
     func setInDriveScreenVisible(_ visible: Bool)
+    /// Pauses automatic detection until `until`, or until `resumeAutoDetect()` when nil (F-CAP-15). The core stores it
+    /// (it survives a reboot), turns the watchdog off and schedules the "back on" notice.
+    func pauseAutoDetect(_ length: AutoDetectPauseLength, until: Date?)
+    /// The user turned automatic detection back on before the pause ended.
+    func resumeAutoDetect()
+    /// Undo on the pause confirmation.
+    func undoPauseAutoDetect()
 }
 
 /// Defaults so existing fakes keep compiling; `CoreTripRecorder` forwards every call to the core.
@@ -113,6 +137,9 @@ extension TripRecording {
     public func onWatchdogOpened() {}
     public func setTriggersAvailable(_ available: Bool) {}
     public func setInDriveScreenVisible(_ visible: Bool) {}
+    public func pauseAutoDetect(_ length: AutoDetectPauseLength, until: Date?) {}
+    public func resumeAutoDetect() {}
+    public func undoPauseAutoDetect() {}
 }
 
 // MARK: - History

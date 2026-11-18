@@ -146,7 +146,8 @@ enum KotlinMapping {
             distanceM: s.distanceM, autoDetectEnabled: s.autoDetectEnabled, startFailed: s.startFailed,
             autoDetectHealth: swift(s.autoDetectHealth),
             lastCheckIn: s.lastCheckInWallMs.map { Date(timeIntervalSince1970: Double($0.int64Value) / 1000) },
-            mayBatchLocation: s.mayBatchLocation)
+            mayBatchLocation: s.mayBatchLocation,
+            autoDetectPausedUntil: s.autoDetectPausedUntilWallMs.map { Date(wallMs: $0.int64Value) })
     }
 
     static func swift(_ h: DrivePerfShared.AutoDetectHealth) -> DPSharedBridge.AutoDetectHealth {
@@ -154,6 +155,15 @@ enum KotlinMapping {
         case .on: .on
         case .off: .off
         case .needsAttention: .needsAttention
+        case .paused: .paused
+        }
+    }
+
+    static func kotlin(_ length: DPSharedBridge.AutoDetectPauseLength) -> DrivePerfShared.AutoDetectPauseLength {
+        switch length {
+        case .oneHour: .oneHour
+        case .untilMorning: .untilMorning
+        case .untilResumed: .untilResumed
         }
     }
 

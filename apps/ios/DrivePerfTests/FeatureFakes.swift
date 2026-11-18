@@ -62,6 +62,9 @@ final class FakeRecorder: TripRecording, TripHistory {
 
     func setAutoDetect(enabled: Bool) { autoDetect = enabled }
 
+    private(set) var resumes = 0
+    func resumeAutoDetect() { resumes += 1 }
+
     func observeTrips() -> AsyncStream<[TripSummary]> {
         AsyncStream { continuation in
             continuation.yield(tripList)

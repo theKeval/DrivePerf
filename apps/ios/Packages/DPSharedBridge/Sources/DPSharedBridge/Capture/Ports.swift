@@ -76,6 +76,16 @@ public protocol AutoDetectWatchdogBridge: AnyObject, Sendable {
     func cancel()
 }
 
+/// Kotlin `AutoDetectResumeNotice`: the F-CAP-15 "Auto-detect is back on" notification at the end of a pause. The core
+/// schedules it when the user pauses until a time and cancels it when they resume early; the adapter schedules one
+/// `UNUserNotificationCenter` request with a fixed identifier.
+public protocol AutoDetectResumeNoticeBridge: AnyObject, Sendable {
+    /// Schedules the notice at `atWallMs` (UTC epoch ms), replacing any pending one.
+    func schedule(atWallMs: Int64)
+    /// Removes the pending notice. Safe when none is pending.
+    func cancel()
+}
+
 // MARK: - Trip files
 
 /// Kotlin `TripFileKind` (data-model.md §2.1).

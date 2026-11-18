@@ -4,8 +4,8 @@ import Observation
 
 /// S-SET-03 Recording settings, reduced to the "Automatic trips" switch (F-SET-01.3, DRIVE-153). It writes the same
 /// `autoTripsEnabled` choice onboarding sets (S-ONB-08) and asks the app to re-read it at once, so triggers, the core's
-/// auto-detect flag, the watchdog and Home's status follow the switch. Default car, battery saver recording, Health
-/// Check and Pause arrive with their own tickets.
+/// auto-detect flag, the watchdog and Home's status follow the switch. It also offers Pause auto-detect (F-CAP-15).
+/// Default car, battery saver recording and Health Check arrive with their own tickets.
 @MainActor
 @Observable
 public final class RecordingSettingsViewModel {
@@ -28,17 +28,21 @@ public final class RecordingSettingsViewModel {
     public private(set) var isRequesting = false
     public var explainer: AlwaysExplainer?
 
+    /// S-HOME-03 Pause auto-detect (F-CAP-15); nil hides the row (tests that only cover the switch).
+    public let pause: PauseAutoDetectViewModel?
+
     private let preferences: any PreferencesStoring
     private let permissionsPort: any PermissionRequesting
     private let refreshCapture: @MainActor () -> Void
 
     public init(
         preferences: any PreferencesStoring, permissions: any PermissionRequesting,
-        refreshCapture: @escaping @MainActor () -> Void
+        refreshCapture: @escaping @MainActor () -> Void, pause: PauseAutoDetectViewModel? = nil
     ) {
         self.preferences = preferences
         permissionsPort = permissions
         self.refreshCapture = refreshCapture
+        self.pause = pause
         autoTripsOn = preferences.preferences.autoTripsEnabled
     }
 
@@ -48,11 +52,13 @@ public final class RecordingSettingsViewModel {
     /// The status line under the switch, in S-HOME-01's words.
     public var statusText: String {
         guard autoTripsOn else { return "Manual mode" }
+        if pause?.isPaused == true { return "Auto-detect paused" }
         return attentionReasons.isEmpty ? "Auto-detect on · ready" : "Auto-detect needs attention"
     }
 
     public var statusDetail: String? {
         guard autoTripsOn else { return nil }
+        if let pause, pause.isPaused { return pause.pausedUntilLine }
         return attentionReasons.first?.shortText
     }
 
