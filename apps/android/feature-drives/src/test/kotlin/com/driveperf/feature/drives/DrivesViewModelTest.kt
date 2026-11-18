@@ -53,6 +53,18 @@ class DrivesViewModelTest {
     }
 
     @Test
+    fun `Replay closes the trip sheet so the app can open S-RPL-01 (DRIVE-200)`() = runTest {
+        source.flow.value = listOf(RecordedTrip("t", at(today, 7, 42), durationS = 600, distanceM = 1609.344))
+        val model = vm()
+        model.state.test {
+            model.onAction(DrivesAction.Open("t"))
+            assertEquals("t", expectMostRecentItem().detail?.id)
+            model.onAction(DrivesAction.OpenReplay("t", "Today, 7:42 am"))
+            assertEquals(null, expectMostRecentItem().detail)
+        }
+    }
+
+    @Test
     fun `an empty list is reported as empty once loaded`() = runTest {
         vm().state.test {
             val state = expectMostRecentItem()

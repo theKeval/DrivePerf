@@ -12,6 +12,14 @@ import com.driveperf.app.bridge.PlatformTripListSource
 import com.driveperf.app.core.AndroidPlatformBindings
 import com.driveperf.app.core.ConsentOnboardingSettings
 import com.driveperf.app.core.DeviceId
+import com.driveperf.app.core.NetworkStatus
+import com.driveperf.app.replay.StandInReplayRepository
+import com.driveperf.domain.replay.ReplayRepository
+import com.driveperf.feature.replay.ReplayMapConfig
+import com.driveperf.feature.replay.ReplayProLock
+import com.driveperf.feature.replay.ReplayRequest
+import com.driveperf.feature.replay.ReplaySource
+import com.driveperf.feature.replay.ReplayViewModel
 import com.driveperf.app.core.WakePath
 import com.driveperf.di.CoreServices
 import com.driveperf.di.DrivePerfCore
@@ -92,6 +100,15 @@ val appModule = module {
 
     viewModel { CaptureViewModel(get(), System::currentTimeMillis, units = get()) }
     viewModel { DrivesViewModel(get(), corrector = get<TripCorrector>(), units = get()) }
+
+    // DRIVE-200 / DRIVE-61: Replay. The repository is the R1 stand-in until CoreServices.replay merges.
+    single { NetworkStatus(androidContext(), get()) }
+    single<ReplayRepository> { StandInReplayRepository() }
+    single { ReplayMapConfig(BuildConfig.HAS_MAPS_KEY, BuildConfig.MAPS_MAP_ID.ifBlank { null }, get<NetworkStatus>().online) }
+    viewModel { (tripId: String) ->
+        // ReplayProLock.NotBuilt: no entitlements yet (ADR-006); bind the 30-day Pro check here when they exist.
+        ReplayViewModel(ReplayRequest(tripId, ReplaySource.TRIP_DETAIL), get(), get(), get(), ReplayProLock.NotBuilt, units = get())
+    }
     single<OnboardingSettings> { ConsentOnboardingSettings(get()) }
     viewModel {
         val consent = get<ConsentSettings>()

@@ -1,5 +1,11 @@
 plugins {
     id("driveperf.android-library")
+    id("driveperf.compose")
+}
+
+android {
+    buildFeatures { compose = true }
+    testOptions { unitTests.isReturnDefaultValues = true }
 }
 
 // One module per PRD epic (ADR-002 section 1). Features see presentation, domain, foundation and
@@ -9,4 +15,20 @@ dependencies {
     implementation(projects.shared.domain)
     implementation(projects.shared.presentation)
     implementation(projects.apps.android.designsystem)
+
+    implementation(libs.androidx.core.ktx)
+    implementation(platform(libs.compose.bom))
+    implementation(libs.compose.ui)
+    implementation(libs.compose.foundation)
+    implementation(libs.compose.material3)
+    implementation(libs.compose.ui.tooling.preview)
+    implementation(libs.androidx.lifecycle.viewmodel.compose)
+    implementation(libs.androidx.lifecycle.runtime.compose)
+    implementation(libs.kotlinx.coroutines.android)
+    // ADR-005: Replay draws on Google Maps through Maps Compose, with a plain-canvas fallback (no key, offline).
+    implementation(libs.maps.compose)
+    debugImplementation(libs.compose.ui.tooling)
+
+    testImplementation(libs.junit)
+    testImplementation(libs.kotlinx.coroutines.test)
 }

@@ -36,6 +36,12 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.NavType
+import androidx.navigation.navArgument
+import com.driveperf.feature.drives.DrivesAction
+import com.driveperf.feature.replay.ReplayRoute
+import com.driveperf.feature.replay.ReplayViewModel
+import org.koin.core.parameter.parametersOf
 import com.driveperf.app.BuildConfig
 import com.driveperf.app.R
 import com.driveperf.app.bridge.PlatformCaptureController
@@ -121,7 +127,16 @@ internal class AppEnv(
     val capture: CaptureUiState,
     val services: AppServices,
     val fixLocation: () -> Unit,
-)
+) {
+    /**
+     * Drives actions go to the view model; Replay also navigates to S-RPL-01. While a drive records, the in-drive gate
+     * covers the whole graph, so Replay can't open then (F-RPL-01 AC6).
+     */
+    fun drivesActions(viewModel: DrivesViewModel): (DrivesAction) -> Unit = { action ->
+        viewModel.onAction(action)
+        if (action is DrivesAction.OpenReplay) navController.navigate(Routes.replay(action.tripId, action.title))
+    }
+}
 
 /** The app-level singletons the destinations talk to. */
 internal class AppServices(
@@ -166,6 +181,7 @@ private fun AppNavHost(navController: NavHostController, captureViewModel: Captu
         profileDestination(env)
         settingsDestinations(env)
         recordingSettingsDestination(env)
+        replayDestination(env)
     }
 }
 
@@ -213,7 +229,7 @@ private fun NavGraphBuilder.tabDestinations(env: AppEnv) {
                     pause = rememberPauseCallbacks(wakePath),
                 ),
             ) { padding ->
-                TabContent(tab, padding, onSeeAll = { env.navController.navigate(Routes.ALL_DRIVES) })
+                TabContent(tab, padding, env, onSeeAll = { env.navController.navigate(Routes.ALL_DRIVES) })
             }
         }
     }
@@ -224,8 +240,30 @@ private fun NavGraphBuilder.allDrivesDestination(env: AppEnv) {
         val viewModel: DrivesViewModel = koinViewModel()
         val state by viewModel.state.collectAsStateWithLifecycle()
         DetailScaffold(title = stringResource(R.string.all_drives_title), onBack = { env.navController.popBackStack() }) { padding ->
-            AllDrivesScreen(state = state, modifier = Modifier.padding(padding), onAction = viewModel::onAction)
+            AllDrivesScreen(state = state, modifier = Modifier.padding(padding), onAction = env.drivesActions(viewModel))
         }
+    }
+}
+
+private fun NavGraphBuilder.replayDestination(env: AppEnv) {
+    composable(
+        Routes.REPLAY,
+        arguments = listOf(
+            navArgument(Routes.REPLAY_TRIP) { type = NavType.StringType },
+            navArgument(Routes.REPLAY_TITLE) {
+                type = NavType.StringType
+                defaultValue = ""
+            },
+        ),
+    ) { entry ->
+        val tripId = entry.arguments?.getString(Routes.REPLAY_TRIP).orEmpty()
+        val viewModel: ReplayViewModel = koinViewModel { parametersOf(tripId) }
+        ReplayRoute(
+            viewModel = viewModel,
+            subtitle = entry.arguments?.getString(Routes.REPLAY_TITLE).orEmpty(),
+            mapId = BuildConfig.MAPS_MAP_ID.ifBlank { null },
+            onBack = { env.navController.popBackStack() },
+        )
     }
 }
 
@@ -258,7 +296,7 @@ private fun NavGraphBuilder.profileDestination(env: AppEnv) {
 }
 
 @Composable
-private fun TabContent(tab: Tab, padding: PaddingValues, onSeeAll: () -> Unit) {
+private fun TabContent(tab: Tab, padding: PaddingValues, env: AppEnv, onSeeAll: () -> Unit) {
     val modifier = Modifier.padding(top = padding.calculateTopPadding())
     when (tab) {
         Tab.Drives -> {
@@ -269,7 +307,7 @@ private fun TabContent(tab: Tab, padding: PaddingValues, onSeeAll: () -> Unit) {
                 onSeeAll = onSeeAll,
                 modifier = modifier,
                 bottomPadding = padding.calculateBottomPadding() + ToolbarClearance,
-                onAction = viewModel::onAction,
+                onAction = env.drivesActions(viewModel),
             )
         }
         Tab.Routes -> RoutesScreen(modifier)
