@@ -63,7 +63,7 @@ class SensorMotionSource(
         val deliver: (MotionSample) -> Unit = { sample ->
             if (gate.accept(sample.tMonoNs, clock.monotonicNs())) batcher.add(sample)
         }
-        val listener = if (capability.hasGyroscope) FullListener(deliver) else NoGyroListener(deliver)
+        val listener = if (capability.hasGyroscope) FullListener(clock, deliver) else NoGyroListener(deliver)
         val sensors = if (capability.hasGyroscope) {
             listOfNotNull(
                 primary,
@@ -120,8 +120,8 @@ class SensorMotionSource(
     )
 
     /** Three-sensor path. Runs only on the sensor thread. */
-    private class FullListener(private val deliver: (MotionSample) -> Unit) : SensorEventListener {
-        private val assembler = MotionAssembler()
+    private class FullListener(clock: Clock, private val deliver: (MotionSample) -> Unit) : SensorEventListener {
+        private val assembler = MotionAssembler(clock::monotonicNs)
 
         override fun onSensorChanged(event: SensorEvent) {
             val v = event.values

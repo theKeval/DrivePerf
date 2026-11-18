@@ -21,7 +21,12 @@ import kotlin.math.sqrt
  * the latest gyroscope reading can be half a second older than an accelerometer event (DRIVE-160 found gyro values
  * repeated for up to 2 s). Accelerometer events are therefore held until a gyroscope event at or after their time has
  * arrived, and the rotation rate is interpolated at the accelerometer timestamp. An event waits at most [maxWaitNs];
- * after that the nearest gyroscope reading is used.
+ * after that the nearest gyroscope reading is used. Gyroscope readings are kept back to the last accelerometer time
+ * consumed (at most [HISTORY_NS]), so a gyroscope burst that arrives before its accelerometer burst still interpolates.
+ *
+ * **Mistimed events:** some devices deliver the first events after registering with timestamps far from now. An event
+ * more than [maxFutureNs] ahead of [nowNs] is dropped before it touches any state, so it cannot block the samples after
+ * it; stale events are left to the downstream [com.driveperf.platform.FreshnessFilter].
  *
  * **Sign conventions** (to be confirmed by the on-device shake/tilt/spin conformance test, which is mandatory):
  * `TYPE_ACCELEROMETER` reads the specific force, +9.8 on z for a phone lying face up, which is the tracker's input
@@ -32,8 +37,10 @@ import kotlin.math.sqrt
  * hands finished samples across threads through a channel.
  */
 internal class MotionAssembler(
+    private val nowNs: () -> Long,
     private val tracker: GravityTracker = GravityTracker(),
     private val maxWaitNs: Long = MAX_WAIT_NS,
+    private val maxFutureNs: Long = MAX_FUTURE_NS,
 ) {
     private class Reading(val tNs: Long, val x: Double, val y: Double, val z: Double)
 
@@ -44,6 +51,7 @@ internal class MotionAssembler(
 
     /** Returns the accelerometer samples this gyroscope reading releases, in time order. */
     fun onGyro(tNs: Long, xRadS: Double, yRadS: Double, zRadS: Double): List<MotionSample> {
+        if (inFuture(tNs)) return emptyList()
         if (gyro.isEmpty() || tNs > gyro.last().tNs) gyro.addLast(Reading(tNs, xRadS * RAD_TO_DEG, yRadS * RAD_TO_DEG, zRadS * RAD_TO_DEG))
         return release()
     }
@@ -56,7 +64,7 @@ internal class MotionAssembler(
 
     /** Queues an accelerometer reading (m/s², gravity included) and returns the samples now complete. */
     fun onAccelerometer(tNs: Long, xMs2: Double, yMs2: Double, zMs2: Double): List<MotionSample> {
-        if (tNs <= lastAccelNs) return emptyList()
+        if (tNs <= lastAccelNs || inFuture(tNs)) return emptyList()
         lastAccelNs = tNs
         pendingAccel.addLast(Reading(tNs, xMs2, yMs2, zMs2))
         return release()
@@ -72,10 +80,21 @@ internal class MotionAssembler(
             pendingAccel.removeFirst()
             out += sample(a, rateAt(a.tNs))
         }
-        // Keep one gyroscope reading at or before the oldest accelerometer event still waiting, for interpolation.
-        val oldest = pendingAccel.firstOrNull()?.tNs ?: gyro.lastOrNull()?.tNs
-        while (oldest != null && gyro.size > 1 && gyro[1].tNs <= oldest) gyro.removeFirst()
+        prune()
         return out
+    }
+
+    private fun inFuture(tNs: Long): Boolean = tNs - nowNs() > maxFutureNs
+
+    /**
+     * Keeps one gyroscope reading at or before the oldest accelerometer time still to come: the oldest one waiting, or
+     * else the last one queued, since later accelerometer events are newer. Never more than [HISTORY_NS] of history.
+     */
+    private fun prune() {
+        val newest = gyro.lastOrNull()?.tNs ?: return
+        val consumed = pendingAccel.firstOrNull()?.tNs ?: lastAccelNs
+        val oldest = maxOf(consumed, newest - HISTORY_NS)
+        while (gyro.size > 1 && gyro[1].tNs <= oldest) gyro.removeFirst()
     }
 
     private fun rateAt(tNs: Long): Vec3 {
@@ -105,5 +124,11 @@ internal class MotionAssembler(
 
         /** Longer than the 500 ms batching latency [SensorMotionSource] requests, so a normal flush never times out. */
         const val MAX_WAIT_NS = 1_000_000_000L
+
+        /** Gyroscope history kept for accelerometer events still to arrive: two batching windows and the wait. */
+        const val HISTORY_NS = 2_000_000_000L
+
+        /** Same tolerance as the downstream freshness filter. */
+        const val MAX_FUTURE_NS = 1_000_000_000L
     }
 }
