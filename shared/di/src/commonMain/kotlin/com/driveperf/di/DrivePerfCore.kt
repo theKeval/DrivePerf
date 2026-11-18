@@ -4,6 +4,7 @@ import com.driveperf.data.local.DatabaseDriverFactory
 import com.driveperf.data.local.LocalEventFeedbackStore
 import com.driveperf.data.local.LocalRouteHistory
 import com.driveperf.data.local.LocalRouteRepository
+import com.driveperf.data.local.LocalSettingsRepository
 import com.driveperf.data.local.LocalTripCorrections
 import com.driveperf.data.local.LocalTripHistory
 import com.driveperf.data.local.LocalTripRepository
@@ -20,6 +21,7 @@ import com.driveperf.domain.hello.GetHelloMessage
 import com.driveperf.domain.hello.HelloMessage
 import com.driveperf.foundation.platformDescription
 import com.driveperf.pipeline.PipelineFinaliser
+import com.driveperf.pipeline.QualityAnalyticsFinaliser
 import com.driveperf.pipeline.capture.CapturePersistence
 import com.driveperf.pipeline.capture.CaptureConfig
 import com.driveperf.pipeline.capture.CapturePorts
@@ -99,7 +101,10 @@ public object DrivePerfCore {
             persistence = CapturePersistence(
                 store,
                 ProtoCaptureLog(files, io),
-                finaliser?.invoke(db) ?: PipelineFinaliser(history, LocalRouteHistory(db, previews, io)),
+                QualityAnalyticsFinaliser(
+                    finaliser?.invoke(db) ?: PipelineFinaliser(history, LocalRouteHistory(db, previews, io)),
+                    analytics,
+                ),
                 previews,
                 ProtoAnalysisFileStore(files, io),
                 LocalWatchdogStore(db, io),
@@ -111,9 +116,6 @@ public object DrivePerfCore {
             config = capture,
             analytics = analytics,
         )
-        val settings = com.driveperf.data.local.LocalSettingsRepository(db, io, clock, analytics)
-        recorder.setBatterySaverRecording(settings.state.value.batterySaverRecording)
-        scope.launch { settings.state.collect { recorder.setBatterySaverRecording(it.batterySaverRecording) } }
         val trips = LocalTripRepository(db, files, io)
         val routes = LocalRouteRepository(db, io)
         // DRIVE-100: trips corrected to not-a-drive more than 30 days ago are deleted once per start.
@@ -128,12 +130,21 @@ public object DrivePerfCore {
             ),
             corrections = corrections,
             analytics = analytics,
-            settings = settings,
+            settings = LocalSettingsRepository(db, io, clock, analytics).also { scope.followBatterySaver(it, recorder) },
             onClose = {
                 scope.cancel()
                 driver.close()
             },
         )
+    }
+
+    /** S-SET-03: the recorder follows the saved battery-saver choice from start-up onwards. */
+    private fun CoroutineScope.followBatterySaver(
+        settings: com.driveperf.domain.settings.SettingsRepository,
+        recorder: TripRecorderEngine,
+    ) {
+        recorder.setBatterySaverRecording(settings.state.value.batterySaverRecording)
+        launch { settings.state.collect { recorder.setBatterySaverRecording(it.batterySaverRecording) } }
     }
 
     /** Forgets the started core. Tests only. */

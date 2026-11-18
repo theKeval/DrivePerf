@@ -108,6 +108,31 @@ class SignalScenariosTest {
     }
 
     @Test
+    fun aPhoneLiftedAtAStopStartsANewEpochButCostsNoScoredShare() = runTest {
+        // DRIVE-164: picked up at a red light and put back at another angle, then driven on.
+        val c = loop(Mount.PORTRAIT_UPRIGHT)
+        c.stop(1.8, 1.5, 15.0)
+        c.phoneMoved(40.0, 2.0)
+        c.cruise(15.0)
+        repeat(3) {
+            c.speedTo(13.0, 1.6, 1.5)
+            c.cruise(10.0)
+            c.speedTo(8.0, 1.5, 1.5)
+            c.turn(-90.0, 9.0)
+            c.stop(1.8, 1.5, 8.0)
+        }
+        val capture = capture(c.streams())
+        val sig = SignalPipeline().process(capture, null)
+        assertTrue(sig.phoneMovedSpans >= 1, "the lift is detected and ends the mount epoch")
+        val flagged = (0 until sig.trace.size).filter { sig.trace.quality[it] and QualityBits.EXCLUDED_PHONE != 0 }
+        assertTrue(flagged.isNotEmpty(), "the samples keep the bit, so events and Smoothness skip them")
+        val r = harness.trip(capture)
+        val q = assertNotNull(r.trip.quality)
+        assertTrue(q.spans.none { it.reason == SegmentReason.PHONE_MOVED }, "no PHONE_MOVED span while stopped: ${q.spans}")
+        assertEquals(QualityBadge.GOOD, q.badge, "stopped time does not lower the share")
+    }
+
+    @Test
     fun g14AndG21MostlyExcludedIsUnscorableAnd10HzIsExcluded() = runTest {
         val r = harness.trip(capture(loop(Mount.FLAT, imuHz = 10).streams()))
         val q = assertNotNull(r.trip.quality)

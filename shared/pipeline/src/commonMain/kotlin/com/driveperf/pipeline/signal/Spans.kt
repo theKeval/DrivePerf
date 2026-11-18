@@ -45,20 +45,25 @@ internal class Spans(private val cfg: SignalConfig) {
         return (from until to).count { !still[it] }.toDouble() / (to - from)
     }
 
-    /** Excluded spans from quality bits; a bit must cover at least one moving sample to make a span (§2.7). */
+    /**
+     * Excluded spans from quality bits (§2.7), over moving time only: nothing is scored while the car is stopped, so a
+     * stop never counts against the scored share (§2.9). Each run of a bit is cut to its moving samples; a stop shorter
+     * than a §3 stop (`stopMinS`) inside the run stays in the span, so a crawl does not split it. A run with no moving
+     * sample makes no span. The bits themselves are untouched, so events and Smoothness still skip those samples.
+     */
     fun excluded(quality: IntArray, moving: BooleanArray, estimatedEndS: Double?): List<TripSegment> {
         val fs = cfg.fs.toDouble()
         val firstScorable = ((estimatedEndS ?: 0.0) * fs).toInt()
+        val bridge = (cfg.stopMinS * fs).toInt()
         val out = mutableListOf<TripSegment>()
         fun add(bit: Int, reason: SegmentReason) {
             var k = firstScorable
             while (k < quality.size) {
                 if (quality[k] and bit == 0) { k++; continue }
                 val start = k
-                var anyMoving = false
-                while (k < quality.size && quality[k] and bit != 0) { anyMoving = anyMoving || moving[k]; k++ }
-                if (anyMoving || bit != QualityBits.LOW_RATE && bit != QualityBits.IMU_GAP) {
-                    out += TripSegment(SegmentKind.EXCLUDED, start / fs, k / fs, reason)
+                while (k < quality.size && quality[k] and bit != 0) k++
+                movingPieces(moving, start, k, bridge).forEach { (a, b) ->
+                    out += TripSegment(SegmentKind.EXCLUDED, a / fs, b / fs, reason)
                 }
             }
         }
@@ -67,6 +72,20 @@ internal class Spans(private val cfg: SignalConfig) {
         add(QualityBits.LOW_RATE, SegmentReason.LOW_IMU_RATE)
         add(QualityBits.IMU_GAP, SegmentReason.IMU_GAP)
         return out
+    }
+
+    /** Moving stretches of `[from, to)` as half-open sample ranges, joined across stops shorter than [bridge] samples. */
+    private fun movingPieces(moving: BooleanArray, from: Int, to: Int, bridge: Int): List<Pair<Int, Int>> {
+        val pieces = mutableListOf<Pair<Int, Int>>()
+        var k = from
+        while (k < to) {
+            if (!moving.getOrElse(k) { false }) { k++; continue }
+            val start = k
+            while (k < to && moving.getOrElse(k) { false }) k++
+            val last = pieces.lastOrNull()
+            if (last != null && start - last.second < bridge) pieces[pieces.lastIndex] = last.first to k else pieces += start to k
+        }
+        return pieces
     }
 
     /**
