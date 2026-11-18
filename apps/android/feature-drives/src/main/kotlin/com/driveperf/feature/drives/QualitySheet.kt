@@ -20,7 +20,6 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.RichTooltip
 import androidx.compose.material3.Surface
@@ -30,9 +29,6 @@ import androidx.compose.material3.TooltipAnchorPosition
 import androidx.compose.material3.TooltipBox
 import androidx.compose.material3.TooltipDefaults
 import androidx.compose.material3.TooltipScope
-import androidx.compose.material3.SheetState
-import androidx.compose.material3.SheetValue
-import androidx.compose.material3.rememberBottomSheetState
 import androidx.compose.material3.rememberTooltipState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -59,6 +55,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.driveperf.designsystem.DpEstimated
+import com.driveperf.designsystem.DpModalBottomSheet
 import com.driveperf.designsystem.DpProvenance
 import com.driveperf.designsystem.DpProvenanceGlyph
 import com.driveperf.designsystem.DpQuality
@@ -81,9 +78,8 @@ private const val HATCH_STEP_DP = 5f
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun QualitySheet(sheet: QualitySheetUi, onDismiss: () -> Unit) {
-    ModalBottomSheet(
+    DpModalBottomSheet(
         onDismissRequest = onDismiss,
-        sheetState = fullHeightSheetState(),
         containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
     ) {
         QualitySheetContent(sheet)

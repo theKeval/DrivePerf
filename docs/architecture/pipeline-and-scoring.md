@@ -318,10 +318,10 @@ hit A: |ω⊥| ≥ 45 °/s sustained ≥ 0.25 s       // normal car roll and pit
 hit B: angle(u(t), mean u over [t−5, t−1]) ≥ 20°
 hit C: |userAccel| ≥ 1.2 g and |dv/dt| from GNSS < 0.25 g within ±1 s
 merge hits ≤ 5 s apart
-span = [firstHit − 2 s, lastHit + 3 s)  →  EXCLUDED, reason PHONE_MOVED
+span = [firstHit − 2 s, lastHit + 3 s)  →  bit 2 EXCLUDED_PHONE; EXCLUDED span, reason PHONE_MOVED, over its moving time (§2.7)
 ```
 
-Each span ends one **mount epoch** and starts the next. The app never claims the driver touched the phone (F-DQ-02).
+Each span ends one **mount epoch** and starts the next, wherever the car is. The `EXCLUDED` span that S-DQ-01 and Replay show covers only the part of the span while the car moves (§2.7): a phone picked up at a red light changes the mount epoch but costs no scored share (DRIVE-164). The app never claims the driver touched the phone (F-DQ-02).
 
 **IMU stillness** (over 2 s): std of |userAccel| < 0.008 g and |ω| < 1 °/s.
 
@@ -375,12 +375,18 @@ R1 stores these values **unfiltered**, so later filter changes need only R1. Eac
 | 4 `IMU_GAP` | > 200 ms without samples | No |
 | 5 `LOW_RATE` | Delivered rate in that second < 20 Hz | No |
 
-A sample is **ok** when bits 1–5 are clear.
+A sample is **ok** when bits 1–5 are clear. Events (§4) and the ledger (§5.2) use only ok samples, whatever the spans say.
+
+**Excluded spans cover moving time only** (DRIVE-164, Keval, 18 Nov 2026). Nothing is scored while the car is stopped, so stopped time never counts against the scored share (§2.9), whichever bit is set:
+- For each of bits 2–5, every run of set samples after the estimated start becomes one `EXCLUDED` span per moving stretch of the run (the §3 moving mask).
+- A stop shorter than a §3 stop (< 10 s) inside the run stays in the span, so a crawl in traffic does not split it.
+- A run with no moving sample makes no span. The bit stays set, so those samples are still never scored.
+- Reasons: bit 2 `PHONE_MOVED`, bit 3 `NOT_ALIGNED`, bit 5 `LOW_IMU_RATE` (or `THERMAL`, below), bit 4 `IMU_GAP`.
 
 | Situation | Handling |
 |---|---|
 | IMU at 25 Hz (LPM, battery ≤ 15 %, thermal serious, steady cruise) | Same pipeline, `Mark`, noted in quality |
-| IMU at 10 Hz (thermal critical, or a long stop) | Moving: `LOW_RATE`, excluded with `THERMAL` or `LOW_IMU_RATE`. Stationary: the bit is set but no span is created, because nothing there is scored |
+| IMU at 10 Hz (thermal critical, or a long stop) | Moving: `LOW_RATE`, excluded with `THERMAL` or `LOW_IMU_RATE`. Stationary: the bit is set but no span is created, because nothing there is scored (the moving-time rule above) |
 | GNSS gap < 180 s with continued motion (P-12) | `GAP` span, reason `NO_GNSS` or `TUNNEL`. Drawn dashed "Estimated". Chord distance goes into `estimatedDistanceM` if `0.5 ≤ chord ÷ (mean speed × gap) ≤ 1.5` |
 | GNSS gap ≥ 180 s | Labelled gap. No distance |
 | GNSS gap, IMU ok, epoch aligned | Still scored (EC-TUN). Events listed, not pinned |
@@ -432,7 +438,7 @@ The straight-line distance slightly understates the true path, and the "Estimate
 
 ### 2.9 Data-quality badge (F-DQ-04)
 
-Definitions: `totalS = durationS`. `excludedS` is the sum of `EXCLUDED`, `ESTIMATED` and interrupted spans. `scoredS = totalS − excludedS`. `f = scoredS ÷ totalS`. `gnss = gnssCoveragePct ÷ 100`, over moving time. `imuDeliv` is delivered ÷ expected samples at the nominal rate in force, while recording. `T` is the ledger's scored moving seconds (§5.2).
+Definitions: `totalS = durationS`. `excludedS` is the union of `EXCLUDED`, `ESTIMATED` and interrupted spans. `scoredS = totalS − excludedS`. `estimatedS` is the length of the `ESTIMATED` span (§2.8). **`f = scoredS ÷ (totalS − estimatedS)`**: the estimated start is never scorable by design (D6), so it is in neither the numerator nor the denominator (DRIVE-164). `EXCLUDED` spans hold moving time only (§2.7), so stops never lower `f`. `gnss = gnssCoveragePct ÷ 100`, over moving time. `imuDeliv` is delivered ÷ expected samples at the nominal rate in force, while recording. `T` is the ledger's scored moving seconds (§5.2).
 
 Evaluate top to bottom. The first match wins and sets `reason`.
 
