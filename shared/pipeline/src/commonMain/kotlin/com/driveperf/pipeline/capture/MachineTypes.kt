@@ -73,8 +73,6 @@ internal data class Stillness(
     val maxGyroDps: Double = 0.0,
     /** Since when every closed window was still; null while moving or unknown. */
     val stillSinceNs: Long? = null,
-    /** Since when every closed window was not still; null while still or unknown. */
-    val movingSinceNs: Long? = null,
 ) {
     companion object {
         /** Adds one sample; closes the window once it spans [CaptureConfig.stillWindowS]. */
@@ -95,7 +93,6 @@ internal data class Stillness(
             val still = sqrt(variance) < cfg.stillAccelStdG && open.maxGyroDps < cfg.stillGyroDps
             return Stillness(
                 stillSinceNs = if (still) w.stillSinceNs ?: start else null,
-                movingSinceNs = if (still) null else w.movingSinceNs ?: start,
             )
         }
 
@@ -132,7 +129,6 @@ internal data class MachineState(
     val slowFixes: Int = 0,
     val slowSinceNs: Long? = null,
     val stoppingBeganAtNs: Long? = null,
-    val resumeFixes: Int = 0,
     val imuHz: Int = 0,
     val imuStoppedForSpace: Boolean = false,
     val power: PowerStatus? = null,

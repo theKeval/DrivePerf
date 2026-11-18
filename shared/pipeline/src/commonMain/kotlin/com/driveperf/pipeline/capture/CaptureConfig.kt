@@ -19,9 +19,9 @@ public data class CaptureConfig(
     val stationarySpeedMps: Double = 0.56,
     val stationaryFixes: Int = 3,
     val pauseAfterS: Double = 30.0,
-    val resumeSpeedMps: Double = 2.0,
-    val resumeFixes: Int = 3,
-    val resumeImuMovingS: Double = 3.0,
+    val resumeSpeedMps: Double = 3.0,
+    val resumeFixAgeS: Double = 5.0,
+    val resumeFixHAccM: Double = 30.0,
     val autoStopS: Double = 240.0,
     val manualStopS: Double = 900.0,
     // §1.4 parked region (P-05)
