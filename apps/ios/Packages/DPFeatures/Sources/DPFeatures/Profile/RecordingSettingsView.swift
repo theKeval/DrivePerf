@@ -8,6 +8,7 @@ struct RecordingSettingsView: View {
     @Bindable var model: RecordingSettingsViewModel
     @Environment(\.scenePhase) private var scenePhase
     @State private var isPausePresented = false
+    @State private var isHealthPresented = false
 
     var body: some View {
         List {
@@ -91,7 +92,7 @@ struct RecordingSettingsView: View {
             } header: { Text("Battery") } footer: {
                 Text("DrivePerf already drops to 25 Hz on its own when your phone is hot, low on battery or in Low Power Mode.")
             }
-            Section { Button("Health Check") { model.openHealthCheck() } }
+            Section { Button("Health Check") { isHealthPresented = true } }
             }
             .listRowBackground(DPColor.surface)
             .listRowSeparatorTint(DPColor.separator)
@@ -106,7 +107,7 @@ struct RecordingSettingsView: View {
         .onChange(of: scenePhase) { _, phase in
             if phase == .active { Task { await model.refresh() } }
         }
-        .sheet(isPresented: $model.isHealthPresented) {
+        .sheet(isPresented: $isHealthPresented) {
             if let capture = model.capture { CaptureStatusSheet(capture: capture, recording: model) }
         }
         .alert("Could not save settings", isPresented: Binding(get: { model.display.saveFailed }, set: { model.display.saveFailed = $0 })) {

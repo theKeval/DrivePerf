@@ -11,9 +11,7 @@ import Observation
 public final class RecordingSettingsViewModel {
     public let display: DisplaySettingsModel
     public let capture: CaptureViewModel?
-    public var isHealthPresented = false
     public var onGarage: () -> Void = {}
-    public func openHealthCheck() { isHealthPresented = true }
 
     /// The sheet that explains what automatic trips need from location while "Always" is missing. One sheet, whose
     /// content moves through the steps, so it never flickers between them.

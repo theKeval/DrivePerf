@@ -3,13 +3,14 @@ import DPSharedBridge
 import SwiftUI
 
 struct SettingsHubView: View {
+    @State private var isHealthPresented = false
     let display: DisplaySettingsModel
     let recording: RecordingSettingsViewModel
     var body: some View {
         List {
             Group {
             Section {
-                Button { recording.openHealthCheck() } label: {
+                Button { isHealthPresented = true } label: {
                     VStack(alignment: .leading) {
                         Text("Health Check").foregroundStyle(DPColor.text)
                         Text(recording.statusText).font(DPFont.meta).foregroundStyle(DPColor.text2)
@@ -36,12 +37,9 @@ struct SettingsHubView: View {
         .environment(\.defaultMinListRowHeight, 52)
         .tint(DPColor.accent)
         .navigationTitle("Settings").navigationBarTitleDisplayMode(.inline)
-        .sheet(isPresented: healthBinding) {
+        .sheet(isPresented: $isHealthPresented) {
             if let capture = recording.capture { CaptureStatusSheet(capture: capture, recording: recording) }
         }
-    }
-    private var healthBinding: Binding<Bool> {
-        Binding(get: { recording.isHealthPresented }, set: { recording.isHealthPresented = $0 })
     }
 }
 
