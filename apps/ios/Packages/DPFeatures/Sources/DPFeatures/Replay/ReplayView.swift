@@ -66,17 +66,20 @@ public struct ReplayView: View {
     }
 
     private var ready: some View {
-        ZStack {
-            if model.isOnline {
-                ReplayMapLayer(model: model)
-            } else {
-                ReplayCanvasLayer(model: model)
+        ZStack(alignment: .top) {
+            Group {
+                if model.isOnline {
+                    ReplayMapLayer(model: model)
+                } else {
+                    ReplayCanvasLayer(model: model)
+                }
             }
+            .ignoresSafeArea(edges: .bottom)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(mapSummary)
+            // A sibling of the map, so VoiceOver reads the label and notes.
+            ReplayChips(model: model)
         }
-        .ignoresSafeArea(edges: .bottom)
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(mapSummary)
-        .overlay(alignment: .top) { ReplayChips(model: model) }
         .safeAreaInset(edge: .bottom) {
             ReplayPlaybackBar(model: model)
                 .padding(.horizontal, DPLayout.screenMargin)
