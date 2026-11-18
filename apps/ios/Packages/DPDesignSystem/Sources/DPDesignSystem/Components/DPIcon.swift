@@ -5,7 +5,7 @@ import SwiftUI
 public enum DPIcon: String, CaseIterable, Sendable {
     case drives, routes, insights, garage, profile
     case record, stop, passenger, gps, check, close, bolt, lock, shield, story, pause, play
-    case chevronRight, chevronLeft, sparkle, gear, battery, minus, info, car
+    case chevronRight, chevronLeft, sparkle, gear, battery, minus, info, car, replay
 
     public var image: Image {
         Image("dp.\(rawValue)", bundle: .module)

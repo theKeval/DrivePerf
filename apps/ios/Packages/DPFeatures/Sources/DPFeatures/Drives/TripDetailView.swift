@@ -4,12 +4,19 @@ import SwiftUI
 
 /// S-TRP-01 Trip detail, with what the shell has today: state banners (question, passenger or not a drive,
 /// interrupted, short, unscorable), the stat tiles with provenance on long-press (F-DQ-05), the data-quality row
-/// (→ S-DQ-01) and "What was this?" (S-TRP-02 type picker). Map, score and events arrive with their own stories.
+/// (→ S-DQ-01), "What was this?" (S-TRP-02 type picker) and Replay (→ S-RPL-01, DRIVE-200). The map hero, score
+/// and events arrive with their own stories.
 struct TripDetailView: View {
     let trips: TripListViewModel
     let tripId: String
+    @Environment(\.replayServices) private var replayServices
+    @Environment(CaptureViewModel.self) private var capture: CaptureViewModel?
     @State private var showsQuality = false
     @State private var shownProvenance: String?
+    @State private var replay: ReplayViewModel?
+    @State private var showsReplay = false
+    /// Replay was asked for while the in-drive lock held it (S-DRV-05); it opens when the lock lifts.
+    @State private var replayHeld = false
 
     var body: some View {
         Group {
@@ -25,6 +32,51 @@ struct TripDetailView: View {
         .sheet(isPresented: $showsQuality) {
             if let quality = trips.dataQuality(id: tripId) { DataQualitySheet(detail: quality) }
         }
+        .navigationDestination(isPresented: $showsReplay) {
+            if let replay, let detail = trips.detail(id: tripId) {
+                ReplayView(
+                    model: replay, title: "Replay", subtitle: detail.title,
+                    mapSummary: "Map of your drive, \(trips.presenter.distanceText(trips.trip(id: tripId)?.distanceM ?? 0)).")
+            }
+        }
+        .onChange(of: capture?.heldContent) { old, new in
+            // The lock lifted and released what it held: open the Replay that was asked for.
+            guard replayHeld, old == .replay, new == nil else { return }
+            replayHeld = false
+            if capture?.isContentLocked(now: Date()) == false { openReplay() }
+        }
+    }
+
+    /// AC6: during a driver trip (or the calm minute after it) Replay waits behind S-DRV-05.
+    private func requestReplay() {
+        if let capture, capture.isContentLocked(now: Date()) {
+            replayHeld = true
+            capture.requestContent(.replay)
+            return
+        }
+        openReplay()
+    }
+
+    private func openReplay() {
+        guard let replayServices, let trip = trips.trip(id: tripId) else { return }
+        replay = replayServices.model(for: trip, source: "trip_detail")
+        showsReplay = true
+    }
+
+    private var replayButton: some View {
+        Button(action: requestReplay) {
+            Label {
+                Text("Replay").font(DPFont.button)
+            } icon: {
+                Image(dp: .replay).resizable().scaledToFit().frame(width: 20, height: 20)
+            }
+            .frame(maxWidth: .infinity, minHeight: DPLayout.touchMin)
+        }
+        .buttonStyle(.glassProminent)
+        .tint(DPColor.accent)
+        .foregroundStyle(DPColor.onAccent)
+        .accessibilityHint("Watch this drive on a map")
+        .accessibilityIdentifier("tripDetail.replay")
     }
 
     private func content(_ detail: TripDetail) -> some View {
@@ -35,6 +87,7 @@ struct TripDetailView: View {
                         ForEach(Array(detail.banners.enumerated()), id: \.offset) { _, banner in bannerView(banner) }
                     }
                 }
+                if replayServices != nil { replayButton }
                 tiles(detail.tiles)
                 Text("Touch and hold a number to see how it was measured.")
                     .font(DPFont.caption).foregroundStyle(DPColor.text3)

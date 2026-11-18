@@ -33,6 +33,13 @@
 			remoteGlobalIDString = E404C32E54FBF664F0BE6EA7;
 			remoteInfo = DrivePerfWidgets;
 		};
+		D20000000000000000000006 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 46F86FAA6BBF9AC94A7E4595 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 778130C49534A4D32801D13D;
+			remoteInfo = DrivePerf;
+		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -54,6 +61,7 @@
 		195F9293022CEE80C9E8D0C0 /* DrivePerfTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = DrivePerfTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		C78DB3CD1C91C53DDCE261D3 /* DrivePerfWidgets.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = DrivePerfWidgets.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		AA7552F4044EA4EB5BDFEB18 /* DrivePerf.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = DrivePerf.xcconfig; path = Config/DrivePerf.xcconfig; sourceTree = "<group>"; };
+		D20000000000000000000001 /* DrivePerfUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = DrivePerfUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -96,6 +104,11 @@
 			path = DrivePerfWidgets;
 			sourceTree = "<group>";
 		};
+		D20000000000000000000002 /* DrivePerfUITests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = DrivePerfUITests;
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -128,6 +141,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		D20000000000000000000003 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -136,6 +156,7 @@
 			children = (
 				B0E0396B5B7A7E19948EF0FB /* DrivePerf */,
 				6DE8CF09256CB1114261B4F1 /* DrivePerfTests */,
+				D20000000000000000000002 /* DrivePerfUITests */,
 				D13300000000000000000002 /* LiveSurface Tests */,
 				837C0CE8527174CF5E6E4F5B /* Shared */,
 				2315202EF18249A247A92E30 /* DrivePerfWidgets */,
@@ -149,6 +170,7 @@
 			children = (
 				7BCCADA3021C07D12E775CB5 /* DrivePerf.app */,
 				195F9293022CEE80C9E8D0C0 /* DrivePerfTests.xctest */,
+				D20000000000000000000001 /* DrivePerfUITests.xctest */,
 				C78DB3CD1C91C53DDCE261D3 /* DrivePerfWidgets.appex */,
 			);
 			name = Products;
@@ -238,6 +260,27 @@
 			productReference = C78DB3CD1C91C53DDCE261D3 /* DrivePerfWidgets.appex */;
 			productType = "com.apple.product-type.app-extension";
 		};
+		D20000000000000000000008 /* DrivePerfUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = D2000000000000000000000B /* Build configuration list for PBXNativeTarget "DrivePerfUITests" */;
+			buildPhases = (
+				D20000000000000000000004 /* Sources */,
+				D20000000000000000000003 /* Frameworks */,
+				D20000000000000000000005 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				D20000000000000000000007 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				D20000000000000000000002 /* DrivePerfUITests */,
+			);
+			name = DrivePerfUITests;
+			productName = DrivePerfUITests;
+			productReference = D20000000000000000000001 /* DrivePerfUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -257,6 +300,10 @@
 					};
 					E404C32E54FBF664F0BE6EA7 = {
 						CreatedOnToolsVersion = 27.2;
+					};
+					D20000000000000000000008 = {
+						CreatedOnToolsVersion = 27.2;
+						TestTargetID = 778130C49534A4D32801D13D;
 					};
 				};
 			};
@@ -283,6 +330,7 @@
 				778130C49534A4D32801D13D /* DrivePerf */,
 				27C2F5CD118605258B779913 /* DrivePerfTests */,
 				E404C32E54FBF664F0BE6EA7 /* DrivePerfWidgets */,
+				D20000000000000000000008 /* DrivePerfUITests */,
 			);
 		};
 /* End PBXProject section */
@@ -303,6 +351,13 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		E4B0627F3737FF8911A1FFA9 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		D20000000000000000000005 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -355,6 +410,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		D20000000000000000000004 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -367,6 +429,11 @@
 			isa = PBXTargetDependency;
 			target = E404C32E54FBF664F0BE6EA7 /* DrivePerfWidgets */;
 			targetProxy = 6CAD0764991D2B807BB930D9 /* PBXContainerItemProxy */;
+		};
+		D20000000000000000000007 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 778130C49534A4D32801D13D /* DrivePerf */;
+			targetProxy = D20000000000000000000006 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -575,6 +642,32 @@
 			};
 			name = Release;
 		};
+		D20000000000000000000009 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "$(DP_APP_ID_DEBUG).uitests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_STRICT_CONCURRENCY = complete;
+				TEST_TARGET_NAME = DrivePerf;
+			};
+			name = Debug;
+		};
+		D2000000000000000000000A /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "$(DP_APP_ID_RELEASE).uitests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_STRICT_CONCURRENCY = complete;
+				TEST_TARGET_NAME = DrivePerf;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -610,6 +703,15 @@
 			buildConfigurations = (
 				4A851F520A969FF7C53CA94F /* Debug */,
 				14F906EE01E24204F1861BD9 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		D2000000000000000000000B /* Build configuration list for PBXNativeTarget "DrivePerfUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				D20000000000000000000009 /* Debug */,
+				D2000000000000000000000A /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

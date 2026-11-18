@@ -12,7 +12,9 @@ import Foundation
 final class AppEnvironment {
     static let shared = AppEnvironment()
 
-    let preferences = UserDefaultsPreferences()
+    let preferences = ReplayFixture.isActive
+        ? UserDefaultsPreferences(defaults: UserDefaults(suiteName: "dp.replayFixture") ?? .standard)
+        : UserDefaultsPreferences()
     let displaySettings = CoreDisplaySettings()
     let permissions = SystemPermissions()
     let crashReporter = ConsentGatedCrashReporter()
@@ -36,6 +38,11 @@ final class AppEnvironment {
     let recorder: CoreTripRecorder
     let surfaceRouter = TripSurfaceRouter()
     let corrections = CoreTripCorrections()
+    /// DRIVE-200, DRIVE-61: S-RPL-01.
+    let replaySource = ReplaySourceSeam.make()
+    let replayAnalytics = CoreReplayAnalytics()
+    let connectivity: any ConnectivityMonitoring = ReplayFixture.isOffline
+        ? FixedConnectivity(online: false) : NetworkConnectivity()
     private(set) lazy var corePorts = CorePorts(
         clock: clock, location: location, motion: motion, activity: activity, power: power, parkedRegion: triggers,
         tripFiles: files)
@@ -48,6 +55,8 @@ final class AppEnvironment {
 
     /// Unit tests host the app: never touch Core Location or the trip files from a test run.
     static let isRunningUnitTests = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
+    /// Unit tests and the Replay fixture (UI tests, screenshots) keep the core and Core Location off.
+    static let isCaptureOff = isRunningUnitTests || ReplayFixture.isActive
 
     private init() {
         recorder = CoreTripRecorder(
@@ -61,7 +70,7 @@ final class AppEnvironment {
     var dependencies: AppDependencies {
         AppDependencies(
             recorder: recorder,
-            history: recorder,
+            history: ReplayFixture.isActive ? FixtureTripHistory() : recorder,
             clock: clock,
             permissions: permissions,
             preferences: preferences,
@@ -76,12 +85,13 @@ final class AppEnvironment {
             .withTripCorrections(corrections)
             .withStatusRequests(surfaceRouter.statusRequests)
             .withDisplaySettings(displaySettings)
+            .withReplay(replaySource, analytics: replayAnalytics, connectivity: connectivity)
     }
 
     /// Recreate location sessions in `didFinishLaunching`, then open the core off the main actor. Location events
     /// received meanwhile wait in the recorder until recovery has been queued (ADR-002 §5, EC-RBT).
     func launch() {
-        guard !launched, !Self.isRunningUnitTests else { return }
+        guard !launched, !Self.isCaptureOff else { return }
         recorder.beginLaunch()
         refreshCapture()
         // Recreate location sessions even before the first unlock; the database must still wait (EC-RBT).
@@ -111,6 +121,7 @@ final class AppEnvironment {
         refreshDisplaySurfaces()
         recorder.surfaceData?.updateLocation(canRecord: canRecordFromSystemSurface)
         corrections.attach(services.corrections)
+        replayAnalytics.attach(services.analytics)
         // The first launch after a restart re-arms the triggers and says why (F-CAP-14.3).
         recorder.onLaunch(reason: BootDetector().isFirstLaunchSinceBoot() ? .boot : .launch)
         updateTriggerAvailability()
@@ -147,7 +158,7 @@ final class AppEnvironment {
     /// Re-reads the permission and the automatic-trips choice, then holds the right `CLServiceSession` and arms or
     /// disarms the wake triggers. Called at launch, on every foreground and after onboarding choices.
     func refreshCapture() {
-        guard !Self.isRunningUnitTests else { return }
+        guard !Self.isCaptureOff else { return }
         let status = authorization.authorizationStatus
         let canRecord = status == .authorizedAlways || status == .authorizedWhenInUse
         let always = status == .authorizedAlways
@@ -184,7 +195,7 @@ final class AppEnvironment {
     /// Tells the core whether the OS triggers can run, from what the user can fix in Settings (Always location, Motion
     /// & Fitness, precise location, Background App Refresh). The core turns it into "Auto-detect needs attention".
     private func updateTriggerAvailability() {
-        guard !Self.isRunningUnitTests else { return }
+        guard !Self.isCaptureOff else { return }
         Task { [weak self] in
             guard let self else { return }
             let snapshot = await permissions.current()
@@ -205,6 +216,17 @@ enum TripIntentHandler {
 }
 
 extension AppDependencies {
+    /// DRIVE-200, DRIVE-61: Replay's source, its analytics and the network state for the offline canvas.
+    fileprivate func withReplay(
+        _ source: any ReplayLoading, analytics: any ReplayAnalytics, connectivity: any ConnectivityMonitoring
+    ) -> AppDependencies {
+        var copy = self
+        copy.replay = source
+        copy.replayAnalytics = analytics
+        copy.connectivity = connectivity
+        return copy
+    }
+
     fileprivate func withDisplaySettings(_ settings: CoreDisplaySettings) -> AppDependencies {
         var copy = self
         copy.displaySettings = settings

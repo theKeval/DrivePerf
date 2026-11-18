@@ -34,3 +34,28 @@ final class CoreUsageAnalytics: UsageAnalytics {
         core?.resetId()
     }
 }
+
+/// A Replay event (S-RPL-01) as the Kotlin port's event type: the name and its allow-listed keys only.
+final class ReplayCoreEvent: NSObject, DrivePerfShared.AnalyticsEvent, @unchecked Sendable {
+    let name: String
+    let properties: [String: String]
+
+    init(_ event: ReplayAnalyticsEvent) {
+        name = event.name
+        properties = event.properties
+    }
+}
+
+/// `ReplayAnalytics` over the core's consent-gated `Analytics` port (DRIVE-200, DRIVE-61).
+@MainActor
+final class CoreReplayAnalytics: ReplayAnalytics {
+    private var core: (any DrivePerfShared.Analytics)?
+
+    func attach(_ analytics: any DrivePerfShared.Analytics) {
+        core = analytics
+    }
+
+    func track(_ event: ReplayAnalyticsEvent) {
+        core?.track(event: ReplayCoreEvent(event))
+    }
+}

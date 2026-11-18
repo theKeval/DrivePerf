@@ -98,6 +98,20 @@ public enum DPColor {
         /// `--dp-data-gap-stroke`: GPS gaps and interrupted stretches.
         public static let gapStroke = Color(dark: 0x7A83_92FF, light: 0x7A83_92FF)
         public static let speed = Color(dark: 0xD6DC_E4FF, light: 0x404A_58FF)
+        /// `--dp-data-route`: the route line on maps (Glide).
+        public static let route = Color(dark: 0x5BE7_C4FF, light: 0x0797_77FF)
+        /// `--dp-data-route-casing`: the outline under the route.
+        public static let routeCasing = Color(dark: 0x0424_1DFF, light: 0xFFFF_FFFF)
+        /// `--dp-data-route-faded`: the route where it is dimmed (left out of the score).
+        public static let routeFaded = Color(dark: 0x5BE7_C459, light: 0x0797_7759)
+        /// `--dp-data-marker`: the replay marker's dot.
+        public static let marker = Color(dark: 0xFFFF_FFFF, light: 0x0B0E_13FF)
+        /// `--dp-data-cursor`.
+        public static let cursor = Color(dark: 0xFFFF_FFFF, light: 0x0B0E_13FF)
+        /// `--dp-data-map-land`: the plain-canvas map background.
+        public static let mapLand = Color(dark: 0x0E13_1AFF, light: 0xEEF0_F3FF)
+        /// `--dp-data-excluded-hatch`: hatching for stretches left out of the score.
+        public static let excludedHatch = Color(dark: 0xC9CE_D629, light: 0x3A43_5124)
     }
 }
 
