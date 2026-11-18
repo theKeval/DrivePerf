@@ -71,9 +71,9 @@ class AutoDetectionTest {
     }
 
     @Test
-    fun pausingAutoDetectRemovesTheWatchdogAndResumingChecksIn() {
+    fun switchingAutoDetectOffRemovesTheWatchdogAndOnChecksIn() {
         val off = m.reduce(idle, MachineEvent.AutoDetect(ns(1.0), false))
-        assertEquals(listOf<MachineEffect>(MachineEffect.WatchdogOff), off.effects)
+        assertEquals(listOf(MachineEffect.WatchdogOff, MachineEffect.CancelResumeNotice), off.effects)
         assertTrue(m.reduce(off.state, MachineEvent.AutoDetect(ns(2.0), false)).effects.isEmpty(), "no change, nothing to do")
         val on = m.reduce(off.state, MachineEvent.AutoDetect(ns(3.0), true))
         assertTrue(MachineEffect.CheckIn in on.effects)

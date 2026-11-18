@@ -15,4 +15,8 @@
     <string name="capture_notification_chip">%1$d min</string>
     <string name="capture_notification_chip_hours">%1$d h</string>
     <string name="capture_notification_stop">Stop</string>
+    <string name="auto_detect_channel_name">Auto-detect</string>
+    <string name="auto_detect_channel_description">Tells you when automatic trips come back on after a pause.</string>
+    <string name="auto_detect_resumed_title">Auto-detect is back on</string>
+    <string name="auto_detect_resumed_body">DrivePerf will record your drives automatically again.</string>
 </resources>

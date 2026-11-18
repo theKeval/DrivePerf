@@ -8,6 +8,7 @@ import com.driveperf.data.local.LocalTripCorrections
 import com.driveperf.data.local.LocalTripHistory
 import com.driveperf.data.local.LocalTripRepository
 import com.driveperf.data.local.LocalTripStore
+import com.driveperf.data.local.LocalAutoDetectPauseStore
 import com.driveperf.data.local.LocalWatchdogStore
 import com.driveperf.data.local.ProtoAnalysisFileStore
 import com.driveperf.data.local.ProtoCaptureLog
@@ -93,6 +94,7 @@ public object DrivePerfCore {
                 parkedRegion = platform.parkedRegion(),
                 files = files,
                 watchdog = platform.watchdog(),
+                resumeNotice = platform.resumeNotice(),
             ),
             persistence = CapturePersistence(
                 store,
@@ -101,6 +103,7 @@ public object DrivePerfCore {
                 previews,
                 ProtoAnalysisFileStore(files, io),
                 LocalWatchdogStore(db, io),
+                LocalAutoDetectPauseStore(db, io),
             ),
             clock = clock,
             zones = SystemTimeZone(),

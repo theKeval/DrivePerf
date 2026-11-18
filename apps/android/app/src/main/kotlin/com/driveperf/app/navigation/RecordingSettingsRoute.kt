@@ -21,10 +21,12 @@ import com.driveperf.feature.capture.AutoDetectStatus
 import com.driveperf.feature.capture.CapturePermissions
 import com.driveperf.feature.capture.CaptureStatusActions
 import com.driveperf.feature.capture.CaptureStatusSheet
+import com.driveperf.feature.capture.R as CaptureR
 import com.driveperf.feature.capture.autoDetectDetail
 import com.driveperf.feature.capture.health
 import com.driveperf.feature.capture.label
 import com.driveperf.feature.onboarding.PermissionReader
+import com.driveperf.feature.settings.RecordingPauseLine
 import com.driveperf.feature.settings.RecordingSettingsScreen
 import com.driveperf.feature.settings.RecordingSettingsUiState
 import com.driveperf.feature.settings.RecordingStatusLine
@@ -101,6 +103,8 @@ fun RecordingSettingsRoute(deps: RecordingSettingsDeps, modifier: Modifier = Mod
     val status by deps.wakePath.autoDetect.collectAsStateWithLifecycle()
     var optedIn by remember { mutableStateOf(deps.consent.automaticTripsEnabled) }
     var showStatus by rememberSaveable { mutableStateOf(false) }
+    var showPause by rememberSaveable { mutableStateOf(false) }
+    val pause = rememberPauseCallbacks(deps.wakePath)
     val session = rememberSaveable(saver = EnableAutoTrips.Saver) { EnableAutoTrips() }
     val fixer = rememberAutoDetectFixer(
         reader = deps.permissionReader,
@@ -111,7 +115,7 @@ fun RecordingSettingsRoute(deps: RecordingSettingsDeps, modifier: Modifier = Mod
     AllTheTimeDialog(fixer)
 
     RecordingSettingsScreen(
-        state = RecordingSettingsUiState(automaticTrips = optedIn, status = statusLine(status)),
+        state = RecordingSettingsUiState(automaticTrips = optedIn, status = statusLine(status), pause = pauseLine(status)),
         onAutomaticTripsChanged = { on ->
             optedIn = on
             deps.consent.automaticTripsEnabled = on
@@ -120,6 +124,7 @@ fun RecordingSettingsRoute(deps: RecordingSettingsDeps, modifier: Modifier = Mod
         },
         onStatusClick = { showStatus = true },
         modifier = modifier,
+        onPauseClick = { showPause = true },
     )
     if (showStatus) {
         CaptureStatusSheet(
@@ -128,9 +133,29 @@ fun RecordingSettingsRoute(deps: RecordingSettingsDeps, modifier: Modifier = Mod
                 onDismiss = { showStatus = false },
                 onFix = fixer::fix,
                 onOpenRecordingSettings = { showStatus = false }, // already here
+                onOpenPause = {
+                    showStatus = false
+                    showPause = true
+                },
             ),
         )
     }
+    if (showPause && status.mode != AutoDetectMode.Off) PauseSheet(status, pause, onDismiss = { showPause = false })
+}
+
+@Composable
+private fun pauseLine(status: AutoDetectStatus): RecordingPauseLine? = when (status.mode) {
+    AutoDetectMode.Off -> null
+    AutoDetectMode.Paused -> RecordingPauseLine(
+        paused = true,
+        title = stringResource(CaptureR.string.status_resume),
+        detail = stringResource(CaptureR.string.status_resume_detail),
+    )
+    else -> RecordingPauseLine(
+        paused = false,
+        title = stringResource(CaptureR.string.status_pause),
+        detail = stringResource(CaptureR.string.status_pause_detail),
+    )
 }
 
 @Composable

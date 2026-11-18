@@ -20,4 +20,6 @@ data class ShellCallbacks(
     val autoDetect: AutoDetectStatus? = null,
     val forceStopNotice: Boolean = false,
     val onDismissForceStop: () -> Unit = {},
+    /** Pause and resume automatic trips (S-HOME-03, F-CAP-15); null hides the pause sheet's entry points. */
+    val pause: PauseCallbacks? = null,
 )

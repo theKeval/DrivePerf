@@ -120,4 +120,42 @@
     <string name="status_glyph_fix">Needs fixing</string>
     <string name="status_glyph_off">Off</string>
     <string name="capture_open_status_description">Open capture status</string>
+    <string name="capture_auto_detect_paused">Auto-detect paused</string>
+    <string name="status_subtitle_paused">Automatic trips are paused</string>
+    <string name="status_summary_paused">Auto-detect is paused %1$s.</string>
+    <string name="status_summary_paused_detail">No drives start on their own. You can still tap Start.</string>
+    <string name="status_pause">Pause auto-detect</string>
+    <string name="status_pause_detail">Stop automatic trips for a while</string>
+    <string name="status_resume">Resume auto-detect</string>
+    <string name="status_resume_detail">Turn automatic trips back on now</string>
+
+    <!-- S-HOME-03 Pause auto-detect (DRIVE-152, F-CAP-15) -->
+    <string name="pause_title">Pause auto-detect</string>
+    <string name="pause_subtitle">No drives start on their own while paused</string>
+    <string name="pause_option_hour">For 1 hour</string>
+    <string name="pause_option_hour_detail">Until %1$s</string>
+    <string name="pause_option_morning">Until tomorrow morning</string>
+    <string name="pause_option_morning_detail">%1$s, %2$s</string>
+    <string name="pause_option_resumed">Until I turn it back on</string>
+    <string name="pause_option_resumed_detail">Manual drives still work</string>
+    <string name="pause_reassurance">You can still record a drive with Start. Pausing doesn’t delete anything.</string>
+    <string name="pause_button_hour">Pause for 1 hour</string>
+    <string name="pause_button_morning">Pause until tomorrow</string>
+    <string name="pause_button_resumed">Pause auto-detect</string>
+    <string name="pause_confirmed_title">Auto-detect paused</string>
+    <string name="pause_confirmed_body">No drives will start on their own. You can still tap Start, and we’ll let you know when it’s back on.</string>
+    <string name="pause_done">Done</string>
+    <string name="pause_undo">Undo</string>
+    <string name="pause_resume_title">Auto-detect is paused</string>
+    <string name="pause_resume_body">While it’s paused, drives only record when you tap Start.</string>
+    <string name="pause_resume">Resume auto-detect</string>
+    <string name="pause_keep_paused">Keep paused</string>
+    <string name="pause_resumed_toast">Auto-detect resumed</string>
+    <string name="pause_until_today">until %1$s</string>
+    <string name="pause_until_tomorrow">until %1$s tomorrow</string>
+    <string name="pause_until_later">until %1$s %2$s</string>
+    <string name="pause_until_resumed">until you turn it back on</string>
+    <string name="paused_banner_title">Auto-detect paused %1$s</string>
+    <string name="paused_banner_body">No drives will start on their own. You can still tap Start.</string>
+    <string name="paused_banner_resume">Resume</string>
 </resources>

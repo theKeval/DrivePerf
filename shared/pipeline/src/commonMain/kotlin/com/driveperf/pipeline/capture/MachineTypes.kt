@@ -1,6 +1,8 @@
 package com.driveperf.pipeline.capture
 
 import com.driveperf.domain.capture.ActivitySample
+import com.driveperf.domain.capture.AutoDetectPause
+import com.driveperf.domain.capture.AutoDetectPauseLength
 import com.driveperf.domain.capture.CaptureBatch
 import com.driveperf.domain.capture.CaptureHeader
 import com.driveperf.domain.capture.CaptureMarkType
@@ -18,8 +20,25 @@ import com.driveperf.domain.trip.InterruptionReason
 import com.driveperf.domain.trip.TripKind
 import kotlin.math.sqrt
 
-/** The machine's timers. Times are monotonic and come back as [MachineEvent.Timer]. */
-internal enum class TimerId { CANDIDATE_TIMEOUT, STOP, IMU_IDLE }
+/**
+ * The machine's timers. Times are monotonic and come back as [MachineEvent.Timer]. [PAUSE_END] is the F-CAP-15 pause's
+ * end while the process lives; every other timer belongs to the trip being recorded.
+ */
+internal enum class TimerId {
+    CANDIDATE_TIMEOUT,
+    STOP,
+    IMU_IDLE,
+    PAUSE_END,
+    ;
+
+    companion object {
+        /** The timers a trip owns: cancelled when it ends. */
+        val trip: List<TimerId> = listOf(CANDIDATE_TIMEOUT, STOP, IMU_IDLE)
+    }
+}
+
+/** Who ended a pause of automatic detection (F-CAP-15). */
+internal enum class ResumedBy { USER, UNDO, TIMER }
 
 /** Why a trip is being finished. */
 internal enum class EndReason(val analyticsKey: String?) {
@@ -128,6 +147,8 @@ internal data class MachineState(
     val inDriveVisible: Boolean = false,
     /** Steady cruise inside a confirmed trip; null otherwise. */
     val cruise: Cruise? = null,
+    /** The user paused automatic detection (F-CAP-15); null when not paused. */
+    val pause: AutoDetectPause? = null,
     /** The thermal state last written as a THERMAL mark in this trip, for the data-quality notes. */
     val markedThermal: ThermalState? = null,
     /** A LOW_BATTERY mark was written in this trip. */
@@ -192,6 +213,26 @@ internal sealed interface MachineEvent {
     data class Passenger(override val nowNs: Long, val keep: Boolean) : MachineEvent
 
     data class AutoDetect(override val nowNs: Long, val enabled: Boolean) : MachineEvent
+
+    /** The pause read from storage, once, before the first other input is handled (EC-RBT). */
+    data class PauseRestored(override val nowNs: Long, val nowWallMs: Long, val pause: AutoDetectPause?) : MachineEvent
+
+    /** The user paused automatic detection until [untilWallMs] (null: until they resume it). */
+    data class PauseAutoDetect(
+        override val nowNs: Long,
+        val nowWallMs: Long,
+        val length: AutoDetectPauseLength,
+        val untilWallMs: Long?,
+    ) : MachineEvent
+
+    /** The user ended the pause early ([ResumedBy.USER] or [ResumedBy.UNDO]). */
+    data class ResumeAutoDetect(override val nowNs: Long, val by: ResumedBy) : MachineEvent
+
+    /**
+     * The wall time, sent before a launch, wake, foreground or the pause timer while paused: a pause whose end has
+     * passed ends here ([ResumedBy.TIMER]) before that input is handled.
+     */
+    data class PauseCheck(override val nowNs: Long, val nowWallMs: Long) : MachineEvent
 
     /** R0 could not be created for [tripId], so nothing it records would be kept. */
     data class LogFailed(override val nowNs: Long, val tripId: String) : MachineEvent
@@ -275,6 +316,15 @@ internal sealed interface MachineEffect {
 
     /** Automatic detection went off: removes the watchdog notification. */
     data object WatchdogOff : MachineEffect
+
+    /** Stores the F-CAP-15 pause, or clears it when null. */
+    data class SavePause(val pause: AutoDetectPause?) : MachineEffect
+
+    /** Schedules the F-CAP-15 resume notice at [atWallMs]. */
+    data class ScheduleResumeNotice(val atWallMs: Long) : MachineEffect
+
+    /** Removes the pending F-CAP-15 resume notice. */
+    data object CancelResumeNotice : MachineEffect
 }
 
 /** One reducer step. */

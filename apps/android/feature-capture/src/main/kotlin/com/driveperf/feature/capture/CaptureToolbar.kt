@@ -87,7 +87,7 @@ private fun CaptureToolbarLabel(state: CaptureUiState, autoDetect: AutoDetectSta
 
 /**
  * The second line of the toolbar and of Recording settings' status row: the first reason when auto-detect needs
- * attention, else the last check-in while it is on.
+ * attention, the end of a pause while paused, else the last check-in while it is on.
  */
 @Composable
 fun autoDetectDetail(status: AutoDetectStatus): String? = when (status.mode) {
@@ -95,6 +95,7 @@ fun autoDetectDetail(status: AutoDetectStatus): String? = when (status.mode) {
     AutoDetectMode.Ready -> status.lastCheckInMs?.let {
         stringResource(R.string.capture_last_check_in, checkInAgo(it, rememberNowMs()))
     }
+    AutoDetectMode.Paused -> pausedUntilLine(status.pausedUntilMs)
     AutoDetectMode.Off -> null
 }
 
@@ -104,6 +105,7 @@ val AutoDetectMode.label: Int
         AutoDetectMode.Off -> R.string.capture_auto_detect_off
         AutoDetectMode.Ready -> R.string.capture_auto_detect_on
         AutoDetectMode.NeedsAttention -> R.string.capture_auto_detect_attention
+        AutoDetectMode.Paused -> R.string.capture_auto_detect_paused
     }
 
 @Preview

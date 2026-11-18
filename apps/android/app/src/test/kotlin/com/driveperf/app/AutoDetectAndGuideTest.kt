@@ -4,10 +4,14 @@ import android.content.Context
 import android.os.Build
 import android.provider.Settings
 import androidx.test.core.app.ApplicationProvider
+import com.driveperf.app.core.CorePause
+import com.driveperf.app.core.WakePath
 import com.driveperf.app.core.autoDetectStatus
 import com.driveperf.app.core.forCapture
 import com.driveperf.app.navigation.EnableAutoTrips
 import com.driveperf.app.navigation.FixStep
+import com.driveperf.domain.capture.AutoDetectHealth
+import com.driveperf.domain.capture.RecorderStatus
 import com.driveperf.feature.capture.AttentionReason
 import com.driveperf.feature.capture.AutoDetectMode
 import com.driveperf.feature.capture.CapturePermissions
@@ -46,6 +50,25 @@ class AutoDetectAndGuideTest {
         assertEquals(7L, status.lastCheckInMs)
         assertEquals(AutoDetectMode.Ready, autoDetectStatus(true, all, WakeStatus(false, false), null).mode)
         assertEquals(AutoDetectMode.Off, autoDetectStatus(false, all, WakeStatus(false, false), null).mode)
+    }
+
+    @Test
+    fun `the core's pause shows as paused, until its end`() {
+        val core = RecorderStatus.IDLE.copy(autoDetectHealth = AutoDetectHealth.PAUSED, autoDetectPausedUntilWallMs = 9L)
+        val status = autoDetectStatus(true, all, WakeStatus(false, false), null, CorePause.of(core))
+        assertEquals(AutoDetectMode.Paused, status.mode)
+        assertEquals(9L, status.pausedUntilMs)
+        assertEquals(CorePause.NONE, CorePause.of(RecorderStatus.IDLE))
+    }
+
+    @Test
+    fun `os wakes are held back only while the pause still holds`() {
+        val until = RecorderStatus.IDLE.copy(autoDetectHealth = AutoDetectHealth.PAUSED, autoDetectPausedUntilWallMs = 100L)
+        assertTrue(WakePath.pauseHolds(until, nowWallMs = 99L))
+        assertFalse("a pause that ran out lets the wake reach the core, which ends it", WakePath.pauseHolds(until, 100L))
+        val indefinite = until.copy(autoDetectPausedUntilWallMs = null)
+        assertTrue(WakePath.pauseHolds(indefinite, Long.MAX_VALUE))
+        assertFalse(WakePath.pauseHolds(RecorderStatus.IDLE, 0L))
     }
 
     @Test

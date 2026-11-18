@@ -4,6 +4,9 @@ import com.driveperf.domain.analytics.Analytics
 import com.driveperf.domain.capture.ActivitySample
 import com.driveperf.domain.capture.ActivitySource
 import com.driveperf.domain.capture.AutoDetectHealth
+import com.driveperf.domain.capture.AutoDetectPauseLength
+import com.driveperf.domain.capture.AutoDetectPauseStore
+import com.driveperf.domain.capture.AutoDetectResumeNotice
 import com.driveperf.domain.capture.AutoDetectWatchdog
 import com.driveperf.domain.capture.CaptureBatch
 import com.driveperf.domain.capture.CaptureHeader
@@ -14,6 +17,7 @@ import com.driveperf.domain.capture.FinalisedTrip
 import com.driveperf.domain.capture.LocationSample
 import com.driveperf.domain.capture.LocationSource
 import com.driveperf.domain.capture.MotionSource
+import com.driveperf.domain.capture.NoOpAutoDetectResumeNotice
 import com.driveperf.domain.capture.NoOpAutoDetectWatchdog
 import com.driveperf.domain.capture.ParkedRegionMonitor
 import com.driveperf.domain.capture.PowerState
@@ -54,7 +58,10 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 
-/** The device ports the recorder drives. [watchdog] schedules the F-CAP-14 notification; the default does nothing. */
+/**
+ * The device ports the recorder drives. [watchdog] schedules the F-CAP-14 notification and [resumeNotice] the F-CAP-15
+ * "back on" notification; the defaults do nothing.
+ */
 public data class CapturePorts(
     val location: LocationSource,
     val motion: MotionSource,
@@ -63,11 +70,13 @@ public data class CapturePorts(
     val parkedRegion: ParkedRegionMonitor,
     val files: TripFileStore,
     val watchdog: AutoDetectWatchdog = NoOpAutoDetectWatchdog,
+    val resumeNotice: AutoDetectResumeNotice = NoOpAutoDetectResumeNotice,
 )
 
 /**
  * Where the recorder persists. [previews] and [analysis] store preview tracks and R1 files; null skips them (tests).
- * [watchdog] keeps the F-CAP-14 check-in across process starts; null keeps it in memory only.
+ * [watchdog] keeps the F-CAP-14 check-in and [pause] the F-CAP-15 pause across process starts; null keeps them in memory
+ * only.
  */
 public data class CapturePersistence(
     val store: TripStore,
@@ -76,6 +85,7 @@ public data class CapturePersistence(
     val previews: PreviewStore? = null,
     val analysis: AnalysisFileStore? = null,
     val watchdog: WatchdogStore? = null,
+    val pause: AutoDetectPauseStore? = null,
 )
 
 /**
@@ -101,6 +111,9 @@ public class TripRecorderEngine(
 
     /** The F-CAP-14 bookkeeping, read once from [CapturePersistence.watchdog]. Touched only on the engine coroutine. */
     private var watchdog: WatchdogState? = null
+
+    /** The stored F-CAP-15 pause is read once, before the first input. Touched only on the engine coroutine. */
+    private var pauseRestored = false
     private val inputs = Channel<Input>(Channel.UNLIMITED)
     private val mutableStatus = MutableStateFlow(RecorderStatus.IDLE)
     private val timers = mutableMapOf<TimerId, Job>()
@@ -157,6 +170,18 @@ public class TripRecorderEngine(
         inputs.trySend(Input.Simple { MachineEvent.AutoDetect(it, enabled) })
     }
 
+    override fun pauseAutoDetect(length: AutoDetectPauseLength, untilWallMs: Long?) {
+        inputs.trySend(Input.Simple { MachineEvent.PauseAutoDetect(it, clock.wallMs(), length, untilWallMs) })
+    }
+
+    override fun resumeAutoDetect() {
+        inputs.trySend(Input.Simple { MachineEvent.ResumeAutoDetect(it, ResumedBy.USER) })
+    }
+
+    override fun undoPauseAutoDetect() {
+        inputs.trySend(Input.Simple { MachineEvent.ResumeAutoDetect(it, ResumedBy.UNDO) })
+    }
+
     private sealed interface Input {
         data class Launch(val reason: RearmReason) : Input
 
@@ -169,6 +194,10 @@ public class TripRecorderEngine(
 
     private suspend fun handle(input: Input) {
         val now = clock.monotonicNs()
+        if (!pauseRestored) {
+            pauseRestored = true
+            apply(MachineEvent.PauseRestored(now, clock.wallMs(), persistence.pause?.read()), now)
+        }
         val event = when (input) {
             is Input.Launch -> launchEvent(now, input.reason)
             is Input.Wake -> MachineEvent.Wake(now, clock.wallMs(), input.event, newHeader(input.event, now))
@@ -178,8 +207,13 @@ public class TripRecorderEngine(
                 return
             }
         }
+        if (state.pause != null && event.endsPause()) apply(MachineEvent.PauseCheck(now, clock.wallMs()), now)
         apply(event, now)
     }
+
+    /** The inputs a pause that has run out ends before (F-CAP-15): launch, wake, foreground and its own timer. */
+    private fun MachineEvent.endsPause(): Boolean = this is MachineEvent.Launch || this is MachineEvent.Wake ||
+        this is MachineEvent.Foreground || (this is MachineEvent.Timer && id == TimerId.PAUSE_END)
 
     /** Reduces [event] and runs its effects. An effect that fails is fed back at once, before any status is shown. */
     private suspend fun apply(event: MachineEvent, now: Long) {
@@ -281,13 +315,16 @@ public class TripRecorderEngine(
         }
     }
 
-    /** Analytics and the F-CAP-14 check-ins. */
+    /** Analytics, the F-CAP-14 check-ins and the F-CAP-15 pause. */
     private suspend fun executeDetection(effect: MachineEffect) {
         when (effect) {
             is MachineEffect.Track -> analytics?.track(effect.event)
             MachineEffect.CheckIn -> checkIn()
             MachineEffect.WatchdogOff -> watchdogOff()
             MachineEffect.DistrustParking -> persistence.store.distrustParking()
+            is MachineEffect.SavePause -> persistence.pause?.write(effect.pause)
+            is MachineEffect.ScheduleResumeNotice -> ports.resumeNotice.schedule(effect.atWallMs)
+            MachineEffect.CancelResumeNotice -> ports.resumeNotice.cancel()
             else -> Unit
         }
     }
@@ -488,6 +525,7 @@ public class TripRecorderEngine(
                 startFailed = state.startFailed,
                 autoDetectHealth = health(),
                 lastCheckInWallMs = watchdog?.lastCheckInWallMs,
+                autoDetectPausedUntilWallMs = state.pause?.untilWallMs,
             )
         } else {
             RecorderStatus(
@@ -500,12 +538,14 @@ public class TripRecorderEngine(
                 autoDetectHealth = health(),
                 lastCheckInWallMs = watchdog?.lastCheckInWallMs,
                 mayBatchLocation = phase == RecorderState.RECORDING && state.cruise?.steady == true && !state.inDriveVisible,
+                autoDetectPausedUntilWallMs = state.pause?.untilWallMs,
             )
         }
     }
 
     private fun health(): AutoDetectHealth = when {
         !state.autoDetect -> AutoDetectHealth.OFF
+        state.pause != null -> AutoDetectHealth.PAUSED
         !state.triggersAvailable -> AutoDetectHealth.NEEDS_ATTENTION
         else -> AutoDetectHealth.ON
     }

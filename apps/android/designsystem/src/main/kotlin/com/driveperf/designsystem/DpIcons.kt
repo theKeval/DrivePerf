@@ -16,4 +16,6 @@ public object DpIcons {
     @DrawableRes public val Check: Int = R.drawable.ic_check
     @DrawableRes public val Exclamation: Int = R.drawable.ic_exclamation
     @DrawableRes public val Health: Int = R.drawable.ic_health
+    @DrawableRes public val Pause: Int = R.drawable.ic_pause
+    @DrawableRes public val Play: Int = R.drawable.ic_play
 }

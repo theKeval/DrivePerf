@@ -32,6 +32,7 @@ import com.driveperf.platform.crash.CrashReporter
 import com.driveperf.platform.crash.PrivacyChoices
 import com.driveperf.platform.crash.SentryCrashReporter
 import com.driveperf.platform.location.FixWatch
+import com.driveperf.platform.wake.AlarmResumeNotice
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -57,6 +58,7 @@ val appModule = module {
     single<PlatformBindings> {
         AndroidPlatformBindings(
             get(), get<FixWatch>(), get(), get(), get(), get<ParkedRegionMonitor>(), get(), DeviceId.of(androidContext()), get(),
+            AlarmResumeNotice(androidContext()),
         )
     }
     single<CoreServices> { DrivePerfCore.start(get(), androidContext()) }

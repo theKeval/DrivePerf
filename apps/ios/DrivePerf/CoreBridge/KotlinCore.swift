@@ -45,6 +45,12 @@ final class KotlinCore: SharedCore {
     func onWatchdogOpened() { services.recorder.onWatchdogOpened() }
     func setTriggersAvailable(_ available: Bool) { services.recorder.setTriggersAvailable(available: available) }
     func setInDriveScreenVisible(_ visible: Bool) { services.recorder.setInDriveScreenVisible(visible: visible) }
+    func pauseAutoDetect(_ length: DPSharedBridge.AutoDetectPauseLength, until: Date?) {
+        services.recorder.pauseAutoDetect(
+            length: KotlinMapping.kotlin(length), untilWallMs: until.map { KotlinLong(value: $0.wallMs) })
+    }
+    func resumeAutoDetect() { services.recorder.resumeAutoDetect() }
+    func undoPauseAutoDetect() { services.recorder.undoPauseAutoDetect() }
 }
 
 /// The DPPlatform adapters as `PlatformBindings` for `DrivePerfCore.start(platform:)` (ADR-002 §5). Each function is
@@ -57,15 +63,21 @@ final class CorePlatformBindings: NSObject, DrivePerfShared.PlatformBindings, @u
     private let device: String
     private let analytics: any DrivePerfShared.AnalyticsSink = StubAnalyticsSink()
     private let watchdogPort: any DrivePerfShared.AutoDetectWatchdog
+    private let resumeNoticePort: any DrivePerfShared.AutoDetectResumeNotice
 
-    /// `watchdog` is the F-CAP-14 notification adapter; without one the core schedules nothing.
+    /// `watchdog` is the F-CAP-14 notification adapter and `resumeNotice` the F-CAP-15 one; without them the core
+    /// schedules nothing.
     @MainActor
-    init(ports: CorePorts, deviceId: String, watchdog: (any AutoDetectWatchdogBridge)? = nil) {
+    init(
+        ports: CorePorts, deviceId: String, watchdog: (any AutoDetectWatchdogBridge)? = nil,
+        resumeNotice: (any AutoDetectResumeNoticeBridge)? = nil
+    ) {
         self.ports = (
             ports.clock, ports.location, ports.motion, ports.activity, ports.power, ports.parkedRegion, ports.tripFiles
         )
         device = deviceId
         watchdogPort = watchdog.map { KotlinWatchdogPort($0) } ?? NoOpAutoDetectWatchdog.shared
+        resumeNoticePort = resumeNotice.map { KotlinResumeNoticePort($0) } ?? NoOpAutoDetectResumeNotice.shared
     }
 
     func clock() -> any DrivePerfShared.Clock { ports.clock }
@@ -78,6 +90,7 @@ final class CorePlatformBindings: NSObject, DrivePerfShared.PlatformBindings, @u
     func deviceId() -> String { device }
     func analyticsSink() -> any DrivePerfShared.AnalyticsSink { analytics }
     func watchdog() -> any DrivePerfShared.AutoDetectWatchdog { watchdogPort }
+    func resumeNotice() -> any DrivePerfShared.AutoDetectResumeNotice { resumeNoticePort }
 }
 
 /// `AutoDetectWatchdog`.
@@ -90,4 +103,16 @@ final class KotlinWatchdogPort: NSObject, DrivePerfShared.AutoDetectWatchdog, Se
 
     func schedule(fireAtWallMs: Int64) { watchdog.schedule(fireAtWallMs: fireAtWallMs) }
     func cancel() { watchdog.cancel() }
+}
+
+/// `AutoDetectResumeNotice`.
+final class KotlinResumeNoticePort: NSObject, DrivePerfShared.AutoDetectResumeNotice, Sendable {
+    private let notice: any AutoDetectResumeNoticeBridge
+
+    init(_ notice: any AutoDetectResumeNoticeBridge) {
+        self.notice = notice
+    }
+
+    func schedule(atWallMs: Int64) { notice.schedule(atWallMs: atWallMs) }
+    func cancel() { notice.cancel() }
 }
