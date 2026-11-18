@@ -116,8 +116,7 @@ public object DrivePerfCore {
             analytics = analytics,
         )
         val settings = com.driveperf.data.local.LocalSettingsRepository(db, io, clock, analytics)
-        recorder.setBatterySaverRecording(settings.state.value.batterySaverRecording)
-        scope.launch { settings.state.collect { recorder.setBatterySaverRecording(it.batterySaverRecording) } }
+        scope.followBatterySaver(settings, recorder)
         val trips = LocalTripRepository(db, files, io)
         val routes = LocalRouteRepository(db, io)
         // DRIVE-100: trips corrected to not-a-drive more than 30 days ago are deleted once per start.
@@ -138,6 +137,15 @@ public object DrivePerfCore {
                 driver.close()
             },
         )
+    }
+
+    /** S-SET-03: the recorder follows the saved battery-saver choice from start-up onwards. */
+    private fun CoroutineScope.followBatterySaver(
+        settings: com.driveperf.domain.settings.SettingsRepository,
+        recorder: TripRecorderEngine,
+    ) {
+        recorder.setBatterySaverRecording(settings.state.value.batterySaverRecording)
+        launch { settings.state.collect { recorder.setBatterySaverRecording(it.batterySaverRecording) } }
     }
 
     /** Forgets the started core. Tests only. */
