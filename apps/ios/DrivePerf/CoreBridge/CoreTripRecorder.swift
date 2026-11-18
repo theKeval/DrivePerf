@@ -95,6 +95,7 @@ final class CoreTripRecorder: TripRecording, TripHistory {
     private let liveSurface: (any LiveSurfacing)?
     private let notifier: (any TripNotifying)?
     private let assertions: (any BackgroundAssertions)?
+    private let renewMotionHistory: () -> Void
     private var core: (any SharedCore)?
     private var pendingWakes: [WakeEvent] = []
     private var awaitingWakeStatus = false
@@ -112,11 +113,13 @@ final class CoreTripRecorder: TripRecording, TripHistory {
 
     init(
         liveSurface: (any LiveSurfacing)? = nil, notifier: (any TripNotifying)? = nil,
-        assertions: (any BackgroundAssertions)? = nil, autoDetectEnabled: Bool = true
+        assertions: (any BackgroundAssertions)? = nil, autoDetectEnabled: Bool = true,
+        renewMotionHistory: @escaping () -> Void = {}
     ) {
         self.liveSurface = liveSurface
         self.notifier = notifier
         self.assertions = assertions
+        self.renewMotionHistory = renewMotionHistory
         autoDetect = autoDetectEnabled
         status.autoDetectEnabled = autoDetectEnabled
     }
@@ -157,6 +160,8 @@ final class CoreTripRecorder: TripRecording, TripHistory {
     func onLaunch() { onLaunch(reason: .launch) }
 
     func onWake(_ event: WakeEvent) {
+        // The process may stay in the background past CMSensorRecorder's 12-hour recording deadline.
+        if autoDetect { renewMotionHistory() }
         assertions?.begin()
         awaitingWakeStatus = true
         guard let core else {

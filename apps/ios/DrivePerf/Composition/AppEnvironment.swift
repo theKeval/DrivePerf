@@ -52,7 +52,8 @@ final class AppEnvironment {
             liveSurface: LiveActivityController(),
             notifier: NotificationAdapter(),
             assertions: backgroundAssertions,
-            autoDetectEnabled: preferences.preferences.autoTripsEnabled)
+            autoDetectEnabled: preferences.preferences.autoTripsEnabled,
+            renewMotionHistory: { [motion] in motion.recordAccelerometerHistory() })
     }
 
     var dependencies: AppDependencies {

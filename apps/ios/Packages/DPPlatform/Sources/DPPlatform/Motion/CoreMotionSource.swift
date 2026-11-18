@@ -88,14 +88,14 @@ public final class CoreMotionSource: MotionSourceBridge, @unchecked Sendable {
     }
 
     /// Starts `CMSensorRecorder`, so the estimated start (§2.8) has accelerometer history to read. The recording
-    /// is kept by the OS for up to 12 hours; call it again at every launch while automatic trips are on.
+    /// lasts at most 12 hours (stored samples live for 3 days). Renew at launch, foreground and every wake.
     /// Does nothing without Motion & Fitness access, so it never shows the prompt.
     public func recordAccelerometerHistory(forHours hours: Double = 12) {
-        guard CMSensorRecorder.isAccelerometerRecordingAvailable(),
-            CMSensorRecorder.authorizationStatus() == .authorized
-        else { return }
-        // CMSensorRecorder performs synchronous XPC; never put it ahead of location restoration at launch.
+        // Capability and authorization checks perform XPC too; keep the entire operation off the launch thread.
         historyQueue.async {
+            guard CMSensorRecorder.isAccelerometerRecordingAvailable(),
+                CMSensorRecorder.authorizationStatus() == .authorized
+            else { return }
             CMSensorRecorder().recordAccelerometer(forDuration: hours * 3600)
         }
     }
