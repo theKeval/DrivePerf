@@ -30,6 +30,7 @@ public final class WakeTriggerMonitor: NSObject, ParkedRegionMonitorBridge {
     private let processStartWallMs: Int64
     private var monitor: CLMonitor?
     private var monitorTask: Task<Void, Never>?
+    private var regionUpdateTask: Task<Void, Never>?
     private var onWake: (@MainActor (WakeEvent) -> Void)?
 
     public init(clock: SystemClock = SystemClock(), spotStore: ParkedSpotStore = ParkedSpotStore()) {
@@ -72,26 +73,37 @@ public final class WakeTriggerMonitor: NSObject, ParkedRegionMonitorBridge {
 
     private func removeParkedRegion() {
         spotStore.clear()
-        if let monitor {
-            Task { await monitor.remove(Self.parkedIdentifier) }
-        }
+        synchronizeRegion()
         isParkedRegionArmed = false
     }
 
     private func armParkedRegion(center: GeoPoint, radiusM: Double) {
         let spot = ParkedSpot(lat: center.lat, lng: center.lng, radiusM: radiusM)
         spotStore.save(spot)
-        guard let monitor else { return }
-        add(spot, to: monitor)
+        synchronizeRegion()
     }
 
-    private func add(_ spot: ParkedSpot, to monitor: CLMonitor) {
-        let condition = CLMonitor.CircularGeographicCondition(
-            center: CLLocationCoordinate2D(latitude: spot.lat, longitude: spot.lng), radius: spot.radiusM)
-        Task { [weak self] in
-            await monitor.remove(Self.parkedIdentifier)
+    private func synchronizeRegion() {
+        guard let monitor else { return }
+        let previous = regionUpdateTask
+        regionUpdateTask = Task { [weak self] in
+            await previous?.value
+            guard let self else { return }
+            guard let spot = self.spotStore.load() else {
+                await monitor.remove(Self.parkedIdentifier)
+                self.isParkedRegionArmed = false
+                return
+            }
+            let record = await monitor.record(for: Self.parkedIdentifier)
+            // Re-arming the same spot must preserve its last event, including an exit waiting at relaunch.
+            if let condition = record?.condition as? CLMonitor.CircularGeographicCondition, spot.matches(condition) {
+                self.isParkedRegionArmed = true
+                return
+            }
+            let condition = CLMonitor.CircularGeographicCondition(
+                center: CLLocationCoordinate2D(latitude: spot.lat, longitude: spot.lng), radius: spot.radiusM)
             await monitor.add(condition, identifier: Self.parkedIdentifier, assuming: .satisfied)
-            self?.isParkedRegionArmed = true
+            self.isParkedRegionArmed = true
         }
     }
 
@@ -104,7 +116,7 @@ public final class WakeTriggerMonitor: NSObject, ParkedRegionMonitorBridge {
             let armed = await monitor.identifiers.contains(Self.parkedIdentifier)
             self.isParkedRegionArmed = armed
             // A Visit or a trip end can save the spot before this monitor exists, so arm it here too.
-            if !armed, let spot = self.spotStore.load() { self.add(spot, to: monitor) }
+            self.synchronizeRegion()
             do {
                 for try await event in await monitor.events {
                     self.handle(event)
@@ -192,6 +204,10 @@ public struct ParkedSpot: Codable, Equatable, Sendable {
     public var lat: Double
     public var lng: Double
     public var radiusM: Double
+
+    func matches(_ condition: CLMonitor.CircularGeographicCondition) -> Bool {
+        lat == condition.center.latitude && lng == condition.center.longitude && radiusM == condition.radius
+    }
 }
 
 public struct ParkedSpotStore: Sendable {

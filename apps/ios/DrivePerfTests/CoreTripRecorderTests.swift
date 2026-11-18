@@ -48,15 +48,44 @@ final class CoreTripRecorderTests: XCTestCase {
         }
     }
 
-    func testBeforeTheCoreStartsCommandsAreDroppedAndTheChoiceIsKept() {
+    func testWakeDuringStartupIsDeliveredAfterLaunchRecovery() {
         let recorder = makeRecorder(attach: false)
         recorder.onWake(DPSharedBridge.WakeEvent(kind: .manual, tMonoNs: 1, wallMs: 1))
         recorder.setAutoDetect(enabled: true)
         XCTAssertEqual(recorder.status.state, .idle)
         XCTAssertTrue(recorder.status.autoDetectEnabled)
-        XCTAssertEqual(assertions.begun, 0, "no trip can start before the core")
+        XCTAssertEqual(assertions.begun, 1, "startup protects the pending wake")
         recorder.attach(core)
-        XCTAssertEqual(core.commands, ["auto:true"], "the stored choice reaches the core when it attaches")
+        XCTAssertEqual(core.commands, ["auto:true"])
+        recorder.onLaunch(reason: .boot)
+        XCTAssertEqual(core.commands, ["auto:true", "launch", "wake:manual"])
+        recorder.onLaunch()
+        XCTAssertEqual(core.commands.filter { $0 == "wake:manual" }.count, 1)
+    }
+
+    func testCandidateKeepsAssertionDespiteGPSDriftAndInitialIdle() async {
+        let recorder = makeRecorder()
+        recorder.beginLaunch()
+        recorder.onWake(DPSharedBridge.WakeEvent(kind: .parkedExit, tMonoNs: 1, wallMs: 1))
+        core.send(.idle)
+        await settle()
+        XCTAssertEqual(assertions.ended, 0)
+        core.send(status(.candidate, manual: false, distance: 3))
+        await waitUntil("candidate with drift") { recorder.status.state == .candidate }
+        XCTAssertEqual(assertions.ended, 0)
+        core.send(status(.recording, manual: false))
+        await waitUntil("confirmed without distance") { recorder.status.state == .recording }
+        XCTAssertEqual(assertions.ended, 1)
+    }
+
+    func testRejectedCandidateReleasesAssertion() async {
+        let recorder = makeRecorder()
+        recorder.onWake(DPSharedBridge.WakeEvent(kind: .parkedExit, tMonoNs: 1, wallMs: 1))
+        core.send(status(.candidate, manual: false))
+        await waitUntil("candidate") { recorder.status.state == .candidate }
+        core.send(.idle)
+        await waitUntil("rejected") { recorder.status.state == .idle }
+        XCTAssertEqual(assertions.ended, 1)
     }
 
     func testCommandsReachTheCore() {

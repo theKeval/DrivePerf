@@ -35,7 +35,7 @@ extension TripNotifying {
     func postDriveDecoded(tripId: String, smoothness: Int?) {}
 }
 
-/// A short UIKit background assertion that keeps a wake alive until the trip is moving.
+/// A short UIKit background assertion covering launch and candidate confirmation.
 @MainActor
 protocol BackgroundAssertions: AnyObject {
     func begin()
@@ -79,10 +79,10 @@ extension SharedCore {
 
 /// `TripRecording` and `TripHistory` for the features, on the shared core's recorder (DRIVE-206). The core decides
 /// everything about a trip; this only adds the iOS surfaces around it: a Live Activity for manual trips, a passive
-/// notification for automatic ones (Spike 1 change 9), and a background assertion from the wake until the trip moves.
+/// notification for automatic ones (Spike 1 change 9), and a background assertion through candidate confirmation.
 ///
 /// It exists before the core starts, because the UI is built first and the core waits for the Core Location sessions
-/// and the first unlock (ADR-002 §5, EC-RBT). Until `attach`, it is idle and drops commands: no trip can start then.
+/// and the first unlock (ADR-002 §5, EC-RBT). Wakes received during startup wait until launch recovery is queued.
 @MainActor
 final class CoreTripRecorder: TripRecording, TripHistory {
     private(set) var status = RecorderStatus.idle {
@@ -96,6 +96,8 @@ final class CoreTripRecorder: TripRecording, TripHistory {
     private let notifier: (any TripNotifying)?
     private let assertions: (any BackgroundAssertions)?
     private var core: (any SharedCore)?
+    private var pendingWakes: [WakeEvent] = []
+    private var awaitingWakeStatus = false
     private var autoDetect: Bool
     private var liveTripId: String?
     private var notifiedTripId: String?
@@ -150,11 +152,17 @@ final class CoreTripRecorder: TripRecording, TripHistory {
         }
     }
 
-    func onLaunch() { core?.onLaunch() }
+    func beginLaunch() { assertions?.begin() }
+
+    func onLaunch() { onLaunch(reason: .launch) }
 
     func onWake(_ event: WakeEvent) {
-        guard let core else { return }
         assertions?.begin()
+        awaitingWakeStatus = true
+        guard let core else {
+            pendingWakes.append(event)
+            return
+        }
         core.onWake(event)
     }
 
@@ -162,7 +170,12 @@ final class CoreTripRecorder: TripRecording, TripHistory {
 
     func markPassenger(keep: Bool) { core?.markPassenger(keep: keep) }
 
-    func onLaunch(reason: RearmReason) { core?.onLaunch(reason: reason) }
+    func onLaunch(reason: RearmReason) {
+        guard let core else { return }
+        core.onLaunch(reason: reason)
+        for wake in pendingWakes { core.onWake(wake) }
+        pendingWakes.removeAll()
+    }
 
     func onForeground() { core?.onForeground() }
 
@@ -251,9 +264,15 @@ final class CoreTripRecorder: TripRecording, TripHistory {
     }
 
     private func apply(_ next: RecorderStatus) {
+        let wasActive = status.state != .idle
         status = next
         defer { publishRecording() }
-        if next.state == .idle || next.distanceM > 0 { assertions?.end() }
+        if next.state != .idle { awaitingWakeStatus = false }
+        // GPS drift can add distance to an unconfirmed candidate; it still needs its wake assertion.
+        if next.state != .candidate && (next.state != .idle || wasActive || next.startFailed || !awaitingWakeStatus) {
+            awaitingWakeStatus = false
+            assertions?.end()
+        }
         guard let tripId = next.tripId, next.state != .idle else {
             endSurfaces()
             return

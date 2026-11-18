@@ -30,6 +30,7 @@ final class AppEnvironment {
     /// Its own activity source for the in-drive content hold: the core's `activity` keeps one sink and is stopped at
     /// the end of every trip.
     let movement = ActivityMovementMonitor(source: CoreMotionActivitySource())
+    private let backgroundAssertions = UIKitBackgroundAssertions()
     let recorder: CoreTripRecorder
     let surfaceRouter = TripSurfaceRouter()
     let corrections = CoreTripCorrections()
@@ -40,6 +41,7 @@ final class AppEnvironment {
     private let sessions = LocationServiceSessions()
     private let authorization = CLLocationManager()
     private var launched = false
+    private var launchTask: Task<Void, Never>?
     private var triggersArmed = false
 
     /// Unit tests host the app: never touch Core Location or the trip files from a test run.
@@ -49,7 +51,7 @@ final class AppEnvironment {
         recorder = CoreTripRecorder(
             liveSurface: LiveActivityController(),
             notifier: NotificationAdapter(),
-            assertions: UIKitBackgroundAssertions(),
+            assertions: backgroundAssertions,
             autoDetectEnabled: preferences.preferences.autoTripsEnabled)
     }
 
@@ -72,18 +74,32 @@ final class AppEnvironment {
             .withStatusRequests(surfaceRouter.statusRequests)
     }
 
-    /// Runs inside `didFinishLaunching`, synchronously: the Core Location sessions first, because a background
-    /// relaunch only keeps its events for a few seconds (ADR-002 §5, A3 §7.3 #4), then the shared core on the same
-    /// adapters, then `onLaunch`, which re-arms the parked region and recovers a killed trip (§1.7).
+    /// Recreate location sessions in `didFinishLaunching`, then open the core off the main actor. Location events
+    /// received meanwhile wait in the recorder until recovery has been queued (ADR-002 §5, EC-RBT).
     func launch() {
         guard !launched, !Self.isRunningUnitTests else { return }
-        // Before the first unlock after a reboot the trip files and the database are unreadable; wait (EC-RBT).
-        guard files.isUnlockedSinceBoot() else { return }
-        launched = true
+        recorder.beginLaunch()
         refreshCapture()
-        let services = DrivePerfCore.shared.start(
-            platform: CorePlatformBindings(
-                ports: corePorts, deviceId: DeviceIdentity.current(), watchdog: watchdog, resumeNotice: resumeNotice))
+        // Recreate location sessions even before the first unlock; the database must still wait (EC-RBT).
+        guard files.isUnlockedSinceBoot() else {
+            backgroundAssertions.end()
+            return
+        }
+        launched = true
+        let bindings = CorePlatformBindings(
+            ports: corePorts, deviceId: DeviceIdentity.current(), watchdog: watchdog, resumeNotice: resumeNotice)
+        launchTask = Task {
+            // Database opening and Kotlin initialization must not block CLMonitor restoration on the main actor.
+            let services = await Task.detached(priority: .userInitiated) {
+                UncheckedSendable(DrivePerfCore.shared.start(platform: bindings))
+            }.value.value
+            finishLaunch(services)
+        }
+    }
+
+    func waitForLaunch() async { await launchTask?.value }
+
+    private func finishLaunch(_ services: CoreServices) {
         recorder.attach(KotlinCore(services))
         recorder.surfaceData = TripSurfaceData(trips: services.trips)
         recorder.surfaceData?.updateLocation(canRecord: canRecordFromSystemSurface)
@@ -165,8 +181,10 @@ final class AppEnvironment {
 enum TripIntentHandler {
     @MainActor
     static func stopTrip() async {
-        AppEnvironment.shared.launch()
-        AppEnvironment.shared.recorder.stop()
+        let environment = AppEnvironment.shared
+        environment.launch()
+        await environment.waitForLaunch()
+        environment.recorder.stop()
     }
 }
 
