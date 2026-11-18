@@ -83,7 +83,10 @@ class RealDriveDiagnostics {
             com.driveperf.pipeline.geo.Geo.haversineM(anchor.lat, anchor.lng, firstAccurate.lat, firstAccurate.lng)
         } else null
         val backdateS = trip?.let { (capture.header.startWallMs - it.startedAt) / 1000.0 }
-        println("STARTREPLAY $id Q2=${q2?.r()} estimated=${trip?.startEstimated} backdateS=$backdateS")
+        println(
+            "STARTREPLAY $id Q2=${q2?.r()} estimated=${trip?.startEstimated} backdateS=$backdateS " +
+                "method=${trip?.captureMeta?.startEstimateMethod} estimatedStartM=${q?.estimatedStartM}",
+        )
         val bySpan = trip?.quality?.spans.orEmpty().groupBy { "${it.kind}/${it.reason}" }
             .mapValues { (_, v) -> v.sumOf { it.t1S - it.t0S }.toInt() }
         println("DIAG $id spansS $bySpan")

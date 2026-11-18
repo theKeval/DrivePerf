@@ -196,7 +196,7 @@ class SignalScenariosTest {
     }
 
     @Test
-    fun aRunStartingAtTheHistoryWindowEdgeIsNotAMotionStart() = runTest {
+    fun aRunAtTheHistoryWindowEdgeUsesABoundedSpeedEstimate() = runTest {
         val streams = DriveFixtures.city.streams
         val edge = SyntheticCapture(seed = 1).apply { activity(ActivityType.AUTOMOTIVE, -900.0) }.streams().activity
         val r = harness.trip(
@@ -207,7 +207,18 @@ class SignalScenariosTest {
             ),
             manual = false,
         )
-        assertTrue(!r.trip.startEstimated, "Spike 1 change 3: the window edge is not the motion start")
+        assertTrue(r.trip.startEstimated)
+        assertEquals("distance_speed", r.trip.captureMeta?.startEstimateMethod)
+        assertTrue(r.trip.startedAt > SyntheticCapture.WALL0 - 900_000, "the query edge is not the departure time")
+        val span = assertNotNull(r.trip.quality).spans.single { it.reason == SegmentReason.ESTIMATED_START }
+        assertTrue(r.events.none { it.tPeakS < span.t1S })
+        val sig = SignalPipeline().process(capture(
+            SyntheticCapture.Streams(streams.fixes, streams.motion, edge, streams.lonTruthG, streams.latTruthG),
+            WakeKind.PARKED_EXIT, parked = true,
+        ), null)
+        for (k in 0 until (span.t1S * 25).toInt()) {
+            assertTrue(sig.trace.quality[k] and QualityBits.ESTIMATED != 0)
+        }
     }
 
     @Test

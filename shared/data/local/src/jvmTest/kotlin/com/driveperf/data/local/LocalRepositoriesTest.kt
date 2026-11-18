@@ -75,6 +75,17 @@ class LocalRepositoriesTest {
         captureMeta = CaptureMeta(WakeKind.PARKED_EXIT, null, null, null, null), createdAt = 1_000L, updatedAt = 1_000L,
     )
 
+    @Test
+    fun startEstimateMethodRoundTripsAndOldCaptureMetadataStillLoads() {
+        for (method in listOf("motion_history", "distance_speed")) {
+            val meta = CaptureMeta(WakeKind.PARKED_EXIT, null, null, null, null, method)
+            val encoded = columnJson.encodeToString(CaptureMetaJson.serializer(), CaptureMetaJson.of(meta))
+            assertEquals(meta, columnJson.decodeFromString(CaptureMetaJson.serializer(), encoded).toDomain())
+        }
+        val legacy = columnJson.decodeFromString(CaptureMetaJson.serializer(), """{"wakeKind":"PARKED_EXIT"}""")
+        assertNull(legacy.toDomain().startEstimateMethod)
+    }
+
     private val finished = recording.copy(
         status = TripStatus.FINALISED, endedAt = 600_000L, endTzOffsetMin = -300, partOfDay = PartOfDay.MORNING,
         context = DriveContext.CITY, distanceM = 5_000.0, estimatedDistanceM = 150.0, durationS = 599.0, movingS = 500.0,
