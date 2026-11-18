@@ -218,12 +218,17 @@ Confirm is evaluated first, then reject, then the 180 s timeout. Motion alone ca
 |---|---|
 | Stationary entry | Speed < 0.56 m/s (2 km/h) on 3 consecutive fixes, or platform stationary signal (iOS `liveUpdates` `stationary`, Android `STILL`) with speed < 0.56 m/s. `stoppingBeganAt` is the first such fix |
 | No GNSS (EC-TUN, underground parking) | IMU stillness (§2.4) for the same duration decides |
-| Resume | A fix no more than 5 s old with horizontal accuracy ≤ 30 m and speed ≥ 3.0 m/s (10.8 km/h). Walking, running or cycling at ≥ MEDIUM blocks resume. IMU motion can raise its sampling rate while the stop timer keeps running. |
+| Resume | A fix no more than 5 s old with horizontal accuracy ≤ 30 m and speed ≥ 3.0 m/s (10.8 km/h). Walking, running or cycling at ≥ MEDIUM blocks resume. When no fix has arrived for ≥ 30 s, sustained non-still IMU windows for ≥ 3 s plus AUTOMOTIVE ≥ MEDIUM may also resume (EC-TUN); unknown stillness never qualifies. Any fresh fix, even inaccurate or stationary, blocks this fallback. IMU motion can raise its sampling rate while the stop timer keeps running. |
 | Stop timer, auto | 240 s from the start of the final stop (P-06, tuning range 120–480 s). The reducer uses that same start time for `ended_at`. Target Q10 |
 | Stop timer, manual, no Stop tapped | 900 s (P-08). The Story says so (F-CAP-01 AC4) |
 | Auto trip < 500 m or < 120 s | `DISCARDED` (F-CAP-17) |
 | Manual trip < 500 m or < 120 s | Kept, "Short trip", no score |
 | Trip > 12 h | At finalisation, split at the longest stop > 30 min (tie: earliest). Without such a stop, no split |
+
+The tunnel threshold is 30 s: the 18 finalized field drives have inter-fix p99 ≤ 6.3 s, and the sparse interrupted
+iPhone trace has p99 7 s. This leaves normal batching and sparse reception below the fallback threshold, while a
+GNSS-less tunnel queue can resume before the 240 s stop timer. The 3 s motion hold spans closed 2 s IMU windows;
+a parked phone receiving fixes keeps the GNSS speed/accuracy resume gate, including lingering AUTOMOTIVE.
 
 ### 1.7 Kill and relaunch (F-CAP-06)
 

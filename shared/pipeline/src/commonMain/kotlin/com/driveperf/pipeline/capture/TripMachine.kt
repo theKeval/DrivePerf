@@ -524,15 +524,28 @@ internal class TripMachine(private val cfg: CaptureConfig = CaptureConfig()) {
         return Transition(rate.state, fx + t.effects + rate.effects)
     }
 
-    private fun imuRules(s: MachineState, nowNs: Long): Transition {
-        if (s.phase != RECORDING) return Transition(s)
-        val gnssStale = s.lastFix?.let { nowNs - it.tMonoNs > secondsNs(GNSS_STALE_S) } ?: true
-        val since = s.still.stillSinceNs
-        return if (gnssStale && since != null && nowNs - since >= secondsNs(cfg.pauseAfterS)) {
-            pause(s.copy(stoppingBeganAtNs = since), nowNs)
-        } else {
-            Transition(s)
+    private fun imuRules(s: MachineState, nowNs: Long): Transition = when (s.phase) {
+        PAUSED -> if (tunnelResumes(s, nowNs)) resume(s, nowNs) else Transition(s)
+        RECORDING -> {
+            val gnssStale = s.lastFix?.let { nowNs - it.tMonoNs > secondsNs(GNSS_STALE_S) } ?: true
+            val since = s.still.stillSinceNs
+            if (gnssStale && since != null && nowNs - since >= secondsNs(cfg.pauseAfterS)) {
+                pause(s.copy(stoppingBeganAtNs = since), nowNs)
+            } else {
+                Transition(s)
+            }
         }
+        else -> Transition(s)
+    }
+
+    private fun tunnelResumes(s: MachineState, nowNs: Long): Boolean {
+        val fixAt = s.lastFix?.tMonoNs ?: s.trip?.header?.startMonoNs ?: nowNs
+        val stale = nowNs - fixAt >= secondsNs(cfg.tunnelResumeFixAgeS)
+        val sampleAt = s.still.lastSampleNs ?: nowNs
+        val freshMotion = nowNs - sampleAt in 0L..secondsNs(cfg.stillWindowS)
+        val moving = s.still.nonStillSinceNs?.let { sampleAt - it >= secondsNs(cfg.tunnelResumeMotionS) } == true
+        val automotiveMotion = moving && s.activity.isAtLeastMedium(ActivityType.AUTOMOTIVE)
+        return stale && freshMotion && automotiveMotion
     }
 
     // ---- activity ----
