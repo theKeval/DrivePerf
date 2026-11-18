@@ -29,7 +29,8 @@ internal class PipelineHarness(
         manual: Boolean = true,
         kind: TripKind = TripKind.DRIVER,
         interruption: InterruptionReason? = null,
-    ): FinaliseResult = finaliser.finalise(FinaliseRequest(capture, null, kind, manual, interruption, 1L))
+        endNs: Long? = null,
+    ): FinaliseResult = finaliser.finalise(FinaliseRequest(capture, endNs, kind, manual, interruption, 1L))
 
     suspend fun trip(capture: CapturedTrip, manual: Boolean = true, kind: TripKind = TripKind.DRIVER): FinalisedTrip =
         checkNotNull(run(capture, manual, kind).trip)

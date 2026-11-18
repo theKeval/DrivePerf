@@ -50,6 +50,7 @@ class R0ExportTool {
         appendLine("# platform: $platform")
         appendLine("# imu_hz: ${h.nominalImuHz}")
         appendLine("# wake_kind: ${h.wakeKind.name}")
+        appendLine("# start_wall_ms: ${h.startWallMs}")
         h.parking?.let { appendLine("# parking: ${fixed(it.point.lat, 7)} ${fixed(it.point.lng, 7)} ${it.wallMs - h.startWallMs}") }
         for (f in trip.fixes) {
             appendLine(
