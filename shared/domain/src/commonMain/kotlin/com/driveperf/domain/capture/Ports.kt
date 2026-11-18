@@ -138,7 +138,7 @@ public object NoOpAutoDetectWatchdog : AutoDetectWatchdog {
  * schedules it when the user pauses automatic detection until a time, again at each launch while the pause lasts
  * (Android alarms do not survive a reboot), and cancels it when the user resumes early, undoes the pause or turns
  * automatic trips off. It is not cancelled when the pause ends on time: by then it has fired, or is about to. iOS uses
- * `UNUserNotificationCenter` with one fixed request identifier; Android an inexact `AlarmManager` alarm that posts the
+ * `UNUserNotificationCenter` with one fixed request identifier; Android a windowed `AlarmManager` alarm that posts the
  * notification.
  */
 public interface AutoDetectResumeNotice {

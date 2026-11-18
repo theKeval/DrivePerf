@@ -26,7 +26,6 @@ import com.driveperf.feature.capture.autoDetectDetail
 import com.driveperf.feature.capture.health
 import com.driveperf.feature.capture.label
 import com.driveperf.feature.onboarding.PermissionReader
-import com.driveperf.feature.capture.pausedUntilLine
 import com.driveperf.feature.settings.RecordingPauseLine
 import com.driveperf.feature.settings.RecordingSettingsScreen
 import com.driveperf.feature.settings.RecordingSettingsUiState
@@ -150,7 +149,7 @@ private fun pauseLine(status: AutoDetectStatus): RecordingPauseLine? = when (sta
     AutoDetectMode.Paused -> RecordingPauseLine(
         paused = true,
         title = stringResource(CaptureR.string.status_resume),
-        detail = pausedUntilLine(status.pausedUntilMs),
+        detail = stringResource(CaptureR.string.status_resume_detail),
     )
     else -> RecordingPauseLine(
         paused = false,

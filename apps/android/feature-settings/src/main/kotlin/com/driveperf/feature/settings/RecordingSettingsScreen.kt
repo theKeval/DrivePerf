@@ -48,8 +48,8 @@ data class RecordingStatusLine(
 )
 
 /**
- * The Pause auto-detect row (F-CAP-15): "Pause auto-detect", or "Resume auto-detect" with the pause's end while [paused].
- * It opens S-HOME-03.
+ * The Pause auto-detect row (F-CAP-15): "Pause auto-detect", or "Resume auto-detect" while [paused]. It opens S-HOME-03;
+ * the status row above it says until when.
  */
 data class RecordingPauseLine(val paused: Boolean, val title: String, val detail: String)
 

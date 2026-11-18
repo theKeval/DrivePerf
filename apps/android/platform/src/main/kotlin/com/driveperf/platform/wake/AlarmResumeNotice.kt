@@ -12,17 +12,20 @@ import com.driveperf.domain.capture.AutoDetectResumeNotice
 import com.driveperf.platform.R
 
 /**
- * The F-CAP-15 "Auto-detect is back on" notice on Android: an inexact `AlarmManager` alarm at the end of a pause that
- * posts a notification. No exact-alarm permission is needed: `setAndAllowWhileIdle` may fire a few minutes late in Doze,
- * which is fine for a confirmation. The alarm also starts the process when it is dead, so `Application.onCreate` launches
- * the core, which ends the pause and re-arms its triggers at once. Alarms do not survive a reboot; the core schedules
- * the notice again at every launch while a pause lasts, and the boot receiver causes that launch.
+ * The F-CAP-15 "Auto-detect is back on" notice on Android: a windowed `AlarmManager` alarm at the end of a pause that
+ * posts a notification. No exact-alarm permission is needed. `setWindow` fires within [WINDOW_MS] of the end while the
+ * phone is awake; in Doze it waits for the next maintenance window or for the user to wake the phone, which is when a
+ * confirmation matters. (`setAndAllowWhileIdle` was tried first: Android gives it a window of 75 % of the delay, so a
+ * pause until 06:00 could be announced hours late.) The alarm also starts the process when it is dead, so
+ * `Application.onCreate` launches the core, which ends the pause and re-arms its triggers. Alarms do not survive a
+ * reboot; the core schedules the notice again at every launch while a pause lasts, and the boot receiver causes that
+ * launch.
  */
 class AlarmResumeNotice(private val context: Context) : AutoDetectResumeNotice {
     private val alarms = context.getSystemService(AlarmManager::class.java)
 
     override fun schedule(atWallMs: Long) {
-        alarms.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, atWallMs, alarmIntent(context))
+        alarms.setWindow(AlarmManager.RTC_WAKEUP, atWallMs, WINDOW_MS, alarmIntent(context))
     }
 
     override fun cancel() {
@@ -33,6 +36,9 @@ class AlarmResumeNotice(private val context: Context) : AutoDetectResumeNotice {
     companion object {
         const val CHANNEL_ID: String = "auto_detect"
         const val NOTIFICATION_ID: Int = 7002
+
+        /** The shortest window Android 12+ honours for an inexact alarm. */
+        private const val WINDOW_MS: Long = 10 * 60_000L
 
         private fun alarmIntent(context: Context): PendingIntent = PendingIntent.getBroadcast(
             context,

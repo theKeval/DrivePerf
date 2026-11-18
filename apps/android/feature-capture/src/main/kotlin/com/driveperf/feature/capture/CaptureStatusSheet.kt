@@ -181,7 +181,7 @@ private fun CheckRow(check: CaptureCheck, onFix: (AttentionReason) -> Unit) {
     ) { Text(stringResource(check.kind.title)) }
 }
 
-/** S-HOME-02's pause row (F-CAP-15): Pause auto-detect, or Resume auto-detect with the pause's end while paused. */
+/** S-HOME-02's pause row (F-CAP-15): Pause auto-detect, or Resume auto-detect while paused. Both open S-HOME-03. */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun PauseRow(status: AutoDetectStatus, onClick: () -> Unit) {
@@ -192,7 +192,7 @@ private fun PauseRow(status: AutoDetectStatus, onClick: () -> Unit) {
         colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
         leadingContent = { Icon(painterResource(if (paused) DpIcons.Play else DpIcons.Pause), contentDescription = null) },
         supportingContent = {
-            Text(if (paused) pausedUntilLine(status.pausedUntilMs) else stringResource(R.string.status_pause_detail))
+            Text(stringResource(if (paused) R.string.status_resume_detail else R.string.status_pause_detail))
         },
         trailingContent = { Icon(painterResource(DpIcons.ChevronRight), contentDescription = null) },
     ) { Text(stringResource(if (paused) R.string.status_resume else R.string.status_pause)) }

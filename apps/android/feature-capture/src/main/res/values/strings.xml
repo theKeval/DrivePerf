@@ -127,6 +127,7 @@
     <string name="status_pause">Pause auto-detect</string>
     <string name="status_pause_detail">Stop automatic trips for a while</string>
     <string name="status_resume">Resume auto-detect</string>
+    <string name="status_resume_detail">Turn automatic trips back on now</string>
 
     <!-- S-HOME-03 Pause auto-detect (DRIVE-152, F-CAP-15) -->
     <string name="pause_title">Pause auto-detect</string>
