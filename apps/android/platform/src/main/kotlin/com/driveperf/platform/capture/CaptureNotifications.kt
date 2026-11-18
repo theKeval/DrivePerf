@@ -1,5 +1,8 @@
 package com.driveperf.platform.capture
 
+import com.driveperf.domain.settings.UnitSystem
+import com.driveperf.domain.trip.DisplayUnit
+
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -14,7 +17,6 @@ import com.driveperf.domain.capture.RecorderState
 import com.driveperf.domain.capture.RecorderStatus
 import com.driveperf.platform.R
 import com.driveperf.platform.location.GpsStatus
-import java.util.Locale
 import java.util.concurrent.TimeUnit
 
 /**
@@ -24,7 +26,10 @@ import java.util.concurrent.TimeUnit
  * uses the same recording status and chronometer. Automatic capture uses a low-importance channel that also supports
  * promotion.
  */
-class CaptureNotifications(private val context: Context) {
+class CaptureNotifications(
+    private val context: Context,
+    private val units: () -> UnitSystem = { UnitSystem.METRIC },
+) {
     private val manager = context.getSystemService(NotificationManager::class.java)
 
     private val promotion by lazy {
@@ -69,8 +74,9 @@ class CaptureNotifications(private val context: Context) {
     ).setShowWhen(false).build()
 
     private fun recordingText(status: RecorderStatus, gps: GpsStatus, minutes: Long): String {
+        val unit = units().display(DisplayUnit.KILOMETRES)
         val progress = context.getString(
-            R.string.capture_notification_progress, minutes, String.format(Locale.US, "%.1f", status.distanceM / METRES_PER_KM),
+            R.string.capture_notification_progress, minutes, "${unit.format(status.distanceM)} ${unit.symbol}",
         )
         val detail = when {
             status.state == RecorderState.FINISHING -> R.string.capture_notification_finishing
@@ -138,7 +144,6 @@ class CaptureNotifications(private val context: Context) {
         private const val MAX_CHIP_MINUTES = 999L
         private const val MAX_CHIP_HOURS = 9999L
         private const val MINUTES_PER_HOUR = 60L
-        private const val METRES_PER_KM = 1000.0
     }
 }
 

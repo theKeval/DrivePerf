@@ -20,14 +20,14 @@
     <string name="capture_fix_location_description">Allow location to record</string>
 
     <string name="drive_title">Recording your drive</string>
-    <string name="drive_distance">%1$s km</string>
+    <string name="drive_distance">%1$s</string>
     <string name="drive_gps_searching">Looking for GPS</string>
     <string name="drive_gps_good">GPS signal good</string>
     <string name="drive_gps_lost">GPS signal lost</string>
     <string name="drive_stop">Stop</string>
     <string name="drive_stop_title">End this drive?</string>
     <string name="drive_stop_body">The drive is saved on your phone and added to your list.</string>
-    <string name="drive_stop_body_short">This drive is very short, under 500 m or 2 minutes. It is kept with a \"Short trip\" label, without a score.</string>
+    <string name="drive_stop_body_short">This drive is very short, under about %1$s or 2 minutes. It is kept with a \"Short trip\" label, without a score.</string>
     <string name="drive_stop_confirm">End drive</string>
     <string name="drive_stop_confirm_short">End anyway</string>
     <string name="drive_stop_keep">Keep recording</string>
@@ -64,7 +64,7 @@
     <string name="saved_title">Drive saved</string>
     <string name="saved_title_short">Short trip saved</string>
     <string name="saved_title_passenger">Passenger trip saved · not scored</string>
-    <string name="saved_summary">%1$s km · %2$d min</string>
+    <string name="saved_summary">%1$s · %2$d min</string>
     <string name="saved_auto_ended">There was no movement for 15 minutes, so DrivePerf ended this trip for you.</string>
     <string name="saved_note">Its Story arrives with the scoring update. The recording is safe on this phone.</string>
     <string name="saved_passenger_note">It is kept in your list and left out of scores.</string>

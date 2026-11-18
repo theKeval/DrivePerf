@@ -1,5 +1,7 @@
 package com.driveperf.feature.onboarding
 
+import com.driveperf.domain.settings.UnitSystem
+
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -12,7 +14,10 @@ import androidx.compose.ui.Modifier
  */
 @Suppress("CyclomaticComplexMethod") // one branch per page: the whole order reads in one place
 @Composable
-fun OnboardingScreen(state: OnboardingUiState, actions: OnboardingActions, modifier: Modifier = Modifier) {
+fun OnboardingScreen(
+    state: OnboardingUiState, actions: OnboardingActions, modifier: Modifier = Modifier,
+    units: UnitSystem = UnitSystem.METRIC,
+) {
     Surface(modifier = modifier.fillMaxSize(), color = MaterialTheme.colorScheme.surface) {
         when (state.step) {
             OnboardingStep.Welcome -> WelcomePage(state, actions)
@@ -24,7 +29,7 @@ fun OnboardingScreen(state: OnboardingUiState, actions: OnboardingActions, modif
             OnboardingStep.Motion -> MotionPage(state, actions)
             OnboardingStep.AutoTrips -> AutoTripsPage(state, actions)
             OnboardingStep.AllTheTime -> AllTheTimePage(state, actions)
-            OnboardingStep.Notifications -> NotificationsPage(state, actions)
+            OnboardingStep.Notifications -> NotificationsPage(state, actions, units)
             OnboardingStep.Battery -> BatteryPage(state, actions)
             OnboardingStep.HelpImprove -> HelpImprovePage(state, actions)
             OnboardingStep.Ready -> ReadyPage(state, actions)

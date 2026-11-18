@@ -1,5 +1,7 @@
 package com.driveperf.feature.onboarding
 
+import com.driveperf.domain.settings.UnitSystem
+
 import android.Manifest
 import android.content.Context
 import android.os.Build
@@ -31,6 +33,7 @@ fun OnboardingRoute(
     permissionReader: PermissionReader,
     onFinished: () -> Unit,
     modifier: Modifier = Modifier,
+    units: UnitSystem = UnitSystem.METRIC,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val context = LocalContext.current
@@ -74,7 +77,7 @@ fun OnboardingRoute(
         },
     )
     val actions = remember(viewModel) { onboardingActions(viewModel, context, launchers) }
-    OnboardingScreen(state = state, actions = actions, modifier = modifier)
+    OnboardingScreen(state = state, actions = actions, modifier = modifier, units = units)
 }
 
 /** The system permission requests the route launches, as plain functions so [onboardingActions] stays small. */

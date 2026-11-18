@@ -1,5 +1,10 @@
 package com.driveperf.feature.settings
 
+import com.driveperf.domain.settings.SettingsVehicle
+import com.driveperf.domain.settings.Settings
+import androidx.compose.material3.RadioButton
+import com.driveperf.designsystem.DpSwitchRow
+
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -8,6 +13,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.toggleable
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -58,20 +64,28 @@ data class RecordingSettingsUiState(
     val automaticTrips: Boolean,
     val status: RecordingStatusLine?,
     val pause: RecordingPauseLine? = null,
+    val preferences: Settings = Settings(),
+    val cars: List<SettingsVehicle> = emptyList(),
+)
+
+/** Independent native actions for S-SET-03, matching the capture status screen's action bundle. */
+data class RecordingSettingsActions(
+    val onAutomaticTripsChanged: (Boolean) -> Unit = {},
+    val onStatusClick: () -> Unit = {},
+    val onPauseClick: () -> Unit = {},
+    val onPreferencesChanged: ((Settings) -> Settings) -> Unit = {},
+    val onGarageClick: () -> Unit = {},
 )
 
 /**
  * S-SET-03 Recording settings (F-SET-01 AC3), reached from Profile: the Automatic trips switch and, while it is on, the
- * auto-detect status row that opens the capture status sheet and the Pause auto-detect row (F-CAP-15). Default car,
- * Battery saver recording and Health Check are not part of this screen yet.
+ * capture status, Pause, Garage default car and battery saver recording.
  */
 @Composable
 fun RecordingSettingsScreen(
     state: RecordingSettingsUiState,
-    onAutomaticTripsChanged: (Boolean) -> Unit,
-    onStatusClick: () -> Unit,
+    actions: RecordingSettingsActions,
     modifier: Modifier = Modifier,
-    onPauseClick: () -> Unit = {},
 ) {
     Column(
         modifier = modifier
@@ -91,16 +105,16 @@ fun RecordingSettingsScreen(
             shape = MaterialTheme.shapes.large,
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
         ) {
-            AutomaticTripsRow(state.automaticTrips, onAutomaticTripsChanged)
+            AutomaticTripsRow(state.automaticTrips, actions.onAutomaticTripsChanged)
             val status = state.status
             if (state.automaticTrips && status != null) {
                 HorizontalDivider(color = MaterialTheme.colorScheme.surface)
-                StatusRow(status, onStatusClick)
+                StatusRow(status, actions.onStatusClick)
             }
             val pause = state.pause
             if (state.automaticTrips && pause != null) {
                 HorizontalDivider(color = MaterialTheme.colorScheme.surface)
-                PauseRow(pause, onPauseClick)
+                PauseRow(pause, actions.onPauseClick)
             }
         }
         if (state.automaticTrips) {
@@ -111,7 +125,51 @@ fun RecordingSettingsScreen(
                 modifier = Modifier.padding(horizontal = 8.dp),
             )
         }
+        RecordingPreferences(state, actions)
     }
+}
+
+@Composable
+private fun RecordingPreferences(state: RecordingSettingsUiState, actions: RecordingSettingsActions) {
+        Card {
+            if (state.cars.isEmpty()) {
+                Text(stringResource(R.string.no_cars), Modifier.padding(16.dp))
+                SettingsLink(stringResource(R.string.add_car), actions.onGarageClick)
+            } else {
+                Text(stringResource(R.string.default_car), Modifier.padding(16.dp), style = MaterialTheme.typography.titleSmall)
+                CarChoice(stringResource(R.string.no_default), state.preferences.defaultVehicleId == null) {
+                    actions.onPreferencesChanged { it.copy(defaultVehicleId = null) }
+                }
+                state.cars.forEach { car ->
+                    CarChoice(car.name, state.preferences.defaultVehicleId == car.id) {
+                        actions.onPreferencesChanged { it.copy(defaultVehicleId = car.id) }
+                    }
+                }
+                SettingsLink(stringResource(R.string.manage_cars), actions.onGarageClick)
+            }
+        }
+        Card {
+            DpSwitchRow(
+                title = stringResource(R.string.battery_saver), description = stringResource(R.string.battery_detail),
+                checked = state.preferences.batterySaverRecording,
+                onCheckedChange = { on -> actions.onPreferencesChanged { it.copy(batterySaverRecording = on) } },
+            )
+            if (state.preferences.batterySaverRecording) {
+                Text(stringResource(R.string.usable_data), Modifier.padding(16.dp))
+            }
+        }
+        Text(stringResource(R.string.battery_footer), style = MaterialTheme.typography.bodyMedium)
+        Card { SettingsLink(stringResource(R.string.health_check), actions.onStatusClick) }
+}
+
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun CarChoice(name: String, selected: Boolean, onClick: () -> Unit) {
+    ListItem(
+        modifier = Modifier.selectable(selected, role = Role.RadioButton, onClick = onClick),
+        leadingContent = { RadioButton(selected, onClick = null) },
+        colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+    ) { Text(name) }
 }
 
 @Composable
@@ -188,8 +246,7 @@ private fun RecordingSettingsOnPreview() {
                 status = RecordingStatusLine(DpHealth.Ok, "OK", "Auto-detect on · ready", "Last check-in 18 min ago"),
                 pause = RecordingPauseLine(paused = false, "Pause auto-detect", "Stop automatic trips for a while"),
             ),
-            onAutomaticTripsChanged = {},
-            onStatusClick = {},
+            actions = RecordingSettingsActions(),
         )
     }
 }
@@ -198,6 +255,6 @@ private fun RecordingSettingsOnPreview() {
 @Composable
 private fun RecordingSettingsOffPreview() {
     DrivePerfTheme {
-        RecordingSettingsScreen(RecordingSettingsUiState(automaticTrips = false, status = null), {}, {})
+        RecordingSettingsScreen(RecordingSettingsUiState(automaticTrips = false, status = null), RecordingSettingsActions())
     }
 }

@@ -3,8 +3,8 @@
     <string name="account_mode_local">Local mode</string>
     <string name="account_mode_body">Your drives stay on this phone. Accounts and backup arrive in a later update.</string>
     <string name="account_settings_title">Settings</string>
-    <string name="account_recording_title">Recording</string>
-    <string name="account_recording_body">Automatic trips</string>
+    <string name="account_recording_title">Settings</string>
+    <string name="account_recording_body">Recording, units and display</string>
     <string name="account_privacy_title">Privacy</string>
     <string name="account_stats_title">Share usage statistics</string>
     <string name="account_stats_body">Counts of which features are used. Never your location, routes or car.</string>

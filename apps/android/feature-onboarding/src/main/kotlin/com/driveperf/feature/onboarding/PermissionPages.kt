@@ -1,5 +1,9 @@
 package com.driveperf.feature.onboarding
 
+import com.driveperf.domain.trip.DisplayUnit
+
+import com.driveperf.domain.settings.UnitSystem
+
 import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -82,7 +86,10 @@ fun MotionPage(state: OnboardingUiState, actions: OnboardingActions) {
  * permission, so this page is skipped there. Refused: the recording notification still shows, it is required.
  */
 @Composable
-fun NotificationsPage(state: OnboardingUiState, actions: OnboardingActions) {
+fun NotificationsPage(
+    state: OnboardingUiState, actions: OnboardingActions,
+    units: UnitSystem = UnitSystem.METRIC,
+) {
     val denied = state.deniedStep == OnboardingStep.Notifications
     OnboardingPage(
         state = state,
@@ -104,9 +111,13 @@ fun NotificationsPage(state: OnboardingUiState, actions: OnboardingActions) {
             }
         } else {
             Heading(stringResource(R.string.onb_notifications_title), stringResource(R.string.onb_notifications_lead))
-            NotificationPreview(R.string.onb_notifications_preview_1_title, R.string.onb_notifications_preview_1_body)
-            NotificationPreview(R.string.onb_notifications_preview_2_title, R.string.onb_notifications_preview_2_body)
-            NotificationPreview(R.string.onb_notifications_preview_3_title, R.string.onb_notifications_preview_3_body)
+            NotificationPreview(R.string.onb_notifications_preview_1_title, stringResource(R.string.onb_notifications_preview_1_body))
+            NotificationPreview(R.string.onb_notifications_preview_2_title, stringResource(R.string.onb_notifications_preview_2_body))
+            val unit = units.display(DisplayUnit.KILOMETRES)
+            NotificationPreview(
+                R.string.onb_notifications_preview_3_title,
+                stringResource(R.string.onb_notifications_preview_3_body, "${unit.format(63_000.0)} ${unit.symbol}"),
+            )
             GroupCard {
                 ChecklistRow(Mark.Yes, stringResource(R.string.onb_notifications_list_1))
                 ChecklistRow(Mark.Yes, stringResource(R.string.onb_notifications_list_2))
@@ -118,7 +129,7 @@ fun NotificationsPage(state: OnboardingUiState, actions: OnboardingActions) {
 }
 
 @Composable
-private fun NotificationPreview(@StringRes title: Int, @StringRes body: Int) {
+private fun NotificationPreview(@StringRes title: Int, body: String) {
     GroupCard {
         Row(
             horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -127,7 +138,7 @@ private fun NotificationPreview(@StringRes title: Int, @StringRes body: Int) {
             GlyphDisc("◎", size = 36)
             Column(modifier = Modifier.weight(1f)) {
                 Text(stringResource(title), style = MaterialTheme.typography.titleSmall)
-                Text(stringResource(body), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(body, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             Text(
                 stringResource(R.string.onb_notifications_now),

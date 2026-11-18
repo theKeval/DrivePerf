@@ -1,5 +1,7 @@
 package com.driveperf.app
 
+import com.driveperf.domain.settings.UnitSystem
+
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
@@ -57,7 +59,7 @@ class InDriveUiTest {
         carName: String? = null,
     ) = CaptureUiState.Recording(
         elapsed = "24:05",
-        distanceKm = "12.4",
+        distance = "12.4 km",
         gps = gps,
         confirmingStop = confirming,
         startedAtLabel = "5:31 PM",
@@ -135,6 +137,12 @@ class InDriveUiTest {
         compose.onNodeWithText("Short trip", substring = true).assertIsDisplayed()
     }
 
+    @Test
+    fun `the short trip threshold follows imperial units`() {
+        show(recording(confirming = true, shortTrip = true).copy(units = UnitSystem.IMPERIAL))
+        compose.onNodeWithText("under about 0.3 mi", substring = true).assertIsDisplayed()
+    }
+
     // ---- passenger sheet (S-DRV-03) ----
 
     @Test
@@ -191,7 +199,7 @@ class InDriveUiTest {
 
     @Test
     fun `a saved drive shows its numbers and the timeout note when the timeout ended it`() {
-        show(DriveCover.Saved("t1", "12.4", 24, SavedKind.DRIVE, autoEnded = true))
+        show(DriveCover.Saved("t1", "12.4 km", 24, SavedKind.DRIVE, autoEnded = true))
         compose.onNodeWithText("Drive saved").assertIsDisplayed()
         compose.onNodeWithText("12.4 km · 24 min").assertIsDisplayed()
         compose.onNodeWithText("There was no movement for 15 minutes", substring = true).assertIsDisplayed()
@@ -201,7 +209,7 @@ class InDriveUiTest {
 
     @Test
     fun `a saved passenger trip says it is not scored, a deleted one says nothing was kept`() {
-        show(DriveCover.Saved("t1", "3.0", 8, SavedKind.PASSENGER, autoEnded = false))
+        show(DriveCover.Saved("t1", "3.0 km", 8, SavedKind.PASSENGER, autoEnded = false))
         compose.onNodeWithText("Passenger trip saved · not scored").assertIsDisplayed()
     }
 

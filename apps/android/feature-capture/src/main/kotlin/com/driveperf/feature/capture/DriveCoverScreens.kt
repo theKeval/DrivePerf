@@ -128,9 +128,9 @@ fun SavedScreen(cover: DriveCover.Saved, onBack: () -> Unit, modifier: Modifier 
                 style = MaterialTheme.typography.headlineMedium,
                 textAlign = TextAlign.Center,
             )
-            if (cover.distanceKm != null && cover.minutes != null) {
+            if (cover.distance != null && cover.minutes != null) {
                 Text(
-                    text = stringResource(R.string.saved_summary, cover.distanceKm, cover.minutes),
+                    text = stringResource(R.string.saved_summary, cover.distance, cover.minutes),
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
