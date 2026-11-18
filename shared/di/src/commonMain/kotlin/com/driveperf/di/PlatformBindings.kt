@@ -74,6 +74,7 @@ public class CoreServices internal constructor(
     public val corrections: TripCorrections,
     /** Usage statistics behind the user's choice (F-ONB-08): events wait until the choice, and are dropped if declined. */
     public val analytics: Analytics,
+    public val settings: com.driveperf.domain.settings.SettingsRepository,
     private val onClose: () -> Unit,
 ) {
     /** Stops the recorder's work and closes the database. Only for a scratch core; the app's core lives as long as the process. */

@@ -1,5 +1,12 @@
 package com.driveperf.app
 
+import com.driveperf.domain.settings.UnitSystem
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
+import com.driveperf.domain.settings.SettingsRepository
+import com.driveperf.feature.settings.SettingsViewModel
+import java.util.Locale
+
 import com.driveperf.app.bridge.PlatformCaptureController
 import com.driveperf.app.bridge.PlatformTripListSource
 import com.driveperf.app.core.AndroidPlatformBindings
@@ -62,6 +69,15 @@ val appModule = module {
         )
     }
     single<CoreServices> { DrivePerfCore.start(get(), androidContext()) }
+    single<SettingsRepository> { get<CoreServices>().settings }
+    single<kotlinx.coroutines.flow.StateFlow<UnitSystem>> {
+        val repository = get<SettingsRepository>()
+        val region = Locale.getDefault().country
+        repository.state.map { it.effectiveUnits(region) }.stateIn(
+            get<CoroutineScope>(), kotlinx.coroutines.flow.SharingStarted.Eagerly, repository.state.value.effectiveUnits(region),
+        )
+    }
+    viewModel { SettingsViewModel(get()) }
     single<TripRecorder> { get<CoreServices>().recorder }
     single<Analytics> { get<CoreServices>().analytics }
     single { PrivacyChoices(get(), get(), get()) }
@@ -74,8 +90,8 @@ val appModule = module {
     // DRIVE-100 (S2): the trip list also answers and corrects what a trip was.
     single { PlatformTripListSource(get(), get<CoreServices>().corrections) } binds arrayOf(TripListSource::class, TripCorrector::class)
 
-    viewModel { CaptureViewModel(get(), System::currentTimeMillis) }
-    viewModel { DrivesViewModel(get(), corrector = get<TripCorrector>()) }
+    viewModel { CaptureViewModel(get(), System::currentTimeMillis, units = get()) }
+    viewModel { DrivesViewModel(get(), corrector = get<TripCorrector>(), units = get()) }
     single<OnboardingSettings> { ConsentOnboardingSettings(get()) }
     viewModel {
         val consent = get<ConsentSettings>()

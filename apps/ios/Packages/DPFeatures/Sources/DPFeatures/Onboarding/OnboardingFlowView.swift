@@ -527,7 +527,7 @@ private struct NotificationsPage: View {
             VStack(spacing: DPSpace.s2) {
                 NotificationPreview(title: "Drive decoded.", message: "Thursday morning · Home → Work")
                 NotificationPreview(title: "Capture needs a fix", message: "Location is set to While Using.")
-                NotificationPreview(title: "Your week, decoded", message: "4 drives · 63 km")
+                NotificationPreview(title: "Your week, decoded", message: "4 drives · \(model.display.distance(63_000))")
             }
             .opacity(model.notificationsDenied ? 0.4 : 1)
             .accessibilityHidden(true)

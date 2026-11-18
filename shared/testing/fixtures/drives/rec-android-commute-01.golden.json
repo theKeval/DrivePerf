@@ -12,7 +12,8 @@
     "ledger": null,
     "events": [],
     "spans": [
-      { "kind": "EXCLUDED", "t0S": 0.00, "t1S": 479.96, "reason": "NOT_ALIGNED" }
+      { "kind": "EXCLUDED", "t0S": 0.00, "t1S": 63.04, "reason": "NOT_ALIGNED" },
+      { "kind": "EXCLUDED", "t0S": 133.04, "t1S": 479.96, "reason": "NOT_ALIGNED" }
     ],
     "tip": null
   },

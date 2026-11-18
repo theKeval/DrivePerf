@@ -133,7 +133,7 @@
     <string name="onb_notifications_preview_2_title">Capture needs a fix</string>
     <string name="onb_notifications_preview_2_body">Location is set to While using the app.</string>
     <string name="onb_notifications_preview_3_title">Your week, decoded</string>
-    <string name="onb_notifications_preview_3_body">4 drives · 63 km</string>
+    <string name="onb_notifications_preview_3_body">4 drives · %1$s</string>
     <string name="onb_notifications_now">now</string>
     <string name="onb_notifications_list_1">Drive decoded</string>
     <string name="onb_notifications_list_2">Capture problems</string>

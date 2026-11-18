@@ -21,7 +21,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -47,6 +46,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.driveperf.designsystem.DpIcons
+import com.driveperf.designsystem.DpModalBottomSheet
 import com.driveperf.designsystem.DrivePerfTheme
 import com.driveperf.domain.capture.AutoDetectPauseLength
 import java.time.ZoneId
@@ -55,14 +55,14 @@ import java.time.ZoneId
 private enum class PauseStep { PICK, CONFIRMED, RESUME }
 
 /**
- * S-HOME-03 Pause auto-detect (F-CAP-15): a ModalBottomSheet that lets someone lending their phone, or wanting privacy,
+ * S-HOME-03 Pause auto-detect (F-CAP-15): a DpModalBottomSheet that lets someone lending their phone, or wanting privacy,
  * stop automatic trips for a while. Opened while not paused it offers three choices; Pause shows the confirmation (Done,
  * Undo). Opened while paused ([pausedUntilMs] with [paused]) it offers Resume auto-detect and Keep paused.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PauseAutoDetectSheet(paused: Boolean, pausedUntilMs: Long?, actions: PauseSheetActions) {
-    ModalBottomSheet(
+    DpModalBottomSheet(
         onDismissRequest = actions.onDismiss,
         containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
     ) {

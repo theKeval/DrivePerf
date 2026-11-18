@@ -37,6 +37,22 @@ class DrivesViewModelTest {
     private fun at(day: LocalDate, hour: Int, minute: Int) = day.atTime(hour, minute).toInstant(ZoneOffset.UTC).toEpochMilli()
 
     @Test
+    fun `units change updates existing cards and open detail without new trip data`() = runTest {
+        val units = MutableStateFlow(com.driveperf.domain.settings.UnitSystem.METRIC)
+        source.flow.value = listOf(RecordedTrip("t", at(today, 7, 42), durationS = 600, distanceM = 1609.344))
+        val model = DrivesViewModel(source, zone, Locale.CANADA, { today }, units = units)
+        model.state.test {
+            assertEquals("10 min · 1.6 km", expectMostRecentItem().trips.single().summary)
+            model.onAction(DrivesAction.Open("t"))
+            assertEquals("km", expectMostRecentItem().detail?.tiles?.first()?.unit)
+            units.value = com.driveperf.domain.settings.UnitSystem.IMPERIAL
+            val changed = expectMostRecentItem()
+            assertEquals("10 min · 1.0 mi", changed.trips.single().summary)
+            assertEquals("mi", changed.detail?.tiles?.first()?.unit)
+        }
+    }
+
+    @Test
     fun `an empty list is reported as empty once loaded`() = runTest {
         vm().state.test {
             val state = expectMostRecentItem()

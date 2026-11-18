@@ -26,6 +26,7 @@ public struct AppDependencies {
     // DRIVE-100, DRIVE-172 (S2): trip corrections and the provenance catalogue for the Drives screens.
     public var corrections: (any TripCorrecting)?
     public var provenance = ProvenanceCatalog()
+    public var displaySettings: (any DisplaySettingsStoring)?
     // DRIVE-150: requests to open the capture status sheet from outside the UI (the watchdog notification).
     public var statusRequests: CaptureStatusRequests?
 
@@ -61,6 +62,7 @@ public final class AppModel {
     }
 
     public private(set) var route: Route
+    public let display: DisplaySettingsModel
     public let capture: CaptureViewModel
     public let trips: TripListViewModel
     public let profile: ProfileViewModel
@@ -77,12 +79,13 @@ public final class AppModel {
         self.dependencies = dependencies
         route = dependencies.preferences.preferences.onboardingCompleted ? .shell : .onboarding
         isSelfTestPresented = dependencies.runSelfTestOnLaunch
+        display = DisplaySettingsModel(storage: dependencies.displaySettings)
         capture = CaptureViewModel(
             recorder: dependencies.recorder, history: dependencies.history, permissions: dependencies.permissions,
-            clock: dependencies.clock, movement: dependencies.movement)
+            clock: dependencies.clock, movement: dependencies.movement, display: display)
         statusRequests = dependencies.statusRequests ?? CaptureStatusRequests()
         trips = TripListViewModel(
-            history: dependencies.history, corrections: dependencies.corrections, catalog: dependencies.provenance)
+            history: dependencies.history, corrections: dependencies.corrections, catalog: dependencies.provenance, display: display)
         profile = ProfileViewModel(dependencies: dependencies)
         // The accessory and the status sheet read permissions on their own, so re-read them after every change here.
         let capture = capture
@@ -94,15 +97,17 @@ public final class AppModel {
                 dependencies.refreshCapture()
                 Task { await capture.refreshReadiness() }
             },
-            pause: pause)
+            pause: pause, display: display, capture: capture)
         if route == .onboarding { onboarding = makeOnboarding() }
     }
 
     private func makeOnboarding() -> OnboardingViewModel {
-        OnboardingViewModel(
+        let model = OnboardingViewModel(
             permissions: dependencies.permissions, preferences: dependencies.preferences,
             crashReporter: dependencies.crashReporter, analytics: dependencies.analytics, refreshCapture: dependencies.refreshCapture,
             onFinished: { [weak self] in self?.finishOnboarding() })
+        model.display = display
+        return model
     }
 
     private func finishOnboarding() {

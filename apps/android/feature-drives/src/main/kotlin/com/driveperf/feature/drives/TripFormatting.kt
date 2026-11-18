@@ -1,5 +1,8 @@
 package com.driveperf.feature.drives
 
+import com.driveperf.domain.settings.UnitSystem
+import com.driveperf.domain.trip.DisplayUnit
+
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -35,11 +38,13 @@ internal class TripFormatting(private val zone: ZoneId, private val locale: Loca
         }
     }
 
-    fun distance(distanceM: Double): String = String.format(Locale.US, "%.1f km", distanceM / METRES_PER_KM)
+    fun distance(distanceM: Double, units: UnitSystem): String {
+        val unit = units.display(DisplayUnit.KILOMETRES)
+        return "${unit.format(distanceM)} ${unit.symbol}"
+    }
 
     private companion object {
         const val SECONDS_PER_MINUTE = 60
         const val MINUTES_PER_HOUR = 60
-        const val METRES_PER_KM = 1000.0
     }
 }

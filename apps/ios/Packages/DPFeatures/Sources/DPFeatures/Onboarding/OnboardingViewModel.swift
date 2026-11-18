@@ -47,6 +47,7 @@ public final class OnboardingViewModel {
     public private(set) var isRequesting = false
     public private(set) var permissions = PermissionSnapshot()
 
+    public var display: DisplaySettingsModel = DisplaySettingsModel()
     public var ageConfirmed = false
     public private(set) var under18Blocked: Bool
     public private(set) var locationDenied = false

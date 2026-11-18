@@ -18,7 +18,6 @@ import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.ContainedLoadingIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -129,9 +128,9 @@ fun SavedScreen(cover: DriveCover.Saved, onBack: () -> Unit, modifier: Modifier 
                 style = MaterialTheme.typography.headlineMedium,
                 textAlign = TextAlign.Center,
             )
-            if (cover.distanceKm != null && cover.minutes != null) {
+            if (cover.distance != null && cover.minutes != null) {
                 Text(
-                    text = stringResource(R.string.saved_summary, cover.distanceKm, cover.minutes),
+                    text = stringResource(R.string.saved_summary, cover.distance, cover.minutes),
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

@@ -97,6 +97,7 @@ public final class CaptureViewModel {
     private enum EndKind { case user, passenger, discard }
 
     private let recorder: any TripRecording
+    public let display: DisplaySettingsModel
     private let history: any TripHistory
     private let permissions: any PermissionRequesting
     private let clock: any ClockBridge
@@ -110,8 +111,9 @@ public final class CaptureViewModel {
         recorder: any TripRecording, history: any TripHistory, permissions: any PermissionRequesting,
         clock: any ClockBridge, movement: (any MovementMonitoring)? = nil,
         now: @escaping @MainActor () -> Date = { Date() }, finishTimeout: Duration = .seconds(3),
-        startTimeout: Duration = .seconds(5)
+        startTimeout: Duration = .seconds(5), display: DisplaySettingsModel? = nil
     ) {
+        self.display = display ?? DisplaySettingsModel()
         self.recorder = recorder
         self.history = history
         self.permissions = permissions
@@ -432,11 +434,6 @@ public enum DriveFormat {
         let secs = total % 60
         return hours > 0
             ? String(format: "%d:%02d:%02d", hours, minutes, secs) : String(format: "%d:%02d", minutes, secs)
-    }
-
-    /// "9.6" (km, one decimal, truncated so it never runs ahead of the road).
-    public static func kilometres(_ metres: Double) -> String {
-        String(format: "%.1f", (max(metres, 0) / 100).rounded(.down) / 10)
     }
 
     /// "5:31 pm"

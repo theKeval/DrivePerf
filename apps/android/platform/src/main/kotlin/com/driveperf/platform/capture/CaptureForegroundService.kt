@@ -1,5 +1,9 @@
 package com.driveperf.platform.capture
 
+import com.driveperf.domain.settings.SettingsRepository
+import com.driveperf.domain.settings.UnitSystem
+import java.util.Locale
+
 import android.app.Notification
 import android.app.NotificationManager
 import android.app.Service
@@ -19,6 +23,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import org.koin.android.ext.android.inject
@@ -33,6 +38,7 @@ import org.koin.android.ext.android.inject
  */
 class CaptureForegroundService : Service() {
     private val recorder: TripRecorder by inject()
+    private val settings: SettingsRepository by inject()
     private val notifications: CaptureNotifications by inject()
     private val fixes: FixWatch by inject()
     private val clock: Clock by inject()
@@ -81,11 +87,16 @@ class CaptureForegroundService : Service() {
     private fun watch() {
         if (watching != null) return
         var active = false
-        watching = recorder.status.onEach { status ->
+        var previousUnits: UnitSystem? = null
+        watching = combine(recorder.status, settings.state) { status, preferences ->
+            status to preferences.effectiveUnits(Locale.getDefault().country)
+        }.onEach { (status, units) ->
+            val unitsChanged = units != previousUnits
+            previousUnits = units
             if (status.state != RecorderState.IDLE) {
                 active = true
                 idleTimeout?.cancel()
-                recordingNotification(status)?.let { notification ->
+                recordingNotification(status, force = unitsChanged)?.let { notification ->
                     getSystemService(NotificationManager::class.java).notify(CaptureNotifications.NOTIFICATION_ID, notification)
                 }
             } else if (active) {
@@ -94,10 +105,10 @@ class CaptureForegroundService : Service() {
         }.launchIn(scope)
     }
 
-    private fun recordingNotification(status: RecorderStatus): Notification? {
+    private fun recordingNotification(status: RecorderStatus, force: Boolean = false): Notification? {
         val nowWallMs = clock.wallMs()
         val started = tracker.startedWallMs(status, nowWallMs)
-        if (started == null || !rateLimit.shouldPost(status, clock.monotonicNs())) return null
+        if (started == null || (!force && !rateLimit.shouldPost(status, clock.monotonicNs()))) return null
         return notifications.build(status, started, fixes.status(), nowWallMs)
     }
 

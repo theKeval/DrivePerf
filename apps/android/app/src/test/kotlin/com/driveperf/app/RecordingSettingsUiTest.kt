@@ -9,6 +9,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import com.driveperf.designsystem.DpHealth
 import com.driveperf.designsystem.DrivePerfTheme
+import com.driveperf.feature.settings.RecordingSettingsActions
 import com.driveperf.feature.settings.RecordingSettingsScreen
 import com.driveperf.feature.settings.RecordingSettingsUiState
 import com.driveperf.feature.settings.RecordingStatusLine
@@ -30,7 +31,9 @@ class RecordingSettingsUiTest {
     private fun show(state: RecordingSettingsUiState) {
         compose.setContent {
             DrivePerfTheme(darkTheme = true) {
-                RecordingSettingsScreen(state, onAutomaticTripsChanged = { changes += it }, onStatusClick = { statusClicks++ })
+                RecordingSettingsScreen(state, RecordingSettingsActions(
+                    onAutomaticTripsChanged = { changes += it }, onStatusClick = { statusClicks++ },
+                ))
             }
         }
     }

@@ -40,6 +40,21 @@ class CaptureViewModelTest {
     @After fun tearDown() = kotlinx.coroutines.Dispatchers.resetMain()
 
     @Test
+    fun `units update the active recording without another fix`() = runTest(dispatcher) {
+        val units = MutableStateFlow(com.driveperf.domain.settings.UnitSystem.METRIC)
+        val controller = FakeController()
+        val model = CaptureViewModel(controller, { nowMs }, units = units)
+        controller.snapshot.value = CaptureSnapshot.Recording(startedWallMs = 40_000, distanceM = 1609.344, gps = GpsHealth.GOOD)
+        model.state.test {
+            advanceTimeBy(1)
+            assertEquals("1.6 km", (expectMostRecentItem() as CaptureUiState.Recording).distance)
+            units.value = com.driveperf.domain.settings.UnitSystem.IMPERIAL
+            advanceTimeBy(1)
+            assertEquals("1.0 mi", (expectMostRecentItem() as CaptureUiState.Recording).distance)
+        }
+    }
+
+    @Test
     fun `idle with location is ready`() = runTest(dispatcher) {
         val vm = CaptureViewModel(FakeController(), { nowMs })
         vm.state.test {
@@ -65,7 +80,7 @@ class CaptureViewModelTest {
             advanceTimeBy(1)
             val state = expectMostRecentItem() as CaptureUiState.Recording
             assertEquals("1:00", state.elapsed)
-            assertEquals("12.4", state.distanceKm)
+            assertEquals("12.4 km", state.distance)
             assertEquals(GpsHealth.GOOD, state.gps)
         }
     }
