@@ -145,6 +145,16 @@ class EstimatedStartTest {
     }
 
     @Test
+    fun lowConfidenceAutomotiveDoesNotMakeObservedHistoryMissing() {
+        val low = sample(-1.0, ActivityType.AUTOMOTIVE, ActivityConfidence.LOW)
+        val fixes = (0..4).map { first.copy(tS = it.toDouble(), lng = 0.009) }
+        assertNull(fallback(fixes, history = listOf(low)))
+        assertNull(fallback(fixes, history = listOf(
+            sample(-60.0, ActivityType.STATIONARY, ActivityConfidence.HIGH), low,
+        )), "must not project a 100 s departure through explicit stationary history at -60 s")
+    }
+
+    @Test
     fun fallbackBoundsRejectRatherThanClippingDistanceDurationOrSpeed() {
         assertNull(fallback((0..4).map { first.copy(tS = it.toDouble(), lng = 0.05) }), "over 5 km")
         assertNull(fallback((0..4).map { first.copy(tS = it.toDouble(), lng = 0.04, speedMps = 1.0) }), "over 900 s")

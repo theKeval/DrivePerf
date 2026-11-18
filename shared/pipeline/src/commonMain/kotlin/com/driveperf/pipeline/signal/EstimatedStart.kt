@@ -34,21 +34,20 @@ internal class EstimatedStart(private val cfg: SignalConfig) {
         return if (runStart != null && !atEdge) {
             check(capture, parking, first, (runStart - h.startWallMs) / MS, "motion_history")
         } else {
-            fallback(capture, parking, gatedFromWake, history, runStart)
+            fallback(capture, parking, gatedFromWake, history.isEmpty() || atEdge, runStart)
         }
     }
 
     private fun fallback(
-        capture: CapturedTrip, parking: Parking, fixes: List<GatedFix>, history: List<ActivitySample>, runStart: Long?,
+        capture: CapturedTrip, parking: Parking, fixes: List<GatedFix>, unknownDeparture: Boolean, runStart: Long?,
     ): StartEstimate? {
         val h = capture.header
-        val noOtherActivity = history.isEmpty() || history.last().type == ActivityType.AUTOMOTIVE
         return if (h.sourceDetail == "geofence") {
             // Keep DRIVE-212's Android geofence policy; the robust fallback below is for iOS wakes.
             if (runStart == null) geofenceRunStart(capture, fixes)?.let {
                 check(capture, parking, fixes.first(), (it - h.startWallMs) / MS, "distance_speed")
             } else null
-        } else if (h.sourceDetail == null && h.wakeKind != WakeKind.ACTIVITY_VEHICLE && noOtherActivity) {
+        } else if (h.sourceDetail == null && h.wakeKind != WakeKind.ACTIVITY_VEHICLE && unknownDeparture) {
             distanceSpeed(capture, parking, fixes)
         } else null
     }
