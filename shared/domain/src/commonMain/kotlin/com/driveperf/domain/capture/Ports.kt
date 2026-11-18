@@ -132,3 +132,26 @@ public object NoOpAutoDetectWatchdog : AutoDetectWatchdog {
 
     override fun cancel(): Unit = Unit
 }
+
+/**
+ * The F-CAP-15 resume notice: a local notification at the time a pause ends, saying "Auto-detect is back on". The core
+ * schedules it when the user pauses automatic detection until a time, again at each launch while the pause lasts
+ * (Android alarms do not survive a reboot), and cancels it when the user resumes early, undoes the pause or turns
+ * automatic trips off. It is not cancelled when the pause ends on time: by then it has fired, or is about to. iOS uses
+ * `UNUserNotificationCenter` with one fixed request identifier; Android an inexact `AlarmManager` alarm that posts the
+ * notification.
+ */
+public interface AutoDetectResumeNotice {
+    /** Schedules the notice at [atWallMs] (UTC), replacing any pending one. */
+    public fun schedule(atWallMs: Long)
+
+    /** Removes the pending notice, if any. Safe to call when none is pending. */
+    public fun cancel()
+}
+
+/** A resume notice that schedules nothing: tests and builds without notifications. */
+public object NoOpAutoDetectResumeNotice : AutoDetectResumeNotice {
+    override fun schedule(atWallMs: Long): Unit = Unit
+
+    override fun cancel(): Unit = Unit
+}

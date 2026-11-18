@@ -13,7 +13,8 @@ public enum class RecorderState { IDLE, CANDIDATE, RECORDING, PAUSED, FINISHING 
  * @property isManual true for a manually started trip (it shows a Stop control).
  * @property elapsedS seconds since the trip start.
  * @property distanceM gated distance so far.
- * @property autoDetectEnabled false while the user has paused automatic detection.
+ * @property autoDetectEnabled the user's Automatic trips switch (S-SET-03). A pause (F-CAP-15) leaves it on and shows as
+ *   [AutoDetectHealth.PAUSED].
  * @property startFailed true when the last start was dropped because its trip file could not be created; cleared by
  *   the next start. The app tells the user that recording could not start.
  * @property autoDetectHealth what Home and Health Check show about automatic detection (F-CAP-14).
@@ -22,6 +23,9 @@ public enum class RecorderState { IDLE, CANDIDATE, RECORDING, PAUSED, FINISHING 
  * @property mayBatchLocation true when the platform may batch location delivery (Android `setMaxUpdateDelayMillis`,
  *   F-CAP-16 AC3): a confirmed trip in steady cruise, not manoeuvre-dense, with the in-drive screen not visible. False
  *   otherwise, and always false when idle; platforms deliver fixes unbatched then.
+ * @property autoDetectPausedUntilWallMs while automatic detection is paused (F-CAP-15, [AutoDetectHealth.PAUSED]): the
+ *   UTC time it comes back on by itself, for "Auto-detect paused until …". Null when not paused, or when paused until
+ *   the user turns it back on.
  */
 public data class RecorderStatus(
     val state: RecorderState,
@@ -34,6 +38,7 @@ public data class RecorderStatus(
     val autoDetectHealth: AutoDetectHealth = if (autoDetectEnabled) AutoDetectHealth.ON else AutoDetectHealth.OFF,
     val lastCheckInWallMs: Long? = null,
     val mayBatchLocation: Boolean = false,
+    val autoDetectPausedUntilWallMs: Long? = null,
 ) {
     public companion object {
         /** Idle, nothing recorded yet. */
@@ -46,8 +51,14 @@ public enum class AutoDetectHealth {
     /** On and checking in. */
     ON,
 
-    /** Turned off or paused by the user (F-CAP-15). Manual starts still work. */
+    /** Turned off by the user (the Automatic trips switch, S-SET-03). Manual starts still work. */
     OFF,
+
+    /**
+     * Paused by the user for a while (F-CAP-15, S-HOME-03): no automatic trip starts and the watchdog is off until
+     * [RecorderStatus.autoDetectPausedUntilWallMs], or until the user resumes it. Manual starts still work.
+     */
+    PAUSED,
 
     /**
      * On, but the platform reported that its triggers cannot run ([TripRecorder.setTriggersAvailable]): a permission
@@ -55,6 +66,18 @@ public enum class AutoDetectHealth {
      * without a wake often only means the phone did not move.
      */
     NEEDS_ATTENTION,
+}
+
+/** How long the user paused automatic detection for (F-CAP-15 analytics `auto_paused {duration}`). */
+public enum class AutoDetectPauseLength {
+    /** For 1 hour. */
+    ONE_HOUR,
+
+    /** Until tomorrow morning, 06:00 local time. */
+    UNTIL_MORNING,
+
+    /** Until the user turns it back on. */
+    UNTIL_RESUMED,
 }
 
 /** Why the platform is (re)starting the core at launch (F-CAP-14 analytics `rearmed {reason}`). */
@@ -76,6 +99,7 @@ public enum class RearmReason {
  * Platform code maps OS callbacks to [onWake] and implements the capture ports; it never decides whether a trip
  * exists.
  */
+@Suppress("TooManyFunctions") // the recorder's whole input surface: one call per platform fact or user action
 public interface TripRecorder {
     /** Live status for UI and live surfaces. */
     public val status: StateFlow<RecorderStatus>
@@ -95,7 +119,10 @@ public interface TripRecorder {
     /** The user marked the current trip as a passenger trip, keeping it ([keep]) or discarding it. */
     public fun markPassenger(keep: Boolean)
 
-    /** Turns automatic detection on or off (F-CAP-15 pause). Manual starts work either way. */
+    /**
+     * Turns automatic detection on or off (the Automatic trips switch, S-SET-03). Manual starts work either way.
+     * Turning it off also ends a pause ([pauseAutoDetect]), without a resume notice.
+     */
     public fun setAutoDetect(enabled: Boolean)
 
     /**
@@ -127,4 +154,21 @@ public interface TripRecorder {
      * ([RecorderStatus.mayBatchLocation]). The default is not visible.
      */
     public fun setInDriveScreenVisible(visible: Boolean) {}
+
+    /**
+     * Pauses automatic detection (F-CAP-15, S-HOME-03) until [untilWallMs] (UTC), or until [resumeAutoDetect] when it
+     * is null. While paused no automatic trip starts, the watchdog is off and the platform's resume notice
+     * ([AutoDetectResumeNotice]) is scheduled at [untilWallMs]. The pause is stored, so it survives a restart (EC-RBT),
+     * and it ends by itself at the first launch, wake or foreground after [untilWallMs], re-arming the triggers. An
+     * automatic candidate being checked is dropped; a confirmed trip keeps recording. Ignored while automatic detection
+     * is off or when [untilWallMs] has passed. Pausing again replaces the pause. [length] is what the user picked, for
+     * analytics.
+     */
+    public fun pauseAutoDetect(length: AutoDetectPauseLength, untilWallMs: Long?) {}
+
+    /** The user turned automatic detection back on before the pause ended (`auto_resumed {by: user}`). */
+    public fun resumeAutoDetect() {}
+
+    /** The user tapped Undo on the pause confirmation: ends the pause as [resumeAutoDetect] does (`auto_pause_undone`). */
+    public fun undoPauseAutoDetect() {}
 }

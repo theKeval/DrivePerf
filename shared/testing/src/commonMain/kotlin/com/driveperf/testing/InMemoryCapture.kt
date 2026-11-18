@@ -1,5 +1,7 @@
 package com.driveperf.testing
 
+import com.driveperf.domain.capture.AutoDetectPause
+import com.driveperf.domain.capture.AutoDetectPauseStore
 import com.driveperf.domain.capture.CaptureBatch
 import com.driveperf.domain.capture.CaptureHeader
 import com.driveperf.domain.capture.CaptureLog
@@ -136,5 +138,18 @@ public class InMemoryWatchdogStore(public var state: WatchdogState = WatchdogSta
     override suspend fun write(state: WatchdogState): Boolean {
         if (writable) this.state = state
         return writable
+    }
+}
+
+/** An [AutoDetectPauseStore] in memory. When [writable] is false, [write] fails as on a full disk. */
+public class InMemoryAutoDetectPauseStore(public var pause: AutoDetectPause? = null) : AutoDetectPauseStore {
+    public var writable: Boolean = true
+
+    override suspend fun read(): AutoDetectPause? = pause
+
+    override suspend fun write(pause: AutoDetectPause?): Boolean {
+        if (!writable) return false
+        this.pause = pause
+        return true
     }
 }

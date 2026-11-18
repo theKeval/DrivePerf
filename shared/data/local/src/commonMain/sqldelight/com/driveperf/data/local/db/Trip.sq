@@ -153,6 +153,16 @@ CREATE TABLE capture_watchdog (
   last_fired_at     INTEGER
 );
 
+-- F-CAP-15 pause of automatic detection (DRIVE-152): a row while paused, none otherwise. until_at is NULL for "until I
+-- turn it back on". Its own row, like capture_watchdog, so setParking's INSERT OR REPLACE on capture_state cannot
+-- clear it.
+CREATE TABLE capture_pause (
+  id         INTEGER NOT NULL PRIMARY KEY CHECK (id = 1),
+  length     TEXT NOT NULL,
+  paused_at  INTEGER NOT NULL,
+  until_at   INTEGER
+);
+
 -- Upsert as insert-if-absent then update: INSERT OR REPLACE would delete the row first and cascade to its feedback
 -- and file rows, and Android 10's SQLite (3.22) has no ON CONFLICT DO UPDATE.
 insertTripIfAbsent:
@@ -308,3 +318,12 @@ SELECT last_check_in_at, due_at, last_fired_at FROM capture_watchdog WHERE id = 
 
 setWatchdog:
 INSERT OR REPLACE INTO capture_watchdog(id, last_check_in_at, due_at, last_fired_at) VALUES (1, ?, ?, ?);
+
+autoDetectPause:
+SELECT length, paused_at, until_at FROM capture_pause WHERE id = 1;
+
+setAutoDetectPause:
+INSERT OR REPLACE INTO capture_pause(id, length, paused_at, until_at) VALUES (1, ?, ?, ?);
+
+clearAutoDetectPause:
+DELETE FROM capture_pause;

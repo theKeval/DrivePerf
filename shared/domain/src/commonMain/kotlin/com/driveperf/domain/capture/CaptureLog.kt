@@ -196,3 +196,25 @@ public interface WatchdogStore {
     /** Stores [state]. Returns false when it could not be written; the caller keeps it in memory. */
     public suspend fun write(state: WatchdogState): Boolean
 }
+
+/**
+ * A pause of automatic detection (F-CAP-15): what the user picked, when, and until when (UTC epoch ms; null until they
+ * turn it back on).
+ */
+public data class AutoDetectPause(
+    val length: AutoDetectPauseLength,
+    val pausedAtWallMs: Long,
+    val untilWallMs: Long?,
+)
+
+/**
+ * Keeps the [AutoDetectPause] across process starts and reboots (EC-RBT). Implemented in `:shared:data:local`; not a
+ * platform port. Like [WatchdogStore] it never throws for storage errors: the recorder keeps the pause in memory.
+ */
+public interface AutoDetectPauseStore {
+    /** The stored pause; null when there is none or it cannot be read. */
+    public suspend fun read(): AutoDetectPause?
+
+    /** Stores [pause], or clears it when null. Returns false when it could not be written. */
+    public suspend fun write(pause: AutoDetectPause?): Boolean
+}

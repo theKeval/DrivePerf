@@ -6,6 +6,7 @@ import com.driveperf.domain.capture.ActivityHistoryCallback
 import com.driveperf.domain.capture.ActivitySample
 import com.driveperf.domain.capture.ActivitySink
 import com.driveperf.domain.capture.ActivitySource
+import com.driveperf.domain.capture.AutoDetectResumeNotice
 import com.driveperf.domain.capture.AutoDetectWatchdog
 import com.driveperf.domain.capture.GeoPoint
 import com.driveperf.domain.capture.LocationSample
@@ -200,4 +201,24 @@ public class RecordingAnalytics : Analytics {
     override fun setUsageConsent(allowed: Boolean): Unit = Unit
 
     override fun resetId(): Unit = Unit
+}
+
+/** Records the F-CAP-15 resume notice the core schedules. */
+public class FakeAutoDetectResumeNotice : AutoDetectResumeNotice {
+    /** The pending notice time, or null when none is pending. */
+    public var scheduledAt: Long? = null
+        private set
+
+    /** Number of [cancel] calls. */
+    public var cancels: Int = 0
+        private set
+
+    override fun schedule(atWallMs: Long) {
+        scheduledAt = atWallMs
+    }
+
+    override fun cancel() {
+        scheduledAt = null
+        cancels++
+    }
 }

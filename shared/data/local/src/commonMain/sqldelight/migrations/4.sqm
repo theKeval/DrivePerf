@@ -1,0 +1,8 @@
+-- Schema 4 → 5 (DRIVE-152, F-CAP-15): the user's pause of automatic detection, kept across restarts (EC-RBT). A
+-- database from before has no row: nothing was paused.
+CREATE TABLE capture_pause (
+  id         INTEGER NOT NULL PRIMARY KEY CHECK (id = 1),
+  length     TEXT NOT NULL,
+  paused_at  INTEGER NOT NULL,
+  until_at   INTEGER
+);
