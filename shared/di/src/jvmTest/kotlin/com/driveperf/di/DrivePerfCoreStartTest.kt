@@ -6,6 +6,7 @@ import com.driveperf.domain.capture.LocationSample
 import com.driveperf.domain.capture.RecorderState
 import com.driveperf.domain.capture.WakeEvent
 import com.driveperf.domain.capture.WakeKind
+import com.driveperf.domain.replay.SegmentStyle
 import com.driveperf.domain.trip.TripSource
 import com.driveperf.domain.tripfile.TripFileKind
 import com.driveperf.testing.FakeActivitySource
@@ -22,7 +23,9 @@ import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
@@ -91,6 +94,12 @@ class DrivePerfCoreStartTest {
         val r1 = assertNotNull(bindings.files.describe(trip.id, TripFileKind.R1, withSha256 = false))
         assertTrue(r1.compressed, "R1 is gzip-compressed at finalisation")
         assertTrue(assertNotNull(bindings.files.describe(trip.id, TripFileKind.R0, withSha256 = false)).compressed)
+        // DRIVE-200: Replay reads the R1 fixes back; a manual trip has no estimated start.
+        val replay = assertNotNull(core.replay.replay(trip.id))
+        assertFalse(replay.summaryOnly)
+        assertTrue(replay.track.size > 20, "the 1 Hz fixes: ${replay.track.size}")
+        assertTrue(replay.spans.none { it.style == SegmentStyle.ESTIMATED })
+        assertNull(core.replay.replay("missing"))
     }
 
     @Test

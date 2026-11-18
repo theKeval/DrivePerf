@@ -12,6 +12,7 @@ import com.driveperf.domain.capture.LocationSource
 import com.driveperf.domain.capture.MotionSource
 import com.driveperf.domain.capture.ParkedRegionMonitor
 import com.driveperf.domain.capture.PowerState
+import com.driveperf.domain.replay.ReplayRepository
 import com.driveperf.domain.repository.RouteRepository
 import com.driveperf.domain.repository.TripRepository
 import com.driveperf.domain.trip.TripCorrections
@@ -70,6 +71,8 @@ public class CoreServices internal constructor(
     public val recorder: TripRecorder,
     public val trips: TripRepository,
     public val routes: RouteRepository,
+    /** Trip Replay and its data-quality overlay (F-RPL-01, F-RPL-08). */
+    public val replay: ReplayRepository,
     public val markEventNeeded: MarkEventNeeded,
     public val corrections: TripCorrections,
     /** Usage statistics behind the user's choice (F-ONB-08): events wait until the choice, and are dropped if declined. */
