@@ -34,15 +34,15 @@ public data class CaptureConfig(
     val imuIdleHz: Int = 10,
     val imuIdleAfterS: Double = 120.0,
     val imuWakeG: Double = 0.03,
-    // F-CAP-16 AC2 steady cruise: IMU at imuReducedHz once fixes stay at or above cruiseMinSpeedMps, within a
-    // cruiseSpeedBandMps band and turning slower than cruiseMaxTurnDps for cruiseHoldS. Any user acceleration at or
-    // above cruiseExitAccelG (braking, accelerating, cornering) ends it at once, so manoeuvres are captured at 50 Hz.
-    // Also the location-batching hint (F-CAP-16 AC3). Provisional: Batch 3 tunes them on real drives.
+    // F-CAP-16 AC2–3: steady cruise backs off the IMU and permits location batching.
+    // Sustained horizontal acceleration ends cruise to restore the nominal rate for manoeuvres.
     val cruiseMinSpeedMps: Double = 16.7,
     val cruiseSpeedBandMps: Double = 2.5,
     val cruiseMaxTurnDps: Double = 3.0,
     val cruiseHoldS: Double = 60.0,
     val cruiseExitAccelG: Double = 0.10,
+    val cruiseAccelTimeConstantS: Double = 0.10,
+    val cruiseAccelMaxGapS: Double = 0.20,
     val lowBatteryPct: Int = 15,
     val endBatteryPct: Int = 5,
     val minFreeBytes: Long = 100L * 1024 * 1024,

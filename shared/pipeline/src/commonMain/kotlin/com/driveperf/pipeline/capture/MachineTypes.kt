@@ -101,19 +101,6 @@ internal data class Stillness(
     }
 }
 
-/**
- * Steady cruise (F-CAP-16): since [sinceNs] every fix was at cruise speed, within the speed band and turning gently.
- * [steady] once that has lasted [CaptureConfig.cruiseHoldS]. [lastCourseDeg] and [lastNs] are the previous fix's.
- */
-internal data class Cruise(
-    val sinceNs: Long,
-    val minMps: Double,
-    val maxMps: Double,
-    val lastCourseDeg: Double?,
-    val lastNs: Long,
-    val steady: Boolean = false,
-)
-
 /** Everything the reducer knows. Immutable; one instance per transition. */
 internal data class MachineState(
     val phase: RecorderState = RecorderState.IDLE,

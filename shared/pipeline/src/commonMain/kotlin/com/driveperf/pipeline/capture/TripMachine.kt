@@ -506,14 +506,11 @@ internal class TripMachine(private val cfg: CaptureConfig = CaptureConfig()) {
         if (!s.isActive() || trip == null) return Transition(s)
         var still = s.still
         var wakeImu = false
-        var manoeuvre = false
         for (m in e.samples) {
             still = Stillness.add(still, m, cfg)
-            val a = Stillness.magnitude(m.userAccelG)
-            if (s.isIdlingImu() && a >= cfg.imuWakeG) wakeImu = true
-            if (a >= cfg.cruiseExitAccelG) manoeuvre = true
+            if (s.isIdlingImu() && Stillness.magnitude(m.userAccelG) >= cfg.imuWakeG) wakeImu = true
         }
-        var state = s.copy(still = still, cruise = if (manoeuvre) null else s.cruise)
+        var state = s.copy(still = still, cruise = cruiseRule.afterMotion(s.cruise, e.samples))
         val fx = mutableListOf<MachineEffect>()
         if (!s.imuStoppedForSpace && e.samples.isNotEmpty()) fx += Append(trip.id, CaptureBatch(motion = e.samples))
         if (wakeImu) {
