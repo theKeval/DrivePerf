@@ -78,11 +78,14 @@ final class PauseAutoDetectTests: XCTestCase {
         model.prepare()
         model.pause()
         XCTAssertEqual(recorder.pauses.last?.1, at(2026, 11, 19, 6))
-        // The phone flies to Vancouver: 06:00 there is three hours later than in Toronto.
+        // The phone flies to Vancouver. The expected end is built from Vancouver's own rules, not a fixed offset: tz data
+        // 2026 puts British Columbia on permanent UTC-7, where older data had PST (UTC-8).
         zone.timeZone = TimeZone(identifier: "America/Vancouver")!
+        let vancouverSix = zone.date(from: DateComponents(year: 2026, month: 11, day: 19, hour: 6))
         model.undo()
         model.pause()
-        XCTAssertEqual(recorder.pauses.last?.1, at(2026, 11, 19, 9))
+        XCTAssertEqual(recorder.pauses.last?.1, vancouverSix)
+        XCTAssertNotEqual(recorder.pauses.last?.1, at(2026, 11, 19, 6), "not 06:00 in the zone the app started in")
     }
 
     func testPauseSendsTheChoiceAndShowsTheConfirmation() {
