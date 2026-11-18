@@ -111,4 +111,28 @@ class AutoDetectReadinessTest {
         assertEquals(CheckInAge.Hours(3), CheckInAge.of(now - 3 * 3_600_000L - 1, now))
         assertEquals(CheckInAge.Older, CheckInAge.of(now - 24 * 3_600_000L, now))
     }
+
+    @Test
+    fun `a pause shows over a missing permission and the checks still list it`() {
+        val paused = AutoDetectReadiness.status(
+            optedIn = true,
+            permissions = all.copy(activity = false),
+            paused = true,
+            pausedUntilMs = 42L,
+        )
+        assertEquals(AutoDetectMode.Paused, paused.mode)
+        assertEquals(42L, paused.pausedUntilMs)
+        assertEquals(listOf(NoActivityRecognition), paused.reasons)
+        assertEquals(1, paused.checks.count { !it.ok })
+    }
+
+    @Test
+    fun `automatic trips off is off even while the core still reports a pause`() {
+        val off = AutoDetectReadiness.status(optedIn = false, permissions = all, paused = true, pausedUntilMs = 42L)
+        assertEquals(AutoDetectMode.Off, off.mode)
+        assertNull(off.pausedUntilMs)
+        val ready = AutoDetectReadiness.status(optedIn = true, permissions = all, paused = false, pausedUntilMs = 42L)
+        assertEquals(AutoDetectMode.Ready, ready.mode)
+        assertNull(ready.pausedUntilMs)
+    }
 }

@@ -85,18 +85,23 @@ data class CaptureCheck(val kind: Kind, val reason: AttentionReason?) {
     }
 }
 
-/** Whether automatic trips are off (the user's choice), ready, or opted in but blocked by [reasons]. */
-enum class AutoDetectMode { Off, Ready, NeedsAttention }
+/**
+ * Whether automatic trips are off (the user's choice), ready, opted in but blocked by [AutoDetectStatus.reasons], or
+ * paused for a while by the user (F-CAP-15).
+ */
+enum class AutoDetectMode { Off, Ready, NeedsAttention, Paused }
 
 /**
  * The one status every surface shows: the toolbar, the Home banner, the capture status sheet and Recording settings.
- * [lastCheckInMs] is the shared core's `RecorderStatus.lastCheckInWallMs`.
+ * [lastCheckInMs] is the shared core's `RecorderStatus.lastCheckInWallMs`; [pausedUntilMs] its
+ * `autoDetectPausedUntilWallMs` while [AutoDetectMode.Paused] (null: until the user turns it back on).
  */
 data class AutoDetectStatus(
     val mode: AutoDetectMode,
     val reasons: List<AttentionReason>,
     val checks: List<CaptureCheck>,
     val lastCheckInMs: Long?,
+    val pausedUntilMs: Long? = null,
 )
 
 /** Pure rules for "Auto-detect on / off / needs attention" (F-CAP-02), as iOS `AutoDetectReadiness`. */
@@ -114,13 +119,18 @@ object AutoDetectReadiness {
 
     /**
      * The status for [optedIn] (the user's Automatic trips choice) and [permissions]. [activityUpdatesFailed] is true when
-     * Play services refused the activity registration although every permission is granted.
+     * Play services refused the activity registration although every permission is granted. [paused] is the shared
+     * core's pause (F-CAP-15), until [pausedUntilMs]: it shows over a missing permission, as the core's health does, and
+     * the checks still list what to fix.
      */
+    @Suppress("LongParameterList") // the facts the one status is made of
     fun status(
         optedIn: Boolean,
         permissions: CapturePermissions,
         activityUpdatesFailed: Boolean = false,
         lastCheckInMs: Long? = null,
+        paused: Boolean = false,
+        pausedUntilMs: Long? = null,
     ): AutoDetectStatus {
         val permissionReasons = reasons(permissions)
         val reasons = if (permissionReasons.isEmpty() && activityUpdatesFailed) {
@@ -130,10 +140,12 @@ object AutoDetectReadiness {
         }
         val mode = when {
             !optedIn -> AutoDetectMode.Off
+            paused -> AutoDetectMode.Paused
             reasons.isEmpty() -> AutoDetectMode.Ready
             else -> AutoDetectMode.NeedsAttention
         }
-        return AutoDetectStatus(mode, if (optedIn) reasons else emptyList(), checks(reasons), lastCheckInMs)
+        val until = pausedUntilMs.takeIf { mode == AutoDetectMode.Paused }
+        return AutoDetectStatus(mode, if (optedIn) reasons else emptyList(), checks(reasons), lastCheckInMs, until)
     }
 
     /** The checks list: failing rows first, then the passing ones, each in [CaptureCheck.Kind] order. */

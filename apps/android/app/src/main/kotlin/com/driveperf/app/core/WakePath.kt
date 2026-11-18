@@ -1,7 +1,10 @@
 package com.driveperf.app.core
 
 import android.content.Context
+import com.driveperf.domain.capture.AutoDetectHealth
+import com.driveperf.domain.capture.AutoDetectPauseLength
 import com.driveperf.domain.capture.RecorderState
+import com.driveperf.domain.capture.RecorderStatus
 import com.driveperf.domain.capture.TripRecorder
 import com.driveperf.domain.capture.WakeKind
 import com.driveperf.feature.capture.AutoDetectReadiness
@@ -61,6 +64,15 @@ class WakePath(
 
     fun dismissForceStopNotice() = health.dismissForceStopNotice()
 
+    /** S-HOME-03 Pause (F-CAP-15): the core keeps the pause, ends it and schedules the "back on" notice. */
+    fun pauseAutoDetect(length: AutoDetectPauseLength, untilWallMs: Long?) = recorder.pauseAutoDetect(length, untilWallMs)
+
+    /** Resume auto-detect, from the Home banner or S-HOME-03. */
+    fun resumeAutoDetect() = recorder.resumeAutoDetect()
+
+    /** Undo on the S-HOME-03 confirmation. */
+    fun undoPauseAutoDetect() = recorder.undoPauseAutoDetect()
+
     fun setInDriveScreenVisible(visible: Boolean) {
         inDriveScreenVisible.value = visible
         recorder.setInDriveScreenVisible(visible)
@@ -70,8 +82,11 @@ class WakePath(
     fun install(permissions: PermissionState, scope: CoroutineScope, location: FixWatch) {
         WakeDispatcher.setHandler { wake ->
             // The core keeps auto-detect on while a permission is missing, so it can report "needs attention" (F-CAP-14);
-            // OS wakes then stop here, as they did when the core itself had auto-detect off.
-            if (wake.kind == WakeKind.MANUAL || automaticNow) CaptureStarter.start(context, wake)
+            // OS wakes then stop here, as they did when the core itself had auto-detect off. So do they during a pause
+            // (F-CAP-15), which would only flash the capture notification: once it has run out they reach the core,
+            // which ends the pause and starts the trip.
+            val automatic = automaticNow && !pauseHolds(recorder.status.value, AndroidClock.wallMs())
+            if (wake.kind == WakeKind.MANUAL || automatic) CaptureStarter.start(context, wake)
         }
         health.onLaunch(optedIn()) { sinceMs -> ForceStopHistory.detected(context, sinceMs) }
         refresh(permissions)
@@ -79,8 +94,8 @@ class WakePath(
             permissionsNow,
             optedInNow,
             health.status,
-            recorder.status.map { it.lastCheckInWallMs }.distinctUntilChanged(),
-        ) { granted, enabled, wake, checkIn -> autoDetectStatus(enabled, granted, wake, checkIn) }
+            recorder.status.map { it.lastCheckInWallMs to CorePause.of(it) }.distinctUntilChanged(),
+        ) { granted, enabled, wake, (checkIn, pause) -> autoDetectStatus(enabled, granted, wake, checkIn, pause) }
             .onEach { mutableAutoDetect.value = it }
             .launchIn(scope)
         recorder.status
@@ -135,5 +150,15 @@ class WakePath(
          */
         fun automaticAllowed(p: PermissionState, optedIn: Boolean): Boolean =
             optedIn && AutoDetectReadiness.reasons(p.forCapture()).isEmpty()
+
+        /**
+         * True while the user's pause (F-CAP-15) still holds at [nowWallMs]: OS wakes are not handed to the capture
+         * service then. A pause whose end has passed does not hold, so the wake reaches the core, which ends it.
+         */
+        fun pauseHolds(status: RecorderStatus, nowWallMs: Long): Boolean {
+            if (status.autoDetectHealth != AutoDetectHealth.PAUSED) return false
+            val until = status.autoDetectPausedUntilWallMs
+            return until == null || until > nowWallMs
+        }
     }
 }
