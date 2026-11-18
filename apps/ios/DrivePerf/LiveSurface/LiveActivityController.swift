@@ -57,6 +57,7 @@ final class LiveActivityController: LiveSurfacing {
         }) else { return false }
         activity = existing
         state = existing.content.state
+        lastDistanceM = existing.content.state.distanceKm * 1000
         lastPushAt = Date()
         lastPushedTenths = Int((existing.content.state.distanceKm * 10).rounded())
         return true
