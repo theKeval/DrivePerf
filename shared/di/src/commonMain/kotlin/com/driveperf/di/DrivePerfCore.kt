@@ -4,6 +4,7 @@ import com.driveperf.data.local.DatabaseDriverFactory
 import com.driveperf.data.local.LocalEventFeedbackStore
 import com.driveperf.data.local.LocalRouteHistory
 import com.driveperf.data.local.LocalRouteRepository
+import com.driveperf.data.local.LocalSettingsRepository
 import com.driveperf.data.local.LocalTripCorrections
 import com.driveperf.data.local.LocalTripHistory
 import com.driveperf.data.local.LocalTripRepository
@@ -115,8 +116,6 @@ public object DrivePerfCore {
             config = capture,
             analytics = analytics,
         )
-        val settings = com.driveperf.data.local.LocalSettingsRepository(db, io, clock, analytics)
-        scope.followBatterySaver(settings, recorder)
         val trips = LocalTripRepository(db, files, io)
         val routes = LocalRouteRepository(db, io)
         // DRIVE-100: trips corrected to not-a-drive more than 30 days ago are deleted once per start.
@@ -131,7 +130,7 @@ public object DrivePerfCore {
             ),
             corrections = corrections,
             analytics = analytics,
-            settings = settings,
+            settings = LocalSettingsRepository(db, io, clock, analytics).also { scope.followBatterySaver(it, recorder) },
             onClose = {
                 scope.cancel()
                 driver.close()
