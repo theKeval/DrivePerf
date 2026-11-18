@@ -46,14 +46,21 @@ public struct ReplaySpan: Equatable, Sendable {
     public var style: ReplaySegmentStyle
     public var t0S: Double
     public var t1S: Double
+    /// The core's chip text: "Estimated start", "No GPS", "Phone moved — not scored", or "Not scored" when an excluded
+    /// span was left out for another reason. Nil falls back to the style's text.
+    public var label: String?
 
-    public init(style: ReplaySegmentStyle, t0S: Double, t1S: Double) {
+    public init(style: ReplaySegmentStyle, t0S: Double, t1S: Double, label: String? = nil) {
         self.style = style
         self.t0S = t0S
         self.t1S = t1S
+        self.label = label
     }
 
-    public func contains(_ tS: Double) -> Bool { tS >= t0S && tS < t1S }
+    /// Kotlin `Replay.spanAt`: start inclusive, end exclusive, except a span that runs to the end of the trip.
+    public func contains(_ tS: Double, durationS: Double) -> Bool {
+        tS >= t0S && (tS < t1S || (tS == t1S && t1S >= durationS))
+    }
 }
 
 /// Kotlin `ReplayFrame`: the marker at one moment. Display-only interpolation between 1 Hz fixes.
@@ -135,6 +142,21 @@ public protocol ReplayTrack: AnyObject, Sendable {
     func frame(at tS: Double) -> ReplayFrame
     /// Trip seconds per wall-clock second.
     func playbackRate(_ speed: PlaybackSpeed) -> Double
+    /// Kotlin `Replay.zoomBucketFor`: the simplification bucket for a map `viewWidth` points wide showing
+    /// `longitudeDelta` degrees of longitude.
+    func zoomBucket(longitudeDelta: Double, viewWidth: Double) -> Int
+}
+
+/// Kotlin `Replay.MAX_ZOOM` and the web-Mercator bucket formula, for fakes and previews that have no core.
+public enum ReplayZoomMath {
+    public static let maxZoom = 22
+
+    public static func bucket(longitudeDelta: Double, viewWidth: Double) -> Int {
+        guard longitudeDelta > 0, viewWidth > 0 else { return maxZoom }
+        let zoom = log2(360 * viewWidth / (256 * longitudeDelta)).rounded(.down)
+        guard zoom.isFinite else { return maxZoom }
+        return min(max(Int(zoom), 0), maxZoom)
+    }
 }
 
 /// Kotlin `ReplayRepository`.

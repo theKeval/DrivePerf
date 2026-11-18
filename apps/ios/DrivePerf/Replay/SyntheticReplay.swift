@@ -56,7 +56,7 @@ final class SyntheticReplay: ReplayTrack, @unchecked Sendable {
 
     /// How a fix is drawn: estimated or excluded by span, otherwise observed (the gap has no fixes).
     private func drawStyle(at tS: Double) -> ReplaySegmentStyle {
-        spans.first { $0.style != .noGps && $0.contains(tS) }?.style ?? .observed
+        spans.first { $0.style != .noGps && $0.contains(tS, durationS: durationS) }?.style ?? .observed
     }
 
     private func inGap(_ tS: Double) -> Bool { tS > gap.lowerBound && tS < gap.upperBound }
@@ -64,7 +64,7 @@ final class SyntheticReplay: ReplayTrack, @unchecked Sendable {
     /// Runs of one style that meet at their boundary fix; the gap is a two-point `noGps` segment across it. Coarser
     /// buckets keep every n-th fix but always each run's first and last.
     func segments(zoomBucket: Int) -> [ReplaySegment] {
-        let stride = max(1, 1 << max(0, 14 - zoomBucket))
+        let stride = max(1, 1 << max(0, 16 - zoomBucket))
         var out: [ReplaySegment] = []
         var run: [ReplayPoint] = []
         var runStyle: ReplaySegmentStyle?
@@ -112,6 +112,10 @@ final class SyntheticReplay: ReplayTrack, @unchecked Sendable {
             tS: t, lat: a.lat + (b.lat - a.lat) * f, lng: a.lng + (b.lng - a.lng) * f,
             speedMps: a.speedMps.map { $0 + ((b.speedMps ?? $0) - $0) * f },
             bearingDeg: (bearing + 360).truncatingRemainder(dividingBy: 360), style: drawStyle(at: t))
+    }
+
+    func zoomBucket(longitudeDelta: Double, viewWidth: Double) -> Int {
+        ReplayZoomMath.bucket(longitudeDelta: longitudeDelta, viewWidth: viewWidth)
     }
 
     func playbackRate(_ speed: PlaybackSpeed) -> Double {

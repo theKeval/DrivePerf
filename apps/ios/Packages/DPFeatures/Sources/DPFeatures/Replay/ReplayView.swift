@@ -125,6 +125,7 @@ private struct ReplayMapLayer: View {
     let model: ReplayViewModel
     @State private var position: MapCameraPosition = .automatic
     @State private var camera: MapCamera?
+    @State private var width: CGFloat = 402
 
     var body: some View {
         MapReader { proxy in
@@ -133,18 +134,19 @@ private struct ReplayMapLayer: View {
             }
             .mapStyle(.standard(elevation: .flat, emphasis: .muted, pointsOfInterest: .excludingAll))
             .mapControls {}
+            // The marker overlay reads the camera, so it follows pans and zooms.
             .onMapCameraChange(frequency: .continuous) { context in camera = context.camera }
             .onMapCameraChange(frequency: .onEnd) { context in
-                model.setZoomBucket(ReplayZoom.bucket(longitudeDelta: context.region.span.longitudeDelta))
+                model.cameraSettled(longitudeDelta: context.region.span.longitudeDelta, viewWidth: width)
             }
             .overlay {
                 ReplayMarkerLayer(model: model, heading: camera?.heading ?? 0) { lat, lng in
-                    _ = camera
-                    return proxy.convert(CLLocationCoordinate2D(latitude: lat, longitude: lng), to: .local)
+                    proxy.convert(CLLocationCoordinate2D(latitude: lat, longitude: lng), to: .local)
                 }
                 .allowsHitTesting(false)
             }
         }
+        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width = $0 }
         .onAppear { if let bounds = model.bounds { position = .region(Self.region(bounds)) } }
     }
 
@@ -153,7 +155,7 @@ private struct ReplayMapLayer: View {
         let center = CLLocationCoordinate2D(latitude: (b.minLat + b.maxLat) / 2, longitude: (b.minLng + b.maxLng) / 2)
         let span = MKCoordinateSpan(
             latitudeDelta: max((b.maxLat - b.minLat) * 1.6, 0.005),
-            longitudeDelta: max((b.maxLng - b.minLng) * 1.3, 0.005))
+            longitudeDelta: max((b.maxLng - b.minLng) * ReplayViewModel.fitPadding, 0.005))
         // Shift up a little: the playback bar covers the bottom of the map.
         return MKCoordinateRegion(
             center: CLLocationCoordinate2D(latitude: center.latitude - span.latitudeDelta * 0.12, longitude: center.longitude),

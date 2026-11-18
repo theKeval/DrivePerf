@@ -1,17 +1,25 @@
+import DPFeatures
 import DPSharedBridge
 import Foundation
+import SwiftUI
 
 /// Debug launch arguments for Replay with no real data: `-replayFixture` lists one synthetic trip, skips onboarding
-/// and keeps the core and Core Location off; `-replayOffline` also reports no network (the plain canvas). Used by the
-/// UI test and for PR screenshots, so no real route is ever shown.
+/// and keeps the core and Core Location off; `-replayOffline` also reports no network (the plain canvas);
+/// `-replayFixtureAt <seconds>` opens the synthetic Replay straight away at that time (screenshots on a phone that
+/// no tool can tap). Used by the UI test and for PR screenshots, so no real route is ever shown.
 enum ReplayFixture {
     #if DEBUG
-    static let isActive = ProcessInfo.processInfo.arguments.contains("-replayFixture")
-    static let isOffline = ProcessInfo.processInfo.arguments.contains("-replayOffline")
+    static let isActive = arguments.contains("-replayFixture") || screenTime != nil
+    static let isOffline = arguments.contains("-replayOffline")
+    static let screenTime: Double? = arguments.firstIndex(of: "-replayFixtureAt")
+        .flatMap { arguments.indices.contains($0 + 1) ? Double(arguments[$0 + 1]) : nil }
     #else
     static let isActive = false
     static let isOffline = false
+    static let screenTime: Double? = nil
     #endif
+
+    private static var arguments: [String] { ProcessInfo.processInfo.arguments }
 
     static let tripId = "synthetic-replay"
 
@@ -44,5 +52,31 @@ final class FixedConnectivity: ConnectivityMonitoring {
 
     func onlineUpdates() -> AsyncStream<Bool> {
         AsyncStream { continuation in continuation.yield(online) }
+    }
+}
+
+/// `-replayFixtureAt`: S-RPL-01 on the synthetic trip, paused at the given time.
+struct ReplayFixtureScreen: View {
+    let time: Double
+    let environment: AppEnvironment
+    @State private var model: ReplayViewModel?
+
+    var body: some View {
+        NavigationStack {
+            if let model {
+                ReplayView(
+                    model: model, title: "Replay", subtitle: "Tuesday evening",
+                    mapSummary: "Map of your drive, 19.9 km.")
+            }
+        }
+        .task {
+            let model = ReplayViewModel(
+                tripId: ReplayFixture.tripId, loader: SyntheticReplayLoader(),
+                connectivity: environment.connectivity, display: DisplaySettingsModel(storage: environment.displaySettings))
+            await model.load()
+            model.scrub(to: time)
+            model.endScrub()
+            self.model = model
+        }
     }
 }

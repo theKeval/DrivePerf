@@ -226,21 +226,31 @@ final class ReplayViewModelTests: XCTestCase {
         XCTAssertEqual(table.frame(at: 0.5).bearingDeg ?? -1, 0, accuracy: 1e-9)
     }
 
-    func testZoomBucketsFollowTheVisibleSpan() {
-        XCTAssertEqual(ReplayZoom.bucket(longitudeDelta: 360), 0)
-        XCTAssertEqual(ReplayZoom.bucket(longitudeDelta: 0.35), 10)
-        XCTAssertEqual(ReplayZoom.bucket(longitudeDelta: 0), 20)
-        XCTAssertEqual(ReplayZoom.bucket(longitudeDelta: 1e-9), 20)
+    func testZoomBucketsMatchTheCoreFormula() {
+        // Kotlin Replay.zoomBucketFor: floor(log2(360 * width / (256 * delta))), 0...22.
+        XCTAssertEqual(ReplayZoomMath.bucket(longitudeDelta: 360, viewWidth: 256), 0)
+        XCTAssertEqual(ReplayZoomMath.bucket(longitudeDelta: 0.35, viewWidth: 402), 10)
+        XCTAssertEqual(ReplayZoomMath.bucket(longitudeDelta: 0, viewWidth: 402), 22)
+        XCTAssertEqual(ReplayZoomMath.bucket(longitudeDelta: 1e-9, viewWidth: 402), 22)
     }
 
-    func testAZoomChangeAsksTheCoreForThatBucketOnce() async {
+    func testACameraChangeAsksTheCoreForThatBucketOnce() async {
         let model = await loaded()
         let track = loader.track as? FakeReplayTrack
-        model.setZoomBucket(5)
-        model.setZoomBucket(12)
-        model.setZoomBucket(5)
+        model.cameraSettled(longitudeDelta: 360, viewWidth: 256 * 32)
+        model.cameraSettled(longitudeDelta: 0.01, viewWidth: 402)
+        model.cameraSettled(longitudeDelta: 360, viewWidth: 256 * 32)
         XCTAssertEqual(model.zoomBucket, 5)
         XCTAssertEqual(track?.bucketsAsked.filter { $0 == 5 }.count, 1)
+    }
+
+    func testTheCoreLabelWinsOverTheStyleText() async {
+        let track = FakeReplayTrack()
+        track.spans[2].label = "Not scored"
+        loader.track = track
+        let model = await loaded()
+        model.scrub(to: 420)
+        XCTAssertEqual(model.spanLabel, "Not scored")
     }
 
     // MARK: Analytics keys
@@ -284,7 +294,7 @@ final class FakeReplayTrack: ReplayTrack, @unchecked Sendable {
     let bbox = FakeReplayTrack.bounds
     let durationS: Double = 600
     let summaryOnly = false
-    let spans = [
+    var spans = [
         ReplaySpan(style: .estimated, t0S: 0, t1S: 30),
         ReplaySpan(style: .noGps, t0S: 200, t1S: 240),
         ReplaySpan(style: .excluded, t0S: 400, t1S: 460),
@@ -303,9 +313,13 @@ final class FakeReplayTrack: ReplayTrack, @unchecked Sendable {
     }
 
     func frame(at tS: Double) -> ReplayFrame {
-        let style = spans.first { $0.contains(tS) }?.style ?? .observed
+        let style = spans.first { $0.contains(tS, durationS: durationS) }?.style ?? .observed
         let t = style == .noGps ? 200 : tS
         return ReplayFrame(tS: tS, lat: Self.lat(t), lng: 0, speedMps: style == .noGps ? nil : 15, bearingDeg: 0, style: style)
+    }
+
+    func zoomBucket(longitudeDelta: Double, viewWidth: Double) -> Int {
+        ReplayZoomMath.bucket(longitudeDelta: longitudeDelta, viewWidth: viewWidth)
     }
 
     func playbackRate(_ speed: PlaybackSpeed) -> Double {

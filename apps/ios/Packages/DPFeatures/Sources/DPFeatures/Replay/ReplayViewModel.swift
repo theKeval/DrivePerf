@@ -16,23 +16,6 @@ public struct ReplayProLockNotBuilt: ReplayProLock {
     public func isLocked(tripStartedAt: Date, now: Date) -> Bool { false }
 }
 
-/// Map zoom to the core's simplification buckets (ADR-005: Douglas–Peucker per zoom bucket).
-public enum ReplayZoom {
-    public static let buckets = 0...20
-
-    /// The web-map zoom level for a visible longitude span, clamped to the buckets.
-    public static func bucket(longitudeDelta: Double) -> Int {
-        guard longitudeDelta > 0, longitudeDelta.isFinite else { return buckets.upperBound }
-        let zoom = Int(log2(360 / longitudeDelta).rounded(.down))
-        return min(max(zoom, buckets.lowerBound), buckets.upperBound)
-    }
-
-    /// The bucket that shows a route of this bounding box fitted to the screen.
-    public static func bucket(fitting bounds: ReplayBounds) -> Int {
-        bucket(longitudeDelta: max(bounds.maxLng - bounds.minLng, bounds.maxLat - bounds.minLat) * 1.3)
-    }
-}
-
 /// One route stretch ready for MapKit, built when the zoom bucket changes, never per frame.
 public struct ReplayPolyline: Identifiable, Sendable {
     public var id: Int
@@ -76,7 +59,7 @@ public final class ReplayViewModel {
     }
     /// `segments` as map coordinates.
     public private(set) var polylines: [ReplayPolyline] = []
-    public private(set) var zoomBucket = ReplayZoom.buckets.upperBound
+    public private(set) var zoomBucket = ReplayZoomMath.maxZoom
     /// The styles this trip draws, for the legend and its order.
     public private(set) var stylesPresent: [ReplaySegmentStyle] = []
 
@@ -125,6 +108,8 @@ public final class ReplayViewModel {
             opened = true
             analytics?.track(.opened(source: source))
         }
+        // Coming back to the screen keeps the position; only a first load or Try again fetches.
+        guard phase != .ready else { return }
         if let tripStartedAt, lock.isLocked(tripStartedAt: tripStartedAt, now: now()) {
             phase = .locked
             return
@@ -154,7 +139,9 @@ public final class ReplayViewModel {
         summaryOnly = track.summaryOnly
         rate = track.playbackRate(speed)
         segmentCache = [:]
-        zoomBucket = ReplayZoom.bucket(fitting: track.bbox)
+        // Until the map reports its camera: the fitted route on a phone-wide map.
+        zoomBucket = track.zoomBucket(
+            longitudeDelta: max(track.bbox.maxLng - track.bbox.minLng, 1e-4) * Self.fitPadding, viewWidth: 402)
         segments = segments(for: zoomBucket)
         let present = Set(segments.map(\.style)).union(spans.map(\.style))
         stylesPresent = ReplaySegmentStyle.allCases.filter(present.contains)
@@ -171,12 +158,16 @@ public final class ReplayViewModel {
         for await online in connectivity.onlineUpdates() { isOnline = online }
     }
 
-    /// The camera settled at a new zoom: simplify for it (cached per bucket).
-    public func setZoomBucket(_ bucket: Int) {
-        let clamped = min(max(bucket, ReplayZoom.buckets.lowerBound), ReplayZoom.buckets.upperBound)
-        guard clamped != zoomBucket, track != nil else { return }
-        zoomBucket = clamped
-        segments = segments(for: clamped)
+    /// How much wider than the route the fitted map is.
+    static let fitPadding = 1.3
+
+    /// The camera settled: simplify for its zoom bucket (cached per bucket).
+    public func cameraSettled(longitudeDelta: Double, viewWidth: Double) {
+        guard let track else { return }
+        let bucket = track.zoomBucket(longitudeDelta: longitudeDelta, viewWidth: viewWidth)
+        guard bucket != zoomBucket else { return }
+        zoomBucket = bucket
+        segments = segments(for: bucket)
     }
 
     private func segments(for bucket: Int) -> [ReplaySegment] {
@@ -287,12 +278,12 @@ public final class ReplayViewModel {
 
     /// The span the marker is in, if any.
     public var activeSpan: ReplaySpan? {
-        spans.first { $0.contains(tS) }
+        spans.first { $0.contains(tS, durationS: durationS) }
     }
 
     /// The small label while the marker is inside a span (AC2): "Estimated start", "No GPS", "Phone moved — not scored".
     public var spanLabel: String? {
-        activeSpan.flatMap { Self.label($0.style) }
+        activeSpan.flatMap { $0.label ?? Self.label($0.style) }
     }
 
     /// The marker hides in a GPS gap and reappears after it.
