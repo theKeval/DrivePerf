@@ -467,7 +467,7 @@ internal class TripMachine(private val cfg: CaptureConfig = CaptureConfig()) {
         val began = s.stoppingBeganAtNs ?: nowNs
         val stopAt = began + secondsNs(stopSeconds(trip))
         return Transition(
-            s.copy(phase = PAUSED, resumeFixes = 0, cruise = null),
+            s.copy(phase = PAUSED, cruise = null),
             listOf(
                 Mark(trip.id, began, CaptureMarkType.PAUSED),
                 Schedule(TimerId.STOP, maxOf(0L, stopAt - nowNs)),
@@ -479,10 +479,10 @@ internal class TripMachine(private val cfg: CaptureConfig = CaptureConfig()) {
     private fun stopSeconds(trip: ActiveTrip): Double = if (trip.manual) cfg.manualStopS else cfg.autoStopS
 
     private fun resumeCheck(s: MachineState, fix: LocationSample, nowNs: Long): Transition {
-        val fast = (fix.speedMps ?: 0.0) >= cfg.resumeSpeedMps
-        val count = if (fast) s.resumeFixes + 1 else 0
-        val next = s.copy(resumeFixes = count)
-        return if (count >= cfg.resumeFixes && !s.humanPowered()) resume(next, nowNs) else Transition(next)
+        val fresh = nowNs - fix.tMonoNs in 0L..secondsNs(cfg.resumeFixAgeS)
+        val accurate = fix.hAccM?.let { it in 0.0..cfg.resumeFixHAccM } == true
+        val driving = (fix.speedMps ?: 0.0) >= cfg.resumeSpeedMps && !s.humanPowered()
+        return if (fresh && accurate && driving) resume(s, nowNs) else Transition(s)
     }
 
     private fun resume(s: MachineState, nowNs: Long): Transition {
@@ -490,7 +490,7 @@ internal class TripMachine(private val cfg: CaptureConfig = CaptureConfig()) {
         val (hz, reason) = targetRate(s.copy(cruise = null))
         val rate = if (s.imuHz != hz && !s.imuStoppedForSpace) rateEffects(trip, hz, reason, nowNs) else emptyList()
         val next = s.copy(
-            phase = RECORDING, slowFixes = 0, slowSinceNs = null, stoppingBeganAtNs = null, resumeFixes = 0,
+            phase = RECORDING, slowFixes = 0, slowSinceNs = null, stoppingBeganAtNs = null,
             imuHz = if (s.imuStoppedForSpace) s.imuHz else hz,
         )
         return Transition(
@@ -528,19 +528,13 @@ internal class TripMachine(private val cfg: CaptureConfig = CaptureConfig()) {
     }
 
     private fun imuRules(s: MachineState, nowNs: Long): Transition {
+        if (s.phase != RECORDING) return Transition(s)
         val gnssStale = s.lastFix?.let { nowNs - it.tMonoNs > secondsNs(GNSS_STALE_S) } ?: true
-        return when {
-            s.phase == RECORDING && gnssStale -> {
-                val since = s.still.stillSinceNs
-                val stillLongEnough = since != null && nowNs - since >= secondsNs(cfg.pauseAfterS)
-                if (stillLongEnough) pause(s.copy(stoppingBeganAtNs = since), nowNs) else Transition(s)
-            }
-            s.phase == PAUSED -> {
-                val since = s.still.movingSinceNs
-                val moving = since != null && nowNs - since >= secondsNs(cfg.resumeImuMovingS)
-                if (moving && s.activity.isAtLeastMedium(ActivityType.AUTOMOTIVE)) resume(s, nowNs) else Transition(s)
-            }
-            else -> Transition(s)
+        val since = s.still.stillSinceNs
+        return if (gnssStale && since != null && nowNs - since >= secondsNs(cfg.pauseAfterS)) {
+            pause(s.copy(stoppingBeganAtNs = since), nowNs)
+        } else {
+            Transition(s)
         }
     }
 
@@ -554,7 +548,6 @@ internal class TripMachine(private val cfg: CaptureConfig = CaptureConfig()) {
         val append = Append(trip.id, CaptureBatch(activity = samples))
         val t = when (state.phase) {
             CANDIDATE -> decideCandidate(state, nowNs)
-            PAUSED -> imuRules(state, nowNs)
             else -> Transition(state)
         }
         return Transition(t.state, listOf(append) + t.effects)
