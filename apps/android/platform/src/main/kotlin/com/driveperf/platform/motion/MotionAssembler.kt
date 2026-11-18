@@ -1,5 +1,6 @@
 package com.driveperf.platform.motion
 
+import com.driveperf.domain.capture.GravityTracker
 import com.driveperf.domain.capture.MotionSample
 import com.driveperf.domain.capture.Quat
 import com.driveperf.domain.capture.Vec3
@@ -8,33 +9,43 @@ import kotlin.math.PI
 import kotlin.math.sqrt
 
 /**
- * Combines the separate Android sensor streams into [MotionSample]s in the normalised device frame, and converts units:
- * m/s² to g, rad/s to °/s (pipeline-and-scoring.md section 2.1).
+ * Combines the raw accelerometer and gyroscope streams into [MotionSample]s in the normalised device frame
+ * (pipeline-and-scoring.md section 2.1): m/s² to g, rad/s to °/s, gravity split out by [GravityTracker].
+ *
+ * **Why not `TYPE_GRAVITY` / `TYPE_LINEAR_ACCELERATION`** (DRIVE-160): on a OnePlus 7T the fused gravity followed every
+ * sustained braking or acceleration within about a second, so linear acceleration lost the low-frequency part of the
+ * car's motion and phone-to-vehicle alignment never converged on any drive. The tracker keeps gravity on the gyroscope
+ * and lets it follow the accelerometer only with a 30 s time constant, which matches Core Motion on iPhone drives.
+ *
+ * **Time alignment:** with batching (`maxReportLatencyUs`) the sensor hub delivers each sensor's events in bursts, so
+ * the latest gyroscope reading can be half a second older than an accelerometer event (DRIVE-160 found gyro values
+ * repeated for up to 2 s). Accelerometer events are therefore held until a gyroscope event at or after their time has
+ * arrived, and the rotation rate is interpolated at the accelerometer timestamp. An event waits at most [maxWaitNs];
+ * after that the nearest gyroscope reading is used.
  *
  * **Sign conventions** (to be confirmed by the on-device shake/tilt/spin conformance test, which is mandatory):
- * `TYPE_LINEAR_ACCELERATION` is already positive towards the device's right edge when it accelerates that way, so it
- * is only scaled; `TYPE_GRAVITY` points away from Earth at rest (a phone lying face-up reads +9.8 on z), which is
- * exactly `gravityUp`, so it is only normalised; `TYPE_GYROSCOPE` is counter-clockwise positive.
+ * `TYPE_ACCELEROMETER` reads the specific force, +9.8 on z for a phone lying face up, which is the tracker's input
+ * convention; `TYPE_GYROSCOPE` is counter-clockwise positive.
  *
  * **Thread safety:** the assembler holds mutable state and is not thread-safe. [SensorMotionSource] calls it only from
  * its single sensor handler thread (spike 1 change 6: callbacks must not touch state from another thread), and
  * hands finished samples across threads through a channel.
- *
- * A sample is emitted each time linear acceleration arrives, using the latest gravity, gyro and attitude readings, once
- * gravity and gyro have been seen.
  */
-internal class MotionAssembler {
-    private var gravity: Vec3? = null
-    private var gyroDps: Vec3? = null
+internal class MotionAssembler(
+    private val tracker: GravityTracker = GravityTracker(),
+    private val maxWaitNs: Long = MAX_WAIT_NS,
+) {
+    private class Reading(val tNs: Long, val x: Double, val y: Double, val z: Double)
+
+    private val pendingAccel = ArrayDeque<Reading>()
+    private val gyro = ArrayDeque<Reading>()
     private var attitude: Quat? = null
+    private var lastAccelNs = Long.MIN_VALUE
 
-    fun onGravity(x: Double, y: Double, z: Double) {
-        val norm = sqrt(x * x + y * y + z * z)
-        if (norm > MIN_GRAVITY) gravity = Vec3(x / norm, y / norm, z / norm)
-    }
-
-    fun onGyro(xRadS: Double, yRadS: Double, zRadS: Double) {
-        gyroDps = Vec3(xRadS * RAD_TO_DEG, yRadS * RAD_TO_DEG, zRadS * RAD_TO_DEG)
+    /** Returns the accelerometer samples this gyroscope reading releases, in time order. */
+    fun onGyro(tNs: Long, xRadS: Double, yRadS: Double, zRadS: Double): List<MotionSample> {
+        if (gyro.isEmpty() || tNs > gyro.last().tNs) gyro.addLast(Reading(tNs, xRadS * RAD_TO_DEG, yRadS * RAD_TO_DEG, zRadS * RAD_TO_DEG))
+        return release()
     }
 
     /** [w] is absent on devices that report only the vector part of the rotation vector. */
@@ -43,25 +54,56 @@ internal class MotionAssembler {
         attitude = Quat(wValue, x, y, z)
     }
 
-    /** Returns the finished sample, or null while gravity or gyro has not arrived yet. */
-    fun onLinearAcceleration(tNs: Long, xMs2: Double, yMs2: Double, zMs2: Double): MotionSample? {
-        val up = gravity
-        val rot = gyroDps
-        return if (up == null || rot == null) {
-            null
-        } else {
-            MotionSample(
-                tMonoNs = tNs,
-                userAccelG = Vec3(xMs2 / Units.G, yMs2 / Units.G, zMs2 / Units.G),
-                gravityUp = up,
-                rotRateDps = rot,
-                attitude = attitude,
-            )
+    /** Queues an accelerometer reading (m/s², gravity included) and returns the samples now complete. */
+    fun onAccelerometer(tNs: Long, xMs2: Double, yMs2: Double, zMs2: Double): List<MotionSample> {
+        if (tNs <= lastAccelNs) return emptyList()
+        lastAccelNs = tNs
+        pendingAccel.addLast(Reading(tNs, xMs2, yMs2, zMs2))
+        return release()
+    }
+
+    private fun release(): List<MotionSample> {
+        val out = mutableListOf<MotionSample>()
+        while (pendingAccel.isNotEmpty()) {
+            val a = pendingAccel.first()
+            val covered = gyro.isNotEmpty() && gyro.last().tNs >= a.tNs
+            val timedOut = gyro.isNotEmpty() && pendingAccel.last().tNs - a.tNs > maxWaitNs
+            if (!covered && !timedOut) break
+            pendingAccel.removeFirst()
+            out += sample(a, rateAt(a.tNs))
+        }
+        // Keep one gyroscope reading at or before the oldest accelerometer event still waiting, for interpolation.
+        val oldest = pendingAccel.firstOrNull()?.tNs ?: gyro.lastOrNull()?.tNs
+        while (oldest != null && gyro.size > 1 && gyro[1].tNs <= oldest) gyro.removeFirst()
+        return out
+    }
+
+    private fun rateAt(tNs: Long): Vec3 {
+        val after = gyro.indexOfFirst { it.tNs >= tNs }
+        return when {
+            after == -1 -> gyro.last().vec()
+            after == 0 -> gyro.first().vec()
+            else -> {
+                val p = gyro[after - 1]
+                val n = gyro[after]
+                val f = (tNs - p.tNs).toDouble() / (n.tNs - p.tNs)
+                Vec3(p.x + (n.x - p.x) * f, p.y + (n.y - p.y) * f, p.z + (n.z - p.z) * f)
+            }
         }
     }
 
+    private fun sample(a: Reading, rotRateDps: Vec3): MotionSample {
+        val force = Vec3(a.x / Units.G, a.y / Units.G, a.z / Units.G)
+        val split = tracker.update(a.tNs, force, rotRateDps)
+        return MotionSample(a.tNs, split.userAccelG, split.gravityUp, rotRateDps, attitude)
+    }
+
+    private fun Reading.vec() = Vec3(x, y, z)
+
     companion object {
         const val RAD_TO_DEG = 180.0 / PI
-        private const val MIN_GRAVITY = 1e-6
+
+        /** Longer than the 500 ms batching latency [SensorMotionSource] requests, so a normal flush never times out. */
+        const val MAX_WAIT_NS = 1_000_000_000L
     }
 }
