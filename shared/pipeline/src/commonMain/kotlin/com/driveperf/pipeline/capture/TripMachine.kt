@@ -155,23 +155,19 @@ internal class TripMachine(private val cfg: CaptureConfig = CaptureConfig()) {
 
     /**
      * Turning detection on is a check-in and re-arms; turning it off removes the watchdog. Turning it off also ends a
-     * pause, silently: a later switch-on means on, not "still paused" (F-CAP-15).
+     * pause, silently: a later switch-on means on, not "still paused" (F-CAP-15). The resume notice is removed on every
+     * switch-off, paused or not: a pause that just ended on time may still have its notice pending (Android delivers the
+     * alarm within a 10-minute window), and "Auto-detect is back on" must not follow a switch-off.
      */
     private fun onAutoDetect(s: MachineState, e: MachineEvent.AutoDetect): Transition {
         val next = s.copy(autoDetect = e.enabled)
         return when {
             e.enabled == s.autoDetect -> Transition(next)
             e.enabled -> Transition(next, (if (s.phase == IDLE) armAt(s.parking) else emptyList()) + MachineEffect.CheckIn)
-            s.pause != null -> Transition(
-                next.copy(pause = null),
-                listOf(
-                    MachineEffect.WatchdogOff,
-                    MachineEffect.SavePause(null),
-                    Cancel(TimerId.PAUSE_END),
-                    MachineEffect.CancelResumeNotice,
-                ),
-            )
-            else -> Transition(next, listOf(MachineEffect.WatchdogOff))
+            else -> {
+                val endPause = if (s.pause != null) listOf(MachineEffect.SavePause(null), Cancel(TimerId.PAUSE_END)) else emptyList()
+                Transition(next.copy(pause = null), listOf(MachineEffect.WatchdogOff, MachineEffect.CancelResumeNotice) + endPause)
+            }
         }
     }
 

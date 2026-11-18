@@ -2,6 +2,7 @@ package com.driveperf.pipeline.capture
 
 import com.driveperf.domain.capture.ActivityConfidence
 import com.driveperf.domain.capture.ActivityType
+import com.driveperf.domain.capture.AutoDetectPauseLength
 import com.driveperf.domain.capture.CaptureMarkType
 import com.driveperf.domain.capture.PowerStatus
 import com.driveperf.domain.capture.RecorderState
@@ -371,5 +372,27 @@ class TripMachineTest {
         val walking = m.reduce(idle, MachineEvent.Activity(ns(1.0), listOf(activity(1.0, ActivityType.WALKING))))
         assertEquals(ActivityType.WALKING, walking.state.activity?.type)
         assertTrue(m.reduce(idle, MachineEvent.Timer(ns(1.0), TimerId.STOP)).effects.isEmpty())
+    }
+
+    @Test
+    fun switchingAutomaticTripsOffAlwaysRemovesTheResumeNotice() {
+        // A pause that has just ended on time: its notice may still be pending (Android's 10-minute alarm window).
+        val paused = m.reduce(
+            idle,
+            MachineEvent.PauseAutoDetect(ns(0.0), wallAt(0.0), AutoDetectPauseLength.ONE_HOUR, wallAt(3_600.0)),
+        ).state
+        val ended = m.reduce(paused, MachineEvent.PauseCheck(ns(3_601.0), wallAt(3_601.0)))
+        assertNull(ended.state.pause)
+        assertFalse(MachineEffect.CancelResumeNotice in ended.effects, "the notice that says it is back on stays")
+        val off = m.reduce(ended.state, MachineEvent.AutoDetect(ns(3_660.0), false))
+        assertTrue(MachineEffect.CancelResumeNotice in off.effects)
+        assertTrue(MachineEffect.WatchdogOff in off.effects)
+        assertFalse(off.effects.any { it is MachineEffect.SavePause }, "nothing paused to clear")
+
+        val stillPaused = m.reduce(paused, MachineEvent.AutoDetect(ns(60.0), false))
+        assertNull(stillPaused.state.pause)
+        assertTrue(MachineEffect.CancelResumeNotice in stillPaused.effects)
+        assertTrue(MachineEffect.SavePause(null) in stillPaused.effects)
+        assertTrue(MachineEffect.Cancel(TimerId.PAUSE_END) in stillPaused.effects)
     }
 }

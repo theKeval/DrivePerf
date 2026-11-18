@@ -66,7 +66,23 @@ final class PauseAutoDetectTests: XCTestCase {
     // MARK: View model
 
     private func makeModel(_ recorder: PauseRecorder, now: Date) -> PauseAutoDetectViewModel {
-        PauseAutoDetectViewModel(recorder: recorder, status: { recorder.status }, now: { now }, calendar: toronto)
+        let calendar = self.toronto
+        return PauseAutoDetectViewModel(recorder: recorder, status: { recorder.status }, now: { now }, calendar: { calendar })
+    }
+
+    func testTheMorningEndFollowsATimeZoneChangeWhileTheAppRuns() {
+        let recorder = PauseRecorder()
+        let now = at(2026, 11, 18, 19, 30)
+        var zone = self.toronto
+        let model = PauseAutoDetectViewModel(recorder: recorder, status: { recorder.status }, now: { now }, calendar: { zone })
+        model.prepare()
+        model.pause()
+        XCTAssertEqual(recorder.pauses.last?.1, at(2026, 11, 19, 6))
+        // The phone flies to Vancouver: 06:00 there is three hours later than in Toronto.
+        zone.timeZone = TimeZone(identifier: "America/Vancouver")!
+        model.undo()
+        model.pause()
+        XCTAssertEqual(recorder.pauses.last?.1, at(2026, 11, 19, 9))
     }
 
     func testPauseSendsTheChoiceAndShowsTheConfirmation() {

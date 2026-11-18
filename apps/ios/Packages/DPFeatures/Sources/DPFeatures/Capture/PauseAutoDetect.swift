@@ -126,18 +126,23 @@ public final class PauseAutoDetectViewModel {
     private let recorder: any TripRecording
     private let status: @MainActor () -> RecorderStatus
     private let now: @MainActor () -> Date
-    private let calendar: Calendar
+    private let currentCalendar: @MainActor () -> Calendar
 
     /// `status` reads the recorder status the views observe (the capture view model's), so the views update with it.
+    /// `calendar` is read at every use: the model lives as long as the app, and the phone may change time zone
+    /// meanwhile, so "tomorrow 06:00" and the times shown must follow the zone it is in now.
     public init(
         recorder: any TripRecording, status: @escaping @MainActor () -> RecorderStatus,
-        now: @escaping @MainActor () -> Date = { Date() }, calendar: Calendar = .current
+        now: @escaping @MainActor () -> Date = { Date() },
+        calendar: @escaping @MainActor () -> Calendar = { Calendar.autoupdatingCurrent }
     ) {
         self.recorder = recorder
         self.status = status
         self.now = now
-        self.calendar = calendar
+        currentCalendar = calendar
     }
+
+    private var calendar: Calendar { currentCalendar() }
 
     /// Paused right now (the core's health).
     public var isPaused: Bool { status().autoDetectHealth == .paused }
