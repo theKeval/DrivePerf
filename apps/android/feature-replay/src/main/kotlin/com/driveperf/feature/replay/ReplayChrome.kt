@@ -3,6 +3,7 @@ package com.driveperf.feature.replay
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -95,7 +96,11 @@ internal fun Readouts(state: ReplayUiState.Ready, time: DoubleState, modifier: M
         derivedStateOf { ReplayFormatting.distance(state.timeline.distanceAt(time.doubleValue), units) }
     }
     Surface(shape = RoundedCornerShape(20.dp), color = MaterialTheme.colorScheme.surfaceContainerHigh, modifier = modifier) {
-        Row(Modifier.fillMaxWidth().height(64.dp).padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+        // Intrinsic height: at XL text the labels wrap below the values instead of being clipped.
+        Row(
+            Modifier.fillMaxWidth().height(IntrinsicSize.Min).heightIn(min = 64.dp).padding(vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
             val speedText = speed
             if (speedText == null) {
                 Readout(stringResource(R.string.replay_no_value), "", R.string.replay_speed)
