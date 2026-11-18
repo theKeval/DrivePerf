@@ -37,10 +37,6 @@ import com.driveperf.designsystem.DrivePerfTheme
  * S-HOME-02: answers "will my next drive be recorded?" from the floating toolbar. A ModalBottomSheet with the summary,
  * "Last check-in" (the shared core's), the checks (failing rows first, each with a tonal Fix, then the passing ones), and a
  * row to Recording settings (F-CAP-02, F-SET-02).
- *
- * The sheet opens fully expanded ([StatusSheetValues]): it is taller than the medium detent anyway, and with a partially
- * expanded stop a tap on the scrim while a swipe was still settling the sheet could leave M3's ModalBottomSheet stuck
- * "animating", after which it took every touch as a drag and no button in it responded (OnePlus 7T, DRIVE-90).
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -54,7 +50,12 @@ fun CaptureStatusSheet(status: AutoDetectStatus, actions: CaptureStatusActions) 
     }
 }
 
-/** Where the status sheet can settle: shown fully or hidden, no partially expanded stop. */
+/**
+ * Where the status sheet can settle: fully expanded or hidden, with no partially expanded stop. The content is taller
+ * than the medium detent anyway, and with that stop a tap on the scrim while a swipe was still settling the sheet could
+ * leave M3's ModalBottomSheet stuck "animating": it then took every touch as a drag and no button in it responded
+ * (OnePlus 7T, DRIVE-90).
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 internal val StatusSheetValues: Set<SheetValue> = setOf(SheetValue.Hidden, SheetValue.Expanded)
 
