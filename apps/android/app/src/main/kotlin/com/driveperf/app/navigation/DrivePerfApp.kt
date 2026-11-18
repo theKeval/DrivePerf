@@ -11,6 +11,11 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.saveable.rememberSaveable
 
 import android.Manifest
+import android.app.Activity
+import androidx.compose.runtime.SideEffect
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.ui.graphics.luminance
+import androidx.core.view.WindowCompat
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.PaddingValues
@@ -133,6 +138,16 @@ private fun AppNavHost(navController: NavHostController, captureViewModel: Captu
     val captureController: PlatformCaptureController = koinInject()
     val permissionReader: PermissionReader = koinInject()
     val context = LocalContext.current
+    val dark = MaterialTheme.colorScheme.surface.luminance() < 0.5f
+    // The in-drive cover sets its own light icons; normal navigation follows the chosen appearance.
+    SideEffect {
+        (context as? Activity)?.window?.let { window ->
+            WindowCompat.getInsetsController(window, window.decorView).apply {
+                isAppearanceLightStatusBars = !dark
+                isAppearanceLightNavigationBars = !dark
+            }
+        }
+    }
     val requestLocation = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
         captureController.refreshPermissions()
         // Refused again (or "don't ask again"): the system dialog will not show, so send the user to Settings.

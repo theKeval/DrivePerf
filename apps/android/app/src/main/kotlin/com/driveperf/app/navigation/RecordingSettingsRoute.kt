@@ -214,9 +214,9 @@ fun SettingsHealthSheet(deps: RecordingSettingsDeps, onDismiss: () -> Unit, onRe
 internal fun SettingsSaveError(settings: SettingsViewModel) {
     val failed by settings.saveFailed.collectAsStateWithLifecycle()
     if (failed) AlertDialog(
-        onDismissRequest = { settings.saveFailed.value = false },
+        onDismissRequest = { settings.dismissError() },
         text = { Text(stringResource(com.driveperf.feature.settings.R.string.save_failed)) },
-        confirmButton = { TextButton(onClick = { settings.saveFailed.value = false }) {
+        confirmButton = { TextButton(onClick = { settings.dismissError() }) {
             Text(stringResource(android.R.string.ok))
         } },
     )

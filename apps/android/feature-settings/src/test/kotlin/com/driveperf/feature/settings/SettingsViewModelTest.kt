@@ -40,6 +40,8 @@ class SettingsViewModelTest {
         advanceUntilIdle()
         assertEquals(true, model.saveFailed.value)
         assertEquals(false, model.state.value.batterySaverRecording)
+        model.dismissError()
+        assertEquals(false, model.saveFailed.value)
     }
 
     private class FakeSettings : SettingsRepository {
