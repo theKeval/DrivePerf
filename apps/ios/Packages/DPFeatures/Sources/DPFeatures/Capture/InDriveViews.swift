@@ -121,7 +121,7 @@ struct EndTripSheet: View {
                 if short {
                     VStack(alignment: .leading, spacing: DPSpace.s1) {
                         Text("This drive is very short").font(DPFont.body.weight(.semibold))
-                        Text("Under 500 m or 2 minutes. It’s kept with a “Short trip” label, without a score.")
+                        Text("Under about \(capture.display.distance(500)) or 2 minutes. It’s kept with a “Short trip” label, without a score.")
                             .font(DPFont.bodySecondary).foregroundStyle(DPColor.text2)
                     }
                     .padding(DPSpace.s4)
