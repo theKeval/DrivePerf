@@ -96,6 +96,9 @@ Dependency rules (ADR-002 section 2): `DPFeatures` sees `DPDesignSystem` and `DP
 - **Wake triggers:** the parked-location `CLMonitor` region (named `parkedSpot`, alphanumeric) is the primary trigger,
   re-armed at every trip end and every launch; significant change is the fallback; Visits only place the first parking
   spot. Wakes older than 5 minutes (fixes) or 15 minutes (region events) are dropped.
+- **Recorded accelerometer history** is renewed at launch, foreground and every wake while automatic trips are on,
+  including wakes delivered while the process stays in the background. The OS records at most 12 hours per request;
+  after a longer period without a wake, missing historical samples cannot be recovered retroactively.
 - **Recording starts at the wake**, GNSS (`liveUpdates` plus the legacy keep-alive) and 50 Hz device motion, and the
   candidate's samples are kept when it is confirmed. Motion callbacks are `@Sendable` and run on their own queue.
 - **Auto-detect health (F-CAP-02, F-CAP-14):** at launch and on every foreground the app reads Always location,

@@ -88,6 +88,22 @@ final class CoreTripRecorderTests: XCTestCase {
         XCTAssertEqual(assertions.ended, 1)
     }
 
+    func testEveryWakeRenewsMotionHistoryEvenWithoutForegroundOrCoreRestart() {
+        var renewals = 0
+        let recorder = CoreTripRecorder(autoDetectEnabled: true, renewMotionHistory: { renewals += 1 })
+        let wake = DPSharedBridge.WakeEvent(kind: .moveSignal, tMonoNs: 1, wallMs: 1)
+        recorder.onWake(wake)
+        XCTAssertEqual(renewals, 1, "a cold-launch wake renews before attachment")
+        recorder.attach(core)
+        recorder.onLaunch()
+        recorder.onWake(wake)
+        recorder.onWake(wake)
+        XCTAssertEqual(renewals, 3, "background-only wakes extend the recording window")
+        recorder.setAutoDetect(enabled: false)
+        recorder.onWake(wake)
+        XCTAssertEqual(renewals, 3, "automatic trips off must not extend sensor history")
+    }
+
     func testCommandsReachTheCore() {
         let recorder = makeRecorder()
         recorder.onLaunch()
