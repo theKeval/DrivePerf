@@ -11,7 +11,7 @@ public final class CoreMotionSource: MotionSourceBridge, @unchecked Sendable {
     public static let batchSize = 25
 
     private let manager = CMMotionManager()
-    private let recorder = CMSensorRecorder()
+    private let historyQueue = DispatchQueue(label: "com.driveperf.recorded-motion", qos: .utility)
     private let queue: OperationQueue
     private let clock: SystemClock
     private let lock = NSLock()
@@ -94,7 +94,10 @@ public final class CoreMotionSource: MotionSourceBridge, @unchecked Sendable {
         guard CMSensorRecorder.isAccelerometerRecordingAvailable(),
             CMSensorRecorder.authorizationStatus() == .authorized
         else { return }
-        recorder.recordAccelerometer(forDuration: hours * 3600)
+        // CMSensorRecorder performs synchronous XPC; never put it ahead of location restoration at launch.
+        historyQueue.async {
+            CMSensorRecorder().recordAccelerometer(forDuration: hours * 3600)
+        }
     }
 
     public func queryRecordedAccelerometer(

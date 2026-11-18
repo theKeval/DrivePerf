@@ -18,6 +18,20 @@ final class PlatformAdapterTests: XCTestCase {
         XCTAssertFalse(MonitorNaming.isValid("parkedSpöt"))
     }
 
+    func testRestoredParkedRegionMatchesOnlyTheSameCondition() throws {
+        let store = ParkedSpotStore(directory: makeTempDirectory())
+        let condition = CLMonitor.CircularGeographicCondition(
+            center: CLLocationCoordinate2D(latitude: 0.001, longitude: 0.002), radius: 120)
+        // Decode through the public storage contract; ParkedSpot has no public memberwise initializer.
+        let data = Data(#"{"lat":0.001,"lng":0.002,"radiusM":120}"#.utf8)
+        let spot = try JSONDecoder().decode(ParkedSpot.self, from: data)
+        store.save(spot)
+        XCTAssertTrue(try XCTUnwrap(store.load()).matches(condition))
+        XCTAssertFalse(spot.matches(CLMonitor.CircularGeographicCondition(center: condition.center, radius: 100)))
+        XCTAssertFalse(spot.matches(CLMonitor.CircularGeographicCondition(
+            center: CLLocationCoordinate2D(latitude: 0.003, longitude: 0.002), radius: 120)))
+    }
+
     // MARK: Spike change 8: stale wakes
 
     func testFreshRegionExitIsAccepted() {

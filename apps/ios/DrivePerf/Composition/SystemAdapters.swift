@@ -2,6 +2,7 @@ import DPPlatform
 import DPSharedBridge
 import Foundation
 import UIKit
+import OSLog
 
 /// `PreferencesStoring` in `UserDefaults`. Choices only, no account or location data.
 @MainActor
@@ -36,7 +37,7 @@ final class NotificationAdapter: TripNotifying {
     func removeTripNotifications(tripId: String) { notifier.removeTripNotifications(tripId: tripId) }
 }
 
-/// Keeps a background wake alive until the first fix (Spike 1: GPS and IMU start within 0.25 s of the wake).
+/// Covers startup and candidate confirmation; continuous location owns execution after confirmation.
 @MainActor
 final class UIKitBackgroundAssertions: BackgroundAssertions {
     private var identifier: UIBackgroundTaskIdentifier = .invalid
@@ -44,7 +45,10 @@ final class UIKitBackgroundAssertions: BackgroundAssertions {
     func begin() {
         guard identifier == .invalid else { return }
         identifier = UIApplication.shared.beginBackgroundTask(withName: "capture-wake") { [weak self] in
-            MainActor.assumeIsolated { self?.end() }
+            MainActor.assumeIsolated {
+                Logger(subsystem: "com.driveperf.capture", category: "wake").notice("Capture wake background task expired")
+                self?.end()
+            }
         }
     }
 

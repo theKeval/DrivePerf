@@ -30,6 +30,7 @@ struct StartTripIntent: LiveActivityIntent {
         #if DRIVEPERF_APP
             let environment = await AppEnvironment.shared
             await environment.launch()
+            await environment.waitForLaunch()
             if stopsTrip {
                 if let tripID { await TripIntentHandler.stop(recorder: environment.recorder, expectedTripID: tripID) }
                 return .result()
