@@ -29,8 +29,7 @@ class GeofenceParkedRegionMonitor(context: Context) : ParkedRegionMonitor {
     private val memory = ParkedRegionMemory()
 
     override fun arm(center: GeoPoint, radiusM: Double) {
-        memory.armed(center, radiusM)
-        register(center, radiusM)
+        if (memory.armed(center, radiusM)) register(center, radiusM)
     }
 
     /** Registers the remembered region again when the last registration did not succeed. */
@@ -40,16 +39,9 @@ class GeofenceParkedRegionMonitor(context: Context) : ParkedRegionMonitor {
 
     @SuppressLint("MissingPermission") // a missing permission throws SecurityException, caught below
     private fun register(center: GeoPoint, radiusM: Double) {
-        val fence = Geofence.Builder()
-            .setRequestId(REQUEST_ID)
-            .setCircularRegion(center.lat, center.lng, radiusM.toFloat())
-            .setExpirationDuration(Geofence.NEVER_EXPIRE)
-            .setTransitionTypes(Geofence.GEOFENCE_TRANSITION_EXIT)
-            .build()
-        val request = GeofencingRequest.Builder().setInitialTrigger(0).addGeofence(fence).build()
         try {
-            client.removeGeofences(listOf(REQUEST_ID))
-            client.addGeofences(request, pendingIntent(appContext))
+            // Adding the same request ID replaces it; a separate removal can race the add.
+            client.addGeofences(request(center, radiusM), pendingIntent(appContext))
                 .addOnSuccessListener { memory.registered(center) }
                 .addOnFailureListener { memory.failed(center) }
         } catch (_: SecurityException) {
@@ -68,6 +60,22 @@ class GeofenceParkedRegionMonitor(context: Context) : ParkedRegionMonitor {
         const val SOURCE_DETAIL = "geofence"
         private const val REQUEST_CODE = 7203
         private const val NS_PER_MS = 1_000_000L
+
+        /** P-05 stays 120 m: within Play services' recommended 100–150 m reliability range. */
+        fun request(center: GeoPoint, radiusM: Double): GeofencingRequest {
+            val fence = Geofence.Builder()
+                .setRequestId(REQUEST_ID)
+                .setCircularRegion(center.lat, center.lng, radiusM.toFloat())
+                .setExpirationDuration(Geofence.NEVER_EXPIRE)
+                .setTransitionTypes(Geofence.GEOFENCE_TRANSITION_EXIT)
+                .setLoiteringDelay(0) // Exit-only: no dwell delay belongs on the departure path.
+                .setNotificationResponsiveness(5_000) // Best effort: 125 m at 25 m/s plus the 120 m radius.
+                .build()
+            return GeofencingRequest.Builder()
+                .setInitialTrigger(GeofencingRequest.INITIAL_TRIGGER_EXIT)
+                .addGeofence(fence)
+                .build()
+        }
 
         fun pendingIntent(context: Context): PendingIntent = PendingIntent.getBroadcast(
             context,
@@ -125,9 +133,11 @@ internal class ParkedRegionMemory {
     private var registered = false
 
     @Synchronized
-    fun armed(center: GeoPoint, radiusM: Double) {
+    fun armed(center: GeoPoint, radiusM: Double): Boolean {
+        if (region == (center to radiusM) && registered) return false
         region = center to radiusM
         registered = false
+        return true
     }
 
     @Synchronized

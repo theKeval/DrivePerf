@@ -33,6 +33,10 @@ class ActivityTransitions(context: Context) {
     private val appContext = context.applicationContext
     private val client = ActivityRecognition.getClient(appContext)
 
+    init {
+        TransitionHistory(appContext).restore()
+    }
+
     /** Registers the transitions. Calling it again replaces the registration for the same PendingIntent. */
     @SuppressLint("MissingPermission") // a missing permission throws SecurityException, caught below
     fun arm(onResult: (Boolean) -> Unit) {
@@ -93,6 +97,7 @@ class ActivityTransitionReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val result = if (ActivityTransitionResult.hasResult(intent)) ActivityTransitionResult.extractResult(intent) else null
         val samples = result?.transitionEvents.orEmpty().mapNotNull { ActivityTransitions.sampleOf(it, AndroidClock) }
+        TransitionHistory(context).add(samples, AndroidClock.wallMs())
         samples.forEach(ActivityLog::add)
         ActivityTransitions.wakeOf(samples)?.let(WakeDispatcher::dispatch)
     }

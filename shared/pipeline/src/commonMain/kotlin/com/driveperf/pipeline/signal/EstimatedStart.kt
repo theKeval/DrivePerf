@@ -5,6 +5,7 @@ import com.driveperf.domain.capture.ActivityType
 import com.driveperf.domain.capture.CapturedTrip
 import com.driveperf.domain.capture.Parking
 import com.driveperf.domain.capture.WakeKind
+import com.driveperf.pipeline.capture.GeofenceDeparture
 import com.driveperf.pipeline.geo.Geo
 
 /** A §2.8 estimate: the trip starts [startOffsetS] before the wake (negative), [distanceM] from the parking spot. */
@@ -22,7 +23,7 @@ internal class EstimatedStart(private val cfg: SignalConfig) {
         val first = gatedFromWake.firstOrNull()
         val windowFromBound = h.startWallMs - (historyS * MS).toLong()
         val windowStart = maxOf(windowFromBound, parking?.wallMs ?: windowFromBound)
-        val runStart = automotiveRunStart(capture, windowStart)
+        val runStart = automotiveRunStart(capture, windowStart) ?: geofenceRunStart(capture, gatedFromWake)
         val atEdge = runStart != null && runStart <= windowStart + (cfg.historyEdgeS * MS).toLong() &&
             windowStart == windowFromBound
         @Suppress("ComplexCondition") // §2.8 needs all four: an automatic wake, a parking spot, a fix and a motion start
@@ -30,6 +31,16 @@ internal class EstimatedStart(private val cfg: SignalConfig) {
             null
         } else {
             check(capture, parking, first, runStart)
+        }
+    }
+
+    private fun geofenceRunStart(capture: CapturedTrip, fixes: List<GatedFix>): Long? {
+        val parking = capture.header.parking
+        val first = fixes.firstOrNull()
+        val driving = fixes.firstOrNull { it.speedMps >= 3.0 && it.tS <= 180.0 && !it.derived }
+        return if (parking == null || first == null || driving == null) null else {
+            val d = Geo.haversineM(parking.point.lat, parking.point.lng, first.lat, first.lng)
+            GeofenceDeparture.startWallMs(capture, d, first.tS, driving.speedMps)
         }
     }
 
