@@ -1,6 +1,8 @@
 package com.driveperf.app
 
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
+import androidx.compose.ui.test.isRoot
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -148,5 +150,21 @@ class ShellUiTest {
         assertEquals(0, compose.onAllNodesWithText("Fix").fetchSemanticsNodes().size)
         compose.onNodeWithText("Turn on").performClick()
         assertEquals(1, recordingSettingsOpened)
+    }
+
+    @Test
+    fun `the status sheet opens fully expanded, so a swipe never leaves it settling between stops`() {
+        val activityOff = AutoDetectReadiness.status(optedIn = true, permissions = CapturePermissions.ALL.copy(activity = false))
+        show(autoDetect = activityOff)
+        compose.onNodeWithText("Physical activity is off").performClick() // the toolbar's second line
+        compose.waitForIdle()
+
+        val sheetRoot = compose.onAllNodes(isRoot()).fetchSemanticsNodes().last().size.height
+        val title = compose.onNodeWithText("Capture status").getUnclippedBoundsInRoot()
+        with(compose.density) {
+            assertTrue("sheet title at ${title.top.toPx()} of $sheetRoot px", title.top.toPx() < sheetRoot / 4f)
+        }
+        compose.onAllNodesWithText("Fix")[1].performScrollTo().performClick() // [0] is the banner's
+        assertEquals(listOf(AttentionReason.NoActivityRecognition), fixed)
     }
 }
