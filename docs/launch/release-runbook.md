@@ -13,7 +13,7 @@ these steps.
 | Workflow | Fastlane lane | Steps |
 |---|---|---|
 | `release-ios.yml` (macOS) | `ios beta` | temporary keychain → App Store Connect API key → `match appstore` **read-only** → signs the `DrivePerf` and `DrivePerfWidgets` targets with the match profiles, in the CI checkout only → `gym` archives `com.driveperf.app` (Release) → dSYMs to Sentry with `sentry-cli` (skipped with a warning until `SENTRY_AUTH_TOKEN` exists) → `pilot` uploads to TestFlight. The dSYM zip is kept as a run artifact for 90 days |
-| `release-android.yml` (Ubuntu) | `android internal` | `bundleProdRelease` signed with the upload key → checks the signature → keeps the AAB and `mapping.txt` as a run artifact for 90 days → `supply` uploads the AAB and its R8 mapping to the **internal** testing track. Without `PLAY_SERVICE_ACCOUNT_JSON` it stops after the artifact (C4) |
+| `release-android.yml` (Ubuntu) | `android internal` | `bundleProdRelease` signed with the upload key → checks the signature → keeps the AAB and `mapping.txt` as a run artifact for 90 days → the R8 mapping to Sentry (`android sentry_mapping`, skipped with a warning until `SENTRY_AUTH_TOKEN` exists) → `supply` uploads the AAB and its R8 mapping to the **internal** testing track. Without `PLAY_SERVICE_ACCOUNT_JSON` it stops after the artifact (C4) |
 
 - **Triggers:** a tag `v1.2.3`, or a manual run with a version input. Both jobs also need the repository variable
   `RELEASE_IOS_ENABLED` / `RELEASE_ANDROID_ENABLED` set to `true`; otherwise the run is skipped.
@@ -124,7 +124,7 @@ Google's API accepts uploads only for an app that already has a bundle. So the f
 Production access later: a personal Play developer account created after November 2023 needs a closed test with at
 least 12 testers for 14 days before it can apply for production. Internal testing has no such rule.
 
-## Part D. Switches and Sentry (Keval)
+## Part D. Switches (Keval)
 
 ```bash
 gh variable set RELEASE_IOS_ENABLED --repo theKeval/DrivePerf --body true
@@ -134,9 +134,44 @@ gh variable set RELEASE_IOS_ENABLED --repo theKeval/DrivePerf --body true
 gh variable set RELEASE_ANDROID_ENABLED --repo theKeval/DrivePerf --body true
 ```
 
-**Sentry dSYM upload** (optional for the first builds; the dSYMs are kept as an artifact either way). Once the Sentry EU
-organisation and the iOS project exist (ADR-007): Sentry → Settings → **Developer Settings → Organization Tokens** →
-create `DrivePerf CI` (it carries the `org:ci` scope that symbol uploads need), then:
+## Part F. Crash reporting on Sentry (Keval, DRIVE-196)
+
+Until these steps are done the apps carry no DSN, so crash reporting does nothing even for users who allowed it
+(Profile shows it as not configured), and the lanes skip the symbol uploads with a warning. Nothing else depends on it.
+
+### F1. The Sentry organisation, EU region (ADR-007)
+
+1. Sign up at sentry.io and create the organisation. **Choose the EU data region (Frankfurt) at sign-up**: it can't be
+   changed later. The free Developer plan is enough for the beta.
+2. Organisation **Settings → Security & Privacy**: turn on **Prevent storing of IP addresses**, keep **Data Scrubber**
+   and **Use Default Scrubbers** on, and add an advanced data-scrubbing rule: *Replace* with `[location removed]`,
+   matching the regex `-?\d{1,3}\.\d{4,}\s*[,;/ ]\s*-?\d{1,3}\.\d{4,}` on all values (the same pattern the apps use).
+3. Create two projects: `driveperf-ios` (platform Apple iOS) and `driveperf-android` (Android). Skip the SDK setup
+   screens; the apps are already wired.
+4. In each project: **Settings → Client Keys (DSN)** → the default key → **Rate limiting**: for example 500 events per
+   hour, so a crash loop can't use up the month's quota. **Settings → Spike Protection** stays on.
+
+### F2. The DSNs (they turn crash reporting on in the builds)
+
+A DSN is not secret (every app binary contains it), but it is never committed. Copy each project's DSN from
+**Settings → Client Keys (DSN)**:
+
+```bash
+gh variable set SENTRY_DSN_IOS --repo theKeval/DrivePerf --body "<iOS DSN>"
+```
+
+```bash
+gh variable set SENTRY_DSN_ANDROID --repo theKeval/DrivePerf --body "<Android DSN>"
+```
+
+The release lanes put them into the builds (`DP_SENTRY_DSN` on iOS, `DRIVEPERF_SENTRY_DSN` on Android). For a
+local device build, put `DP_SENTRY_DSN = <iOS DSN>` in the gitignored `apps/ios/Config/Local.xcconfig`, or run Gradle with
+`DRIVEPERF_SENTRY_DSN=<Android DSN>`. Leaving either empty turns crash reporting off for that build.
+
+### F3. Symbol uploads (dSYMs and the R8 mapping)
+
+Sentry → Settings → **Developer Settings → Organization Tokens** → create `DrivePerf CI` (it carries the `org:ci` scope
+that symbol uploads need), then:
 
 ```bash
 gh secret set SENTRY_AUTH_TOKEN --env prod --repo theKeval/DrivePerf
@@ -147,11 +182,39 @@ gh variable set SENTRY_ORG --repo theKeval/DrivePerf --body <organisation slug>
 ```
 
 ```bash
-gh variable set SENTRY_PROJECT_IOS --repo theKeval/DrivePerf --body <iOS project slug>
+gh variable set SENTRY_PROJECT_IOS --repo theKeval/DrivePerf --body driveperf-ios
 ```
 
-The organisation and project slugs are in the Sentry URL. The DSN that turns crash reporting on in the apps is a
-separate step (DRIVE-196).
+```bash
+gh variable set SENTRY_PROJECT_ANDROID --repo theKeval/DrivePerf --body driveperf-android
+```
+
+The organisation slug is in the Sentry URL. With the token set, `release-ios.yml` uploads the dSYMs (the app's dSYM
+covers the shared Kotlin code, which is linked into the app binary) and `release-android.yml` uploads the R8 mapping
+under a UUID it also writes into the bundle.
+
+### F4. Check it before the beta (ADR-007 confirmation)
+
+1. Install the first build that has the DSN, allow crash reports in onboarding (S-ONB-13) or Profile (S-PRV-07).
+2. Trigger a test crash on a test build and reopen the app, so the report is sent on the next launch. In Sentry: the
+   iOS crash, including one from shared Kotlin code, shows symbolicated frames and the tags `in_trip`, `capture_mode`,
+   `trip_state` and `app_build`, and nothing else; the Android crash shows de-obfuscated frames.
+3. Turn crash reports off in Profile: nothing more arrives.
+
+## Halting a rollout on crash-free sessions (F-ANA-03 AC3)
+
+The rule: halt a staged rollout (Play) or pause a phased release (App Store) if a release's crash-free sessions drop
+below **99.5 % on at least 1,000 sessions**. Sentry sees only users who allowed crash reports, so check the consent-free
+numbers too before deciding:
+
+- **Sentry:** Releases → the release → **Crash Free Sessions**, and the session count. An alert rule (Alerts → Create
+  Alert → *Crash Free Session Rate* below 99.5 % for the release) emails Keval.
+- **Play Console:** Android vitals → Crashes and ANRs for the release (users who share usage data with developers).
+- **Xcode Organizer:** Crashes for the build (users who share analytics with developers).
+
+To halt: Play Console → **Production → Releases → Manage rollout → Halt rollout**; App Store Connect → the version →
+**Phased Release → Pause**. Both can resume later. Internal testing and TestFlight have no staged rollout, so this
+applies from the first production release (wave 2 onwards).
 
 ## Part E. Cut a release
 
@@ -210,6 +273,9 @@ separate step (DRIVE-196).
 | `ANDROID_UPLOAD_KEY_PASSWORD` | secret | env `prod` | Gradle signing | C1 |
 | `PLAY_SERVICE_ACCOUNT_JSON` | secret | env `prod` | `supply` | C3 |
 | `PLAY_RELEASE_STATUS` | variable (optional) | repository | `supply`, `draft` only for C4's case | C4 |
-| `SENTRY_AUTH_TOKEN` | secret (optional) | env `prod` | dSYM upload | D |
-| `SENTRY_ORG` | variable (optional) | repository | dSYM upload | D |
-| `SENTRY_PROJECT_IOS` | variable (optional) | repository | dSYM upload | D |
+| `SENTRY_DSN_IOS` | variable (optional) | repository | crash reporting in the iOS build | F2 |
+| `SENTRY_DSN_ANDROID` | variable (optional) | repository | crash reporting in the Android build | F2 |
+| `SENTRY_AUTH_TOKEN` | secret (optional) | env `prod` | dSYM and R8 mapping upload | F3 |
+| `SENTRY_ORG` | variable (optional) | repository | dSYM and R8 mapping upload | F3 |
+| `SENTRY_PROJECT_IOS` | variable (optional) | repository | dSYM upload | F3 |
+| `SENTRY_PROJECT_ANDROID` | variable (optional) | repository | R8 mapping upload | F3 |

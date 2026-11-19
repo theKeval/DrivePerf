@@ -11,6 +11,9 @@ kotlin {
         binaries.framework {
             baseName = "DrivePerfShared"
             isStatic = true
+            // Release frameworks keep light debug info, so the app's dSYM (uploaded to Sentry by the release lane) can
+            // symbolicate Kotlin frames in crash reports (ADR-007, DRIVE-196).
+            freeCompilerArgs += "-Xadd-light-debug=enable"
             export(projects.shared.foundation)
             export(projects.shared.domain)
             export(projects.shared.presentation)
@@ -23,6 +26,12 @@ kotlin {
         api(projects.shared.domain)
         api(projects.shared.presentation)
         api(projects.shared.di)
+    }
+
+    // Sentry Kotlin Multiplatform, for its Kotlin/Native unhandled-exception hook only (KotlinCrashHook). It calls into
+    // Sentry Cocoa, which the Xcode project links at the exact version this SDK was built against (libs.versions.toml).
+    sourceSets.iosMain.dependencies {
+        implementation(libs.sentry.kmp)
     }
 }
 

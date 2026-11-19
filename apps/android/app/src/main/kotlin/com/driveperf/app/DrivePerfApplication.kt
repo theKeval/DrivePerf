@@ -10,9 +10,12 @@ import com.driveperf.feature.onboarding.PermissionReader
 import com.driveperf.platform.capture.AutoTripNoticeTaps
 import com.driveperf.platform.capture.CaptureNotifications
 import com.driveperf.platform.capture.DriveDecodedNotice
+import com.driveperf.platform.crash.CrashReporter
 import com.driveperf.platform.crash.PrivacyChoices
 import com.driveperf.platform.platformModule
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.onEach
 import org.koin.android.ext.koin.androidContext
 import org.koin.android.ext.koin.androidLogger
 import org.koin.core.context.startKoin
@@ -37,10 +40,14 @@ class DrivePerfApplication : Application() {
             scope = koin.get<CoroutineScope>(),
             location = koin.get(),
         )
-        koin.get<TripRecorder>().onLaunch()
+        val recorder = koin.get<TripRecorder>()
+        recorder.onLaunch()
         // DRIVE-137, after the core has started: the "Drive decoded." channel, and the tap counter for the automatic
         // trip's notice (auto_trip_notification_tapped), registered before any activity is created.
         koin.get<DriveDecodedNotice>().ensureChannel()
         registerActivityLifecycleCallbacks(koin.get<AutoTripNoticeTaps>())
+        // DRIVE-196: crash reports say whether a trip was being captured (in_trip, capture_mode, trip_state).
+        val crashReporter = koin.get<CrashReporter>()
+        recorder.status.onEach(crashReporter::setTrip).launchIn(koin.get<CoroutineScope>())
     }
 }

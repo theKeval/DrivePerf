@@ -28,6 +28,9 @@ playServicesLocation = "21.4.0"
 # Maps Compose (ADR-005, DRIVE-200 Replay); brings the Maps SDK for Android (play-services-maps 20.0.0).
 mapsCompose = "9.0.1"
 sentry = "8.63.0"
+# Sentry Kotlin Multiplatform (DRIVE-196, ADR-007): Kotlin/Native crash capture on iOS. 0.29.0 links Sentry Cocoa 9.30.2;
+# the Xcode project pins that exact Cocoa version. Bump both together.
+sentryKmp = "0.29.0"
 junit = "4.13.2"
 turbine = "1.2.1"
 robolectric = "4.17"
@@ -75,6 +78,7 @@ kotlinx-coroutines-android = { module = "org.jetbrains.kotlinx:kotlinx-coroutine
 play-services-location = { module = "com.google.android.gms:play-services-location", version.ref = "playServicesLocation" }
 maps-compose = { module = "com.google.maps.android:maps-compose", version.ref = "mapsCompose" }
 sentry-android = { module = "io.sentry:sentry-android", version.ref = "sentry" }
+sentry-kmp = { module = "io.sentry:sentry-kotlin-multiplatform", version.ref = "sentryKmp" }
 junit = { module = "junit:junit", version.ref = "junit" }
 turbine = { module = "app.cash.turbine:turbine", version.ref = "turbine" }
 robolectric = { module = "org.robolectric:robolectric", version.ref = "robolectric" }
