@@ -137,6 +137,9 @@ public data class DeleteTripUi(
     val error: String?,
 )
 
+/** The toast after S-TRP-02 saved: "Marked as passenger · scores updated" with "Undo". */
+public data class TripEditMessageUi(val tripId: String, val text: String, val undoLabel: String)
+
 /** What the user does on S-TRP-02 and S-TRP-03 (sent as [DrivesIntent.Edit]). */
 public sealed interface TripEditAction {
     /** "Edit" on trip detail opens S-TRP-02 for [tripId] on [page] (the Story chips open a picker directly). */
@@ -149,7 +152,7 @@ public sealed interface TripEditAction {
 
     public data class PickCar(val vehicleId: String) : TripEditAction
 
-    /** ✓ / Save: writes what changed, then [DrivesEffect.TripEdited]. */
+    /** ✓ / Save: writes what changed, then shows the state's `editMessage`. */
     public data object Save : TripEditAction
 
     /** × or drag down: discards the changes. */
@@ -157,6 +160,9 @@ public sealed interface TripEditAction {
 
     /** "Undo" on the toast: puts back the type and car the last save changed. */
     public data object Undo : TripEditAction
+
+    /** The toast timed out or was swiped away. */
+    public data object DismissMessage : TripEditAction
 
     /** "Delete drive": opens S-TRP-03 for [tripId]. */
     public data class AskDelete(val tripId: String) : TripEditAction
@@ -174,7 +180,7 @@ public sealed interface TripEditAction {
  * Analytics: `trip_corrected {to, source}`, `trip_car_changed {source}` and `trip_deleted {source}`, with fixed values
  * only.
  */
-@Suppress("LongParameterList") // the presenter's hooks
+@Suppress("LongParameterList", "TooManyFunctions") // the presenter's hooks; one function per step of edit and delete
 internal class TripEditing(
     private val scope: CoroutineScope,
     private val corrections: TripCorrections?,
@@ -194,8 +200,14 @@ internal class TripEditing(
 
     private data class Deletion(val tripId: String, val source: String, val deleting: Boolean = false, val failed: Boolean = false)
 
-    /** What the last save changed, to put back on "Undo". */
-    private data class Undo(val tripId: String, val correction: TripCorrection?, val carId: String?, val carChanged: Boolean)
+    /** What the last save changed, to put back on "Undo", and its toast. */
+    private data class Undo(
+        val tripId: String,
+        val correction: TripCorrection?,
+        val carId: String?,
+        val carChanged: Boolean,
+        val message: String,
+    )
 
     private data class State(
         val vehicles: List<TripVehicle> = emptyList(),
@@ -225,40 +237,49 @@ internal class TripEditing(
             is TripEditAction.ShowPage -> change { s -> s.copy(draft = s.draft?.copy(page = action.page)) }
             is TripEditAction.PickType -> change { s -> s.copy(draft = s.draft?.copy(type = action.type)) }
             is TripEditAction.PickCar -> change { s -> s.copy(draft = s.draft?.copy(carId = action.vehicleId, carChosen = true)) }
-            TripEditAction.Save -> save()
+            TripEditAction.Save -> state.value.draft?.let(::save)
             TripEditAction.Close -> change { it.copy(draft = null) }
             TripEditAction.Undo -> undo()
+            TripEditAction.DismissMessage -> change { it.copy(undo = null) }
+            is TripEditAction.AskDelete, TripEditAction.CancelDelete, TripEditAction.ConfirmDelete -> deleteAction(action)
+        }
+    }
+
+    /** S-TRP-03's actions. */
+    private fun deleteAction(action: TripEditAction) {
+        when (action) {
             is TripEditAction.AskDelete -> if (canEdit && find(action.tripId) != null) {
                 val source = if (state.value.draft?.tripId == action.tripId) "edit" else "detail"
                 change { it.copy(deletion = Deletion(action.tripId, source)) }
             }
             TripEditAction.CancelDelete -> change { s -> s.copy(deletion = s.deletion?.takeIf { it.deleting }) }
             TripEditAction.ConfirmDelete -> delete()
+            else -> Unit
         }
     }
 
-    private fun save() {
-        val draft = state.value.draft ?: return
+    private fun save(draft: Draft) {
         change { it.copy(draft = null) }
         val trip = find(draft.tripId) ?: return
         val from = TripEditType.of(trip)
         val toType = draft.type?.takeIf { it != from }
         val carChanged = draft.carChosen && draft.carId != trip.vehicleId
-        if (toType == null && !carChanged) return
-        val carName = vehicles.firstOrNull { it.id == draft.carId }?.name
+        if (toType != null || carChanged) write(trip, from, toType, draft.carId.takeIf { carChanged }, carChanged)
+    }
+
+    /** Saves [toType] and, when [carChanged], car [carId], then shows the toast with Undo. */
+    private fun write(trip: Trip, from: TripEditType, toType: TripEditType?, carId: String?, carChanged: Boolean) {
+        val carName = vehicles.firstOrNull { it.id == carId }?.name
         scope.launch {
             toType?.let { type ->
                 corrections?.correct(trip.id, type.correction)
                 track("trip_corrected", mapOf("to" to type.key, "source" to SOURCE))
             }
-            val movedCar = carChanged && ports?.vehicles?.setVehicle(trip.id, draft.carId) == true
+            val movedCar = carChanged && ports?.vehicles?.setVehicle(trip.id, carId) == true
             if (movedCar) track("trip_car_changed", mapOf("source" to SOURCE))
-            change {
-                it.copy(
-                    undo = Undo(trip.id, (trip.correction ?: from.correction).takeIf { toType != null }, trip.vehicleId, movedCar),
-                )
-            }
-            emit(DrivesEffect.TripEdited(trip.id, TripEditCopy.savedMessage(toType, carName.takeIf { movedCar })))
+            val message = TripEditCopy.savedMessage(toType, carName.takeIf { movedCar })
+            val previous = (trip.correction ?: from.correction).takeIf { toType != null }
+            change { it.copy(undo = Undo(trip.id, previous, trip.vehicleId, movedCar, message)) }
         }
     }
 
@@ -300,16 +321,19 @@ internal class TripEditing(
     /** S-TRP-02 for the open draft, if its trip is still listed. */
     fun editUi(rows: TripRows): TripEditUi? {
         val s = state.value
-        val draft = s.draft ?: return null
-        val trip = find(draft.tripId) ?: return null
+        val draft = s.draft
+        val trip = draft?.let { find(it.tripId) } ?: return null
         return TripEditCopy.sheet(trip, rows.row(trip), draft.page, draft.type ?: TripEditType.of(trip),
             if (draft.carChosen) draft.carId else trip.vehicleId, s.vehicles)
     }
 
+    /** The toast of the last save, until it is dismissed or undone. */
+    fun messageUi(): TripEditMessageUi? = state.value.undo?.let { TripEditMessageUi(it.tripId, it.message, "Undo") }
+
     /** S-TRP-03, while it is open and its trip is still listed. */
     fun deleteUi(rows: TripRows): DeleteTripUi? {
-        val deletion = state.value.deletion ?: return null
-        val row = find(deletion.tripId)?.let(rows::row) ?: return null
+        val deletion = state.value.deletion
+        val row = deletion?.let { find(it.tripId) }?.let(rows::row) ?: return null
         return TripEditCopy.dialog(row, deletion.deleting, deletion.failed)
     }
 

@@ -115,6 +115,7 @@ public class DrivesPresenter(
         ownedScope?.cancel()
     }
 
+    @Suppress("CyclomaticComplexMethod") // one branch per intent; the work is in the functions they call
     override fun dispatch(intent: DrivesIntent) {
         when (intent) {
             is DrivesIntent.Open -> change { it.copy(detailId = intent.tripId, pendingOpened = true, pendingView = Surface.TRIP_DETAIL) }
@@ -200,7 +201,8 @@ public class DrivesPresenter(
     }
 
     /** A listed trip, drive or not, by ID (DRIVE-131). */
-    private fun listedTrip(id: String): Trip? = inputs.value.let { i -> i.trips?.firstOrNull { it.id == id } ?: i.notDrives.firstOrNull { it.id == id } }
+    private fun listedTrip(id: String): Trip? =
+        inputs.value.let { i -> i.trips?.firstOrNull { it.id == id } ?: i.notDrives.firstOrNull { it.id == id } }
 
     /** Renders again from the current inputs, after the edit or filter state changed. */
     private fun refresh() = change { it }
@@ -233,6 +235,7 @@ public class DrivesPresenter(
             canEdit = editing.canEdit,
             edit = editing.editUi(rows),
             deleting = editing.deleteUi(rows),
+            editMessage = editing.messageUi(),
             history = history.ui,
         )
     }

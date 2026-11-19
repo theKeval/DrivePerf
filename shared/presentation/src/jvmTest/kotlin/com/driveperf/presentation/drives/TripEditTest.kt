@@ -143,7 +143,7 @@ class TripEditTest {
     }
 
     @Test
-    fun `choosing passenger shows the banner and save corrects the trip with analytics and a toast`() = runTest(UnconfinedTestDispatcher()) {
+    fun `passenger shows the banner, and save corrects the trip with analytics and a toast`() = runTest(UnconfinedTestDispatcher()) {
         val p = presenter()
         val effects = effects(p)
         p.edit(TripEditAction.Open("a", TripEditPage.TYPE))
@@ -166,7 +166,10 @@ class TripEditTest {
         assertEquals(listOf("a" to TripCorrection.PASSENGER), corrections.corrections)
         assertTrue(vehicles.moves.isEmpty())
         assertEquals(listOf(mapOf("to" to "passenger", "source" to "trip_detail")), analytics.named("trip_corrected"))
-        assertEquals(listOf<DrivesEffect>(DrivesEffect.TripEdited("a", "Marked as passenger · scores updated")), effects)
+        assertTrue(effects.isEmpty())
+        assertEquals(TripEditMessageUi("a", "Marked as passenger · scores updated", "Undo"), p.state.value.editMessage)
+        p.edit(TripEditAction.DismissMessage)
+        assertNull(p.state.value.editMessage)
     }
 
     @Test
@@ -200,9 +203,11 @@ class TripEditTest {
         assertTrue(corrections.corrections.isEmpty())
         assertEquals(listOf<Pair<String, String?>>("a" to "ioniq"), vehicles.moves)
         assertEquals(listOf(mapOf("source" to "trip_detail")), analytics.named("trip_car_changed"))
-        assertEquals(listOf<DrivesEffect>(DrivesEffect.TripEdited("a", "Moved to the Ioniq · stats updated")), effects)
+        assertTrue(effects.isEmpty())
+        assertEquals("Moved to the Ioniq · stats updated", p.state.value.editMessage?.text)
 
         p.edit(TripEditAction.Undo)
+        assertNull(p.state.value.editMessage)
         assertEquals(listOf<Pair<String, String?>>("a" to "ioniq", "a" to "gti"), vehicles.moves)
         assertTrue(corrections.corrections.isEmpty())
         p.edit(TripEditAction.Undo)
@@ -235,6 +240,7 @@ class TripEditTest {
 
         assertNull(p.state.value.edit)
         assertTrue(corrections.corrections.isEmpty() && vehicles.moves.isEmpty() && effects.isEmpty())
+        assertNull(p.state.value.editMessage)
         p.edit(TripEditAction.Save)
         assertTrue(effects.isEmpty())
     }

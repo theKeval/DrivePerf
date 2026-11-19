@@ -169,7 +169,9 @@ internal class HistoryFiltering(
         change { it.copy(applied = keys, draft = null) }
         if (added.isEmpty()) return
         val bucket = countBucket(Facets(data()).matching(keys).size)
-        FilterGroup.entries.filter { it in added }.forEach { track("history_filtered", mapOf("filter" to it.key, "count_bucket" to bucket)) }
+        FilterGroup.entries.filter { it in added }.forEach {
+            track("history_filtered", mapOf("filter" to it.key, "count_bucket" to bucket))
+        }
     }
 
     private fun toggle(keys: Set<FilterKey>, key: FilterKey) = if (key in keys) keys - key else keys + key

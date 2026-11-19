@@ -224,6 +224,8 @@ public data class DrivesState(
     val edit: TripEditUi? = null,
     /** S-TRP-03 Delete trip confirmation, while it is open. */
     val deleting: DeleteTripUi? = null,
+    /** The toast after S-TRP-02 saved ("Marked as passenger · scores updated · Undo"), until it is dismissed. */
+    val editMessage: TripEditMessageUi? = null,
     /** S-HIS-01's filter chips and S-HIS-02 (DRIVE-126 AC3); [sections] already holds only the matching drives. */
     val history: HistoryFilterUi = HistoryFilterUi(),
 ) {
@@ -319,9 +321,6 @@ public sealed interface DrivesEffect {
 
     /** Push S-SCO-02. */
     public data object OpenHowScoresWork : DrivesEffect
-
-    /** S-TRP-02 saved: show [message] ("Marked as passenger · scores updated") with Undo ([TripEditAction.Undo]). */
-    public data class TripEdited(val tripId: String, val message: String) : DrivesEffect
 
     /** S-TRP-03 deleted [tripId]: go back to the list it was opened from and show [message] ("Drive deleted"). */
     public data class TripDeleted(val tripId: String, val message: String) : DrivesEffect
