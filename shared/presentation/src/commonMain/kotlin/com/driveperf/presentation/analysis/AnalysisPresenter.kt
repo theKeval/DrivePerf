@@ -191,6 +191,7 @@ public class AnalysisPresenter(
     private suspend fun load() {
         // The channels, their pyramids and the G-G grid are all built here, off the main thread, in one state: the
         // screen never sees "loaded" without its timeline.
+        val units = unitSystem
         val ready = withContext(compute) {
             val choices = preferences?.read() ?: AnalysisChoices()
             analyses.analysis(tripId)?.let { a ->
@@ -210,6 +211,7 @@ public class AnalysisPresenter(
         }
         analysis = ready.first
         update { ready.second }
+        if (unitSystem != units) rebuild() // the units changed while the channels were being built
         track("analysis_opened", "source" to source.key)
     }
 
