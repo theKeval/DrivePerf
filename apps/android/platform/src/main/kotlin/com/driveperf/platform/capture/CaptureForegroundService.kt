@@ -42,6 +42,9 @@ class CaptureForegroundService : Service() {
     private val notifications: CaptureNotifications by inject()
     private val fixes: FixWatch by inject()
     private val clock: Clock by inject()
+    private val autoNotices: AutoTripNoticeTracker by inject()
+    private val decodedNotice: DriveDecodedNotice by inject()
+    private val appScope: CoroutineScope by inject() // outlives the service: "Drive decoded." is posted after it stops
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private var watching: Job? = null
     private var idleTimeout: Job? = null
@@ -73,8 +76,11 @@ class CaptureForegroundService : Service() {
     private fun goForeground(isManualStart: Boolean = false) {
         if (foreground) return
         notifications.ensureChannel()
-        val notification = recordingNotification(recorder.status.value) ?: notifications.buildStarting(isManualStart)
+        val status = recorder.status.value
+        val recording = recordingNotification(status)
+        val notification = recording ?: notifications.buildStarting(isManualStart)
         startForeground(CaptureNotifications.NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION)
+        if (recording != null) autoNotices.onRecordingNoticeShown(status, notificationsVisible())
         foreground = true
         // A wake the core drops at once (stale, auto detection off) never leaves idle: end after a grace period.
         idleTimeout?.cancel()
@@ -98,9 +104,13 @@ class CaptureForegroundService : Service() {
                 idleTimeout?.cancel()
                 recordingNotification(status, force = unitsChanged)?.let { notification ->
                     getSystemService(NotificationManager::class.java).notify(CaptureNotifications.NOTIFICATION_ID, notification)
+                    autoNotices.onRecordingNoticeShown(status, notificationsVisible())
                 }
             } else if (active) {
+                val endedAutoTrip = autoNotices.takeEndedTrip()
                 endService()
+                // F-CAP-11 AC3: the recording notice is gone with the service; "Drive decoded." takes its place.
+                if (endedAutoTrip != null) appScope.launch { decodedNotice.post(endedAutoTrip) }
             }
         }.launchIn(scope)
     }
@@ -111,6 +121,8 @@ class CaptureForegroundService : Service() {
         if (started == null || (!force && !rateLimit.shouldPost(status, clock.monotonicNs()))) return null
         return notifications.build(status, started, fixes.status(), nowWallMs)
     }
+
+    private fun notificationsVisible(): Boolean = getSystemService(NotificationManager::class.java).areNotificationsEnabled()
 
     private fun endIfIdle() {
         if (recorder.status.value.state == RecorderState.IDLE) endService()

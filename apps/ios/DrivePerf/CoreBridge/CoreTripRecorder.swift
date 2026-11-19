@@ -27,12 +27,27 @@ extension LiveSurfacing {
 @MainActor
 protocol TripNotifying: AnyObject {
     func postAutoTripRecording(tripId: String)
+    /// The recording notice; [posted] runs once it is shown (not when notifications are off). [automatic] marks the
+    /// automatic trip's notice (F-CAP-11) apart from the manual fallback's.
+    func postRecordingNotice(tripId: String, automatic: Bool, posted: @escaping @MainActor () -> Void)
     func removeTripNotifications(tripId: String)
     func postDriveDecoded(tripId: String, smoothness: Int?)
 }
 
 extension TripNotifying {
+    func postRecordingNotice(tripId: String, automatic: Bool, posted: @escaping @MainActor () -> Void) {
+        postAutoTripRecording(tripId: tripId)
+        posted()
+    }
+
     func postDriveDecoded(tripId: String, smoothness: Int?) {}
+}
+
+/// F-CAP-11 analytics for the automatic trip's notice. No properties; the app maps them to the Kotlin `Analytics` port,
+/// which holds them until the user has answered "Share usage statistics" (ADR-007).
+enum AutoTripNoticeEvent: String, CaseIterable {
+    case posted = "auto_trip_notification_posted"
+    case tapped = "auto_trip_notification_tapped"
 }
 
 /// A short UIKit background assertion covering launch and candidate confirmation.
@@ -107,6 +122,8 @@ final class CoreTripRecorder: TripRecording, TripHistory {
     private var activityRecoveryAttemptID: String?
     private(set) var isStartingFromIntent = false
     var surfaceData: TripSurfaceData?
+    /// Set by the composition root once the core has started (DRIVE-137).
+    var trackNotice: ((AutoTripNoticeEvent) -> Void)?
     var liveActivitiesEnabled: Bool { liveSurface?.activitiesEnabled ?? false }
     private var statusObservers: [UUID: AsyncStream<RecorderStatus>.Continuation] = [:]
     private var historyObservers: [UUID: AsyncStream<[TripSummary]>.Continuation] = [:]
@@ -307,9 +324,16 @@ final class CoreTripRecorder: TripRecording, TripHistory {
 
     private func postRecordingNotice(tripID: String, automatic: Bool) {
         guard notifiedTripId == nil else { return }
-        notifier?.postAutoTripRecording(tripId: tripID)
+        notifier?.postRecordingNotice(tripId: tripID, automatic: automatic) { [weak self] in
+            if automatic { self?.trackNotice?(.posted) }
+        }
         notifiedTripId = tripID
         notifiedAutomaticTrip = automatic
+    }
+
+    /// The user opened the app from the automatic trip's notice (`auto_trip_notification_tapped`).
+    func autoTripNoticeOpened() {
+        trackNotice?(.tapped)
     }
 
     private func endSurfaces() {

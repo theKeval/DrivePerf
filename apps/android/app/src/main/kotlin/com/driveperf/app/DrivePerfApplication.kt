@@ -7,7 +7,9 @@ import com.driveperf.app.di.drivesModule
 import com.driveperf.app.di.replayModule
 import com.driveperf.domain.capture.TripRecorder
 import com.driveperf.feature.onboarding.PermissionReader
+import com.driveperf.platform.capture.AutoTripNoticeTaps
 import com.driveperf.platform.capture.CaptureNotifications
+import com.driveperf.platform.capture.DriveDecodedNotice
 import com.driveperf.platform.crash.PrivacyChoices
 import com.driveperf.platform.platformModule
 import kotlinx.coroutines.CoroutineScope
@@ -36,5 +38,9 @@ class DrivePerfApplication : Application() {
             location = koin.get(),
         )
         koin.get<TripRecorder>().onLaunch()
+        // DRIVE-137, after the core has started: the "Drive decoded." channel, and the tap counter for the automatic
+        // trip's notice (auto_trip_notification_tapped), registered before any activity is created.
+        koin.get<DriveDecodedNotice>().ensureChannel()
+        registerActivityLifecycleCallbacks(koin.get<AutoTripNoticeTaps>())
     }
 }
