@@ -20,5 +20,7 @@ internal fun AppEnv.onDrivesEffect(effect: DrivesEffect) {
             navController.popBackStack(Routes.TRIP_DETAIL, inclusive = true)
             Toast.makeText(navController.context, effect.message, Toast.LENGTH_SHORT).show()
         }
+        // S-RPL-02 and S-SCO-04 open as sheets over the screen that asked (ScoreDestinations.kt), not as routes.
+        is DrivesEffect.OpenEvidence, is DrivesEffect.OpenTip -> Unit
     }
 }

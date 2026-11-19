@@ -125,6 +125,8 @@ public data class TipUi(
     /** "Next time, ease off a little earlier before the light. …" */
     val text: String,
     val why: String,
+    /** The event "See the moment" opens (S-RPL-02); null for a tip with no counted event. */
+    val eventId: String? = null,
 )
 
 /** A trip card's score badge (components.md §12). */

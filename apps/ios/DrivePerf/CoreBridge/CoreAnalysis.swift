@@ -60,6 +60,8 @@ final class CoreAnalysisPresenter: AnalysisPresenting {
                         continuation.yield(.message(message.text))
                     } else if let replay = effect as? AnalysisEffectOpenReplay {
                         continuation.yield(.openReplay(tripId: replay.tripId))
+                    } else if let evidence = effect as? AnalysisEffectOpenEvidence {
+                        continuation.yield(.openEvidence(eventId: evidence.eventId))
                     }
                 }
                 continuation.finish()
@@ -185,6 +187,8 @@ final class CoreAnalysisPresenter: AnalysisPresenting {
         case .filterGg(let type): AnalysisIntentFilterGg(type: type.map(KotlinMapping.kotlin))
         case .showEvent(let id): AnalysisIntentShowEvent(eventId: id)
         case .openReplay: AnalysisIntentOpenReplay.shared
+        case .openEvidence(let id): AnalysisIntentOpenEvidence(eventId: id)
+        case .reload: AnalysisIntentReload.shared
         }
     }
 

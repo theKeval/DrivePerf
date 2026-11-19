@@ -19,12 +19,27 @@ struct TripMetaRow: View {
     }
 }
 
-/// S-TRP-01 Smoothness card: ring 124 with its comparison and lines, "How scores work", the four contributors and
-/// "Smoothness breakdown ›".
+/// S-TRP-01 Smoothness card: ring 124 with its comparison and lines, "How scores work", the four contributors (one with
+/// events expands to its event rows, each opening its evidence: DRIVE-87 AC2) and "Smoothness breakdown ›".
 struct TripScoreCard: View {
     let score: ScoreSummary
     let trips: TripListViewModel
     let tripId: String
+    var links = TripLinkWords()
+    /// Opens S-RPL-02 for an event; nil without Replay, and then the rows are not buttons.
+    var onEvent: ((String) -> Void)?
+    @State private var open: ScoreContributorID?
+
+    init(
+        score: ScoreSummary, trips: TripListViewModel, tripId: String, links: TripLinkWords = TripLinkWords(),
+        onEvent: ((String) -> Void)? = nil
+    ) {
+        self.score = score
+        self.trips = trips
+        self.tripId = tripId
+        self.links = links
+        self.onEvent = onEvent
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: DPSpace.s4) {
@@ -42,9 +57,13 @@ struct TripScoreCard: View {
                     .frame(minHeight: DPLayout.touchMin)
             }
             ForEach(score.contributors) { contributor in
-                ContributorRowView(contributor: contributor)
-                    .accessibilityElement(children: .ignore)
-                    .accessibilityLabel(contributor.accessibilityLabel)
+                ExpandableContributorRow(
+                    contributor: contributor, isOpen: open == contributor.id, links: links, padding: 0,
+                    onToggle: { opening in
+                        withAnimation(.spring) { open = opening ? contributor.id : nil }
+                        if opening { trips.contributorTapped(contributor.id) }
+                    },
+                    onEvent: onEvent)
             }
             Rectangle().fill(DPColor.separator).frame(height: 0.5)
             NavigationLink {
@@ -87,9 +106,12 @@ struct TripScoreCard: View {
     }
 }
 
-/// "Events · n": counts by type and the rows; "No abrupt inputs on this drive." without any.
+/// "Events · n": counts by type and the rows; "No abrupt inputs on this drive." without any. Each row, pinned or not,
+/// opens its evidence (DRIVE-55); one reported "Not accurate?" is left out and opens nothing.
 struct TripEventsSection: View {
     let events: TripEvents
+    var links = TripLinkWords()
+    var onEvent: ((String) -> Void)?
 
     var body: some View {
         VStack(alignment: .leading, spacing: DPSpace.s2) {
@@ -121,7 +143,7 @@ struct TripEventsSection: View {
                 VStack(spacing: 0) {
                     ForEach(Array(events.rows.enumerated()), id: \.element.id) { index, row in
                         if index > 0 { Rectangle().fill(DPColor.separator).frame(height: 0.5).padding(.leading, 40) }
-                        ScoreEventRowView(event: row)
+                        EventRowButton(event: row, links: links, onEvent: onEvent)
                     }
                 }
                 .padding(.horizontal, DPSpace.s4).padding(.vertical, DPSpace.s1)
@@ -131,10 +153,14 @@ struct TripEventsSection: View {
     }
 }
 
-/// The positive card first (✦ Cleanest stretch), then the tip card.
+/// The positive card first (✦ Cleanest stretch), then the tip card: it pushes S-SCO-04 ([onTip]) and "See the
+/// moment ›" opens its event's evidence ([onTipEvidence], DRIVE-102).
 struct TripHighlights: View {
     let cleanest: String?
     let tip: ScoreTip?
+    var links = TripLinkWords()
+    var onTip: (() -> Void)?
+    var onTipEvidence: (() -> Void)?
 
     var body: some View {
         VStack(alignment: .leading, spacing: DPSpace.s2) {
@@ -152,7 +178,94 @@ struct TripHighlights: View {
                 .dpCard()
                 .accessibilityElement(children: .combine)
             }
-            if let tip { TipCardView(tip: tip) }
+            if let tip { tipCard(tip) }
+        }
+    }
+
+    @ViewBuilder
+    private func tipCard(_ tip: ScoreTip) -> some View {
+        if let onTip {
+            Button(action: onTip) { TipCardView(tip: tip).contentShape(Rectangle()) }
+                .buttonStyle(.plain)
+                .accessibilityHint(links.openTip)
+                .accessibilityIdentifier("tripDetail.tip")
+        } else {
+            TipCardView(tip: tip)
+        }
+        if tip.eventId != nil, let onTipEvidence {
+            Button(action: onTipEvidence) {
+                HStack(spacing: DPSpace.s1) {
+                    Text(links.seeTheMoment).font(DPFont.body.weight(.semibold))
+                    Image(systemName: "chevron.right").font(DPFont.caption)
+                }
+                .foregroundStyle(DPColor.accentText)
+                .frame(minHeight: DPLayout.touchMin)
+            }
+            .accessibilityHint(links.openEvidence)
+            .accessibilityIdentifier("tripDetail.tipMoment")
+        }
+    }
+}
+
+/// An event row that opens its evidence ([onEvent]), unless it was reported "Not accurate?" and left out, or there is
+/// no Replay to open it with.
+struct EventRowButton: View {
+    let event: ScoreEventRow
+    let links: TripLinkWords
+    let onEvent: ((String) -> Void)?
+
+    var body: some View {
+        if let onEvent, !event.isExcluded {
+            Button { onEvent(event.id) } label: { ScoreEventRowView(event: event).contentShape(Rectangle()) }
+                .buttonStyle(.plain)
+                .accessibilityLabel(event.accessibilityLabel)
+                .accessibilityHint(links.openEvidence)
+                .accessibilityIdentifier("event.\(event.id)")
+        } else {
+            ScoreEventRowView(event: event)
+        }
+    }
+}
+
+/// A contributor row; one with events toggles them open, and each event opens its evidence (DRIVE-87 AC2). Shared by
+/// trip detail and S-SCO-01.
+struct ExpandableContributorRow: View {
+    let contributor: ScoreContributor
+    let isOpen: Bool
+    let links: TripLinkWords
+    var padding: CGFloat = DPSpace.s4
+    let onToggle: (Bool) -> Void
+    let onEvent: ((String) -> Void)?
+
+    var body: some View {
+        let hasEvents = !contributor.events.isEmpty
+        VStack(alignment: .leading, spacing: 0) {
+            Button {
+                guard hasEvents else { return }
+                onToggle(!isOpen)
+            } label: {
+                HStack {
+                    ContributorRowView(contributor: contributor)
+                    if hasEvents {
+                        Image(systemName: isOpen ? "chevron.up" : "chevron.down").font(DPFont.caption).foregroundStyle(DPColor.text3)
+                    }
+                }
+                .padding(padding)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .disabled(!hasEvents)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(contributor.accessibilityLabel)
+            .accessibilityHint(hasEvents ? (isOpen ? links.hideEvents : links.showEvents) : "")
+            .accessibilityAddTraits(hasEvents ? .isButton : [])
+            .accessibilityIdentifier("contributor.\(contributor.id)")
+            if hasEvents && isOpen {
+                ForEach(contributor.events) { event in
+                    EventRowButton(event: event, links: links, onEvent: onEvent).padding(.horizontal, padding)
+                }
+                .padding(.bottom, DPSpace.s2)
+            }
         }
     }
 }
@@ -164,6 +277,9 @@ struct ScoreBreakdownView: View {
     let tripId: String
     @State private var open: ScoreContributorID?
     @State private var didPickInitial = false
+    @Environment(\.replayServices) private var replayServices
+    /// S-RPL-02 for a contributor's event (DRIVE-87 AC2); nil without Replay.
+    @State private var evidence: TripEvidenceSheets?
 
     var body: some View {
         ScrollView {
@@ -201,6 +317,19 @@ struct ScoreBreakdownView: View {
             }
         }
         .onAppear { trips.showBreakdown(tripId) }
+        .onAppear {
+            guard evidence == nil, let replayServices else { return }
+            evidence = TripEvidenceSheets(presenters: replayServices.presenters, tripId: tripId)
+        }
+        .tripEvidenceSheets(evidence)
+    }
+
+    private var openEvent: ((String) -> Void)? {
+        guard let evidence else { return nil }
+        return { [trips, tripId] eventId in
+            trips.evidenceOpened(tripId: tripId, eventId: eventId)
+            evidence.openEvidence(eventId)
+        }
     }
 
     private func hero(_ score: ScoreSummary, _ breakdown: ScoreBreakdown) -> some View {
@@ -262,37 +391,15 @@ struct ScoreBreakdownView: View {
         }
     }
 
-    @ViewBuilder
     private func contributorRow(_ contributor: ScoreContributor) -> some View {
-        let hasEvents = !contributor.events.isEmpty
-        let isOpen = hasEvents && open == contributor.id
-        VStack(alignment: .leading, spacing: 0) {
-            Button {
-                guard hasEvents else { return }
-                withAnimation(.spring) { open = isOpen ? nil : contributor.id }
-                if !isOpen { trips.contributorTapped(contributor.id) }
-            } label: {
-                HStack {
-                    ContributorRowView(contributor: contributor)
-                    if hasEvents {
-                        Image(systemName: isOpen ? "chevron.up" : "chevron.down").font(DPFont.caption).foregroundStyle(DPColor.text3)
-                    }
-                }
-                .padding(DPSpace.s4)
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .disabled(!hasEvents)
-            .accessibilityElement(children: .ignore)
-            .accessibilityLabel(contributor.accessibilityLabel)
-            .accessibilityAddTraits(hasEvents ? .isButton : [])
-            if isOpen {
-                ForEach(contributor.events) { event in
-                    ScoreEventRowView(event: event).padding(.horizontal, DPSpace.s4)
-                }
-                .padding(.bottom, DPSpace.s2)
-            }
-        }
+        ExpandableContributorRow(
+            contributor: contributor, isOpen: open == contributor.id,
+            links: trips.detail(id: tripId)?.links ?? TripLinkWords(),
+            onToggle: { opening in
+                withAnimation(.spring) { open = opening ? contributor.id : nil }
+                if opening { trips.contributorTapped(contributor.id) }
+            },
+            onEvent: openEvent)
     }
 
     @ViewBuilder

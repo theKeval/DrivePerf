@@ -7,7 +7,8 @@ import SwiftUI
 /// with its comparison and contributors (→ S-SCO-01, S-SCO-02), the stat tiles with provenance on long-press
 /// (F-DQ-05), events by type, the positive card and the tip, then data quality (→ S-DQ-01) and "What was this?".
 /// Scores are hidden on passenger and not-a-drive trips. Story, Share and Export wait for their epics; the Pro lock is
-/// deferred. The map hero arrives with its own story.
+/// deferred. The map hero (drawn from the preview track, no tiles) opens Replay; event rows, contributor events and
+/// the tip's moment open S-RPL-02, and the tip card pushes S-SCO-04 (DRIVE-55, DRIVE-87, DRIVE-102).
 struct TripDetailView: View {
     let trips: TripListViewModel
     let tripId: String
@@ -21,10 +22,13 @@ struct TripDetailView: View {
     @State private var showsReplay = false
     /// Replay was asked for while the in-drive lock held it (S-DRV-05); it opens when the lock lifts.
     @State private var replayHeld = false
-    @State private var analysis: (any AnalysisPresenting)?
     @State private var analysisTitle = ""
     @State private var showsAnalysis = false
     @State private var analysisHeld = false
+    /// Replay asked for from Analysis: it is pushed over Analysis.
+    @State private var showsReplayOverAnalysis = false
+    /// S-RPL-02 and S-SCO-04 over trip detail; nil without Replay (previews, tests).
+    @State private var evidence: TripEvidenceSheets?
     /// The detail was opened once; coming back from a pushed screen re-opens it only if another trip took its place.
     @State private var hasOpened = false
 
@@ -52,7 +56,11 @@ struct TripDetailView: View {
                 hasOpened = true
                 trips.open(tripId)
             }
+            if evidence == nil, let replayServices {
+                evidence = TripEvidenceSheets(presenters: replayServices.presenters, tripId: tripId)
+            }
         }
+        .tripEvidenceSheets(evidence)
         .sheet(isPresented: Binding(
             get: { trips.dataQuality(id: tripId) != nil }, set: { if !$0 { trips.closeQuality() } })
         ) {
@@ -70,16 +78,28 @@ struct TripDetailView: View {
             trips.replayOpened()
             replayRequest = request
             replay = replayServices.model(tripId: tripId, source: .tripDetail)
-            showsReplay = true
+            // From Analysis, Replay goes on top of it; from trip detail, on top of trip detail.
+            if showsAnalysis { showsReplayOverAnalysis = true } else { showsReplay = true }
         }
         .navigationDestination(isPresented: $showsAnalysis) {
-            if let analysis { AnalysisView(presenter: analysis, title: analysisTitle) }
+            if let analysisPresenters {
+                // Asks for the presenter once, and shows Analysis's Replay button (#85 × #87).
+                AnalysisView(
+                    presenters: analysisPresenters, tripId: tripId, title: analysisTitle,
+                    onReplay: replayServices == nil ? nil : { _ in requestReplay() }
+                )
+                .navigationDestination(isPresented: $showsReplayOverAnalysis) {
+                    if let replay, let replayRequest {
+                        ReplayView(
+                            model: replay, title: "Replay", subtitle: replayRequest.title, mapSummary: replayRequest.mapSummary)
+                    }
+                }
+            }
         }
         .onChange(of: trips.analysisRequest) { _, request in
-            guard let request, request.tripId == tripId, let analysisPresenters else { return }
+            guard let request, request.tripId == tripId, analysisPresenters != nil else { return }
             trips.analysisOpened()
             analysisTitle = request.title
-            analysis = analysisPresenters.presenter(tripId: tripId)
             showsAnalysis = true
         }
         .onChange(of: capture?.heldContent) { old, new in
@@ -94,6 +114,43 @@ struct TripDetailView: View {
                 if capture?.isContentLocked(now: Date()) == false { trips.requestAnalysis(tripId) }
             }
         }
+    }
+
+    /// The map hero; it opens Replay when Replay is available.
+    private func mapHero(_ map: TripMap, _ detail: TripDetail) -> some View {
+        let replay: (() -> Void)? = replayServices == nil ? nil : { requestReplay() }
+        return TripMapHero(
+            map: map, quality: detail.quality, qualityWord: detail.qualityWord, links: detail.links, onReplay: replay)
+    }
+
+    /// The positive card and the tip, whose card and moment open S-SCO-04 and S-RPL-02 when Replay is available.
+    private func highlights(_ detail: TripDetail) -> some View {
+        let tip: (() -> Void)? = evidence == nil ? nil : { openTip() }
+        let moment: (() -> Void)? = evidence == nil ? nil : { openTipEvidence() }
+        return TripHighlights(
+            cleanest: detail.cleanest, tip: detail.tip, links: detail.links, onTip: tip, onTipEvidence: moment)
+    }
+
+    /// An event row or a contributor's event: S-RPL-02 (DRIVE-87 AC2, DRIVE-55). Nil without Replay.
+    private var openEvent: ((String) -> Void)? {
+        guard let evidence else { return nil }
+        return { [trips, tripId] eventId in
+            trips.evidenceOpened(tripId: tripId, eventId: eventId)
+            evidence.openEvidence(eventId)
+        }
+    }
+
+    /// The tip card: S-SCO-04 for the trip's own tip (DRIVE-102).
+    private func openTip() {
+        trips.tipOpened(tripId)
+        evidence?.openTip()
+    }
+
+    /// The tip's "See the moment": `tip_evidence_opened`, then S-RPL-02 for its event (DRIVE-102).
+    private func openTipEvidence() {
+        guard let eventId = trips.detail(id: tripId)?.tip?.eventId else { return }
+        trips.tipEvidenceOpened(tripId)
+        evidence?.openEvidence(eventId)
     }
 
     /// D1: during a driver trip (or the calm minute after it) Analysis waits behind S-DRV-05 too.
@@ -181,18 +238,19 @@ struct TripDetailView: View {
                         ForEach(Array(detail.banners.enumerated()), id: \.offset) { _, banner in bannerView(banner) }
                     }
                 }
+                if let map = detail.map { mapHero(map, detail) }
                 if let meta = detail.meta { TripMetaRow(meta: meta) }
                 actions(detail)
                 if !detail.scoresHidden, let score = detail.score {
-                    TripScoreCard(score: score, trips: trips, tripId: tripId)
+                    TripScoreCard(score: score, trips: trips, tripId: tripId, links: detail.links, onEvent: openEvent)
                 }
                 tiles(detail.tiles)
                 Text("Touch and hold a number to see how it was measured.")
                     .font(DPFont.caption).foregroundStyle(DPColor.text3)
                 if !detail.scoresHidden {
-                    if let events = detail.events { TripEventsSection(events: events) }
+                    if let events = detail.events { TripEventsSection(events: events, links: detail.links, onEvent: openEvent) }
                     if detail.cleanest != nil || detail.tip != nil {
-                        TripHighlights(cleanest: detail.cleanest, tip: detail.tip)
+                        highlights(detail)
                     }
                 }
                 VStack(spacing: 0) {

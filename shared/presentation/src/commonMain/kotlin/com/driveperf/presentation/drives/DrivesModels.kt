@@ -163,6 +163,8 @@ public data class TripDetailUi(
     val tip: TipUi? = null,
     /** Analysis needs the detailed data; false once it was removed to save space. */
     val canAnalyse: Boolean = true,
+    /** The map hero (DRIVE-55); null until the route has loaded, or when there is none to draw. */
+    val map: TripMapUi? = null,
 ) {
     /** "Usable"; null before analysis. */
     val qualityWord: String? get() = quality?.let(TripCopy::badgeWord)
@@ -300,6 +302,20 @@ public sealed interface DrivesIntent {
 
     /** S-HIS-01's filter chips and S-HIS-02 (DRIVE-126 AC3). */
     public data class History(val action: HistoryFilterAction) : DrivesIntent
+    /**
+     * An event row on S-TRP-01 or under an S-SCO-01 contributor, pinned or not (DRIVE-87 AC2, DRIVE-55):
+     * [DrivesEffect.OpenEvidence] opens S-RPL-02. Ignored for an event reported "Not accurate?", which is left out.
+     */
+    public data class OpenEvidence(val tripId: String, val eventId: String) : DrivesIntent
+
+    /** The tip card on S-TRP-01 (DRIVE-102): [DrivesEffect.OpenTip] opens S-SCO-04 for the trip's own tip. */
+    public data class OpenTip(val tripId: String) : DrivesIntent
+
+    /**
+     * The tip card's "See the moment" on S-TRP-01 (DRIVE-102): records `tip_evidence_opened {tip_id}` and opens S-RPL-02
+     * for the tip's event. Ignored when the tip has no event.
+     */
+    public data class OpenTipEvidence(val tripId: String) : DrivesIntent
 }
 
 /** One-shot navigation. */
@@ -324,6 +340,11 @@ public sealed interface DrivesEffect {
 
     /** S-TRP-03 deleted [tripId]: go back to the list it was opened from and show [message] ("Drive deleted"). */
     public data class TripDeleted(val tripId: String, val message: String) : DrivesEffect
+    /** Open S-RPL-02 for [eventId] of [tripId] over the current screen (DRIVE-87 AC2, DRIVE-55, DRIVE-102). */
+    public data class OpenEvidence(val tripId: String, val eventId: String) : DrivesEffect
+
+    /** Push S-SCO-04 for the trip's own tip (DRIVE-102). */
+    public data class OpenTip(val tripId: String) : DrivesEffect
 }
 
 /** Where S-SCO-02 was opened from (`scores_explainer_viewed {source}`). */
