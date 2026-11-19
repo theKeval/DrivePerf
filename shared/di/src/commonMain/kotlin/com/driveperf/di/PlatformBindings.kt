@@ -19,6 +19,10 @@ import com.driveperf.domain.trip.TripCorrections
 import com.driveperf.domain.capture.TripRecorder
 import com.driveperf.domain.tripfile.TripFileStore
 import com.driveperf.foundation.Clock
+import com.driveperf.domain.capture.RecorderState
+import com.driveperf.presentation.replay.ReplayPresenter
+import com.driveperf.presentation.replay.ReplaySource
+import kotlinx.coroutines.CoroutineScope
 
 /**
  * The natively implemented ports (ADR-002 section 5). Swift supplies its adapters at app launch; Android supplies
@@ -78,8 +82,31 @@ public class CoreServices internal constructor(
     /** Usage statistics behind the user's choice (F-ONB-08): events wait until the choice, and are dropped if declined. */
     public val analytics: Analytics,
     public val settings: com.driveperf.domain.settings.SettingsRepository,
+    private val clock: Clock,
     private val onClose: () -> Unit,
 ) {
+    /**
+     * The shared Replay presenter for [tripId] (S-RPL-01), running in a child of [scope]. Android passes
+     * `viewModelScope`. Call `close()` when the screen goes away.
+     */
+    public fun replayPresenter(tripId: String, source: ReplaySource, scope: CoroutineScope): ReplayPresenter =
+        ReplayPresenter(
+            tripId = tripId,
+            source = source,
+            replays = replay,
+            isRecording = recordingCheck(tripId),
+            analytics = analytics,
+            monoNowNs = clock::monotonicNs,
+            scope = scope,
+        )
+
+    /** [replayPresenter] on the main thread with its own scope, for Swift. Call `close()` on deinit. */
+    public fun replayPresenter(tripId: String, source: ReplaySource): ReplayPresenter =
+        ReplayPresenter.onMain(tripId, source, replay, recordingCheck(tripId), analytics, clock::monotonicNs)
+
+    private fun recordingCheck(tripId: String): () -> Boolean =
+        { recorder.status.value.let { it.tripId == tripId && it.state != RecorderState.IDLE } }
+
     /** Stops the recorder's work and closes the database. Only for a scratch core; the app's core lives as long as the process. */
     public fun close() {
         onClose()

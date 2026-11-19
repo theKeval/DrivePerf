@@ -134,6 +134,7 @@ public object DrivePerfCore {
             corrections = corrections,
             analytics = analytics,
             settings = LocalSettingsRepository(db, io, clock, analytics).also { scope.followBatterySaver(it, recorder) },
+            clock = clock,
             onClose = {
                 scope.cancel()
                 driver.close()
