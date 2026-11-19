@@ -61,7 +61,7 @@ final class UIKitBackgroundAssertions: BackgroundAssertions {
 
 extension BuildFlags {
     /// Read from Info.plist keys set by build settings (`DP_FEATURE_*` in Config/DrivePerf.xcconfig). All off
-    /// until the Apple Developer account exists (DRIVE-42).
+    /// until each feature is built on the paid Apple Developer account (DRIVE-42).
     static func fromBundle(_ bundle: Bundle = .main) -> BuildFlags {
         func flag(_ key: String) -> Bool { (bundle.object(forInfoDictionaryKey: key) as? String) == "YES" }
         return BuildFlags(

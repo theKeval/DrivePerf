@@ -19,6 +19,7 @@ Read `apps/ios/README.md` and ADR-002 sections 2 to 5 first. Minimum iOS 26, iPh
 - **Design:** `docs/design/<JIRA-KEY>/ios/` and `docs/design/screens/ios/` are the source of truth; take colors,
   spacing and type verbatim from `design-spec.md`; use the SVG assets, never recreate icons.
 - **Signing:** the committed config is unsigned (`CODE_SIGNING_ALLOWED=NO` in CI). Device runs use the gitignored
-  `apps/ios/Config/Local.xcconfig`, which must override the bundle ID and the team together (README "Your iPhone");
-  never sign `com.driveperf.*` with a Personal Team, and never commit a Team ID or DSN.
+  `apps/ios/Config/Local.xcconfig`, which sets the paid DrivePerf team for `com.driveperf.app.dev` (README "Your
+  iPhone"). The Personal Team fallback must override the bundle ID and the team together; never sign
+  `com.driveperf.*` with a Personal Team. Never commit a DSN; the Team ID stays in `Local.xcconfig`.
 - **Tests:** XCTest or Swift Testing for view models and bridges; `tools/run-ios.sh` runs the app on a simulator.

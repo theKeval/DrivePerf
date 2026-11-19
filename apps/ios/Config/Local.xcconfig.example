@@ -1,16 +1,18 @@
-// Copy to Config/Local.xcconfig (gitignored) to run a Debug build on your own iPhone with a free Personal Team.
-// Temporary: only until the Apple Developer account is bought (DRIVE-42). The launch build is com.driveperf.app.
+// Copy to Config/Local.xcconfig (gitignored) to sign a Debug build for your own iPhone (README "Run it on your iPhone").
 //
-// Both lines below are required together. The bundle ID override keeps the Personal Team away from
-// com.driveperf.*; never set DEVELOPMENT_TEAM without it. Release builds ignore this team on purpose.
-DP_APP_ID_DEBUG = com.yourname.driveperf.dev
+// Default: the paid DrivePerf team (Apple Developer Program, DRIVE-42). The Debug build signs as com.driveperf.app.dev,
+// its widget extension as com.driveperf.app.dev.widgets, both with the App Group group.com.driveperf.app. Those IDs and
+// the group are registered in that team's portal. Set DEVELOPMENT_TEAM to its Team ID (developer.apple.com/account ›
+// Membership details). Release builds ignore this team on purpose: the release lane signs com.driveperf.app.
 DEVELOPMENT_TEAM = YOURTEAMID
 CODE_SIGN_STYLE = Automatic
 CODE_SIGN_IDENTITY = Apple Development
 
-// A free Personal Team cannot use App Groups, so signing fails on the App Group entitlement the widgets need.
-// These two lines swap in entitlements without it. The app and the widgets then run with no shared data: the widget
-// and Control Center control show their empty state and the app skips publishing the widget snapshot. Delete both lines
-// once the paid account exists; the committed Release and Debug config for com.driveperf.app is unchanged.
-DP_ENTITLEMENTS_APP = Config/DrivePerf.personal-team.entitlements
-DP_ENTITLEMENTS_WIDGETS = Config/DrivePerfWidgets.personal-team.entitlements
+// Fallback, a free Personal Team (no access to the paid team, or the membership has lapsed): set DEVELOPMENT_TEAM above
+// to the Personal Team's ID and uncomment all three lines below. They go together. The bundle ID override keeps the
+// Personal Team away from com.driveperf.*, which it could claim and block for the paid team. A free team cannot use
+// App Groups, so the two entitlement lines swap in variants without the group: the widget and the Control Center
+// control then show their empty state and the app skips publishing the widget snapshot.
+// DP_APP_ID_DEBUG = com.yourname.driveperf.dev
+// DP_ENTITLEMENTS_APP = Config/DrivePerf.personal-team.entitlements
+// DP_ENTITLEMENTS_WIDGETS = Config/DrivePerfWidgets.personal-team.entitlements

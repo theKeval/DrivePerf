@@ -67,8 +67,9 @@ module or a dependency edge. Path-specific instruction files in `.github/instruc
 - **The website deploys from `main`:** a push touching `web/**`, `backend/firebase/**` or
   `.github/workflows/web.yml` deploys driveperf.com to production. Leave those paths alone unless the ticket is about
   the website or Firebase config.
-- **iOS builds are simulator-only for now.** Never pick a Personal Team for `com.driveperf.app` or
-  `com.driveperf.app.dev`: it can block those IDs for the paid account.
+- **The committed iOS config is unsigned (simulator and CI).** Device builds sign `com.driveperf.app.dev` with the paid
+  DrivePerf team through the gitignored `apps/ios/Config/Local.xcconfig` (`apps/ios/README.md`). Never pick a Personal
+  Team for `com.driveperf.*`: it can block those IDs for the paid team.
 - **No secrets and no real location data in the repo.** GPX/CSV fixtures must be synthetic or privacy-trimmed and carry
   a `# privacy-trimmed` header (CI rejects them otherwise). Release workflows are inert until their accounts exist
   (`docs/architecture/ci-cd.md`).
