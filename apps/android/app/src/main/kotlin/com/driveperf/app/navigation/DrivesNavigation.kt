@@ -14,5 +14,7 @@ internal fun AppEnv.onDrivesEffect(effect: DrivesEffect) {
         is DrivesEffect.OpenTrip -> navController.navigate(Routes.tripDetail(effect.tripId)) { launchSingleTop = true }
         is DrivesEffect.OpenBreakdown -> navController.navigate(Routes.scoreBreakdown(effect.tripId)) { launchSingleTop = true }
         DrivesEffect.OpenHowScoresWork -> navController.navigate(Routes.HOW_SCORES_WORK) { launchSingleTop = true }
+        // S-RPL-02 and S-SCO-04 open as sheets over the screen that asked (ScoreDestinations.kt), not as routes.
+        is DrivesEffect.OpenEvidence, is DrivesEffect.OpenTip -> Unit
     }
 }

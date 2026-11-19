@@ -81,6 +81,7 @@ fun TripDetailScreen(
     ) {
         Title(detail)
         detail.banners.forEach { Banner(it, detail.id, onAction) }
+        detail.map?.let { TripMapHero(it, detail.quality) { onAction(DrivesIntent.OpenReplay(detail.id)) } }
         MetaRow(detail)
         Actions(detail, onAction)
         if (!detail.scoresHidden) detail.score?.let { ScoreCard(it, detail.id, onAction) }
@@ -93,8 +94,13 @@ fun TripDetailScreen(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         if (!detail.scoresHidden) {
-            detail.events?.let { EventsSection(it) }
-            Highlights(detail.cleanest, detail.tip)
+            detail.events?.let { EventsSection(it) { id -> onAction(DrivesIntent.OpenEvidence(detail.id, id)) } }
+            Highlights(
+                detail.cleanest,
+                detail.tip,
+                onTip = { onAction(DrivesIntent.OpenTip(detail.id)) },
+                onTipEvidence = { onAction(DrivesIntent.OpenTipEvidence(detail.id)) },
+            )
         }
         DetailsList(detail, state.canCorrect, onAction)
     }
@@ -182,7 +188,9 @@ private fun ScoreCard(score: ScoreUi, tripId: String, onAction: (DrivesIntent) -
             TextButton(onClick = { onAction(DrivesIntent.OpenHowScoresWork(ExplainerSource.TRIP_DETAIL)) }) {
                 Text(stringResource(R.string.score_how_scores_work))
             }
-            score.contributors.forEach { ContributorRow(it) }
+            TripContributors(score.contributors, onOpen = { onAction(DrivesIntent.TapContributor(it)) }) {
+                onAction(DrivesIntent.OpenEvidence(tripId, it))
+            }
             if (score.isScored || score.contributors.isNotEmpty()) {
                 HorizontalDivider()
             }

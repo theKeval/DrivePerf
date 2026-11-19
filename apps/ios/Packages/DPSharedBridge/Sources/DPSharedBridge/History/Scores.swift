@@ -196,8 +196,14 @@ public struct ScoreTip: Equatable, Sendable {
     /// "Next time, …"
     public var text: String
     public var why: String
+    /// The event "See the moment" opens (S-RPL-02); nil for a tip with no counted event.
+    public var eventId: String?
 
-    public init(tipId: String, category: ScoreTipCategory, kicker: String, title: String, text: String, why: String) {
+    public init(
+        tipId: String, category: ScoreTipCategory, kicker: String, title: String, text: String, why: String,
+        eventId: String? = nil
+    ) {
+        self.eventId = eventId
         self.tipId = tipId
         self.category = category
         self.kicker = kicker

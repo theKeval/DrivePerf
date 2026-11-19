@@ -110,6 +110,19 @@ public sealed interface AnalysisIntent {
 
     /** The Replay button. */
     public data object OpenReplay : AnalysisIntent
+
+    /**
+     * An event tick on the timeline or a "Peaks on this drive" row (DRIVE-39 AC1): S-ANL-02 closes, the cursor goes to
+     * the event's peak and [AnalysisEffect.OpenEvidence] opens S-RPL-02 over S-ANL-01. Dragging across a tick still
+     * only scrubs ([MoveCursor]).
+     */
+    public data class OpenEvidence(val eventId: String) : AnalysisIntent
+
+    /**
+     * Feedback on an event changed in the evidence sheet: the analysis is read again, so an event reported "Not
+     * accurate?" leaves the ticks, the map and the G-G (the zoom, cursor and channels stay).
+     */
+    public data object Reload : AnalysisIntent
 }
 
 /** One-shot navigation and toasts. */
@@ -121,6 +134,9 @@ public sealed interface AnalysisEffect {
 
     /** Open S-RPL-01 for [tripId]. */
     public data class OpenReplay(val tripId: String) : AnalysisEffect
+
+    /** Open S-RPL-02 for [eventId] of this trip over S-ANL-01 (DRIVE-39 AC1). */
+    public data class OpenEvidence(val eventId: String) : AnalysisEffect
 }
 
 /**
@@ -185,10 +201,11 @@ public class AnalysisPresenter(
             is AnalysisIntent.ShowEvent -> showEvent(intent.eventId)
             AnalysisIntent.OpenReplay -> emit(AnalysisEffect.OpenReplay(tripId))
             AnalysisIntent.Back -> Unit
+            is AnalysisIntent.OpenEvidence, AnalysisIntent.Reload -> evidenceIntent(intent)
         }
     }
 
-    private suspend fun load() {
+    private suspend fun load(report: Boolean = true) {
         // The channels, their pyramids and the G-G grid are all built here, off the main thread, in one state: the
         // screen never sees "loaded" without its timeline.
         val units = unitSystem
@@ -212,7 +229,7 @@ public class AnalysisPresenter(
         analysis = ready.first
         update { ready.second }
         if (unitSystem != units) rebuild() // the units changed while the channels were being built
-        track("analysis_opened", "source" to source.key)
+        if (report) track("analysis_opened", "source" to source.key)
     }
 
     /** Rebuilds what depends on the window, the channels or the units. */
@@ -302,6 +319,22 @@ public class AnalysisPresenter(
         val marker = analysis?.markers?.firstOrNull { it.eventId == eventId } ?: return
         update { it.copy(ggExpanded = false) }
         moveCursor(marker.tPeakS)
+    }
+
+    /** The link to S-RPL-02 and the reload after feedback given there (DRIVE-39 AC1). */
+    private fun evidenceIntent(intent: AnalysisIntent) {
+        when (intent) {
+            is AnalysisIntent.OpenEvidence -> openEvidence(intent.eventId)
+            AnalysisIntent.Reload -> scope.launch { load(report = false) }
+            else -> Unit
+        }
+    }
+
+    /** Only an event that is on the timeline: one reported "Not accurate?" has no tick and no evidence. */
+    private fun openEvidence(eventId: String) {
+        if (analysis?.markers?.none { it.eventId == eventId } != false) return
+        showEvent(eventId)
+        emit(AnalysisEffect.OpenEvidence(eventId))
     }
 
     private fun options(a: TripAnalysis, on: Set<AnalysisChannel>): List<ChannelOption> = AnalysisChannel.entries.map { c ->

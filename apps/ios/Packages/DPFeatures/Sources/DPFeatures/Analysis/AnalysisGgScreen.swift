@@ -83,7 +83,7 @@ struct AnalysisGgScreen: View {
             Text(copy.ggPeaksTitle).font(DPFont.sectionTitle)
             VStack(spacing: 0) {
                 ForEach(current.peaks) { row in
-                    Button { model.send(.showEvent(row.eventId)) } label: {
+                    Button { model.send(.openEvidence(row.eventId)) } label: {
                         HStack(spacing: DPSpace.s3) {
                             DPEventGlyph(AnalysisPalette.glyph(row.type), size: 16)
                             VStack(alignment: .leading, spacing: 2) {

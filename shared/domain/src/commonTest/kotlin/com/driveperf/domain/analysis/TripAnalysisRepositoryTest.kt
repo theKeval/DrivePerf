@@ -13,6 +13,7 @@ import com.driveperf.domain.trip.Confidence
 import com.driveperf.domain.trip.DrivingEvent
 import com.driveperf.domain.trip.EventFeedback
 import com.driveperf.domain.trip.EventType
+import com.driveperf.domain.trip.InaccurateReason
 import com.driveperf.domain.trip.Placement
 import com.driveperf.domain.trip.PreviewRow
 import com.driveperf.domain.trip.QualityBadge
@@ -49,12 +50,16 @@ class TripAnalysisRepositoryTest {
         "e1", "t1", EventType.BRAKE, 6.0, 5.0, 7.0, 2.0, -0.3, null, 0.0005, 0.0, 12.0, 6.0, Confidence.HIGH, "v1",
     )
 
-    private class FakeTrips(var trip: Trip?, val events: List<DrivingEvent>) : TripRepository {
+    private class FakeTrips(
+        var trip: Trip?,
+        val events: List<DrivingEvent>,
+        val feedback: Map<String, EventFeedback> =
+            mapOf("e1" to EventFeedback("e1", "t1", needed = true, inaccurate = null, at = 1)),
+    ) : TripRepository {
         override fun observeTrips(): Flow<List<Trip>> = flowOf(listOfNotNull(trip))
         override suspend fun trip(id: String): Trip? = trip?.takeIf { it.id == id }
         override suspend fun events(tripId: String): List<DrivingEvent> = events
-        override suspend fun feedback(tripId: String): Map<String, EventFeedback> =
-            mapOf("e1" to EventFeedback("e1", tripId, needed = true, inaccurate = null, at = 1))
+        override suspend fun feedback(tripId: String): Map<String, EventFeedback> = feedback
         override suspend fun score(tripId: String): Score? = null
         override suspend fun delete(tripId: String): FileResult = error("unused")
     }
@@ -93,6 +98,23 @@ class TripAnalysisRepositoryTest {
         assertEquals(listOf(event), a.events)
         assertNull(a.score)
         assertEquals(20.0, a.data.durationS)
+    }
+
+    @Test
+    fun anEventReportedNotAccurateLeavesTheMarkersAndTheEvents() = runTest {
+        // Reported from the evidence sheet opened on Analysis (DRIVE-39 AC1): the reload must drop its tick, map pin,
+        // G-G point and peak row, as Replay drops its pin.
+        val rejected = event.copy(id = "e2", tPeakS = 12.0, tStartS = 11.0, tEndS = 13.0)
+        val feedback = mapOf(
+            "e1" to EventFeedback("e1", "t1", needed = true, inaccurate = null, at = 1),
+            "e2" to EventFeedback("e2", "t1", needed = false, inaccurate = InaccurateReason.PHONE_MOVED, at = 2),
+        )
+        val trips = FakeTrips(trip(), listOf(event, rejected), feedback)
+        val repo = TripAnalysisRepository(trips, replays(replay), FakeFiles(AnalysisFixtures.trace(20)), FakePreviews(null))
+        val a = repo.analysis("t1")!!
+        assertEquals(listOf("e1"), a.markers.map { it.eventId })
+        assertTrue(a.markers.single().needed, "a needed event still shows, hollow")
+        assertEquals(listOf(event), a.events)
     }
 
     @Test

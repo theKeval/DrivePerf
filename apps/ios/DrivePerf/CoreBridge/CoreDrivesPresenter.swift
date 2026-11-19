@@ -37,8 +37,8 @@ final class CoreDrivesPresenter: DrivesPresenting {
         }
         Task { [weak self] in
             for await effect in effects.value {
-                // iOS pushes trip detail and the score screens with navigation links, so only Replay and Analysis
-                // come back as navigation.
+                // iOS pushes trip detail and the score screens with navigation links, and opens the evidence and
+                // tip itself (TripEvidenceSheets), so only Replay and Analysis come back as navigation.
                 guard let self, let effect, let navigation = Self.navigation(effect) else { continue }
                 if navigationObservers.isEmpty {
                     pendingNavigation.append(navigation)
@@ -119,8 +119,35 @@ final class CoreDrivesPresenter: DrivesPresenting {
             correction: KotlinMapping.swift(d.correction),
             meta: d.meta.map { TripMeta(car: $0.car, isPassenger: $0.passenger, source: $0.source, timeRange: $0.timeRange) },
             scoresHidden: d.scoresHidden, score: d.score.map(score), breakdown: d.breakdown.map(breakdown),
-            events: d.events.map(events), cleanest: d.cleanest, tip: d.tip.map(tip), canAnalyse: d.canAnalyse)
+            events: d.events.map(events), cleanest: d.cleanest, tip: d.tip.map(tip), canAnalyse: d.canAnalyse,
+            map: d.map.map(tripMap), links: links)
     }
+
+    /// The S-TRP-01 map hero (DRIVE-55), in the S-ANL-01 map card's types.
+    static func tripMap(_ m: TripMapUi) -> TripMap {
+        TripMap(
+            widthM: m.widthM, heightM: m.heightM,
+            segments: m.segments.map { s in
+                let xs = CoreAnalysisTimeline.doubles(s.xs)
+                let ys = CoreAnalysisTimeline.doubles(s.ys)
+                return AnalysisMapSegment(
+                    style: CoreAnalysisPresenter.swift(s.style), points: zip(xs, ys).map { AnalysisMapPoint(x: $0, y: $1) })
+            },
+            pins: m.pins.map {
+                AnalysisMapPin(
+                    eventId: $0.eventId, type: KotlinMapping.swift($0.type), needed: $0.needed,
+                    at: AnalysisMapPoint(x: $0.at.x, y: $0.at.y))
+            },
+            stops: m.stops.map { AnalysisMapPoint(x: $0.x, y: $0.y) },
+            maxSpeed: m.maxSpeed.map { AnalysisMapPoint(x: $0.x, y: $0.y) },
+            estimatedStart: m.estimatedStart, accessibilityLabel: m.accessibilityLabel)
+    }
+
+    /// The shared `TripLinkCopy` (decision 3).
+    static let links = TripLinkWords(
+        estimatedStart: TripLinkCopy.shared.ESTIMATED_START, seeTheMoment: TripLinkCopy.shared.SEE_THE_MOMENT,
+        openEvidence: TripLinkCopy.shared.OPEN_EVIDENCE, openTip: TripLinkCopy.shared.OPEN_TIP,
+        showEvents: TripLinkCopy.shared.SHOW_EVENTS, hideEvents: TripLinkCopy.shared.HIDE_EVENTS)
 
     static func quality(_ q: QualitySheetUi) -> DataQualityDetail {
         DataQualityDetail(
@@ -216,7 +243,8 @@ final class CoreDrivesPresenter: DrivesPresenting {
 
     static func tip(_ t: TipUi) -> ScoreTip {
         ScoreTip(
-            tipId: t.tipId, category: KotlinMapping.swift(t.category), kicker: t.kicker, title: t.title, text: t.text, why: t.why)
+            tipId: t.tipId, category: KotlinMapping.swift(t.category), kicker: t.kicker, title: t.title, text: t.text, why: t.why,
+            eventId: t.eventId)
     }
 
     static func explainer(_ h: HowScoresWorkUi) -> HowScoresWork {
@@ -258,6 +286,9 @@ final class CoreDrivesPresenter: DrivesPresenting {
         case .tapContributor(let id): DrivesIntentTapContributor(contributor: contributorID(id))
         case .answer(let tripId, let yes): DrivesIntentAnswer(tripId: tripId, yes: yes)
         case .correct(let tripId, let to): DrivesIntentCorrect(tripId: tripId, to: KotlinMapping.kotlin(to))
+        case .openEvidence(let tripId, let eventId): DrivesIntentOpenEvidence(tripId: tripId, eventId: eventId)
+        case .openTip(let tripId): DrivesIntentOpenTip(tripId: tripId)
+        case .openTipEvidence(let tripId): DrivesIntentOpenTipEvidence(tripId: tripId)
         }
     }
 

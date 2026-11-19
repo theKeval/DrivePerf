@@ -131,7 +131,10 @@ internal fun AnalysisTimelineChart(
 private val EVENT_ICON = 12.dp
 private val TICK_TARGET = 48.dp
 
-/** Each event tick is a 48 dp button for TalkBack and touch: "Hard braking, 10:41 into the drive." */
+/**
+ * Each event tick is a 48 dp button for TalkBack and touch: "Hard braking, 10:41 into the drive." A tap opens its
+ * evidence (DRIVE-39 AC1); a drag across it still only scrubs, snapping to it.
+ */
 @Composable
 private fun TickButtons(timeline: AnalysisTimeline, heights: List<Dp>, controls: AnalysisControls) {
     BoxWithConstraints(Modifier.fillMaxWidth()) {
@@ -144,9 +147,9 @@ private fun TickButtons(timeline: AnalysisTimeline, heights: List<Dp>, controls:
                     .semantics {
                         role = Role.Button
                         contentDescription = tick.accessibilityLabel
-                        onClick { controls.jumpTo(tick.tPeakS); true }
+                        onClick { controls.openEvidence(tick.eventId); true }
                     }
-                    .pointerInput(tick.eventId) { detectTapGestures { controls.jumpTo(tick.tPeakS) } },
+                    .pointerInput(tick.eventId) { detectTapGestures { controls.openEvidence(tick.eventId) } },
             )
         }
     }

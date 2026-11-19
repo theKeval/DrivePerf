@@ -228,8 +228,10 @@ internal class TripScore(
     fun tip(detail: TripScoreDetail): TipUi? {
         val tip = detail.score?.takeIf { it.smoothness != null }?.tip
         val text = tip?.let { TipCopy.text(it.tipId) }
+        // "See the moment" only for an event that is still listed and not reported "Not accurate?" (DRIVE-102).
+        val eventId = tip?.eventId?.takeIf { id -> detail.events.any { it.id == id } && detail.feedback[id]?.inaccurate == null }
         return if (tip == null || text == null) null else TipUi(tip.tipId, tip.category, ScoreCopy.TIP_KICKER, text.title,
-            text.nextTime, text.why)
+            text.nextTime, text.why, eventId)
     }
 
     /** "1.2 km with no abrupt inputs." (the positive card first, F-SCO-06 AC2; no road names in v1). */
