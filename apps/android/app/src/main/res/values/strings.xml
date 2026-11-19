@@ -7,8 +7,6 @@
     <string name="profile_title">Profile</string>
     <string name="profile_button_description">Profile</string>
     <string name="all_drives_title">All drives</string>
-    <string name="analysis_title">Analysis</string>
-    <string name="analysis_placeholder">Analysis is on its way.</string>
     <string name="recording_settings_title">Recording</string>
     <string name="back">Back</string>
     <string name="core_line">Shared core: %1$s</string>
