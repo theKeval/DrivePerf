@@ -1,0 +1,48 @@
+-- Reads for the Drives list and trip detail (DRIVE-126, DRIVE-55, DRIVE-77). Queries only: the tables live in
+-- Trip.sq, Route.sq and Vehicle.sq.
+
+-- Every listed trip's spans in one query, so the list costs two queries at any length (DRIVE-126 AC2), not one per
+-- trip. The WHERE clause matches Trip.sq listedTrips.
+listedSegments:
+SELECT s.* FROM trip_segment s
+JOIN trip t ON t.id = s.trip_id
+WHERE t.status IN ('FINALISED', 'INTERRUPTED') AND t.deleted_at IS NULL
+  AND (t.kind IS NULL OR t.kind NOT IN ('TRANSIT', 'NOT_DRIVING'))
+ORDER BY s.trip_id, s.seq;
+
+-- What each trip card shows of its score, route and car. Trips marked as not a drive are included: their cards are
+-- listed under "Not drives".
+scoreLines:
+SELECT t.id AS trip_id, s.smoothness, s.delta, s.calibrating_k, s.calibrating_of, s.record_state_json,
+       m.route_id, r.name AS route_name, r.name_preset AS route_preset,
+       v.nickname AS car_nickname, v.make AS car_make, v.model AS car_model
+FROM trip t
+LEFT JOIN score s ON s.trip_id = t.id
+LEFT JOIN route_match m ON m.trip_id = t.id
+LEFT JOIN route r ON r.id = m.route_id AND r.deleted_at IS NULL
+LEFT JOIN vehicle v ON v.id = t.vehicle_id AND v.deleted_at IS NULL
+WHERE t.status IN ('FINALISED', 'INTERRUPTED') AND t.deleted_at IS NULL;
+
+activeCarCount:
+SELECT COUNT(*) FROM vehicle WHERE deleted_at IS NULL AND is_active = 1;
+
+-- One trip's route, record eligibility and car (S-TRP-01, S-SCO-01).
+tripLabels:
+SELECT t.started_at, m.route_id, m.eligible_for_record, m.ineligible_reason,
+       r.name AS route_name, r.name_preset AS route_preset,
+       v.nickname AS car_nickname, v.make AS car_make, v.model AS car_model
+FROM trip t
+LEFT JOIN route_match m ON m.trip_id = t.id
+LEFT JOIN route r ON r.id = m.route_id AND r.deleted_at IS NULL
+LEFT JOIN vehicle v ON v.id = t.vehicle_id AND v.deleted_at IS NULL
+WHERE t.id = ?;
+
+-- The last ten scored driver runs of a route up to and including one trip, newest first (S-SCO-01 runs sparkline).
+routeRuns:
+SELECT s.smoothness FROM route_match m
+JOIN trip t ON t.id = m.trip_id
+JOIN score s ON s.trip_id = t.id
+WHERE m.route_id = :routeId AND t.deleted_at IS NULL AND t.kind = 'DRIVER' AND s.smoothness IS NOT NULL
+  AND (t.started_at < :startedAt OR (t.started_at = :startedAt AND t.id <= :tripId))
+ORDER BY t.started_at DESC, t.id DESC
+LIMIT 10;
