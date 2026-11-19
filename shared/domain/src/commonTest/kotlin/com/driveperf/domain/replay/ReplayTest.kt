@@ -221,6 +221,44 @@ class ReplayTest {
     }
 
     @Test
+    fun aShortGapBetweenSparseRowsIsNeitherDrawnSolidNorInterpolated() {
+        // Codex P2 on #76: summary rows at 108 s and 132 s around a recorded GAP at 110-114 s.
+        val rows = (0..9).map { ReplayPoint(it * 12.0, it * STEP_DEG, 0.0, 11.0) } +
+            (11..15).map { ReplayPoint(it * 12.0, it * STEP_DEG, 0.0, 11.0) }
+        val replay = build(
+            rows,
+            spans = listOf(span(SegmentKind.GAP, 110.0, 114.0, SegmentReason.NO_GNSS), span(SegmentKind.EXCLUDED, 40.0, 42.0)),
+            durationS = 180.0,
+            summaryOnly = true,
+        )
+        val segments = replay.segments(16)
+        assertEquals(
+            listOf(SegmentStyle.OBSERVED, SegmentStyle.EXCLUDED, SegmentStyle.OBSERVED, SegmentStyle.NO_GPS, SegmentStyle.OBSERVED),
+            segments.map { it.style },
+        )
+        assertEquals(listOf(108.0, 132.0), segments[3].points.map { it.tS }, "the stretch holding the gap is broken")
+        assertEquals(listOf(36.0, 48.0), segments[1].points.map { it.tS }, "a short excluded span is not drawn solid")
+        for (t in listOf(109.0, 112.0, 125.0)) {
+            val frame = replay.frameAt(t)
+            assertEquals(SegmentStyle.NO_GPS, frame.style, "t=$t")
+            assertNear(9 * STEP_DEG, frame.lat)
+            assertNull(frame.speedMps)
+        }
+        assertEquals("No GPS", replay.spanAt(112.0)?.label)
+    }
+
+    @Test
+    fun theEstimatedStartNeverReportsTheFirstFixSpeed() {
+        // Codex P2 on #76: an estimate whose preview has no parking row starts the track at the first fix.
+        val replay = build(northbound(60, 120), spans = listOf(span(SegmentKind.ESTIMATED, 0.0, 60.0)), durationS = 120.0)
+        val early = replay.frameAt(10.0)
+        assertEquals(SegmentStyle.ESTIMATED, early.style)
+        assertNull(early.speedMps)
+        assertNear(60 * STEP_DEG, early.lat)
+        assertEquals(11.0, replay.frameAt(60.0).speedMps, "measured from the first fix on")
+    }
+
+    @Test
     fun overlappingSpansKeepTheStrongerStyleAndEqualNeighboursMerge() {
         val resolved = ReplayBuilder.resolve(
             listOf(
