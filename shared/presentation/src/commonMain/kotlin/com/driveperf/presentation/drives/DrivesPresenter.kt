@@ -56,6 +56,7 @@ public class DrivesPresenter(
     scope: CoroutineScope,
     private val scores: ScoreReader? = null,
     private val analytics: Analytics? = null,
+    edits: TripEditPorts? = null,
     private val maps: TripMapSource? = null,
 ) : BasePresenter<DrivesState, DrivesIntent, DrivesEffect>(DrivesState(canCorrect = corrections != null), scope) {
     /** Which screen the open trip's score is viewed on (`score_viewed {surface}`). */
@@ -88,6 +89,12 @@ public class DrivesPresenter(
 
     private val explainer = ScoreExplainer.content(format::longDate)
 
+    /** S-TRP-02 and S-TRP-03 (DRIVE-131). */
+    private val editing = TripEditing(this.scope, corrections, edits, ::listedTrip, ::refresh, ::emit, ::trackProperties)
+
+    /** S-HIS-01's filters and S-HIS-02 (DRIVE-126 AC3). */
+    private val filtering = HistoryFiltering(::historyData, ::refresh, ::trackProperties)
+
     init {
         update { it.copy(explainer = explainer) }
         this.scope.launch { trips.collect { list -> change { it.copy(trips = list) } } }
@@ -96,6 +103,7 @@ public class DrivesPresenter(
         }
         this.scope.launch { units.collect { system -> change { it.copy(units = system) } } }
         scores?.let(::observeScores)
+        editing.start()
         maps?.let(::observeMap)
     }
 
@@ -128,7 +136,7 @@ public class DrivesPresenter(
         ownedScope?.cancel()
     }
 
-    @Suppress("CyclomaticComplexMethod") // one branch per intent; the score and cross-link ones are grouped
+    @Suppress("CyclomaticComplexMethod") // one branch per intent; the work is in the functions they call
     override fun dispatch(intent: DrivesIntent) {
         when (intent) {
             is DrivesIntent.Open -> change { it.copy(detailId = intent.tripId, pendingOpened = true, pendingView = Surface.TRIP_DETAIL) }
@@ -145,6 +153,8 @@ public class DrivesPresenter(
                 scope.launch { port.answerSuspect(intent.tripId, if (intent.yes) SuspectAnswer.YES else SuspectAnswer.NO) }
             }
             is DrivesIntent.Correct -> corrections?.let { port -> scope.launch { port.correct(intent.tripId, intent.to) } }
+            is DrivesIntent.Edit -> editing.dispatch(intent.action)
+            is DrivesIntent.History -> filtering.dispatch(intent.action)
             is DrivesIntent.OpenEvidence, is DrivesIntent.OpenTip, is DrivesIntent.OpenTipEvidence -> crossLink(intent)
         }
     }
@@ -230,17 +240,34 @@ public class DrivesPresenter(
         analytics?.track(DrivesEvent(name, properties.toMap()))
     }
 
+    private fun trackProperties(name: String, properties: Map<String, String>) {
+        analytics?.track(DrivesEvent(name, properties))
+    }
+
+    /** A listed trip, drive or not, by ID (DRIVE-131). */
+    private fun listedTrip(id: String): Trip? =
+        inputs.value.let { i -> i.trips?.firstOrNull { it.id == id } ?: i.notDrives.firstOrNull { it.id == id } }
+
+    /** Renders again from the current inputs, after the edit or filter state changed. */
+    private fun refresh() = change { it }
+
+    /** What S-HIS-01's filters work from (DRIVE-126 AC3). */
+    private fun historyData(): HistoryData = inputs.value.let { i ->
+        HistoryData(i.trips.orEmpty().sortedByDescending { it.startedAt }, i.notDrives, i.lines, editing.vehicles)
+    }
+
     private fun render(i: Inputs): DrivesState {
         val rows = rows(i)
         val trips = i.trips.orEmpty().sortedByDescending { it.startedAt }
         val notDrives = i.notDrives.sortedByDescending { it.startedAt }
         val tripRows = trips.map(rows::row)
         val byId = (trips + notDrives).associateBy { it.id }
+        val history = filtering.build(HistoryData(trips, notDrives, i.lines, editing.vehicles), rows, tripRows)
         return DrivesState(
             loaded = i.trips != null,
             trips = tripRows,
             notDrives = notDrives.map(rows::row),
-            sections = rows.sections(trips, tripRows),
+            sections = rows.sections(history.trips, history.rows),
             // With no drives left, All drives opens on the trips marked as not a drive.
             filter = i.filter ?: if (trips.isEmpty() && notDrives.isNotEmpty()) DrivesFilter.NOT_DRIVES else DrivesFilter.DRIVES,
             canCorrect = corrections != null,
@@ -249,6 +276,11 @@ public class DrivesPresenter(
             countText = drivesCount(trips.size),
             sinceText = trips.lastOrNull()?.let(rows::since),
             explainer = explainer,
+            canEdit = editing.canEdit,
+            edit = editing.editUi(rows),
+            deleting = editing.deleteUi(rows),
+            editMessage = editing.messageUi(),
+            history = history.ui,
         )
     }
 
@@ -313,7 +345,10 @@ public class DrivesPresenter(
             return DrivesPresenter(trips, corrections, units, format, clock, scope, scores, analytics).also { it.ownedScope = scope }
         }
 
-        /** [onMain] with the open trip's map hero too (`CoreServices.drivesPresenter`, DRIVE-55). */
+        /**
+         * [onMain] with trip edit and delete (DRIVE-131) and the open trip's map hero (DRIVE-55), for
+         * `CoreServices.drivesPresenter`.
+         */
         @Suppress("LongParameterList") // the screens' inputs
         public fun onMain(
             trips: Flow<List<Trip>>,
@@ -323,10 +358,11 @@ public class DrivesPresenter(
             clock: Clock,
             scores: ScoreReader?,
             analytics: Analytics?,
-            maps: TripMapSource?,
+            edits: TripEditPorts? = null,
+            maps: TripMapSource? = null,
         ): DrivesPresenter {
             val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
-            return DrivesPresenter(trips, corrections, units, format, clock, scope, scores, analytics, maps)
+            return DrivesPresenter(trips, corrections, units, format, clock, scope, scores, analytics, edits, maps)
                 .also { it.ownedScope = scope }
         }
     }

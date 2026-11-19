@@ -25,9 +25,17 @@ public final class TripListViewModel {
         public var title: String
     }
 
+    /// A trip S-TRP-03 deleted (DRIVE-131): its detail closes and the list shows `message` ("Drive deleted").
+    public struct DeletedTrip: Equatable, Sendable {
+        public var tripId: String
+        public var message: String
+    }
+
     public private(set) var state: DrivesScreenState
     public private(set) var replayRequest: ReplayRequest?
     public private(set) var analysisRequest: AnalysisRequest?
+    /// The trip S-TRP-03 just deleted, until the list has shown its toast (`deletionShown()`).
+    public private(set) var deletedTrip: DeletedTrip?
     private let presenter: any DrivesPresenting
 
     public init(presenter: any DrivesPresenting) {
@@ -54,6 +62,8 @@ public final class TripListViewModel {
                 replayRequest = ReplayRequest(tripId: tripId, title: title, mapSummary: mapSummary)
             case .openAnalysis(let tripId, let title):
                 analysisRequest = AnalysisRequest(tripId: tripId, title: title)
+            case .tripDeleted(let tripId, let message):
+                deletedTrip = DeletedTrip(tripId: tripId, message: message)
             }
         }
     }
@@ -125,6 +135,33 @@ public final class TripListViewModel {
 
     /// "What was this?" (S-TRP-02 type picker); `.driver` restores a trip as a drive.
     public func correct(tripId: String, to correction: TripCorrection) { send(.correct(tripId: tripId, to: correction)) }
+
+    // MARK: S-TRP-02 Edit trip and S-TRP-03 Delete trip (DRIVE-131)
+
+    /// Trip edit and delete are possible.
+    public var canEdit: Bool { state.canEdit }
+
+    /// S-TRP-02 for [id], while it is open.
+    public func editForm(id: String) -> TripEditForm? {
+        state.edit?.tripId == id ? state.edit : nil
+    }
+
+    /// S-TRP-03, while it is open.
+    public var deleteConfirmation: DeleteTripConfirmation? { state.deleting }
+
+    /// The toast after a save, with Undo.
+    public var editToast: TripEditToast? { state.editMessage }
+
+    public func edit(_ command: TripEditCommand) { send(.edit(command)) }
+
+    /// The list showed the "Drive deleted" toast.
+    public func deletionShown() { deletedTrip = nil }
+
+    // MARK: S-HIS-01 filters and S-HIS-02 (DRIVE-126 AC3)
+
+    public var historyFilters: HistoryFilters { state.history }
+
+    public func filter(_ command: HistoryFilterCommand) { send(.history(command)) }
 
     /// An event row on trip detail or S-SCO-01 (DRIVE-87 AC2, DRIVE-55); the view opens S-RPL-02 itself.
     public func evidenceOpened(tripId: String, eventId: String) { send(.openEvidence(tripId: tripId, eventId: eventId)) }

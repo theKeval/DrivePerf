@@ -220,6 +220,16 @@ public data class DrivesState(
     val sinceText: String? = null,
     /** S-SCO-02 How scores work. */
     val explainer: HowScoresWorkUi? = null,
+    /** Trip edit and delete are possible (DRIVE-131): the corrections, car and delete ports are wired. */
+    val canEdit: Boolean = false,
+    /** S-TRP-02 Edit trip, while it is open. */
+    val edit: TripEditUi? = null,
+    /** S-TRP-03 Delete trip confirmation, while it is open. */
+    val deleting: DeleteTripUi? = null,
+    /** The toast after S-TRP-02 saved ("Marked as passenger · scores updated · Undo"), until it is dismissed. */
+    val editMessage: TripEditMessageUi? = null,
+    /** S-HIS-01's filter chips and S-HIS-02 (DRIVE-126 AC3); [sections] already holds only the matching drives. */
+    val history: HistoryFilterUi = HistoryFilterUi(),
 ) {
     val isEmpty: Boolean get() = loaded && trips.isEmpty()
 
@@ -287,6 +297,11 @@ public sealed interface DrivesIntent {
 
     public data class Filter(val filter: DrivesFilter) : DrivesIntent
 
+    /** S-TRP-02 Edit trip and S-TRP-03 Delete trip (DRIVE-131). */
+    public data class Edit(val action: TripEditAction) : DrivesIntent
+
+    /** S-HIS-01's filter chips and S-HIS-02 (DRIVE-126 AC3). */
+    public data class History(val action: HistoryFilterAction) : DrivesIntent
     /**
      * An event row on S-TRP-01 or under an S-SCO-01 contributor, pinned or not (DRIVE-87 AC2, DRIVE-55):
      * [DrivesEffect.OpenEvidence] opens S-RPL-02. Ignored for an event reported "Not accurate?", which is left out.
@@ -323,6 +338,8 @@ public sealed interface DrivesEffect {
     /** Push S-SCO-02. */
     public data object OpenHowScoresWork : DrivesEffect
 
+    /** S-TRP-03 deleted [tripId]: go back to the list it was opened from and show [message] ("Drive deleted"). */
+    public data class TripDeleted(val tripId: String, val message: String) : DrivesEffect
     /** Open S-RPL-02 for [eventId] of [tripId] over the current screen (DRIVE-87 AC2, DRIVE-55, DRIVE-102). */
     public data class OpenEvidence(val tripId: String, val eventId: String) : DrivesEffect
 

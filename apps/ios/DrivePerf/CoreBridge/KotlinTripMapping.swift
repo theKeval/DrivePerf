@@ -24,6 +24,7 @@ extension KotlinMapping {
         case .bike: .bike
         case .walk: .walk
         case .other: .other
+        case .taxi: .taxi
         }
     }
 
@@ -35,6 +36,7 @@ extension KotlinMapping {
         case .bike: .bike
         case .walk: .walk
         case .other: .other
+        case .taxi: .taxi
         }
     }
 

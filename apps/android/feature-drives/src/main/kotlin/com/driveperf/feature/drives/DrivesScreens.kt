@@ -154,6 +154,7 @@ fun AllDrivesScreen(
                 )
             }
         }
+        if (state.filter == DrivesFilter.DRIVES && !state.isEmpty) drivesFilterItems(state.history, onAction)
         if (state.filter == DrivesFilter.NOT_DRIVES) {
             items(state.notDrives, key = { it.id }) { TripRow(it, state.canCorrect, onAction) }
         } else {

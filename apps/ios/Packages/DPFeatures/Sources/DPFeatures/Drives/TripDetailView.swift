@@ -49,6 +49,7 @@ struct TripDetailView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .dpScreenBackground()
         .navigationBarTitleDisplayMode(.inline)
+        .tripEditing(trips: trips, tripId: tripId)
         .onAppear {
             // `open` records `trip_detail_opened`, so popping back from Replay or the breakdown doesn't send it again.
             if !hasOpened || trips.detail(id: tripId) == nil {
@@ -213,15 +214,17 @@ struct TripDetailView: View {
     private func actions(_ detail: TripDetail) -> some View {
         let hasReplay = replayServices != nil
         let hasAnalysis = analysisPresenters != nil
-        if hasReplay || hasAnalysis {
+        if hasReplay || hasAnalysis || trips.canEdit {
             ViewThatFits(in: .horizontal) {
                 HStack(spacing: DPSpace.s2) {
                     if hasReplay { replayButton }
                     if hasAnalysis { analysisButton(enabled: detail.canAnalyse) }
+                    if trips.canEdit { TripEditButton(trips: trips, tripId: detail.id) }
                 }
                 VStack(spacing: DPSpace.s2) {
                     if hasReplay { replayButton }
                     if hasAnalysis { analysisButton(enabled: detail.canAnalyse) }
+                    if trips.canEdit { TripEditButton(trips: trips, tripId: detail.id) }
                 }
             }
         }

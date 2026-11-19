@@ -231,7 +231,7 @@ class TripSheetTest {
     @Test
     fun `copy covers every reason and correction`() {
         assertEquals(
-            listOf("I was driving", "I was a passenger", "Bus or train", "Bike ride", "Walk", "Something else"),
+            listOf("I was driving", "I was a passenger", "Bus or train", "Bike ride", "Walk", "Something else", "Taxi or rideshare"),
             TripCopy.correctionOptions.map { it.title },
         )
         assertEquals(

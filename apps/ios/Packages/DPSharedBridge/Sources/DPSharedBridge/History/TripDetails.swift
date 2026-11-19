@@ -14,12 +14,14 @@ public enum TripKind: String, Equatable, Sendable, Codable {
 /// Kotlin `TripCorrection`: the user's answer to "what was this?". `driver` undoes a correction.
 public enum TripCorrection: String, Equatable, Sendable, Codable, CaseIterable {
     case driver, passenger, transit, bike, walk, other
+    /// Taxi or rideshare (DRIVE-131): like a passenger trip, not scored but kept in history.
+    case taxi
 
     /// Out of scores and history, into the "Not drives" filter for 30 days.
     public var isNotADrive: Bool {
         switch self {
         case .transit, .bike, .walk, .other: true
-        case .driver, .passenger: false
+        case .driver, .passenger, .taxi: false
         }
     }
 }

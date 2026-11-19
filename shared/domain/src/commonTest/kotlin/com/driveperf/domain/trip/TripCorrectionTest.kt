@@ -16,11 +16,12 @@ class TripCorrectionTest {
     @Test
     fun correctionsSetTheKindAndOnlyNonDrivesLeaveHistory() {
         assertEquals(
-            listOf(false, false, true, true, true, true),
+            listOf(false, false, true, true, true, true, false),
             TripCorrection.entries.map { it.isNotADrive },
         )
         TripCorrection.entries.forEach { assertEquals(it.isNotADrive, trip.copy(kind = it.kind).isNotADrive, it.name) }
         assertFalse(trip.copy(kind = TripKind.TAXI).isNotADrive)
+        assertEquals(TripKind.TAXI, TripCorrection.TAXI.kind)
     }
 
     @Test

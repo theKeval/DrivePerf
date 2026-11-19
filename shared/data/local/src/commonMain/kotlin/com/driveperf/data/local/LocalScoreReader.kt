@@ -34,15 +34,15 @@ public class LocalScoreReader(private val db: DrivePerfDatabase, private val io:
         trips.scoreForTrip(tripId).asFlow().mapToOneOrNull(io),
         trips.eventsForTrip(tripId).asFlow().mapToList(io),
         trips.feedbackForTrip(tripId).asFlow().mapToList(io),
-    ) { score, events, feedback ->
-        // The labels and the runs change with the score rows (a route match is written with the score), so they are
-        // read again whenever the score flow emits.
-        val (labels, runs) = withContext(io) {
-            val labels = q.tripLabels(tripId).executeAsOneOrNull()
-            val runs = labels?.route_id?.let { route ->
+        // The labels follow the trip row too, so moving the trip to another car (DRIVE-131) shows at once.
+        q.tripLabels(tripId).asFlow().mapToOneOrNull(io),
+    ) { score, events, feedback, labels ->
+        // The runs change with the score rows (a route match is written with the score), so they are read again
+        // whenever the score or label flows emit.
+        val runs = withContext(io) {
+            labels?.route_id?.let { route ->
                 q.routeRuns(route, labels.started_at, tripId).executeAsList().map { it.toInt() }.reversed()
             }.orEmpty()
-            labels to runs
         }
         TripScoreDetail(
             tripId = tripId,

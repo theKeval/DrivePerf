@@ -292,11 +292,23 @@ public struct DrivesScreenState: Equatable, Sendable {
     public var corrections: [CorrectionChoice]
     /// S-SCO-02 How scores work.
     public var explainer: HowScoresWork?
+    /// Trip edit and delete are possible (DRIVE-131).
+    public var canEdit: Bool
+    /// S-TRP-02 Edit trip, while it is open.
+    public var edit: TripEditForm?
+    /// S-TRP-03 Delete trip, while it is open.
+    public var deleting: DeleteTripConfirmation?
+    /// The toast after S-TRP-02 saved, with Undo.
+    public var editMessage: TripEditToast?
+    /// S-HIS-01's filter chips and S-HIS-02 (DRIVE-126 AC3); `sections` already holds only the matching drives.
+    public var history: HistoryFilters
 
     public init(
         hasLoaded: Bool = false, trips: [TripRow] = [], latest: [TripRow]? = nil, notDrives: [TripRow] = [], sections: [TripSection] = [],
         canCorrect: Bool = false, detail: TripDetail? = nil, quality: DataQualityDetail? = nil, countText: String = "0 drives",
-        sinceText: String? = nil, corrections: [CorrectionChoice] = [], explainer: HowScoresWork? = nil
+        sinceText: String? = nil, corrections: [CorrectionChoice] = [], explainer: HowScoresWork? = nil,
+        canEdit: Bool = false, edit: TripEditForm? = nil, deleting: DeleteTripConfirmation? = nil,
+        editMessage: TripEditToast? = nil, history: HistoryFilters = HistoryFilters()
     ) {
         self.hasLoaded = hasLoaded
         self.trips = trips
@@ -310,6 +322,11 @@ public struct DrivesScreenState: Equatable, Sendable {
         self.sinceText = sinceText
         self.corrections = corrections
         self.explainer = explainer
+        self.canEdit = canEdit
+        self.edit = edit
+        self.deleting = deleting
+        self.editMessage = editMessage
+        self.history = history
     }
 }
 
@@ -330,6 +347,10 @@ public enum DrivesAction: Equatable, Sendable {
     case tapContributor(ScoreContributorID)
     case answer(tripId: String, yes: Bool)
     case correct(tripId: String, to: TripCorrection)
+    /// S-TRP-02 Edit trip and S-TRP-03 Delete trip (DRIVE-131).
+    case edit(TripEditCommand)
+    /// S-HIS-01's filter chips and S-HIS-02 (DRIVE-126 AC3).
+    case history(HistoryFilterCommand)
     /// An event row on S-TRP-01 or S-SCO-01 (DRIVE-87 AC2, DRIVE-55). iOS opens S-RPL-02 itself.
     case openEvidence(tripId: String, eventId: String)
     /// The tip card on S-TRP-01 (DRIVE-102). iOS pushes S-SCO-04 itself.
@@ -344,6 +365,8 @@ public enum DrivesNavigation: Equatable, Sendable {
     case openReplay(tripId: String, title: String, mapSummary: String)
     /// Open S-ANL-01: `title` is shown under "Analysis".
     case openAnalysis(tripId: String, title: String)
+    /// S-TRP-03 deleted the trip: leave its detail and show `message` ("Drive deleted").
+    case tripDeleted(tripId: String, message: String)
 }
 
 /// The shared Drives presenter as features see it (DRIVE-217).

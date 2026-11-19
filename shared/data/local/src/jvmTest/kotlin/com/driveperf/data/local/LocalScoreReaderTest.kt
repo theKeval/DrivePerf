@@ -27,6 +27,7 @@ import com.driveperf.domain.trip.Placement
 import com.driveperf.domain.trip.TripQuality
 import com.driveperf.testing.InMemoryTripFileStore
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -135,6 +136,25 @@ class LocalScoreReaderTest {
         assertNull(missing.score)
         assertNull(missing.route)
         assertTrue(missing.runs.isEmpty())
+    }
+
+    @Test
+    fun theDetailFollowsATripMovedToAnotherCar() = runTest {
+        addCar("gti", "GTI", "Volkswagen", "Golf GTI")
+        addCar("ioniq", "Ioniq", "Hyundai", "Ioniq 5")
+        LocalTripStore(db, "d", coroutineContext).saveFinalised(FinalisedTrip(trip("t1", 1_000L, vehicle = "gti"), score = score("t1", 80)))
+        val reader = LocalScoreReader(db, coroutineContext)
+        val cars = mutableListOf<String?>()
+        val watching = backgroundScope.launch { reader.observeDetail("t1").collect { cars += it.car } }
+        testScheduler.runCurrent()
+        assertEquals(listOf<String?>("GTI"), cars)
+
+        LocalTripVehicles(db, coroutineContext, com.driveperf.testing.TestClock()).setVehicle("t1", "ioniq")
+        testScheduler.runCurrent()
+
+        assertEquals("Ioniq", cars.last())
+        assertEquals("Ioniq", reader.observeLines().first().lines.getValue("t1").car)
+        watching.cancel()
     }
 
     @Test

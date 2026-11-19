@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- S-TRP-02 Edit trip, S-TRP-03 Delete trip and S-HIS-02 filters (DRIVE-131, DRIVE-126). Most copy comes formatted from
+     the shared presenter; these are the fixed control labels. -->
+<resources>
+    <string name="trip_edit_action">Edit</string>
+    <string name="trip_edit_save">Save</string>
+    <string name="trip_edit_close">Close</string>
+    <string name="trip_edit_back">Back to Edit trip</string>
+    <string name="trip_edit_type">Trip type</string>
+    <string name="trip_edit_car">Car</string>
+    <string name="trip_edit_current">Current</string>
+    <string name="trip_edit_default">Default</string>
+</resources>
