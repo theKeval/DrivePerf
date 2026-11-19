@@ -118,10 +118,10 @@ class ReplayViewModelTest {
 
     @Test fun `the span label follows the marker through each overlay span`() {
         val vm = viewModel()
-        assertEquals(SegmentStyle.ESTIMATED, vm.spanAt(30.0))
+        assertEquals(SegmentStyle.ESTIMATED, vm.spanAt(30.0)?.style)
         assertNull("observed data has no label", vm.spanAt(100.0))
-        assertEquals(SegmentStyle.NO_GPS, vm.spanAt(220.0))
-        assertEquals(SegmentStyle.EXCLUDED, vm.spanAt(420.0))
+        assertEquals(SegmentStyle.NO_GPS, vm.spanAt(220.0)?.style)
+        assertEquals(SegmentStyle.EXCLUDED, vm.spanAt(420.0)?.style)
         assertNull(vm.spanAt(450.0))
     }
 

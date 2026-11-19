@@ -8,7 +8,7 @@ import com.driveperf.domain.analytics.Analytics
 import com.driveperf.domain.replay.PlaybackSpeed
 import com.driveperf.domain.replay.Replay
 import com.driveperf.domain.replay.ReplayRepository
-import com.driveperf.domain.replay.SegmentStyle
+import com.driveperf.domain.replay.ReplaySpan
 import com.driveperf.domain.settings.UnitSystem
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -186,7 +186,7 @@ class ReplayViewModel(
     }
 
     /** The overlay span under the marker, for its label (F-RPL-08 AC2). */
-    fun spanAt(tS: Double): SegmentStyle? = ready()?.timeline?.spanAt(tS)
+    fun spanAt(tS: Double): ReplaySpan? = ready()?.timeline?.spanAt(tS)
 
     override fun openLegend() {
         if (ready()?.legendOpen != false) return

@@ -30,11 +30,12 @@
     <string name="replay_span_estimated">Estimated start</string>
     <string name="replay_span_no_gps">No GPS</string>
     <string name="replay_span_excluded">Phone moved — not scored</string>
+    <string name="replay_span_not_scored">Not scored</string>
     <string name="replay_legend_title">Line styles</string>
     <string name="replay_legend_observed">Solid: recorded by GPS.</string>
     <string name="replay_legend_estimated">Dashed: filled in from your phone’s location history before recording started. Never scored.</string>
     <string name="replay_legend_no_gps">Dotted: no GPS here, like a tunnel. The marker jumps the gap.</string>
-    <string name="replay_legend_excluded">Faded: the phone moved in its mount, so this part isn’t scored.</string>
+    <string name="replay_legend_excluded">Faded: left out of the score, for example when the phone moved in its mount.</string>
     <string name="replay_legend_done">Done</string>
     <!-- Lock (Free, older than 30 days): the Pro seam, ADR-006. -->
     <string name="replay_lock_title">Replay for drives older than 30 days is part of Pro. Nothing is deleted.</string>

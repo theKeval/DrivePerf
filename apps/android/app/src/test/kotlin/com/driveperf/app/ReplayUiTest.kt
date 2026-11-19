@@ -8,7 +8,6 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
-import com.driveperf.app.replay.StandInReplayRepository
 import com.driveperf.designsystem.DrivePerfTheme
 import com.driveperf.domain.analytics.Analytics
 import com.driveperf.domain.analytics.AnalyticsEvent
@@ -52,7 +51,7 @@ class ReplayUiTest {
     private fun replay(online: Boolean = true): ReplayViewModel {
         val vm = ReplayViewModel(
             ReplayRequest("t1"),
-            StandInReplayRepository(),
+            SyntheticReplays(),
             analytics,
             ReplayMapConfig(hasMapsKey = false, mapId = null, online = MutableStateFlow(online)),
         )

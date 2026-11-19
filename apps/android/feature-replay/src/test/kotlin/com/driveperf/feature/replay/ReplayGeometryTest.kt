@@ -1,6 +1,9 @@
 package com.driveperf.feature.replay
 
+import com.driveperf.domain.replay.ReplaySpan
+import com.driveperf.domain.replay.SegmentStyle
 import com.driveperf.domain.settings.UnitSystem
+import com.driveperf.domain.trip.SegmentReason
 import com.driveperf.domain.trip.BoundingBox
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -40,6 +43,14 @@ class ReplayGeometryTest {
         assertEquals("1.6", ReplayFormatting.distance(1609.344, UnitSystem.METRIC))
         assertEquals("1.0", ReplayFormatting.distance(1609.344, UnitSystem.IMPERIAL))
         assertEquals("mi", ReplayFormatting.distanceUnit(UnitSystem.IMPERIAL))
+    }
+
+    @Test fun `left-out spans name the phone moving only when that is the reason`() {
+        fun excluded(reason: SegmentReason?) = ReplaySpan(SegmentStyle.EXCLUDED, 0.0, 1.0, reason).chipLabel()
+        assertEquals(R.string.replay_span_excluded, excluded(SegmentReason.PHONE_MOVED))
+        assertEquals(R.string.replay_span_excluded, excluded(null))
+        assertEquals(R.string.replay_span_not_scored, excluded(SegmentReason.NOT_ALIGNED))
+        assertEquals(R.string.replay_span_estimated, ReplaySpan(SegmentStyle.ESTIMATED, 0.0, 1.0).chipLabel())
     }
 
     @Test fun `the clock reads minutes and seconds, with hours on long drives`() {

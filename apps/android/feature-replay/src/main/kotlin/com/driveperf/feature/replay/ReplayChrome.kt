@@ -143,8 +143,8 @@ internal fun SpanChip(state: ReplayUiState.Ready, time: DoubleState, modifier: M
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            LineSwatch(current, Modifier.width(20.dp).height(12.dp))
-            Text(stringResource(current.label()), style = MaterialTheme.typography.labelLarge)
+            LineSwatch(current.style, Modifier.width(20.dp).height(12.dp))
+            Text(stringResource(current.chipLabel()), style = MaterialTheme.typography.labelLarge)
         }
     }
 }

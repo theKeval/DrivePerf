@@ -1,4 +1,4 @@
-package com.driveperf.app.replay
+package com.driveperf.app
 
 import com.driveperf.domain.replay.Replay
 import com.driveperf.domain.replay.ReplayPoint
@@ -6,14 +6,14 @@ import com.driveperf.domain.replay.ReplayRepository
 import com.driveperf.domain.replay.ReplaySpan
 import com.driveperf.domain.replay.SegmentStyle
 import com.driveperf.domain.trip.BoundingBox
+import com.driveperf.domain.trip.SegmentReason
 import kotlin.math.sin
 
 /**
- * DRIVE-200 SEAM (R1 stand-in): a synthetic replay for every trip, until the shared model (`CoreServices.replay`,
- * branch DRIVE-200-replay-model) merges and the app binds it instead. The route is made up (no real locations) and has
- * each overlay style: an estimated start, a tunnel gap and an excluded span.
+ * A synthetic 15-minute trip for the Replay UI tests (made-up coordinates, no real locations): an estimated start
+ * 0–60 s, a tunnel with no GPS 360–400 s and a phone-moved span 600–660 s, on the shared Replay model.
  */
-class StandInReplayRepository : ReplayRepository {
+internal class SyntheticReplays : ReplayRepository {
     override suspend fun replay(tripId: String): Replay {
         val points = (0..DURATION_S).map { t ->
             val f = t / DURATION_S.toDouble()
@@ -26,7 +26,7 @@ class StandInReplayRepository : ReplayRepository {
             spans = listOf(
                 ReplaySpan(SegmentStyle.ESTIMATED, 0.0, ESTIMATED_END.toDouble()),
                 ReplaySpan(SegmentStyle.NO_GPS, GAP_START.toDouble(), GAP_END.toDouble()),
-                ReplaySpan(SegmentStyle.EXCLUDED, EXCLUDED_START.toDouble(), EXCLUDED_END.toDouble()),
+                ReplaySpan(SegmentStyle.EXCLUDED, EXCLUDED_START.toDouble(), EXCLUDED_END.toDouble(), SegmentReason.PHONE_MOVED),
             ),
             summaryOnly = false,
             track = points.filterNot { it.tS > GAP_START && it.tS < GAP_END },

@@ -8,7 +8,9 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.driveperf.designsystem.DpEstimated
 import com.driveperf.designsystem.DrivePerfTheme
+import com.driveperf.domain.replay.ReplaySpan
 import com.driveperf.domain.replay.SegmentStyle
+import com.driveperf.domain.trip.SegmentReason
 
 /** How a line looks: dashes are `on/off` lengths in dp, empty for solid. One table for both renderers and the legend. */
 @Immutable
@@ -43,6 +45,15 @@ internal fun SegmentStyle.label(): Int = when (this) {
     SegmentStyle.NO_GPS -> R.string.replay_span_no_gps
     SegmentStyle.EXCLUDED -> R.string.replay_span_excluded
 }
+
+/** The chip for [this] span: EXCLUDED for a reason other than the phone moving reads "Not scored" (#76). */
+@StringRes
+internal fun ReplaySpan.chipLabel(): Int =
+    if (style == SegmentStyle.EXCLUDED && reason != null && reason != SegmentReason.PHONE_MOVED) {
+        R.string.replay_span_not_scored
+    } else {
+        style.label()
+    }
 
 @StringRes
 internal fun SegmentStyle.legend(): Int = when (this) {

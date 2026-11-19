@@ -1,7 +1,7 @@
 package com.driveperf.feature.replay
 
 import com.driveperf.domain.replay.Replay
-import com.driveperf.domain.replay.SegmentStyle
+import com.driveperf.domain.replay.ReplaySpan
 import com.driveperf.domain.trip.BoundingBox
 import kotlin.math.PI
 import kotlin.math.asin
@@ -51,7 +51,6 @@ class ReplayProjection(bbox: BoundingBox, width: Float, height: Float, insets: I
     companion object {
         private const val TILE = 256.0
         private const val MIN_SPAN = 1e-7
-        private const val MAX_ZOOM = 21
 
         /** Longitude to Web Mercator x in 0..1. */
         fun worldX(lng: Double): Double = (lng + 180.0) / 360.0
@@ -63,7 +62,7 @@ class ReplayProjection(bbox: BoundingBox, width: Float, height: Float, insets: I
         }
 
         /** World pixels per unit of world coordinates is `256 × 2^zoom`; floor it into a bucket. */
-        fun zoomFor(pixelsPerWorld: Double): Int = floor(log2(pixelsPerWorld / TILE)).toInt().coerceIn(0, MAX_ZOOM)
+        fun zoomFor(pixelsPerWorld: Double): Int = floor(log2(pixelsPerWorld / TILE)).toInt().coerceIn(0, Replay.MAX_ZOOM)
     }
 }
 
@@ -71,10 +70,9 @@ class ReplayProjection(bbox: BoundingBox, width: Float, height: Float, insets: I
  * Per-trip lookups the screen needs every frame, computed once when the replay loads: distance so far (readout) and
  * the quality span at a time (F-RPL-08 AC2 label). Lookups are allocation-free.
  */
-class ReplayTimeline(replay: Replay) {
+class ReplayTimeline(private val replay: Replay) {
     private val times: DoubleArray
     private val distances: DoubleArray
-    private val spanStyles = replay.spans.filter { it.style != SegmentStyle.OBSERVED }
     val durationS: Double = replay.durationS
 
     init {
@@ -107,10 +105,7 @@ class ReplayTimeline(replay: Replay) {
     }
 
     /** The overlay span (estimated, no GPS, excluded) the marker is in at [tS], or null on observed data. */
-    fun spanAt(tS: Double): SegmentStyle? {
-        for (span in spanStyles) if (tS >= span.t0S && tS < span.t1S) return span.style
-        return null
-    }
+    fun spanAt(tS: Double): ReplaySpan? = replay.spanAt(tS)
 
     private companion object {
         const val EARTH_RADIUS_M = 6_371_000.0

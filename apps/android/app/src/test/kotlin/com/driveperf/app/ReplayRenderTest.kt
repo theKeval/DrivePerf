@@ -12,7 +12,6 @@ import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.unit.Density
-import com.driveperf.app.replay.StandInReplayRepository
 import com.driveperf.designsystem.DrivePerfTheme
 import com.driveperf.domain.analytics.Analytics
 import com.driveperf.domain.analytics.AnalyticsEvent
@@ -31,7 +30,7 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
 /**
- * DRIVE-200 / DRIVE-61: renders S-RPL-01 on the plain canvas with the synthetic stand-in trip (no real locations) at the
+ * DRIVE-200 / DRIVE-61: renders S-RPL-01 on the plain canvas with the synthetic trip (no real locations) at the
  * start, in the no-GPS gap and in the excluded span, dark and light, and at XL text. PNGs go to build/reports/DRIVE-200.
  */
 @RunWith(RobolectricTestRunner::class)
@@ -76,7 +75,7 @@ class ReplayRenderTest {
 
     private fun viewModel(online: Boolean) = ReplayViewModel(
         ReplayRequest("synthetic"),
-        StandInReplayRepository(),
+        SyntheticReplays(),
         analytics,
         ReplayMapConfig(hasMapsKey = false, mapId = null, online = MutableStateFlow(online)),
     )
