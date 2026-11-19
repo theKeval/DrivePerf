@@ -8,7 +8,12 @@ import com.driveperf.domain.replay.ReplayPoint
 import com.driveperf.domain.replay.ReplayRepository
 import com.driveperf.domain.trip.BoundingBox
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import com.driveperf.domain.replay.StaticReplayRepository
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.setMain
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
@@ -18,7 +23,7 @@ import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
-@OptIn(ExperimentalCoroutinesApi::class) // runCurrent
+@OptIn(ExperimentalCoroutinesApi::class) // runCurrent, setMain
 class ReplayPresenterTest {
     private val replay = Replay(
         tripId = "trip-1",
@@ -216,6 +221,22 @@ class ReplayPresenterTest {
     fun beforeLoadingThePlayheadIsZero() = runTest {
         assertEquals(0.0, ReplayState().playheadAt(123L))
         assertTrue(ReplayState().loading)
+    }
+
+    @Test
+    fun onMainRunsOnTheMainDispatcherAndCloseCancelsItsOwnScope() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+        try {
+            val p = ReplayPresenter.onMain("trip-1", ReplaySource.STORY, StaticReplayRepository(replay), { false }, events, { clock.ns })
+            runCurrent()
+            assertEquals(replay, p.state.value.replay)
+            assertEquals(mapOf("source" to "story"), events.tracked.single().properties)
+            p.close()
+            p.dispatch(ReplayIntent.Play)
+            assertTrue(p.state.value.playing, "intents still update the last state after close")
+        } finally {
+            Dispatchers.resetMain()
+        }
     }
 
     @Test
