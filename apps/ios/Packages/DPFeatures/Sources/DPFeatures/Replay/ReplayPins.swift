@@ -136,6 +136,8 @@ private struct ReplayPinPulse: View {
 
     var body: some View {
         let color = DPEventGlyph.color(kind.glyph)
+        // Read once here: the animator's closure is Sendable and may not touch main-actor state.
+        let still = reduceMotion
         Group {
             if reduceMotion {
                 Circle().strokeBorder(color, lineWidth: 2).frame(width: 32, height: 32)
@@ -144,7 +146,7 @@ private struct ReplayPinPulse: View {
             }
         }
         .keyframeAnimator(initialValue: Value(), trigger: trigger) { content, value in
-            content.scaleEffect(reduceMotion ? 1 : value.scale).opacity(value.opacity)
+            content.scaleEffect(still ? 1 : value.scale).opacity(value.opacity)
         } keyframes: { _ in
             KeyframeTrack(\.scale) {
                 LinearKeyframe(1, duration: 0)
