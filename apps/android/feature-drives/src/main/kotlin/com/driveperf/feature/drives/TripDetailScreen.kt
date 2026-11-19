@@ -46,6 +46,7 @@ import com.driveperf.presentation.score.ScoreUi
 @Composable
 internal fun DrivesSheets(state: DrivesState, onAction: (DrivesIntent) -> Unit) {
     state.quality?.let { QualitySheet(it, onDismiss = { onAction(DrivesIntent.CloseQuality) }) }
+    TripEditOverlays(state, onAction)
 }
 
 /**
@@ -82,7 +83,7 @@ fun TripDetailScreen(
         Title(detail)
         detail.banners.forEach { Banner(it, detail.id, onAction) }
         MetaRow(detail)
-        Actions(detail, onAction)
+        Actions(detail, onAction, canEdit = state.canEdit)
         if (!detail.scoresHidden) detail.score?.let { ScoreCard(it, detail.id, onAction) }
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             detail.tiles.forEach { StatTile(it, Modifier.width(104.dp)) }
@@ -128,7 +129,7 @@ private fun MetaRow(detail: TripDetailUi) {
 
 /** S-TRP-01 action row: Replay (filled primary, radius 28) and Analysis (tonal). */
 @Composable
-private fun Actions(detail: TripDetailUi, onAction: (DrivesIntent) -> Unit) {
+private fun Actions(detail: TripDetailUi, onAction: (DrivesIntent) -> Unit, canEdit: Boolean = false) {
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         Button(
             onClick = { onAction(DrivesIntent.OpenReplay(detail.id)) },
@@ -144,6 +145,7 @@ private fun Actions(detail: TripDetailUi, onAction: (DrivesIntent) -> Unit) {
         ) {
             Text(stringResource(R.string.drives_analysis))
         }
+        if (canEdit) TripEditButton(detail.id, onAction, Modifier.weight(1f))
     }
 }
 

@@ -154,6 +154,10 @@ fun AllDrivesScreen(
                 )
             }
         }
+        if (state.filter == DrivesFilter.DRIVES && !state.isEmpty) {
+            item(key = "filters") { DrivesFilterRow(state.history, onAction) }
+            item(key = "filters-empty") { DrivesFilterEmpty(state.history, onAction) }
+        }
         if (state.filter == DrivesFilter.NOT_DRIVES) {
             items(state.notDrives, key = { it.id }) { TripRow(it, state.canCorrect, onAction) }
         } else {
@@ -173,6 +177,7 @@ fun AllDrivesScreen(
             }
         }
     }
+    state.history.sheet?.let { DrivesFilterSheet(it, onAction) }
 }
 
 /** A week's sticky header: "This week" and "3 drives · avg 84". */
