@@ -204,6 +204,7 @@ struct TripCardStack: View {
                     TripRowView(row: row)
                 }
                 .buttonStyle(.plain)
+                .accessibilityIdentifier("tripRow.\(row.id)")
                 .contextMenu {
                     if trips.canCorrect { CorrectionMenu(trips: trips, tripId: row.id) }
                 }

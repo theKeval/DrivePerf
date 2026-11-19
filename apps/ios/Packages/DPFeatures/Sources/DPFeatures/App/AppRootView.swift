@@ -18,6 +18,8 @@ public struct AppRootView: View {
                 if let onboarding = model.onboarding { OnboardingFlowView(model: onboarding) }
             case .shell:
                 ShellView(model: model)
+                    .environment(model.capture)
+                    .environment(\.replayServices, model.replay)
             }
         }
         .task { await model.display.observe() }

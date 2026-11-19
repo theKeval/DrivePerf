@@ -29,6 +29,9 @@ public struct AppDependencies {
     public var displaySettings: (any DisplaySettingsStoring)?
     // DRIVE-150: requests to open the capture status sheet from outside the UI (the watchdog notification).
     public var statusRequests: CaptureStatusRequests?
+    // DRIVE-200, DRIVE-61: S-RPL-01 Replay over the shared presenter. Nil hides the entry.
+    public var replayPresenters: (any ReplayPresenterMaking)?
+    public var connectivity: (any ConnectivityMonitoring)?
 
     public init(
         recorder: any TripRecording, history: any TripHistory, clock: any ClockBridge,
@@ -70,6 +73,8 @@ public final class AppModel {
     /// S-HOME-03 (F-CAP-15), shared by the capture status sheet and Recording settings.
     public let pause: PauseAutoDetectViewModel
     public let statusRequests: CaptureStatusRequests
+    /// S-RPL-01, when the app has a replay source.
+    public let replay: ReplayServices?
     public private(set) var onboarding: OnboardingViewModel?
     public var isSelfTestPresented: Bool
 
@@ -87,6 +92,10 @@ public final class AppModel {
         trips = TripListViewModel(
             history: dependencies.history, corrections: dependencies.corrections, catalog: dependencies.provenance, display: display)
         profile = ProfileViewModel(dependencies: dependencies)
+        let display = display
+        replay = dependencies.replayPresenters.map {
+            ReplayServices(presenters: $0, connectivity: dependencies.connectivity, display: display)
+        }
         // The accessory and the status sheet read permissions on their own, so re-read them after every change here.
         let capture = capture
         // It reads the capture model's status, so the views that show the pause update with it.

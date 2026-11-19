@@ -9,12 +9,16 @@ struct DrivePerfApp: App {
 
     var body: some Scene {
         WindowGroup {
-            TripSurfacePresentation(
-                router: AppEnvironment.shared.surfaceRouter,
-                dependencies: AppEnvironment.shared.dependencies)
-                .onChange(of: scenePhase) { _, phase in
-                    if phase == .active { AppEnvironment.shared.foregrounded() }
-                }
+            if let time = ReplayFixture.screenTime {
+                ReplayFixtureScreen(time: time, environment: AppEnvironment.shared)
+            } else {
+                TripSurfacePresentation(
+                    router: AppEnvironment.shared.surfaceRouter,
+                    dependencies: AppEnvironment.shared.dependencies)
+                    .onChange(of: scenePhase) { _, phase in
+                        if phase == .active { AppEnvironment.shared.foregrounded() }
+                    }
+            }
         }
     }
 }
