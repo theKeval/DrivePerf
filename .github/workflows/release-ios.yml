@@ -100,6 +100,7 @@ jobs:
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
           SENTRY_ORG: ${{ vars.SENTRY_ORG }}
           SENTRY_PROJECT_IOS: ${{ vars.SENTRY_PROJECT_IOS }}
+          SENTRY_DSN_IOS: ${{ vars.SENTRY_DSN_IOS }}   # DRIVE-196: crash reporting on in the build; empty = off
           FASTLANE_SKIP_UPDATE_CHECK: '1'
           FASTLANE_HIDE_CHANGELOG: '1'
         run: bundle exec fastlane ios beta

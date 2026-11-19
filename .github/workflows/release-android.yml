@@ -5,7 +5,8 @@ name: release-android
 # testing track. The job runs only when the repository variable RELEASE_ANDROID_ENABLED is 'true', in the `prod`
 # environment, which needs Keval's approval for every run. Every secret lives in that environment; the runbook lists
 # them and how Keval creates them: docs/launch/release-runbook.md. Without PLAY_SERVICE_ACCOUNT_JSON the run stops
-# after the signed bundle (for the first, manual Play upload). Nothing here creates tags. A pull request that touches
+# after the signed bundle (for the first, manual Play upload). With SENTRY_AUTH_TOKEN the R8 mapping also goes to
+# Sentry under a UUID the bundle carries, and SENTRY_DSN_ANDROID turns crash reporting on in the build (DRIVE-196). Nothing here creates tags. A pull request that touches
 # the lanes only loads them (no secrets, no environment).
 
 on:
@@ -53,6 +54,7 @@ jobs:
     env:
       DRIVEPERF_RUN_NUMBER: ${{ github.run_number }}
       HAS_PLAY_KEY: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON != '' }}
+      HAS_SENTRY: ${{ secrets.SENTRY_AUTH_TOKEN != '' }}
     steps:
       - uses: actions/checkout@v7
 
@@ -83,8 +85,14 @@ jobs:
           printf '%s' "$ANDROID_UPLOAD_KEYSTORE_BASE64" | base64 --decode > "$keystore"
           echo "DRIVEPERF_UPLOAD_KEYSTORE=$keystore" >> "$GITHUB_ENV"
 
+      # DRIVE-196: the build embeds this UUID (sentry-debug-meta.properties) and the mapping is uploaded under it.
+      - name: Sentry mapping ID
+        if: env.HAS_SENTRY == 'true'
+        run: echo "DRIVEPERF_SENTRY_PROGUARD_UUID=$(cat /proc/sys/kernel/random/uuid)" >> "$GITHUB_ENV"
+
       - name: Bundle prodRelease (signed)
         env:
+          DRIVEPERF_SENTRY_DSN: ${{ vars.SENTRY_DSN_ANDROID }}
           DRIVEPERF_UPLOAD_STORE_PASSWORD: ${{ secrets.ANDROID_UPLOAD_STORE_PASSWORD }}
           DRIVEPERF_UPLOAD_KEY_ALIAS: ${{ secrets.ANDROID_UPLOAD_KEY_ALIAS }}
           DRIVEPERF_UPLOAD_KEY_PASSWORD: ${{ secrets.ANDROID_UPLOAD_KEY_PASSWORD }}
@@ -105,10 +113,25 @@ jobs:
           retention-days: 90
 
       - uses: ruby/setup-ruby@de492cf36cbab201753d720ce4f4e336cd688c94   # v1.336.0, pinned: this job holds prod secrets
-        if: env.HAS_PLAY_KEY == 'true'
+        if: env.HAS_PLAY_KEY == 'true' || env.HAS_SENTRY == 'true'
         with:
           ruby-version: '4.0'
           bundler-cache: true
+
+      - name: Fastlane android sentry_mapping
+        if: env.HAS_SENTRY == 'true'
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG: ${{ vars.SENTRY_ORG }}
+          SENTRY_PROJECT_ANDROID: ${{ vars.SENTRY_PROJECT_ANDROID }}
+          FASTLANE_SKIP_UPDATE_CHECK: '1'
+          FASTLANE_HIDE_CHANGELOG: '1'
+        run: bundle exec fastlane android sentry_mapping
+
+      - name: Sentry mapping skipped
+        if: env.HAS_SENTRY != 'true'
+        run: |
+          echo "::warning::SENTRY_AUTH_TOKEN is not set: the R8 mapping was not uploaded to Sentry (it is in this run's artifacts)."
 
       - name: Fastlane android internal
         if: env.HAS_PLAY_KEY == 'true'
