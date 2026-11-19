@@ -67,6 +67,10 @@ import com.driveperf.domain.trip.OverlayStyle
 import com.driveperf.domain.trip.Provenance
 import com.driveperf.domain.trip.QualityBadge
 import com.driveperf.domain.trip.TripCorrection
+import com.driveperf.presentation.drives.CoverageSpanUi
+import com.driveperf.presentation.drives.LegendEntryUi
+import com.driveperf.presentation.drives.ProvenancedValue
+import com.driveperf.presentation.drives.QualitySheetUi
 import kotlinx.coroutines.launch
 
 private const val HATCH_STEP_DP = 5f
@@ -138,7 +142,7 @@ internal fun QualitySheetContent(sheet: QualitySheetUi) {
             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 sheet.legend.forEach { p ->
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                        DpProvenanceGlyph(p.dp(), MaterialTheme.colorScheme.onSurfaceVariant)
+                        DpProvenanceGlyph(p.provenance.dp(), MaterialTheme.colorScheme.onSurfaceVariant)
                         Text("${p.label} · ${p.meaning}", style = MaterialTheme.typography.bodyMedium)
                     }
                 }
@@ -173,7 +177,7 @@ private fun DetailRow(row: ProvenancedValue) {
                 .heightIn(min = 56.dp)
                 .padding(horizontal = 16.dp, vertical = 12.dp)
                 .clearAndSetSemantics {
-                    contentDescription = row.contentDescription + (row.note?.let { " $it." } ?: "")
+                    contentDescription = row.accessibilityLabel + (row.note?.let { " $it." } ?: "")
                     customActions = listOf(CustomAccessibilityAction(showHow) { scope.launch { tooltip.show() }; true })
                 },
             verticalArrangement = Arrangement.spacedBy(2.dp),
@@ -217,8 +221,8 @@ internal fun CoverageStrip(spans: List<CoverageSpanUi>, modifier: Modifier = Mod
         val h = size.height
         drawRoundRect(measured, cornerRadius = CornerRadius(h / 2, h / 2))
         spans.forEach { span ->
-            val x0 = span.from * size.width
-            val w = (span.to - span.from) * size.width
+            val x0 = span.from.toFloat() * size.width
+            val w = (span.to - span.from).toFloat() * size.width
             when (span.style) {
                 OverlayStyle.ESTIMATED_START, OverlayStyle.SHORT_GAP -> {
                     drawRect(empty, Offset(x0, 0f), Size(w, h))
@@ -256,7 +260,7 @@ private fun CoverageLegend() {
             OverlayStyle.EXCLUDED to R.string.dq_legend_left_out,
         ).forEach { (style, label) ->
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                CoverageStrip(style?.let { listOf(CoverageSpanUi(it, 0f, 1f)) }.orEmpty(), Modifier.width(22.dp))
+                CoverageStrip(style?.let { listOf(CoverageSpanUi(it, 0.0, 1.0)) }.orEmpty(), Modifier.width(22.dp))
                 Text(stringResource(label), style = MaterialTheme.typography.labelSmall)
             }
         }
@@ -275,13 +279,13 @@ private fun QualitySheetPreview() {
                     hero = "Mostly solid, with 41 s without GPS. The score is fair; that stretch is drawn dotted.",
                     estimatedStart = null,
                     coverage = listOf(
-                        CoverageSpanUi(OverlayStyle.ESTIMATED_START, 0f, 0.03f),
-                        CoverageSpanUi(OverlayStyle.SHORT_GAP, 0.6f, 0.62f),
+                        CoverageSpanUi(OverlayStyle.ESTIMATED_START, 0.0, 0.03),
+                        CoverageSpanUi(OverlayStyle.SHORT_GAP, 0.6, 0.62),
                     ),
                     scoredLine = "Scored 33 of 33 min",
                     coverageDescription = "Drive coverage, 33 minutes.",
                     rows = listOf(ProvenancedValue("gnssCoverage", "GPS coverage", "97", "%", Provenance.DERIVED, "")),
-                    legend = Provenance.entries,
+                    legend = Provenance.entries.map { LegendEntryUi(it, it.label, it.meaning) },
                 ),
             )
         }

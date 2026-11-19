@@ -17,15 +17,15 @@ import com.driveperf.domain.analytics.Analytics
 import com.driveperf.domain.analytics.AnalyticsEvent
 import com.driveperf.domain.trip.TripCorrection
 import com.driveperf.feature.drives.DrivesHomeScreen
-import com.driveperf.feature.drives.DrivesAction
-import com.driveperf.feature.drives.DrivesUiState
 import com.driveperf.feature.drives.REPLAY_BUTTON_TAG
-import com.driveperf.feature.drives.TripDetailUi
-import com.driveperf.feature.drives.TripRowUi
-import com.driveperf.feature.replay.ReplayMapConfig
 import com.driveperf.feature.replay.ReplayHeader
+import com.driveperf.feature.replay.ReplayMapConfig
 import com.driveperf.feature.replay.ReplayRoute
 import com.driveperf.feature.replay.ReplayViewModel
+import com.driveperf.presentation.drives.DrivesIntent
+import com.driveperf.presentation.drives.DrivesState
+import com.driveperf.presentation.drives.TripDetailUi
+import com.driveperf.presentation.drives.TripRowUi
 import kotlinx.coroutines.flow.MutableStateFlow
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -116,14 +116,14 @@ class ReplayUiTest {
         compose.onNodeWithTag("replay_canvas_map").assertIsDisplayed()
     }
 
-    private fun tripSheet(actions: MutableList<DrivesAction>, open: () -> Boolean = { true }) {
-        val detail = TripDetailUi("trip-7", "Today, 8:05 am", emptyList(), emptyList(), null, TripCorrection.DRIVER)
+    private fun tripSheet(actions: MutableList<DrivesIntent>, open: () -> Boolean = { true }) {
+        val detail = TripDetailUi("trip-7", "Tuesday morning", emptyList(), emptyList(), null, TripCorrection.DRIVER)
         compose.setContent {
             DrivePerfTheme(darkTheme = true) {
                 DrivesHomeScreen(
-                    state = DrivesUiState(
+                    state = DrivesState(
                         loaded = true,
-                        trips = listOf(TripRowUi("trip-7", "Today, 8:05 am", "12 min · 8.1 km")),
+                        trips = listOf(TripRowUi("trip-7", "Tuesday morning", "10 Nov · 8:05 AM", "8.1 km", "12 min")),
                         detail = detail.takeIf { open() },
                     ),
                     onSeeAll = {},
@@ -135,28 +135,28 @@ class ReplayUiTest {
     }
 
     @Test fun `Replay on the trip sheet closes the sheet, then opens Replay for that trip`() {
-        val actions = mutableListOf<DrivesAction>()
+        val actions = mutableListOf<DrivesIntent>()
         tripSheet(actions)
         compose.onNodeWithTag(REPLAY_BUTTON_TAG).assertIsDisplayed().performClick()
         compose.waitForIdle()
-        assertEquals(listOf<DrivesAction>(DrivesAction.OpenReplay("trip-7", "Today, 8:05 am")), actions)
+        assertEquals(listOf<DrivesIntent>(DrivesIntent.OpenReplay("trip-7")), actions)
     }
 
     @Test fun `Replay is disabled while the sheet slides away, so it opens once`() {
-        val actions = mutableListOf<DrivesAction>()
+        val actions = mutableListOf<DrivesIntent>()
         tripSheet(actions)
         compose.mainClock.autoAdvance = false
         compose.onNodeWithTag(REPLAY_BUTTON_TAG).performClick()
         compose.mainClock.advanceTimeByFrame()
         compose.onNodeWithTag(REPLAY_BUTTON_TAG).assertIsNotEnabled()
-        assertEquals("nothing goes out before the hide completes", emptyList<DrivesAction>(), actions)
+        assertEquals("nothing goes out before the hide completes", emptyList<DrivesIntent>(), actions)
         compose.mainClock.autoAdvance = true
         compose.waitForIdle()
-        assertEquals(listOf<DrivesAction>(DrivesAction.OpenReplay("trip-7", "Today, 8:05 am")), actions)
+        assertEquals(listOf<DrivesIntent>(DrivesIntent.OpenReplay("trip-7")), actions)
     }
 
     @Test fun `a hide cut short when the sheet goes away opens nothing`() {
-        val actions = mutableListOf<DrivesAction>()
+        val actions = mutableListOf<DrivesIntent>()
         var open by mutableStateOf(true)
         tripSheet(actions) { open }
         compose.mainClock.autoAdvance = false
@@ -165,6 +165,6 @@ class ReplayUiTest {
         open = false
         compose.mainClock.autoAdvance = true
         compose.waitForIdle()
-        assertEquals(emptyList<DrivesAction>(), actions)
+        assertEquals(emptyList<DrivesIntent>(), actions)
     }
 }

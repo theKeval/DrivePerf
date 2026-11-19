@@ -153,7 +153,8 @@ class TripSheetTest {
 
     @Test
     fun `the rows that lowered the badge are marked`() {
-        fun lowered(reason: QualityReason) = quality.sheet(quality(QualityBadge.LIMITED, reason)).rows.filter { it.lowersBadge }.map { it.key }
+        fun lowered(reason: QualityReason) =
+            quality.sheet(quality(QualityBadge.LIMITED, reason)).rows.filter { it.lowersBadge }.map { it.key }
         assertEquals(listOf("imuRate"), lowered(QualityReason.LOW_IMU_RATE))
         assertEquals(listOf("imuRate"), lowered(QualityReason.NO_IMU))
         assertEquals(listOf("gnssCoverage"), lowered(QualityReason.LOW_GNSS))
@@ -185,15 +186,10 @@ class TripSheetTest {
             bus.text,
         )
         assertEquals(BannerAction.Restore, sheet.banners(trip(kind = TripKind.PASSENGER)).single().action)
-        assertTrue(
-            sheet.banners(trip(kind = TripKind.NOT_DRIVING, correction = TripCorrection.WALK)).single().text.startsWith("Marked as a walk."),
-        )
-        assertTrue(
-            sheet.banners(trip(kind = TripKind.NOT_DRIVING, correction = TripCorrection.BIKE)).single().text.startsWith("Marked as a bike ride."),
-        )
-        assertTrue(
-            sheet.banners(trip(kind = TripKind.NOT_DRIVING, correction = TripCorrection.OTHER)).single().text.startsWith("Marked as not a drive."),
-        )
+        fun marked(c: TripCorrection) = sheet.banners(trip(kind = TripKind.NOT_DRIVING, correction = c)).single().text
+        assertTrue(marked(TripCorrection.WALK).startsWith("Marked as a walk."))
+        assertTrue(marked(TripCorrection.BIKE).startsWith("Marked as a bike ride."))
+        assertTrue(marked(TripCorrection.OTHER).startsWith("Marked as not a drive."))
     }
 
     @Test
@@ -214,14 +210,18 @@ class TripSheetTest {
         assertFalse(short.attention)
         val unscorable = sheet.banners(trip(quality = quality(QualityBadge.UNSCORABLE, QualityReason.NO_GYRO))).single()
         assertTrue(unscorable.attention)
-        assertEquals("We couldn’t score this one fairly. This phone has no gyroscope. Here’s the route and the stats anyway.", unscorable.text)
+        assertEquals(
+            "We couldn’t score this one fairly. This phone has no gyroscope. Here’s the route and the stats anyway.",
+            unscorable.text,
+        )
     }
 
     @Test
     fun `the detail carries the answer to What was this`() {
         assertEquals(TripCorrection.DRIVER, sheet.detail(trip(), "T", "S").correction)
         assertEquals(TripCorrection.PASSENGER, sheet.detail(trip(kind = TripKind.PASSENGER), "T", "S").correction)
-        val walk = sheet.detail(trip(kind = TripKind.NOT_DRIVING, correction = TripCorrection.WALK, quality = quality(QualityBadge.USABLE)), "T", "S")
+        val walked = trip(kind = TripKind.NOT_DRIVING, correction = TripCorrection.WALK, quality = quality(QualityBadge.USABLE))
+        val walk = sheet.detail(walked, "T", "S")
         assertEquals(TripCorrection.WALK, walk.correction)
         assertEquals("Usable", walk.qualityWord)
         assertEquals("S", walk.subtitle)
@@ -235,7 +235,10 @@ class TripSheetTest {
             TripCopy.correctionOptions.map { it.title },
         )
         assertEquals(
-            setOf("Phone moved", "Lining up", "Slow sensors", "Sensor gap", "App stopped", "Low battery", "Phone too warm", "Paused", "No GPS", "Estimated start"),
+            setOf(
+                "Phone moved", "Lining up", "Slow sensors", "Sensor gap", "App stopped", "Low battery", "Phone too warm", "Paused",
+                "No GPS", "Estimated start",
+            ),
             SegmentReason.entries.map(TripCopy::reasonWord).toSet(),
         )
         assertEquals(QualityReason.entries.size + 1, (QualityReason.entries + null).map(TripCopy::reasonText).toSet().size)
@@ -246,6 +249,7 @@ class TripSheetTest {
         )
         val stops = ProvenancedValue("stops", "Stops", "2", "", Provenance.DERIVED, "")
         assertEquals("Stops, 2. Derived.", stops.accessibilityLabel)
-        assertEquals("Estimated start, about 0.4 kilometres. Estimated.", quality.sheet(quality(QualityBadge.GOOD)).rows.last().accessibilityLabel)
+        val start = quality.sheet(quality(QualityBadge.GOOD)).rows.last()
+        assertEquals("Estimated start, about 0.4 kilometres. Estimated.", start.accessibilityLabel)
     }
 }

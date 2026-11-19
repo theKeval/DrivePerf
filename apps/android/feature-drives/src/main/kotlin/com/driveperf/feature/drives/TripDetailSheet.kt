@@ -71,19 +71,26 @@ import com.driveperf.domain.trip.OverlayStyle
 import com.driveperf.domain.trip.Provenance
 import com.driveperf.domain.trip.QualityBadge
 import com.driveperf.domain.trip.TripCorrection
+import com.driveperf.presentation.drives.BannerAction
+import com.driveperf.presentation.drives.DrivesIntent
+import com.driveperf.presentation.drives.DrivesState
+import com.driveperf.presentation.drives.ProvenancedValue
+import com.driveperf.presentation.drives.TripBannerUi
+import com.driveperf.presentation.drives.TripCopy
+import com.driveperf.presentation.drives.TripDetailUi
 import kotlinx.coroutines.launch
 
 /** The trip sheet and the data-quality sheet, when the state opens them. */
 @Composable
-internal fun DrivesSheets(state: DrivesUiState, onAction: (DrivesAction) -> Unit) {
+internal fun DrivesSheets(state: DrivesState, onAction: (DrivesIntent) -> Unit) {
     state.detail?.let { TripDetailSheet(it, state.canCorrect, onAction) }
-    state.quality?.let { QualitySheet(it, onDismiss = { onAction(DrivesAction.CloseQuality) }) }
+    state.quality?.let { QualitySheet(it, onDismiss = { onAction(DrivesIntent.CloseQuality) }) }
 }
 
 /**
  * Trip sheet (S-TRP-01, the parts the shell has): banners (question, passenger or not a drive, interrupted, short,
  * unscorable), stat tiles with provenance on long-press (F-DQ-05), the data-quality row (→ S-DQ-01) and "What was
- * this?" (S-TRP-02), and Replay (S-RPL-01, DRIVE-200): the sheet slides away first, and [DrivesAction.OpenReplay]
+ * this?" (S-TRP-02), and Replay (S-RPL-01, DRIVE-200): the sheet slides away first, and [DrivesIntent.OpenReplay]
  * goes out only once that hide completes. Map, score and events arrive with their own stories.
  */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -91,13 +98,13 @@ internal fun DrivesSheets(state: DrivesUiState, onAction: (DrivesAction) -> Unit
 internal fun TripDetailSheet(
     detail: TripDetailUi,
     canCorrect: Boolean,
-    onAction: (DrivesAction) -> Unit,
+    onAction: (DrivesIntent) -> Unit,
 ) {
     val sheetState = rememberDpSheetState()
     val scope = rememberCoroutineScope()
     var opening by remember { mutableStateOf(false) }
     DpModalBottomSheet(
-        onDismissRequest = { onAction(DrivesAction.CloseDetail) },
+        onDismissRequest = { onAction(DrivesIntent.CloseDetail) },
         sheetState = sheetState,
     ) {
         Column(
@@ -106,7 +113,7 @@ internal fun TripDetailSheet(
                 .padding(start = 16.dp, end = 16.dp, bottom = 32.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            Text(detail.title, style = MaterialTheme.typography.titleLarge, modifier = Modifier.semantics { heading() })
+            SheetTitle(detail)
             ReplayButton(enabled = !opening) {
                 // One transition at a time: the sheet slides away first, and Replay opens only if that finished.
                 // A cancelled hide (the sheet left composition, a competing gesture) throws here and opens nothing.
@@ -114,7 +121,7 @@ internal fun TripDetailSheet(
                 scope.launch {
                     try {
                         sheetState.hide()
-                        onAction(DrivesAction.OpenReplay(detail.id, detail.title))
+                        onAction(DrivesIntent.OpenReplay(detail.id))
                     } finally {
                         opening = false
                     }
@@ -136,7 +143,7 @@ internal fun TripDetailSheet(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .heightIn(min = 56.dp)
-                                .clickable { onAction(DrivesAction.OpenQuality(detail.id)) }
+                                .clickable { onAction(DrivesIntent.OpenQuality(detail.id)) }
                                 .padding(horizontal = 16.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
@@ -146,11 +153,20 @@ internal fun TripDetailSheet(
                     }
                     if (canCorrect) {
                         if (detail.quality != null) HorizontalDivider()
-                        CorrectionRow(detail.correction) { onAction(DrivesAction.Correct(detail.id, it)) }
+                        CorrectionRow(detail.correction) { onAction(DrivesIntent.Correct(detail.id, it)) }
                     }
                 }
             }
         }
+    }
+}
+
+/** "Thursday morning" over "5 Nov · 8:14 AM". */
+@Composable
+private fun SheetTitle(detail: TripDetailUi) {
+    Column {
+        Text(detail.title, style = MaterialTheme.typography.titleLarge, modifier = Modifier.semantics { heading() })
+        Text(detail.subtitle, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
@@ -171,7 +187,7 @@ private fun ReplayButton(enabled: Boolean, onClick: () -> Unit) {
 const val REPLAY_BUTTON_TAG: String = "trip_detail_replay"
 
 @Composable
-private fun Banner(banner: TripBannerUi, tripId: String, onAction: (DrivesAction) -> Unit) {
+private fun Banner(banner: TripBannerUi, tripId: String, onAction: (DrivesIntent) -> Unit) {
     Surface(
         shape = MaterialTheme.shapes.medium,
         color = if (banner.attention) DrivePerfTheme.extendedColors.warningContainer else MaterialTheme.colorScheme.surfaceContainerHigh,
@@ -180,10 +196,10 @@ private fun Banner(banner: TripBannerUi, tripId: String, onAction: (DrivesAction
             Text(banner.text, style = MaterialTheme.typography.bodyMedium)
             when (banner.action) {
                 is BannerAction.Answer -> Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedButton(onClick = { onAction(DrivesAction.Answer(tripId, true)) }) { Text(stringResource(R.string.drives_yes)) }
-                    Button(onClick = { onAction(DrivesAction.Answer(tripId, false)) }) { Text(stringResource(R.string.drives_no)) }
+                    OutlinedButton(onClick = { onAction(DrivesIntent.Answer(tripId, true)) }) { Text(stringResource(R.string.drives_yes)) }
+                    Button(onClick = { onAction(DrivesIntent.Answer(tripId, false)) }) { Text(stringResource(R.string.drives_no)) }
                 }
-                BannerAction.Restore -> TextButton(onClick = { onAction(DrivesAction.Correct(tripId, TripCorrection.DRIVER)) }) {
+                BannerAction.Restore -> TextButton(onClick = { onAction(DrivesIntent.Correct(tripId, TripCorrection.DRIVER)) }) {
                     Text(stringResource(R.string.drives_restore))
                 }
                 null -> Unit
@@ -205,7 +221,7 @@ private fun CorrectionRow(current: TripCorrection, onPick: (TripCorrection) -> U
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(stringResource(R.string.drives_what_was_this), Modifier.weight(1f))
-            Text(TripPresenter.correctionTitle(current), color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(TripCopy.correctionTitle(current), color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         CorrectionMenu(expanded = open, onDismiss = { open = false }, onPick = onPick)
     }
@@ -225,7 +241,7 @@ private fun StatTile(value: ProvenancedValue, modifier: Modifier = Modifier) {
     ) {
         Surface(
             modifier = modifier.clearAndSetSemantics {
-                contentDescription = value.contentDescription
+                contentDescription = value.accessibilityLabel
                 customActions = listOf(CustomAccessibilityAction(showHow) { scope.launch { tooltip.show() }; true })
             },
             shape = MaterialTheme.shapes.medium,

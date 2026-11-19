@@ -127,8 +127,15 @@ internal class TripRows(
     /** "This week", "Last week", "19–25 Oct" or "27 Oct – 2 Nov". */
     private fun weekTitle(weekStart: Long): String {
         val thisWeek = format.weekStart(nowMs)
-        if (weekStart == thisWeek) return "This week"
-        if (weekStart == format.weekStart(thisWeek - 1)) return "Last week"
+        return when (weekStart) {
+            thisWeek -> "This week"
+            format.weekStart(thisWeek - 1) -> "Last week"
+            else -> weekRange(weekStart)
+        }
+    }
+
+    /** "19–25 Oct" or "27 Oct – 2 Nov". */
+    private fun weekRange(weekStart: Long): String {
         // Midday on the last day, so a daylight-saving change in the week cannot move it to another day.
         val end = weekStart + DAYS_TO_WEEK_END * DAY_MS + HALF_DAY_MS
         val startDay = format.dayOfMonth(weekStart)

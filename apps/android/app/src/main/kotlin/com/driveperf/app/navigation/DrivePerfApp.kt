@@ -21,6 +21,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -38,7 +39,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.NavType
 import androidx.navigation.navArgument
-import com.driveperf.feature.drives.DrivesAction
+import com.driveperf.presentation.drives.DrivesEffect
 import com.driveperf.feature.capture.ContentTarget
 import com.driveperf.feature.replay.ReplayHeader
 import com.driveperf.feature.replay.ReplayRoute
@@ -131,12 +132,13 @@ internal class AppEnv(
     val fixLocation: () -> Unit,
 ) {
     /**
-     * Drives actions go to the view model; Replay also navigates to S-RPL-01. While a drive records, the in-drive gate
-     * covers the whole graph, so Replay can't open then (F-RPL-01 AC6).
+     * The Drives presenter's navigation: Replay opens S-RPL-01. While a drive records, the in-drive gate covers the whole
+     * graph, so Replay can't open then (F-RPL-01 AC6).
      */
-    fun drivesActions(viewModel: DrivesViewModel): (DrivesAction) -> Unit = { action ->
-        viewModel.onAction(action)
-        if (action is DrivesAction.OpenReplay) navController.navigate(Routes.replay(action.tripId, action.title))
+    fun onDrivesEffect(effect: DrivesEffect) {
+        when (effect) {
+            is DrivesEffect.OpenReplay -> navController.navigate(Routes.replay(effect.tripId, effect.title))
+        }
     }
 }
 
@@ -241,8 +243,9 @@ private fun NavGraphBuilder.allDrivesDestination(env: AppEnv) {
     composable(Routes.ALL_DRIVES) {
         val viewModel: DrivesViewModel = koinViewModel()
         val state by viewModel.state.collectAsStateWithLifecycle()
+        LaunchedEffect(viewModel) { viewModel.effects.collect(env::onDrivesEffect) }
         DetailScaffold(title = stringResource(R.string.all_drives_title), onBack = { env.navController.popBackStack() }) { padding ->
-            AllDrivesScreen(state = state, modifier = Modifier.padding(padding), onAction = env.drivesActions(viewModel))
+            AllDrivesScreen(state = state, modifier = Modifier.padding(padding), onAction = viewModel::onAction)
         }
     }
 }
@@ -312,12 +315,13 @@ private fun TabContent(tab: Tab, padding: PaddingValues, env: AppEnv, onSeeAll: 
         Tab.Drives -> {
             val viewModel: DrivesViewModel = koinViewModel()
             val state by viewModel.state.collectAsStateWithLifecycle()
+            LaunchedEffect(viewModel) { viewModel.effects.collect(env::onDrivesEffect) }
             DrivesHomeScreen(
                 state = state,
                 onSeeAll = onSeeAll,
                 modifier = modifier,
                 bottomPadding = padding.calculateBottomPadding() + ToolbarClearance,
-                onAction = env.drivesActions(viewModel),
+                onAction = viewModel::onAction,
             )
         }
         Tab.Routes -> RoutesScreen(modifier)

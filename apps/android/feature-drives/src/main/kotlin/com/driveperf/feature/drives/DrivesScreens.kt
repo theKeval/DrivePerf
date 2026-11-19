@@ -46,6 +46,11 @@ import com.driveperf.designsystem.DrivePerfTheme
 import com.driveperf.domain.trip.QualityBadge
 import com.driveperf.domain.trip.Suspect
 import com.driveperf.domain.trip.TripCorrection
+import com.driveperf.presentation.drives.DrivesFilter
+import com.driveperf.presentation.drives.DrivesIntent
+import com.driveperf.presentation.drives.DrivesState
+import com.driveperf.presentation.drives.TripCopy
+import com.driveperf.presentation.drives.TripRowUi
 
 private const val DIMMED_ALPHA = 0.6f
 
@@ -55,11 +60,11 @@ private const val DIMMED_ALPHA = 0.6f
  */
 @Composable
 fun DrivesHomeScreen(
-    state: DrivesUiState,
+    state: DrivesState,
     onSeeAll: () -> Unit,
     modifier: Modifier = Modifier,
     bottomPadding: Dp = 0.dp,
-    onAction: (DrivesAction) -> Unit = {},
+    onAction: (DrivesIntent) -> Unit = {},
 ) {
     LazyColumn(
         modifier = modifier.fillMaxSize(),
@@ -87,7 +92,7 @@ fun DrivesHomeScreen(
                     style = MaterialTheme.typography.titleLargeEmphasized,
                 )
             }
-            items(state.trips.take(LATEST_DRIVES), key = { it.id }) { TripRow(it, state.canCorrect, onAction) }
+            items(state.latest, key = { it.id }) { TripRow(it, state.canCorrect, onAction) }
             if (state.seeAll) {
                 item { TextButton(onClick = onSeeAll) { Text(stringResource(R.string.drives_see_all)) } }
             }
@@ -106,10 +111,10 @@ fun DrivesHomeScreen(
 /** Every recorded drive, newest first (S-HIS-01), with the "Not drives" filter (F-CAP-04 AC3). */
 @Composable
 fun AllDrivesScreen(
-    state: DrivesUiState,
+    state: DrivesState,
     modifier: Modifier = Modifier,
     bottomPadding: Dp = 0.dp,
-    onAction: (DrivesAction) -> Unit = {},
+    onAction: (DrivesIntent) -> Unit = {},
 ) {
     LazyColumn(
         modifier = modifier.fillMaxSize(),
@@ -121,12 +126,12 @@ fun AllDrivesScreen(
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     FilterChip(
                         selected = state.filter == DrivesFilter.DRIVES,
-                        onClick = { onAction(DrivesAction.Filter(DrivesFilter.DRIVES)) },
+                        onClick = { onAction(DrivesIntent.Filter(DrivesFilter.DRIVES)) },
                         label = { Text(stringResource(R.string.drives_filter_drives)) },
                     )
                     FilterChip(
                         selected = state.filter == DrivesFilter.NOT_DRIVES,
-                        onClick = { onAction(DrivesAction.Filter(DrivesFilter.NOT_DRIVES)) },
+                        onClick = { onAction(DrivesIntent.Filter(DrivesFilter.NOT_DRIVES)) },
                         label = { Text(stringResource(R.string.drives_filter_not_drives)) },
                     )
                 }
@@ -159,7 +164,7 @@ fun AllDrivesScreen(
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun TripRow(trip: TripRowUi, canCorrect: Boolean, onAction: (DrivesAction) -> Unit, modifier: Modifier = Modifier) {
+private fun TripRow(trip: TripRowUi, canCorrect: Boolean, onAction: (DrivesIntent) -> Unit, modifier: Modifier = Modifier) {
     var menu by remember { mutableStateOf(false) }
     val whatWasThis = stringResource(R.string.drives_what_was_this)
     Card(
@@ -171,19 +176,23 @@ private fun TripRow(trip: TripRowUi, canCorrect: Boolean, onAction: (DrivesActio
                 modifier = Modifier
                     .fillMaxWidth()
                     .combinedClickable(
-                        onClick = { onAction(DrivesAction.Open(trip.id)) },
+                        onClick = { onAction(DrivesIntent.Open(trip.id)) },
                         onLongClick = if (canCorrect) ({ menu = true }) else null,
                     )
-                    .alpha(if (trip.kindLabel != null) DIMMED_ALPHA else 1f)
+                    .alpha(if (trip.dimmed) DIMMED_ALPHA else 1f)
                     .padding(16.dp)
                     .clearAndSetSemantics {
-                        contentDescription = rowDescription(trip)
+                        contentDescription = trip.accessibilityLabel
                         if (canCorrect) customActions = listOf(CustomAccessibilityAction(whatWasThis) { menu = true; true })
                     },
                 verticalArrangement = Arrangement.spacedBy(6.dp),
             ) {
-                Text(text = trip.start, style = MaterialTheme.typography.titleMediumEmphasized)
-                Text(trip.summary, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(text = trip.title, style = MaterialTheme.typography.titleMediumEmphasized)
+                Text(
+                    "${trip.subtitle} · ${trip.stats}",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                     trip.quality?.let { QualityBadgeChip(it) } ?: DpStatusChip(label = stringResource(R.string.drives_recorded))
                     if (trip.interrupted) DpStatusChip(label = stringResource(R.string.drives_interrupted), attention = true)
@@ -191,36 +200,27 @@ private fun TripRow(trip: TripRowUi, canCorrect: Boolean, onAction: (DrivesActio
                     trip.kindLabel?.let { DpStatusChip(label = it) }
                 }
             }
-            CorrectionMenu(expanded = menu, onDismiss = { menu = false }) { onAction(DrivesAction.Correct(trip.id, it)) }
+            CorrectionMenu(expanded = menu, onDismiss = { menu = false }) { onAction(DrivesIntent.Correct(trip.id, it)) }
         }
         val question = trip.question
         if (question != null && canCorrect) {
             QuestionBar(question, Modifier.padding(start = 16.dp, end = 16.dp, bottom = 16.dp)) {
-                onAction(DrivesAction.Answer(trip.id, it))
+                onAction(DrivesIntent.Answer(trip.id, it))
             }
         }
     }
 }
 
-private fun rowDescription(trip: TripRowUi): String = listOfNotNull(
-    trip.start,
-    trip.summary,
-    trip.kindLabel,
-    "Interrupted".takeIf { trip.interrupted },
-    "Short trip, not scored".takeIf { trip.short },
-    trip.quality?.let { "${TripPresenter.badgeWord(it)} data" },
-).joinToString(", ")
-
 /** "What was this?" (S-TRP-02 type picker, F-CAP-04). */
 @Composable
 internal fun CorrectionMenu(expanded: Boolean, onDismiss: () -> Unit, onPick: (TripCorrection) -> Unit) {
     DropdownMenu(expanded = expanded, onDismissRequest = onDismiss) {
-        TripCorrection.entries.forEach { correction ->
+        TripCopy.correctionOptions.forEach { option ->
             DropdownMenuItem(
-                text = { Text(TripPresenter.correctionTitle(correction)) },
+                text = { Text(option.title) },
                 onClick = {
                     onDismiss()
-                    onPick(correction)
+                    onPick(option.correction)
                 },
             )
         }
@@ -261,7 +261,7 @@ internal fun QualityBadgeChip(badge: QualityBadge, modifier: Modifier = Modifier
             horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             DpQualityGlyph(badge.dp(), size = 14.dp, ink = MaterialTheme.colorScheme.surface)
-            Text(TripPresenter.badgeWord(badge), style = MaterialTheme.typography.labelLarge)
+            Text(TripCopy.badgeWord(badge), style = MaterialTheme.typography.labelLarge)
         }
     }
 }
@@ -271,13 +271,18 @@ internal fun QualityBadgeChip(badge: QualityBadge, modifier: Modifier = Modifier
 private fun DrivesHomeScreenPreview() {
     DrivePerfTheme {
         DrivesHomeScreen(
-            state = DrivesUiState(
+            state = DrivesState(
                 loaded = true,
                 canCorrect = true,
                 trips = listOf(
-                    TripRowUi("a", "Today, 7:42 AM", "25 min · 12.4 km", QualityBadge.GOOD),
-                    TripRowUi("b", "Yesterday, 5:10 PM", "18 min · 9.1 km", QualityBadge.USABLE, interrupted = true),
-                    TripRowUi("c", "Mon, 8:02 AM", "31 min · 11.0 km", QualityBadge.LIMITED, question = Suspect.TRANSIT),
+                    TripRowUi("a", "Tuesday morning", "10 Nov · 7:42 AM", "12.4 km", "25 min", quality = QualityBadge.GOOD),
+                    TripRowUi(
+                        "b", "Monday evening", "9 Nov · 5:10 PM", "9.1 km", "18 min", quality = QualityBadge.USABLE, interrupted = true,
+                    ),
+                    TripRowUi(
+                        "c", "Monday morning", "9 Nov · 8:02 AM", "11.0 km", "31 min", quality = QualityBadge.LIMITED,
+                        question = Suspect.TRANSIT,
+                    ),
                 ),
             ),
             onSeeAll = {},
