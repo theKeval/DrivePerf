@@ -7,6 +7,7 @@ import com.driveperf.domain.capture.RecorderState
 import com.driveperf.domain.capture.WakeEvent
 import com.driveperf.domain.capture.WakeKind
 import com.driveperf.domain.replay.SegmentStyle
+import com.driveperf.presentation.replay.ReplaySource
 import com.driveperf.domain.trip.TripSource
 import com.driveperf.domain.tripfile.TripFileKind
 import com.driveperf.testing.FakeActivitySource
@@ -16,6 +17,7 @@ import com.driveperf.testing.FakeParkedRegionMonitor
 import com.driveperf.testing.FakePowerState
 import com.driveperf.testing.InMemoryTripFileStore
 import com.driveperf.testing.TestClock
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
@@ -100,6 +102,14 @@ class DrivePerfCoreStartTest {
         assertTrue(replay.track.size > 20, "the 1 Hz fixes: ${replay.track.size}")
         assertTrue(replay.spans.none { it.style == SegmentStyle.ESTIMATED })
         assertNull(core.replay.replay("missing"))
+        // The shared presenter loads the same replay; a trip that is not recording is never sent to the drive screen.
+        val presenterScope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Default)
+        val presenter = core.replayPresenter(trip.id, ReplaySource.TRIP_DETAIL, presenterScope)
+        val loaded = withTimeout(5_000) { presenter.state.first { !it.loading } }
+        assertEquals(trip.id, loaded.replay?.tripId)
+        assertNull(loaded.unavailable)
+        presenter.close()
+        presenterScope.cancel()
     }
 
     @Test
