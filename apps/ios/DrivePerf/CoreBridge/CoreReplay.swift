@@ -65,6 +65,12 @@ final class CoreReplayTrack: ReplayTrack, @unchecked Sendable {
             style: Self.style(f.style))
     }
 
+    func span(at tS: Double) -> DPSharedBridge.ReplaySpan? {
+        replay.spanAt(tS: tS).map {
+            DPSharedBridge.ReplaySpan(style: Self.style($0.style), t0S: $0.t0S, t1S: $0.t1S, label: $0.label)
+        }
+    }
+
     func playbackRate(_ speed: DPSharedBridge.PlaybackSpeed) -> Double {
         replay.playbackRate(speed: Self.kotlin(speed))
     }

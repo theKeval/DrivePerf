@@ -140,6 +140,8 @@ public protocol ReplayTrack: AnyObject, Sendable {
     func segments(zoomBucket: Int) -> [ReplaySegment]
     /// The marker at `tS`. Never interpolates across a `noGps` gap.
     func frame(at tS: Double) -> ReplayFrame
+    /// Kotlin `Replay.spanAt`: the overlay span at `tS` for the marker's chip, or nil on an observed stretch.
+    func span(at tS: Double) -> ReplaySpan?
     /// Trip seconds per wall-clock second.
     func playbackRate(_ speed: PlaybackSpeed) -> Double
     /// Kotlin `Replay.zoomBucketFor`: the simplification bucket for a map `viewWidth` points wide showing

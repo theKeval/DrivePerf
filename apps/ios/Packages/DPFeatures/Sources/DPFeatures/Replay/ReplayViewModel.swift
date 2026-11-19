@@ -38,7 +38,10 @@ public final class ReplayViewModel {
     public private(set) var speed = PlaybackSpeed.auto
     /// Trip seconds at the marker.
     public private(set) var tS: Double = 0
+    /// The core's `frameAt` for the marker; iOS adds no interpolation of its own.
     public private(set) var frame: ReplayFrame?
+    /// The core's `spanAt` for the chip (F-RPL-08 AC2), or nil on an observed stretch.
+    public private(set) var activeSpan: ReplaySpan?
     public private(set) var isScrubbing = false
     /// False with no network path: the plain canvas replaces the map (AC5).
     public private(set) var isOnline = true
@@ -72,7 +75,6 @@ public final class ReplayViewModel {
     private let source: String
     private let now: @MainActor () -> Date
     private var track: (any ReplayTrack)?
-    private var table: ReplayFrameTable?
     private var segmentCache: [Int: [ReplaySegment]] = [:]
     private var rate: Double = 1
     private var lastTick: TimeInterval?
@@ -119,20 +121,11 @@ public final class ReplayViewModel {
             phase = .failed
             return
         }
-        let table = await Self.sample(track)
-        apply(track, table: table)
+        apply(track)
     }
 
-    /// Samples the marker off the main actor: one core call per sample, once.
-    private nonisolated static func sample(_ track: any ReplayTrack) async -> ReplayFrameTable {
-        await Task.detached(priority: .userInitiated) {
-            ReplayFrameTable(durationS: track.durationS) { track.frame(at: $0) }
-        }.value
-    }
-
-    func apply(_ track: any ReplayTrack, table: ReplayFrameTable) {
+    func apply(_ track: any ReplayTrack) {
         self.track = track
-        self.table = table
         durationS = track.durationS
         spans = track.spans.sorted { $0.t0S < $1.t0S }
         bounds = track.bbox
@@ -148,7 +141,7 @@ public final class ReplayViewModel {
         tS = 0
         isPlaying = false
         lastTick = nil
-        frame = table.frame(at: 0)
+        seek(0)
         phase = .ready
     }
 
@@ -206,9 +199,10 @@ public final class ReplayViewModel {
         if isPlaying { analytics?.track(.played(speed: speed)) }
     }
 
-    /// One display frame (TimelineView `.animation`): `time` is the display clock in seconds. Allocation-free.
+    /// One display frame (TimelineView `.animation`): `time` is the display clock in seconds. The marker and the chip
+    /// come from the core's `frameAt` and `spanAt` at the new time.
     public func tick(at time: TimeInterval) {
-        guard isPlaying, let table else { return }
+        guard isPlaying, track != nil else { return }
         guard let last = lastTick else {
             lastTick = time
             return
@@ -221,8 +215,7 @@ public final class ReplayViewModel {
             next = durationS
             finished = true
         }
-        tS = next
-        frame = table.frame(at: next)
+        seek(next)
         if finished {
             pause()
             analytics?.track(.completed)
@@ -271,15 +264,11 @@ public final class ReplayViewModel {
     private func seek(_ value: Double) {
         let clamped = min(max(value, 0), durationS)
         tS = clamped
-        frame = table?.frame(at: clamped)
+        frame = track?.frame(at: clamped)
+        activeSpan = track?.span(at: clamped)
     }
 
     // MARK: Overlay (F-RPL-08)
-
-    /// The span the marker is in, if any.
-    public var activeSpan: ReplaySpan? {
-        spans.first { $0.contains(tS, durationS: durationS) }
-    }
 
     /// The small label while the marker is inside a span (AC2): "Estimated start", "No GPS", "Phone moved — not scored".
     public var spanLabel: String? {

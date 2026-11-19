@@ -114,6 +114,10 @@ final class SyntheticReplay: ReplayTrack, @unchecked Sendable {
             bearingDeg: (bearing + 360).truncatingRemainder(dividingBy: 360), style: drawStyle(at: t))
     }
 
+    func span(at tS: Double) -> ReplaySpan? {
+        spans.first { $0.contains(tS, durationS: durationS) }
+    }
+
     func zoomBucket(longitudeDelta: Double, viewWidth: Double) -> Int {
         ReplayZoomMath.bucket(longitudeDelta: longitudeDelta, viewWidth: viewWidth)
     }

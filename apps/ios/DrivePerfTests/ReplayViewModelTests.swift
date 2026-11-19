@@ -203,27 +203,27 @@ final class ReplayViewModelTests: XCTestCase {
 
     // MARK: Frames and zoom
 
-    func testTheFrameTableNeverInterpolatesAcrossAGap() {
-        let track = FakeReplayTrack()
-        let table = ReplayFrameTable(durationS: track.durationS) { track.frame(at: $0) }
-        let before = table.frame(at: 199.25)
-        XCTAssertEqual(before.style, .observed)
-        XCTAssertEqual(before.lat, FakeReplayTrack.lat(199.25), accuracy: 1e-9)
-        let edge = table.frame(at: 199.75)
-        XCTAssertEqual(edge.lat, FakeReplayTrack.lat(199.5), accuracy: 1e-9, "no line drawn into the gap")
-        let inside = table.frame(at: 220.2)
-        XCTAssertEqual(inside.style, .noGps)
-        XCTAssertEqual(inside.lat, FakeReplayTrack.lat(200), accuracy: 1e-9, "held at the last fix")
-        let after = table.frame(at: 240.25)
-        XCTAssertEqual(after.style, .observed)
-        XCTAssertEqual(after.lat, FakeReplayTrack.lat(240.25), accuracy: 1e-9, "jumps to the far side")
+    func testTheMarkerIsTheCoresFrameRightUpToASpanBoundary() async {
+        // The estimated start ends at 30 s and has no measured speed: just before it the marker is still estimated.
+        let model = await loaded()
+        model.scrub(to: 29.75)
+        XCTAssertEqual(model.frame?.style, .estimated)
+        XCTAssertNil(model.frame?.speedMps)
+        XCTAssertEqual(model.frame?.lat ?? 0, FakeReplayTrack.lat(29.75), accuracy: 1e-12)
+        XCTAssertEqual(model.spanLabel, "Estimated start")
+        model.scrub(to: 30)
+        XCTAssertEqual(model.frame?.style, .observed)
+        XCTAssertEqual(model.frame?.speedMps, 15)
+        XCTAssertNil(model.spanLabel)
     }
 
-    func testTheFrameTableTurnsTheShortWayRound() {
-        let table = ReplayFrameTable(durationS: 1, step: 1) { t in
-            ReplayFrame(tS: t, lat: 0, lng: 0, bearingDeg: t == 0 ? 350 : 10)
-        }
-        XCTAssertEqual(table.frame(at: 0.5).bearingDeg ?? -1, 0, accuracy: 1e-9)
+    func testTheMarkerJumpsTheGapAsTheCoreSays() async {
+        let model = await loaded()
+        model.scrub(to: 220.2)
+        XCTAssertEqual(model.frame?.lat ?? 0, FakeReplayTrack.lat(200), accuracy: 1e-12, "held at the last fix")
+        model.scrub(to: 240.25)
+        XCTAssertEqual(model.frame?.style, .observed)
+        XCTAssertEqual(model.frame?.lat ?? 0, FakeReplayTrack.lat(240.25), accuracy: 1e-12, "on the far side")
     }
 
     func testZoomBucketsMatchTheCoreFormula() {
@@ -315,7 +315,12 @@ final class FakeReplayTrack: ReplayTrack, @unchecked Sendable {
     func frame(at tS: Double) -> ReplayFrame {
         let style = spans.first { $0.contains(tS, durationS: durationS) }?.style ?? .observed
         let t = style == .noGps ? 200 : tS
-        return ReplayFrame(tS: tS, lat: Self.lat(t), lng: 0, speedMps: style == .noGps ? nil : 15, bearingDeg: 0, style: style)
+        let speed: Double? = style == .noGps || style == .estimated ? nil : 15
+        return ReplayFrame(tS: tS, lat: Self.lat(t), lng: 0, speedMps: speed, bearingDeg: 0, style: style)
+    }
+
+    func span(at tS: Double) -> ReplaySpan? {
+        spans.first { $0.contains(tS, durationS: durationS) }
     }
 
     func zoomBucket(longitudeDelta: Double, viewWidth: Double) -> Int {

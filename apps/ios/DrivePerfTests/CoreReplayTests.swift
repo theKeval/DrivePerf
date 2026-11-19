@@ -48,6 +48,10 @@ final class CoreReplayTests: XCTestCase {
         XCTAssertNil(inGap.speedMps)
         XCTAssertEqual(inGap.lat, 43.6 + 40 * 1e-4, accuracy: 1e-9, "held at the last fix before the gap")
         XCTAssertEqual(track.frame(at: 20).style, .observed)
+        XCTAssertNil(track.frame(at: 5).speedMps, "no speed on the estimated start")
+        XCTAssertEqual(track.span(at: 5)?.label, "Estimated start")
+        XCTAssertNil(track.span(at: 20))
+        XCTAssertEqual(track.span(at: 100)?.style, .excluded, "a span that runs to the end includes the end")
         XCTAssertEqual(track.playbackRate(.auto), 100.0 / 60, accuracy: 1e-9)
         XCTAssertEqual(track.playbackRate(.x30), 30)
     }
