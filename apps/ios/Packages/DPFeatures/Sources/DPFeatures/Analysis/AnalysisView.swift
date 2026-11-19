@@ -5,7 +5,8 @@ import SwiftUI
 /// S-ANL-01 Analysis for one trip (F-RPL-05, F-RPL-06): the map card, Time/Distance and zoom, the synced timeline,
 /// the legend, the G-G card and the stat tiles; S-ANL-03 is the Channels menu, S-ANL-02 a full-screen cover. `title`
 /// is the trip's title, shown under "Analysis". `onReplay` opens S-RPL-01 for the trip; without it there is no Replay
-/// button. The view model is made once, when the screen first appears, and closes its presenter when it goes away.
+/// button. Ticks and G-G peaks open S-RPL-02 over the screen when Replay's services are in the environment (DRIVE-39
+/// AC1). The view model is made once, when the screen first appears, and closes its presenter when it goes away.
 public struct AnalysisView: View {
     @State private var model: AnalysisViewModel?
     private let make: @MainActor () -> any AnalysisPresenting
@@ -45,6 +46,12 @@ private struct AnalysisWorkspace: View {
     let onReplay: ((String) -> Void)?
     @Environment(\.dismiss) private var dismiss
     @Environment(\.verticalSizeClass) private var verticalSize
+    @Environment(\.replayServices) private var replayServices
+    /// S-RPL-02 for a tick or a peak (DRIVE-39 AC1); nil without Replay (previews, tests).
+    @State private var evidence: TripEvidenceSheets?
+    /// S-ANL-02 is on screen: the evidence waits for it to go, as a sheet cannot rise over a closing cover.
+    @State private var ggOnScreen = false
+    @State private var pendingEvidence: String?
 
     private var state: AnalysisScreenState { model.state }
 
@@ -56,8 +63,18 @@ private struct AnalysisWorkspace: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { toolbar }
             .overlay(alignment: .bottom) { toast }
-            .fullScreenCover(isPresented: ggBinding) {
-                if let gg = state.gg { AnalysisGgScreen(model: model, gg: gg, subtitle: title) }
+            .fullScreenCover(isPresented: ggBinding, onDismiss: ggDismissed) {
+                if let gg = state.gg {
+                    AnalysisGgScreen(model: model, gg: gg, subtitle: title).onAppear { ggOnScreen = true }
+                }
+            }
+            .tripEvidenceSheets(evidence)
+            .onAppear {
+                guard evidence == nil, let replayServices else { return }
+                let sheets = TripEvidenceSheets(presenters: replayServices.presenters, tripId: state.tripId)
+                // "Not accurate?" in the sheet: the event leaves the ticks, the map and the G-G.
+                sheets.onFeedbackChanged = { [model] in model.send(.reload) }
+                evidence = sheets
             }
             .task { await model.observe() }
             .task {
@@ -66,6 +83,7 @@ private struct AnalysisWorkspace: View {
                     case .close: dismiss()
                     case .message(let text): model.message = text
                     case .openReplay(let tripId): onReplay?(tripId)
+                    case .openEvidence(let eventId): openEvidence(eventId)
                     }
                 }
             }
@@ -216,6 +234,23 @@ private struct AnalysisWorkspace: View {
 
     private var ggBinding: Binding<Bool> {
         Binding(get: { model.state.ggExpanded }, set: { if !$0 { model.send(.collapseGg) } })
+    }
+
+    /// A tick, or a peak row on S-ANL-02 (which the presenter closes first): S-RPL-02 rises once nothing covers S-ANL-01.
+    private func openEvidence(_ eventId: String) {
+        if ggOnScreen {
+            pendingEvidence = eventId
+        } else {
+            evidence?.openEvidence(eventId)
+        }
+    }
+
+    private func ggDismissed() {
+        ggOnScreen = false
+        if let eventId = pendingEvidence {
+            pendingEvidence = nil
+            evidence?.openEvidence(eventId)
+        }
     }
 }
 

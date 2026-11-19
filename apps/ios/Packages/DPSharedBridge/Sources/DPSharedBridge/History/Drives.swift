@@ -167,12 +167,17 @@ public struct TripDetail: Equatable, Sendable {
     public var tip: ScoreTip?
     /// False once the detailed data was removed to save space.
     public var canAnalyse: Bool
+    /// The map hero (DRIVE-55); nil until the route has loaded, or when there is none to draw.
+    public var map: TripMap?
+    /// The words of the map hero and the evidence and tip links.
+    public var links: TripLinkWords
 
     public init(
         id: String, title: String, subtitle: String, banners: [TripBanner] = [], tiles: [ProvenancedValue] = [],
         quality: QualityBadge? = nil, qualityWord: String? = nil, correction: TripCorrection = .driver,
         meta: TripMeta? = nil, scoresHidden: Bool = false, score: ScoreSummary? = nil, breakdown: ScoreBreakdown? = nil,
-        events: TripEvents? = nil, cleanest: String? = nil, tip: ScoreTip? = nil, canAnalyse: Bool = true
+        events: TripEvents? = nil, cleanest: String? = nil, tip: ScoreTip? = nil, canAnalyse: Bool = true,
+        map: TripMap? = nil, links: TripLinkWords = TripLinkWords()
     ) {
         self.id = id
         self.title = title
@@ -190,6 +195,8 @@ public struct TripDetail: Equatable, Sendable {
         self.cleanest = cleanest
         self.tip = tip
         self.canAnalyse = canAnalyse
+        self.map = map
+        self.links = links
     }
 }
 
@@ -323,6 +330,12 @@ public enum DrivesAction: Equatable, Sendable {
     case tapContributor(ScoreContributorID)
     case answer(tripId: String, yes: Bool)
     case correct(tripId: String, to: TripCorrection)
+    /// An event row on S-TRP-01 or S-SCO-01 (DRIVE-87 AC2, DRIVE-55). iOS opens S-RPL-02 itself.
+    case openEvidence(tripId: String, eventId: String)
+    /// The tip card on S-TRP-01 (DRIVE-102). iOS pushes S-SCO-04 itself.
+    case openTip(tripId: String)
+    /// The tip card's "See the moment": records `tip_evidence_opened {tip_id}`. iOS opens S-RPL-02 itself.
+    case openTipEvidence(tripId: String)
 }
 
 /// Kotlin `DrivesEffect`.

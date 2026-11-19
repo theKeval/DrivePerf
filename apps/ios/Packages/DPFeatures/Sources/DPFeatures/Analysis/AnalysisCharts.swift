@@ -62,15 +62,17 @@ struct AnalysisTimelineCanvas: View {
         .accessibilityChartDescriptor(AnalysisChartDescriptor(timeline))
     }
 
-    /// Event ticks as buttons: "Hard braking, 10:41 into the drive." (44 pt targets).
+    /// Event ticks as buttons: "Hard braking, 10:41 into the drive." (44 pt targets). A tap opens the evidence
+    /// (DRIVE-39 AC1); a drag across a tick still only scrubs, snapping to it.
     private func ticks(width: CGFloat) -> some View {
         let top = heights.reduce(0) { $0 + $1 + Self.laneGap } + Self.eventLane / 2 - DPLayout.touchMin / 2
         return ForEach(timeline.ticks) { tick in
-            Button { model.jump(to: tick.tPeakS) } label: { Color.clear }
+            Button { model.send(.openEvidence(tick.eventId)) } label: { Color.clear }
                 .frame(width: DPLayout.touchMin, height: DPLayout.touchMin)
                 .contentShape(Rectangle())
                 .offset(x: width * tick.x - DPLayout.touchMin / 2, y: top)
                 .accessibilityLabel(tick.accessibilityLabel)
+                .accessibilityHint(TripLinkWords().openEvidence)
         }
     }
 

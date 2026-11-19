@@ -471,6 +471,10 @@ public enum AnalysisAction: Equatable, Sendable {
     case filterGg(DrivingEventType?)
     case showEvent(String)
     case openReplay
+    /// An event tick or a G-G peak row: the presenter answers with `AnalysisNavigation.openEvidence` (DRIVE-39 AC1).
+    case openEvidence(String)
+    /// Feedback changed in the evidence sheet: the analysis is read again.
+    case reload
 }
 
 /// Kotlin `AnalysisEffect`.
@@ -478,6 +482,8 @@ public enum AnalysisNavigation: Equatable, Sendable {
     case close
     case message(String)
     case openReplay(tripId: String)
+    /// Open S-RPL-02 for this event of the trip over S-ANL-01 (DRIVE-39 AC1).
+    case openEvidence(eventId: String)
 }
 
 /// The shared Analysis presenter as features see it.

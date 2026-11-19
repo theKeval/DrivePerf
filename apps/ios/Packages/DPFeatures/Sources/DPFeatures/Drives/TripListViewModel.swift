@@ -126,6 +126,15 @@ public final class TripListViewModel {
     /// "What was this?" (S-TRP-02 type picker); `.driver` restores a trip as a drive.
     public func correct(tripId: String, to correction: TripCorrection) { send(.correct(tripId: tripId, to: correction)) }
 
+    /// An event row on trip detail or S-SCO-01 (DRIVE-87 AC2, DRIVE-55); the view opens S-RPL-02 itself.
+    public func evidenceOpened(tripId: String, eventId: String) { send(.openEvidence(tripId: tripId, eventId: eventId)) }
+
+    /// The tip card on trip detail (DRIVE-102); the view pushes S-SCO-04 itself.
+    public func tipOpened(_ tripId: String) { send(.openTip(tripId: tripId)) }
+
+    /// The tip card's "See the moment" (`tip_evidence_opened {tip_id}`); the view opens S-RPL-02 itself.
+    public func tipEvidenceOpened(_ tripId: String) { send(.openTipEvidence(tripId: tripId)) }
+
     /// Sends [action] and reads the new state at once, so a sheet opens in the same frame.
     private func send(_ action: DrivesAction) {
         presenter.dispatch(action)
