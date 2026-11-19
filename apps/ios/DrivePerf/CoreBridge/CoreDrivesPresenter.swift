@@ -10,6 +10,8 @@ final class CoreDrivesPresenter: DrivesPresenting {
     private var presenter: DrivePerfShared.DrivesPresenter?
     private var stateObservers: [UUID: AsyncStream<DrivesScreenState>.Continuation] = [:]
     private var navigationObservers: [UUID: AsyncStream<DrivesNavigation>.Continuation] = [:]
+    /// Navigation that arrived while nobody observed it, for the next observer.
+    private var pendingNavigation: [DrivesNavigation] = []
 
     /// The Kotlin state, read now: an intent's effect on it is visible at once.
     var state: DrivesScreenState { Self.swift(presenter?.state.value) }
@@ -36,7 +38,11 @@ final class CoreDrivesPresenter: DrivesPresenting {
             for await effect in effects.value {
                 guard let self, let open = effect as? DrivesEffectOpenReplay else { continue }
                 let navigation = DrivesNavigation.openReplay(tripId: open.tripId, title: open.title, mapSummary: open.mapSummary)
-                navigationObservers.values.forEach { $0.yield(navigation) }
+                if navigationObservers.isEmpty {
+                    pendingNavigation.append(navigation)
+                } else {
+                    navigationObservers.values.forEach { $0.yield(navigation) }
+                }
             }
         }
     }
@@ -55,6 +61,8 @@ final class CoreDrivesPresenter: DrivesPresenting {
     func navigation() -> AsyncStream<DrivesNavigation> {
         let id = UUID()
         return AsyncStream { continuation in
+            pendingNavigation.forEach { continuation.yield($0) }
+            pendingNavigation.removeAll()
             navigationObservers[id] = continuation
             continuation.onTermination = { [weak self] _ in
                 Task { @MainActor in self?.navigationObservers[id] = nil }
