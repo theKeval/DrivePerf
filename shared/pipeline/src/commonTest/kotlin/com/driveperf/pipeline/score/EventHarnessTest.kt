@@ -47,7 +47,7 @@ class EventHarnessTest {
     fun labelsRoundTrip() {
         val labels = listOf(e(EventType.CORNER, 47.25), e(EventType.BRAKE, 9.5))
         val text = EventHarness.writeLabels("x", labels)
-        assertEquals("# id: x\ntype,t_peak_s\nBRAKE,9.50\nCORNER,47.25\n", text)
+        assertEquals("# privacy-trimmed\n# id: x\ntype,t_peak_s\nBRAKE,9.50\nCORNER,47.25\n", text)
         assertEquals(labels.sortedBy { it.tPeakS }, EventHarness.parseLabels(text))
     }
 

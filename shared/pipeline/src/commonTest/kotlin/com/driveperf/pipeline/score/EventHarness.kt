@@ -2,6 +2,7 @@ package com.driveperf.pipeline.score
 
 import com.driveperf.domain.trip.DrivingEvent
 import com.driveperf.domain.trip.EventType
+import com.driveperf.testing.FixtureCsv
 import kotlin.math.abs
 
 /** One labelled or detected event: its type and peak time on the trip time base (seconds from `startedAt`). */
@@ -58,13 +59,19 @@ internal object EventHarness {
 
     fun of(events: List<DrivingEvent>): List<LabelledEvent> = events.map { LabelledEvent(it.type, it.tPeakS) }
 
-    /** `<id>.labels.csv`: `#` comment lines, a `type,t_peak_s` header, then one event per line. */
+    /**
+     * `<id>.labels.csv`: the `# privacy-trimmed` header first (ADR-008: every committed CSV declares it in its first 5
+     * lines, and `tools/ci/check-fixture-headers.sh` rejects one without it), `#` comment lines, a `type,t_peak_s`
+     * header, then one event per line. Every labelled file, the A19 set's included, carries the same header.
+     */
     fun writeLabels(id: String, labels: List<LabelledEvent>): String = buildString {
+        append(FixtureCsv.PRIVACY_HEADER).append('\n')
         append("# id: ").append(id).append('\n')
         append("type,t_peak_s\n")
         labels.sortedBy { it.tPeakS }.forEach { append(it.type.name).append(',').append(fixed2(it.tPeakS)).append('\n') }
     }
 
+    /** Reads [writeLabels]' format: `#` lines, the privacy header among them, and the column header are skipped. */
     fun parseLabels(text: String): List<LabelledEvent> = text.lineSequence()
         .map { it.trim() }
         .filter { it.isNotEmpty() && !it.startsWith("#") && !it.startsWith("type,") }

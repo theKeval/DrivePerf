@@ -15,6 +15,7 @@ import kotlin.test.assertTrue
 /**
  * DRIVE-93 AC2 on files: every `<id>.csv` in the labelled set with a `<id>.labels.csv` beside it is run through the
  * full pipeline and the detected events must meet the Q20 precision and recall targets per type, over the whole set.
+ * Both files start with the `# privacy-trimmed` header (ADR-008), as every §8.2 fixture does.
  *
  * The set is the committed synthetic one (`src/jvmTest/resources/labelled`, which must equal its generator) unless
  * `-PlabelledSet=<dir>` names another, such as the A19 field set, which never enters the repository:
@@ -39,6 +40,7 @@ class LabelledSetTest {
             assertEquals(csv, csvFile.readText(), "${l.fixture.id}.csv differs from the generator; regenerate deliberately")
             assertEquals(labels, labelsFile.readText())
             assertTrue(csvFile.readLines().first() == FixtureCsv.PRIVACY_HEADER)
+            assertTrue(labelsFile.readLines().first() == FixtureCsv.PRIVACY_HEADER, "${labelsFile.name}: ADR-008 header")
         }
     }
 
@@ -49,6 +51,9 @@ class LabelledSetTest {
         assertTrue(labelled.isNotEmpty(), "no <id>.labels.csv in $set")
         val perTrip = labelled.map { labelsFile ->
             val id = labelsFile.name.removeSuffix(".labels.csv")
+            listOf(labelsFile, File(set, "$id.csv")).forEach { f ->
+                assertTrue(f.readLines().first() == FixtureCsv.PRIVACY_HEADER, "${f.name}: no '# privacy-trimmed' first line (ADR-008)")
+            }
             val parsed = FixtureCsv.parse(File(set, "$id.csv").readText())
             val trip = checkNotNull(harness.run(captureOf(id, parsed)).trip) { "$id finalised to no trip" }
             EventHarness.evaluate(EventHarness.of(trip.events), EventHarness.parseLabels(labelsFile.readText()))
