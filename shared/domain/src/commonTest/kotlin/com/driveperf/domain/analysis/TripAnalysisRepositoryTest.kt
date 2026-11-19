@@ -76,7 +76,8 @@ class TripAnalysisRepositoryTest {
     @Test
     fun aFinishedTripGetsItsChannelsMarkersAndMap() = runTest {
         val files = FakeFiles(AnalysisFixtures.trace(20))
-        val repo = TripAnalysisRepository(FakeTrips(trip(), listOf(event)), replays(replay), files, FakePreviews(AnalysisFixtures.preview(4)))
+        val previews = FakePreviews(AnalysisFixtures.preview(4))
+        val repo = TripAnalysisRepository(FakeTrips(trip(), listOf(event)), replays(replay), files, previews)
         val a = repo.analysis("t1")!!
         assertSame(replay, a.replay)
         assertFalse(a.data.summaryOnly)

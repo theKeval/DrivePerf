@@ -44,11 +44,13 @@ public class DistanceAxis(private val times: DoubleArray, private val metres: Do
     }
 
     override fun tOf(x: Double): Double {
-        if (times.isEmpty() || length <= 0.0) return 0.0
-        if (x <= metres[0]) return 0.0
         val i = lower(metres, x)
-        if (i == metres.size) return durationS
-        val t = if (metres[i] == metres[i - 1]) times[i - 1] else lerp(metres[i - 1], metres[i], times[i - 1], times[i], x)
+        val t = when {
+            times.isEmpty() || length <= 0.0 || x <= metres[0] -> 0.0
+            i == metres.size -> durationS
+            metres[i] == metres[i - 1] -> times[i - 1]
+            else -> lerp(metres[i - 1], metres[i], times[i - 1], times[i], x)
+        }
         return t.coerceIn(0.0, durationS)
     }
 
@@ -107,11 +109,12 @@ public class ChannelTrack(public val series: Series) {
         if (series.size == 0 || width <= 0.0 || buckets <= 0) return LanePath(DoubleArray(0), DoubleArray(0))
         val i0 = (series.lowerBound(axis.tOf(x0)) - 1).coerceAtLeast(0)
         val i1 = (series.lowerBound(axis.tOf(x1)) + 1).coerceAtMost(series.size)
-        return if (i1 - i0 <= 2 * buckets) raw(axis, x0, width, i0, i1, range) else bucketed(axis, x0, width, buckets, range)
+        return if (i1 - i0 <= 2 * buckets) raw(axis, x0, width, i0 until i1, range) else bucketed(axis, x0, width, buckets, range)
     }
 
-    private fun raw(axis: AxisScale, x0: Double, width: Double, i0: Int, i1: Int, range: LaneRange): LanePath {
-        val n = (i1 - i0).coerceAtLeast(0)
+    private fun raw(axis: AxisScale, x0: Double, width: Double, indices: IntRange, range: LaneRange): LanePath {
+        val i0 = indices.first
+        val n = (indices.last - i0 + 1).coerceAtLeast(0)
         val xs = DoubleArray(n) { (axis.xOf(series.timeAt(i0 + it)) - x0) / width }
         val ys = DoubleArray(n) { range.norm(series.values[i0 + it]) }
         return LanePath(xs, ys)

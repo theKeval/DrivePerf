@@ -126,7 +126,13 @@ public object AnalysisDataBuilder {
         val fixes = trace.fixes.sortedBy { it.tS }
         val speed = speedTrack(fixes.map { it.tS }, fixes.map { it.speedMps }, noGps)
         val positioned = fixes.filter { it.lat != null && it.lng != null }
-        val distance = distanceAxis(positioned.map { it.tS }, positioned.map { it.lat!! }, positioned.map { it.lng!! }, durationS, distanceM)
+        val distance = distanceAxis(
+            positioned.map { it.tS },
+            positioned.map { it.lat ?: 0.0 },
+            positioned.map { it.lng ?: 0.0 },
+            durationS,
+            distanceM,
+        )
         return Parts(
             speed,
             ChannelTrack(Series.uniform(rate, lon)),

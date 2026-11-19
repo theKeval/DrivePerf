@@ -121,7 +121,8 @@ internal object AnalysisPanels {
         val ofType = analysis.events.filter { it.type == type }
         val top = ofType.maxByOrNull { abs(it.peakG) } ?: return@mapNotNull null
         val count = if (ofType.size == 1) "1 event" else "${ofType.size} events"
-        GgPeakRow(type, AnalysisCopy.typeTitle(type), "$count · largest ${AnalysisCopy.clock(top.tPeakS)} in", AnalysisCopy.g(top.peakG), top.id)
+        val detail = "$count · largest ${AnalysisCopy.clock(top.tPeakS)} in"
+        GgPeakRow(type, AnalysisCopy.typeTitle(type), detail, AnalysisCopy.g(top.peakG), top.id)
     }
 
     /** "3 min left out: phone moved. …" (S-ANL-02 Part), when at least half a minute was excluded. */

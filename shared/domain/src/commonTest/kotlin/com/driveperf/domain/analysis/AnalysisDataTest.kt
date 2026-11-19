@@ -16,11 +16,11 @@ import kotlin.test.assertTrue
 internal object AnalysisFixtures {
     const val RATE = 50
 
-    fun trace(seconds: Int, quality: (Int) -> Int = { 0 }, lonG: (Int) -> Double = { 0.1 }, fixes: List<AnalysisFix>? = null): AnalysisTrace {
+    fun trace(seconds: Int, quality: (Int) -> Int = { 0 }, fixes: List<AnalysisFix>? = null): AnalysisTrace {
         val n = seconds * RATE
         return AnalysisTrace(
             rateHz = RATE,
-            lonG = DoubleArray(n) { lonG(it) },
+            lonG = DoubleArray(n) { 0.1 },
             latG = DoubleArray(n) { -0.05 },
             vertG = DoubleArray(n),
             yawDps = DoubleArray(n),

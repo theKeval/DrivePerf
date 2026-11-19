@@ -174,10 +174,7 @@ public class AnalysisPresenter(
         if (analysis == null) return
         when (intent) {
             is AnalysisIntent.SetAxis -> setAxis(intent.axis)
-            AnalysisIntent.ZoomIn -> zoomTo(state.value.zoom * 2)
-            AnalysisIntent.ZoomOut -> zoomTo(state.value.zoom / 2)
-            AnalysisIntent.ResetZoom -> zoomTo(1.0)
-            is AnalysisIntent.Pinch -> zoomTo(state.value.zoom * intent.factor)
+            AnalysisIntent.ZoomIn, AnalysisIntent.ZoomOut, AnalysisIntent.ResetZoom, is AnalysisIntent.Pinch -> zoom(intent)
             is AnalysisIntent.MoveCursor -> moveCursor(intent.tS)
             is AnalysisIntent.ToggleChannel -> toggle(intent.channel)
             AnalysisIntent.ExpandGg -> expandGg()
@@ -190,32 +187,39 @@ public class AnalysisPresenter(
     }
 
     private suspend fun load() {
-        val loaded = withContext(compute) { analyses.analysis(tripId) }
-        if (loaded == null) {
+        // The channels, their pyramids and the G-G grid are all built here, off the main thread, in one state: the
+        // screen never sees "loaded" without its timeline.
+        val ready = withContext(compute) {
+            analyses.analysis(tripId)?.let { a ->
+                a to views(a, state.value.copy(loading = false, summaryOnly = a.data.summaryOnly, map = AnalysisMap.of(a)), null)
+            }
+        }
+        if (ready == null) {
             update { it.copy(loading = false, unavailable = AnalysisUnavailable.NOT_FOUND) }
             return
         }
-        analysis = loaded
-        update { it.copy(loading = false, summaryOnly = loaded.data.summaryOnly, map = AnalysisMap.of(loaded)) }
-        rebuild()
+        analysis = ready.first
+        update { ready.second }
         track("analysis_opened", "source" to source.key)
     }
 
     /** Rebuilds what depends on the window, the channels or the units. */
     private fun rebuild(window: Double? = null) {
         val a = analysis ?: return
-        update { s ->
-            val scale = a.data.axis(s.axis)
-            val width = scale.length / s.zoom
-            val start = window ?: centred(scale.xOf(s.cursorS), width, scale.length)
-            s.copy(
-                loadingText = AnalysisCopy.loading(a.data.durationS),
-                timeline = AnalysisTimeline.build(a, s.map, s.axis, start, start + width, s.channels, unitSystem),
-                channelOptions = options(a, s.channels),
-                stats = AnalysisPanels.stats(a, unitSystem),
-                gg = AnalysisPanels.gg(a, s.ggFilter),
-            )
-        }
+        update { views(a, it, window) }
+    }
+
+    private fun views(a: TripAnalysis, s: AnalysisState, window: Double?): AnalysisState {
+        val scale = a.data.axis(s.axis)
+        val width = scale.length / s.zoom
+        val start = window ?: centred(scale.xOf(s.cursorS), width, scale.length)
+        return s.copy(
+            loadingText = AnalysisCopy.loading(a.data.durationS),
+            timeline = AnalysisTimeline.build(a, s.map, s.axis, start, start + width, s.channels, unitSystem),
+            channelOptions = options(a, s.channels),
+            stats = AnalysisPanels.stats(a, unitSystem),
+            gg = AnalysisPanels.gg(a, s.ggFilter),
+        )
     }
 
     private fun centred(x: Double, width: Double, length: Double): Double =
@@ -229,6 +233,18 @@ public class AnalysisPresenter(
         track("analysis_axis", "axis" to axis.key)
     }
 
+    private fun zoom(intent: AnalysisIntent) {
+        val z = state.value.zoom
+        zoomTo(
+            when (intent) {
+                AnalysisIntent.ZoomIn -> z * 2
+                AnalysisIntent.ZoomOut -> z / 2
+                is AnalysisIntent.Pinch -> z * intent.factor
+                else -> 1.0
+            },
+        )
+    }
+
     private fun zoomTo(zoom: Double) {
         val z = zoom.coerceIn(1.0, MAX_ZOOM)
         if (z == state.value.zoom) return
@@ -239,10 +255,9 @@ public class AnalysisPresenter(
     private fun moveCursor(tS: Double) {
         val a = analysis ?: return
         val t = tS.coerceIn(0.0, a.data.durationS)
-        val timeline = state.value.timeline
+        val x = state.value.timeline?.xOf(t)
         update { it.copy(cursorS = t) }
-        val x = timeline?.xOf(t)
-        if (timeline == null || x == null || x < 0.0 || x > 1.0) rebuild()
+        if (x == null || x !in 0.0..1.0) rebuild()
     }
 
     private fun toggle(channel: AnalysisChannel) {

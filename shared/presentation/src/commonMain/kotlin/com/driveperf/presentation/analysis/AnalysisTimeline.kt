@@ -87,13 +87,15 @@ public class AnalysisTimeline internal constructor(
         val d = analysis.data
         val steps = generateSequence(0.0) { it + TABLE_STEP_S }.takeWhile { it <= d.durationS }.map { it to null }.toList()
         val events = analysis.markers.map { it.tPeakS to AnalysisCopy.typeSpoken(it.type) }
+        fun text(channel: AnalysisChannel, t: Double): String =
+            d.track(channel)?.series?.valueAt(t)?.takeUnless { it.isNaN() }?.let { format(channel, it) } ?: AnalysisCopy.NO_VALUE
         return (steps + events).sortedBy { it.first }.map { (t, note) ->
             TableRow(
-                time = AnalysisCopy.clock(t),
-                speed = d.speed?.series?.valueAt(t)?.takeUnless { it.isNaN() }?.let { AnalysisCopy.speed(it, units) } ?: AnalysisCopy.NO_VALUE,
-                lonG = d.lonG?.series?.valueAt(t)?.takeUnless { it.isNaN() }?.let(AnalysisCopy::signedG) ?: AnalysisCopy.NO_VALUE,
-                latG = d.latG?.series?.valueAt(t)?.takeUnless { it.isNaN() }?.let(AnalysisCopy::signedG) ?: AnalysisCopy.NO_VALUE,
-                note = note,
+                AnalysisCopy.clock(t),
+                text(AnalysisChannel.SPEED, t),
+                text(AnalysisChannel.LON_G, t),
+                text(AnalysisChannel.LAT_G, t),
+                note,
             )
         }
     }
@@ -188,7 +190,7 @@ public class AnalysisTimeline internal constructor(
 
         private fun rangeLabel(channel: AnalysisChannel, range: LaneRange?, units: UnitSystem): String = when {
             range == null -> AnalysisCopy.NO_VALUE
-            channel == AnalysisChannel.SPEED -> "0–${AnalysisCopy.fixed(AnalysisCopy.speedValue(range.max, units), 0)} ${AnalysisCopy.speedUnit(units)}"
+            channel == AnalysisChannel.SPEED -> "0–${AnalysisCopy.speed(range.max, units)}"
             channel == AnalysisChannel.LON_G || channel == AnalysisChannel.LAT_G -> "±${AnalysisCopy.fixed(G_RANGE, 1)} g"
             channel == AnalysisChannel.JERK -> "±${AnalysisCopy.fixed(JERK_RANGE, 1)} g/s"
             channel == AnalysisChannel.ELEVATION ->
@@ -215,7 +217,8 @@ public class AnalysisTimeline internal constructor(
             val d = analysis.data
             val parts = mutableListOf("Timeline, ${AnalysisCopy.minutes(d.durationS)} minutes.")
             d.speed?.series?.maxValue()?.takeUnless { it.isNaN() }?.let {
-                parts += "Speed peaked at ${AnalysisCopy.fixed(AnalysisCopy.speedValue(it, units), 0)} ${AnalysisCopy.spokenSpeedUnit(units)}."
+                val shown = AnalysisCopy.fixed(AnalysisCopy.speedValue(it, units), 0)
+                parts += "Speed peaked at $shown ${AnalysisCopy.spokenSpeedUnit(units)}."
             }
             val events = analysis.events
             parts += when (events.size) {

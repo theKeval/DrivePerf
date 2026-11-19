@@ -10,6 +10,7 @@ import kotlin.math.roundToLong
  * The S-ANL-01, S-ANL-02 and S-ANL-03 copy (design specs DRIVE-45 and DRIVE-50) and number formatting, so both apps
  * show the same words and values (ADR-002 section 4, coordinator decision 3).
  */
+@Suppress("TooManyFunctions") // one function per piece of copy or number format
 public object AnalysisCopy {
     public const val TITLE: String = "Analysis"
     public const val GG_TITLE: String = "Friction circle"

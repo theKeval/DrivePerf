@@ -44,11 +44,8 @@ public class Series private constructor(
         if (size == 0 || tS < timeAt(0) - EPSILON || tS > timeAt(size - 1) + EPSILON) return Double.NaN
         val b = lowerBound(tS).coerceAtMost(size - 1)
         val tb = timeAt(b)
-        if (b == 0 || tb - tS <= EPSILON) return values[b]
-        val a = b - 1
-        val ta = timeAt(a)
-        val f = (tS - ta) / (tb - ta)
-        return values[a] + (values[b] - values[a]) * f
+        val ta = if (b == 0) tb else timeAt(b - 1)
+        return if (b == 0 || tb - tS <= EPSILON) values[b] else values[b - 1] + (values[b] - values[b - 1]) * (tS - ta) / (tb - ta)
     }
 
     /** The largest finite value, or `NaN` when there is none. */

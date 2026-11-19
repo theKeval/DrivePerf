@@ -43,9 +43,12 @@ internal object AnalysisTestData {
     const val RATE = 50
 
     fun events(): List<DrivingEvent> = listOf(
-        DrivingEvent("brake", "t1", EventType.BRAKE, 150.0, 149.0, 151.0, 2.0, -0.31, null, lat(150.0), 0.0, 12.0, 6.0, Confidence.HIGH, "v1"),
-        DrivingEvent("corner", "t1", EventType.CORNER, 300.0, 299.0, 301.0, 2.0, 0.22, null, lat(300.0), 0.0, 10.0, 10.0, Confidence.HIGH, "v1"),
+        event("brake", EventType.BRAKE, 150.0, -0.31),
+        event("corner", EventType.CORNER, 300.0, 0.22),
     )
+
+    private fun event(id: String, type: EventType, t: Double, g: Double) =
+        DrivingEvent(id, "t1", type, t, t - 1, t + 1, 2.0, g, null, lat(t), 0.0, 12.0, 6.0, Confidence.HIGH, "v1")
 
     fun lat(tS: Double): Double = tS * 0.00009
 

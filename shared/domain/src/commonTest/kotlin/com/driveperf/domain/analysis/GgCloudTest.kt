@@ -63,7 +63,9 @@ class GgCloudTest {
     @Test
     fun theDotFollowsTheCursorAndHidesInGaps() {
         val c = cloud(doubleArrayOf(0.0, 0.2, Double.NaN), doubleArrayOf(0.0, -0.2, 0.0))
-        assertEquals(GgPoint(0.1, -0.1), c.dotAt(0.05))
+        val dot = c.dotAt(0.05)!!
+        assertEquals(0.1, dot.latG, 1e-12)
+        assertEquals(-0.1, dot.lonG, 1e-12)
         assertNull(c.dotAt(0.15))
         assertNull(c.dotAt(9.0))
     }
