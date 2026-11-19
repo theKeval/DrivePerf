@@ -5,7 +5,8 @@ import kotlinx.coroutines.flow.Flow
 /**
  * What the user says a trip really was (F-CAP-04 AC3, analytics `trip_corrected {to}`). Each correction sets the
  * trip's [kind]; [TRANSIT], [BIKE], [WALK] and [OTHER] are not drives, so the trip leaves scores and history and waits
- * [NotDrives.RETENTION_MS] in the "Not drives" filter before it is deleted. [DRIVER] undoes a correction.
+ * [NotDrives.RETENTION_MS] in the "Not drives" filter before it is deleted. [DRIVER] undoes a correction. [TAXI] (taxi or
+ * rideshare, F-HIS-02 AC1) is like [PASSENGER]: not scored, but it stays in history.
  */
 public enum class TripCorrection(public val kind: TripKind) {
     DRIVER(TripKind.DRIVER),
@@ -14,6 +15,7 @@ public enum class TripCorrection(public val kind: TripKind) {
     BIKE(TripKind.NOT_DRIVING),
     WALK(TripKind.NOT_DRIVING),
     OTHER(TripKind.NOT_DRIVING),
+    TAXI(TripKind.TAXI),
     ;
 
     /** The trip leaves scores and history for the "Not drives" filter. */

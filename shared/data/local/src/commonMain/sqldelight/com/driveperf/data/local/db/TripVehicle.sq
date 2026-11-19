@@ -1,0 +1,19 @@
+-- Which car a trip was in (DRIVE-131, F-HIS-02 AC2; S-TRP-02 car picker, S-HIS-02 car filter). Queries only: the tables
+-- live in Trip.sq and Vehicle.sq, and trip.vehicle_id already exists, so there is no migration.
+
+-- The cars a trip can be put in: active and not deleted, oldest first (the Garage order).
+activeTripVehicles:
+SELECT id, nickname, make, model, year, is_default FROM vehicle
+WHERE deleted_at IS NULL AND is_active = 1
+ORDER BY added_at, id;
+
+isActiveVehicle:
+SELECT COUNT(*) FROM vehicle WHERE id = ? AND deleted_at IS NULL AND is_active = 1;
+
+-- Only a finished, live trip changes car (as for corrections).
+setTripVehicle:
+UPDATE trip SET vehicle_id = :vehicle_id, updated_at = :updated_at
+WHERE id = :id AND deleted_at IS NULL AND status IN ('FINALISED', 'INTERRUPTED');
+
+changedRows:
+SELECT changes();

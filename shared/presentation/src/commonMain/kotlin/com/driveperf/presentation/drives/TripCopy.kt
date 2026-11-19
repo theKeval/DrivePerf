@@ -33,6 +33,7 @@ public object TripCopy {
         TripCorrection.BIKE -> "Bike ride"
         TripCorrection.WALK -> "Walk"
         TripCorrection.OTHER -> "Something else"
+        TripCorrection.TAXI -> "Taxi or rideshare"
     }
 
     /** Every "What was this?" choice, in order (S-TRP-02). */
@@ -80,7 +81,12 @@ public object TripCopy {
         TripCorrection.WALK -> "Walk"
         TripCorrection.OTHER -> "Not a drive"
         TripCorrection.PASSENGER -> "Passenger"
-        TripCorrection.DRIVER, null -> if (trip.kind == TripKind.PASSENGER) "Passenger" else null
+        TripCorrection.TAXI -> "Taxi or rideshare"
+        TripCorrection.DRIVER, null -> when (trip.kind) {
+            TripKind.PASSENGER -> "Passenger"
+            TripKind.TAXI -> "Taxi or rideshare"
+            else -> null
+        }
     }
 
     /** A unit symbol as a screen reader should say it: "km" → "kilometres" (accessibility.md). */
