@@ -39,3 +39,9 @@ tasks.named<Test>("jvmTest") {
     systemProperty("driveperf.labelledFixtures", labelled.asFile.absolutePath)
     systemProperty("driveperf.labelledSet", providers.gradleProperty("labelledSet").getOrElse(labelled.asFile.absolutePath))
 }
+
+// DRIVE-131: the iOS simulator run prints test output, so CI logs show how long the recompute takes on Kotlin/Native
+// (the common HistoryRecomputeTest prints one line; no other common test prints).
+tasks.withType<AbstractTestTask>().matching { it.name == "iosSimulatorArm64Test" }.configureEach {
+    testLogging { showStandardStreams = true }
+}

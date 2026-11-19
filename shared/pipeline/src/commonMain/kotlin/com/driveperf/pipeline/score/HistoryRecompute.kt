@@ -6,6 +6,7 @@ import com.driveperf.domain.repository.ScoredTrip
 import com.driveperf.domain.repository.TripHistory
 import com.driveperf.domain.repository.TripRepository
 import com.driveperf.domain.score.Score
+import com.driveperf.domain.score.ScoreChange
 import com.driveperf.domain.score.ScoreHistoryStore
 import com.driveperf.domain.score.TripRecompute
 import com.driveperf.domain.trip.DriveContext
@@ -13,6 +14,8 @@ import com.driveperf.domain.trip.QualityBadge
 import com.driveperf.domain.trip.Trip
 import com.driveperf.domain.trip.TripKind
 import com.driveperf.foundation.Clock
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 /**
  * §5.7 "Corrections" (F-HIS-02 AC1, F-SCO-05): after a trip's kind, an event's feedback or a deletion changed, walks
@@ -28,6 +31,10 @@ import com.driveperf.foundation.Clock
  *
  * Earlier trips are read once and later ones are compared in memory, so a long history stays inside the 2 s budget.
  * The result depends only on the stored trips, and no score's [Score.algorithmVersion] changes (F-SCO-04 AC3).
+ *
+ * Walks never overlap: each reads, recomputes and saves under one lock, so a walk started after a change always
+ * reads it. A change committed during a walk is protected by the store, which writes a score only while it still
+ * equals what the walk read; that change's own recompute then runs next.
  */
 public class HistoryRecompute(
     private val history: TripHistory,
@@ -41,25 +48,26 @@ public class HistoryRecompute(
         trips.trip(tripId)?.let { from(it.startedAt) }
     }
 
-    /** Recomputes every finished trip that started at or after [startedAt]. Returns the scores it changed. */
-    public suspend fun from(startedAt: Long): List<Score> {
+    /** Recomputes every finished trip that started at or after [startedAt]. Returns the scores it wrote. */
+    public suspend fun from(startedAt: Long): List<Score> = lock.withLock {
         val later = store.finishedFrom(startedAt).toMutableList()
-        if (later.isEmpty()) return emptyList()
+        if (later.isEmpty()) return@withLock emptyList()
         val view = RecomputeHistory(history, startedAt, later)
         val walk = Walk(PriorHistory(view), FeedbackRescorer(view, previews, cfg), clock.wallMs())
-        val changed = mutableListOf<Score>()
+        val changes = mutableListOf<ScoreChange>()
         for (i in later.indices) {
             val item = later[i]
             val before = item.score ?: continue
             val after = walk.recompute(item, before)
             if (after != before) {
                 later[i] = item.copy(score = after)
-                changed += after
+                changes += ScoreChange(before, after)
             }
         }
-        if (changed.isNotEmpty()) store.saveScores(changed)
-        return changed
+        if (changes.isEmpty()) emptyList() else store.saveScores(changes)
     }
+
+    private val lock = Mutex()
 
     /** One recompute pass: priors and the re-scorer read the history as this pass has updated it so far. */
     private inner class Walk(val priors: PriorHistory, val rescorer: FeedbackRescorer, val now: Long) {

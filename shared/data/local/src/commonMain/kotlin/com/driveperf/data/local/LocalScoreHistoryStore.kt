@@ -3,6 +3,7 @@ package com.driveperf.data.local
 import com.driveperf.data.local.db.DrivePerfDatabase
 import com.driveperf.domain.repository.ScoredTrip
 import com.driveperf.domain.score.Score
+import com.driveperf.domain.score.ScoreChange
 import com.driveperf.domain.score.ScoreHistoryStore
 import kotlinx.coroutines.withContext
 import kotlin.coroutines.CoroutineContext
@@ -25,10 +26,18 @@ public class LocalScoreHistoryStore(private val db: DrivePerfDatabase, private v
         }
     }
 
-    /** A score whose trip was deleted meanwhile is dropped, as the deletion took the trip's score with it. */
-    override suspend fun saveScores(scores: List<Score>): Unit = withContext(io) {
-        db.transaction {
-            scores.filter { q.tripExists(it.tripId).executeAsOne() > 0 }.forEach { db.tripQueries.upsertScore(it.toRow()) }
+    /**
+     * Compare-and-set per score: a change is written only while the stored score still equals what the walk read, so
+     * feedback or a deletion committed during the walk is never overwritten.
+     */
+    override suspend fun saveScores(changes: List<ScoreChange>): List<Score> = withContext(io) {
+        db.transactionWithResult {
+            changes.mapNotNull { (before, after) ->
+                val stored = db.tripQueries.scoreForTrip(after.tripId).executeAsOneOrNull()?.toDomain()
+                if (stored != before) return@mapNotNull null
+                db.tripQueries.upsertScore(after.toRow())
+                after
+            }
         }
     }
 }

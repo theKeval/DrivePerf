@@ -29,6 +29,3 @@ SELECT id FROM trip
 WHERE status IN ('FINALISED', 'INTERRUPTED') AND deleted_at IS NULL AND started_at >= ?
 ORDER BY started_at ASC, id ASC
 LIMIT 1;
-
-tripExists:
-SELECT count(*) FROM trip WHERE id = ?;

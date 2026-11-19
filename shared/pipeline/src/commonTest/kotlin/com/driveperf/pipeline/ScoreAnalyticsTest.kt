@@ -133,7 +133,7 @@ class ScoreAnalyticsTest {
         val store = object : com.driveperf.domain.score.ScoreHistoryStore {
             override suspend fun finishedFrom(startedAt: Long) =
                 listOf(ScoredTrip(d.trip.copy(kind = TripKind.PASSENGER), d.score, null))
-            override suspend fun saveScores(scores: List<com.driveperf.domain.score.Score>) = Unit
+            override suspend fun saveScores(changes: List<com.driveperf.domain.score.ScoreChange>) = changes.map { it.after }
         }
         com.driveperf.pipeline.score.HistoryRecompute(history, store, trips, com.driveperf.testing.TestClock()).fromTrip(d.trip.id)
         assertEquals(sent, tracked.size, "corrections and feedback re-score without passing through the finaliser")

@@ -123,6 +123,9 @@ public fun interface TripRecompute {
     }
 }
 
+/** One score a recompute changed: [before] as its walk read it, [after] as it recomputed it. */
+public data class ScoreChange(val before: Score, val after: Score)
+
 /** What [TripRecompute] reads and writes. Implemented in `:shared:data:local`. */
 public interface ScoreHistoryStore {
     /**
@@ -131,8 +134,12 @@ public interface ScoreHistoryStore {
      */
     public suspend fun finishedFrom(startedAt: Long): List<com.driveperf.domain.repository.ScoredTrip>
 
-    /** Replaces these scores in one transaction. Every score write goes to the `score` table. */
-    public suspend fun saveScores(scores: List<Score>)
+    /**
+     * In one transaction, writes each change's [ScoreChange.after] to the `score` table while the stored score still
+     * equals its [ScoreChange.before], and returns the scores written. A score that changed after the walk read it, or
+     * whose trip was deleted, is left alone: a newer change wrote it, and that change's own recompute follows.
+     */
+    public suspend fun saveScores(changes: List<ScoreChange>): List<Score>
 }
 
 /**

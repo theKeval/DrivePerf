@@ -8,6 +8,7 @@ import com.driveperf.domain.route.Route
 import com.driveperf.domain.route.RouteMatch
 import com.driveperf.domain.route.RouteState
 import com.driveperf.domain.score.Score
+import com.driveperf.domain.score.ScoreChange
 import com.driveperf.domain.score.TripRecompute
 import com.driveperf.domain.trip.EventFeedback
 import com.driveperf.domain.trip.Placement
@@ -30,6 +31,7 @@ import kotlinx.coroutines.test.runTest
 import kotlin.coroutines.EmptyCoroutineContext
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 
 /** DRIVE-131: what the §5.7 recompute reads and writes, and the three changes that start it. */
@@ -91,14 +93,26 @@ class RecomputeStoreTest {
     }
 
     @Test
-    fun changedScoresAreWrittenTogetherAndADeletedTripsScoreIsDropped() = runTest {
+    fun changesAreWrittenOnlyWhileTheStoredScoreIsWhatTheWalkRead() = runTest {
         save(trip("a", 1_000L))
         save(trip("b", 2_000L))
+        save(trip("c", 3_000L))
+        val read = store.finishedFrom(0L).associate { it.trip.id to assertNotNull(it.score) }
+        // Feedback re-scores b after the walk read it.
+        LocalEventFeedbackStore(db, io).save(EventFeedback("e1", "b", needed = true, inaccurate = null, at = 2L), score("b", 95))
 
-        store.saveScores(listOf(score("a", 90), score("b", 91), score("gone", 92)))
+        val written = store.saveScores(
+            listOf(
+                ScoreChange(read.getValue("a"), score("a", 90)),
+                ScoreChange(read.getValue("b"), score("b", 91)),
+                ScoreChange(score("gone", 80), score("gone", 92)),
+            ),
+        )
 
+        assertEquals(listOf("a"), written.map { it.tripId })
         assertEquals(90, inner.score("a")?.smoothness)
-        assertEquals(91, inner.score("b")?.smoothness)
+        assertEquals(95, inner.score("b")?.smoothness, "the newer feedback score is kept")
+        assertEquals(80, inner.score("c")?.smoothness, "untouched")
         assertNull(inner.score("gone"))
     }
 
