@@ -65,6 +65,8 @@ final class AppEnvironment {
             assertions: backgroundAssertions,
             autoDetectEnabled: preferences.preferences.autoTripsEnabled,
             renewMotionHistory: { [motion] in motion.recordAccelerometerHistory() })
+        // The Replay fixture opens straight on the shell, in its own preferences suite.
+        if ReplayFixture.isActive { preferences.update { $0.onboardingCompleted = true } }
     }
 
     var dependencies: AppDependencies {

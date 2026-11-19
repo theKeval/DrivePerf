@@ -18,11 +18,20 @@ final class ReplayUITests: XCTestCase {
     /// Drives tab → the fixture trip → Replay.
     @MainActor
     private func openReplay(_ app: XCUIApplication) {
-        let trip = app.buttons.matching(NSPredicate(format: "label CONTAINS[c] %@", "19.9")).firstMatch
-        XCTAssertTrue(trip.waitForExistence(timeout: 20), "the fixture trip is listed")
+        let trip = app.buttons["tripRow.synthetic-replay"]
+        guard trip.waitForExistence(timeout: 30) else {
+            // CI is the only place these run: leave the screen's tree in the log.
+            print(app.debugDescription)
+            XCTFail("the fixture trip is listed")
+            return
+        }
         trip.tap()
         let replay = app.buttons["tripDetail.replay"]
-        XCTAssertTrue(replay.waitForExistence(timeout: 10), "trip detail offers Replay")
+        guard replay.waitForExistence(timeout: 10) else {
+            print(app.debugDescription)
+            XCTFail("trip detail offers Replay")
+            return
+        }
         replay.tap()
     }
 
