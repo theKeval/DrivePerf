@@ -82,4 +82,22 @@ class LocalTripVehiclesTest {
         assertFalse(vehicles.setVehicle("live", null))
         assertEquals("gti", trips.trip("a")?.vehicleId)
     }
+
+    @Test
+    fun undoRestoresARetiredCarButNotAMissingOne() = runTest {
+        car("gti", "GTI", addedAt = 1)
+        car("ioniq", "Ioniq", addedAt = 2)
+        LocalTripStore(db, "device-1", io).saveFinalised(FinalisedTrip(trip("a")))
+        assertTrue(vehicles.setVehicle("a", "ioniq"))
+        driver.execute(null, "UPDATE vehicle SET is_active = 0 WHERE id = 'gti'", 0)
+        assertFalse(vehicles.setVehicle("a", "gti"), "a retired car cannot be chosen")
+
+        assertTrue(vehicles.restoreVehicle("a", "gti"))
+        assertEquals("gti", trips.trip("a")?.vehicleId)
+        assertTrue(vehicles.restoreVehicle("a", null))
+        assertNull(trips.trip("a")?.vehicleId)
+        assertFalse(vehicles.restoreVehicle("a", "missing"))
+        assertFalse(vehicles.restoreVehicle("nope", "gti"))
+        assertNull(trips.trip("a")?.vehicleId)
+    }
 }

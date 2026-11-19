@@ -41,4 +41,11 @@ public interface TripVehicles {
      * nothing, when there is no such finished trip or [vehicleId] is not an active car.
      */
     public suspend fun setVehicle(tripId: String, vehicleId: String?): Boolean
+
+    /**
+     * Puts the finished trip [tripId] back in car [vehicleId], or in no car, as it was before an edit (S-TRP-02 Undo).
+     * Unlike [setVehicle] the car need not be active: a trip that was in a car since retired goes back to it. Returns
+     * false, and changes nothing, when there is no such finished trip or no such car.
+     */
+    public suspend fun restoreVehicle(tripId: String, vehicleId: String?): Boolean
 }

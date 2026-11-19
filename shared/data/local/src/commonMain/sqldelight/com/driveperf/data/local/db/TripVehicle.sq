@@ -10,6 +10,10 @@ ORDER BY added_at, id;
 isActiveVehicle:
 SELECT COUNT(*) FROM vehicle WHERE id = ? AND deleted_at IS NULL AND is_active = 1;
 
+-- Undo puts a trip back in the car it had, retired or not (the row still exists).
+vehicleExists:
+SELECT COUNT(*) FROM vehicle WHERE id = ?;
+
 -- Only a finished, live trip changes car (as for corrections).
 setTripVehicle:
 UPDATE trip SET vehicle_id = :vehicle_id, updated_at = :updated_at

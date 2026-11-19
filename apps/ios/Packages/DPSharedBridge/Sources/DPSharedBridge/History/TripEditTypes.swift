@@ -157,13 +157,14 @@ public struct DeleteTripConfirmation: Equatable, Sendable {
     }
 }
 
-/// Kotlin `TripEditMessageUi`: the toast after a save, "Marked as passenger · scores updated" with "Undo".
+/// Kotlin `TripEditMessageUi`: the toast after a save, "Marked as passenger · scores updated" with "Undo"; without
+/// `undoLabel`, why an Undo did not go through.
 public struct TripEditToast: Equatable, Sendable {
     public var tripId: String
     public var text: String
-    public var undoLabel: String
+    public var undoLabel: String?
 
-    public init(tripId: String, text: String, undoLabel: String = "Undo") {
+    public init(tripId: String, text: String, undoLabel: String? = "Undo") {
         self.tripId = tripId
         self.text = text
         self.undoLabel = undoLabel

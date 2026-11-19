@@ -6,7 +6,9 @@ import com.driveperf.domain.settings.UnitSystem
 import com.driveperf.domain.trip.DrivingEvent
 import com.driveperf.domain.trip.EventFeedback
 import com.driveperf.domain.trip.Trip
+import com.driveperf.domain.trip.SuspectAnswer
 import com.driveperf.domain.trip.TripCorrection
+import com.driveperf.domain.trip.TripCorrections
 import com.driveperf.domain.trip.TripKind
 import com.driveperf.domain.trip.TripVehicle
 import com.driveperf.domain.trip.TripVehicles
@@ -40,8 +42,16 @@ class FakeTripVehicles(private val trips: MutableStateFlow<List<Trip>>) : TripVe
         ),
     )
     val moves = mutableListOf<Pair<String, String?>>()
+    val restores = mutableListOf<Pair<String, String?>>()
+    var restoreResult = true
 
     override fun observeVehicles(): Flow<List<TripVehicle>> = cars
+
+    override suspend fun restoreVehicle(tripId: String, vehicleId: String?): Boolean {
+        restores += tripId to vehicleId
+        if (restoreResult) trips.update { list -> list.map { if (it.id == tripId) it.copy(vehicleId = vehicleId) else it } }
+        return restoreResult
+    }
 
     override suspend fun setVehicle(tripId: String, vehicleId: String?): Boolean {
         moves += tripId to vehicleId
@@ -68,13 +78,29 @@ class FakeTripDeletes(private val trips: MutableStateFlow<List<Trip>>) : TripRep
     }
 }
 
+/** The core's corrections port: it records each correction and answers with the trip, or null when [fails]. */
+class EditCorrections(private val trips: MutableStateFlow<List<Trip>>) : TripCorrections {
+    val notDrives = MutableStateFlow<List<Trip>>(emptyList())
+    val corrections = mutableListOf<Pair<String, TripCorrection>>()
+    var fails = false
+
+    override fun observeNotDrives(): Flow<List<Trip>> = notDrives
+    override suspend fun answerSuspect(tripId: String, answer: SuspectAnswer): Trip? = null
+    override suspend fun purgeExpiredNotDrives(): Int = 0
+
+    override suspend fun correct(tripId: String, to: TripCorrection): Trip? {
+        corrections += tripId to to
+        return if (fails) null else (trips.value + notDrives.value).firstOrNull { it.id == tripId }
+    }
+}
+
 /** S-TRP-02 Edit trip and S-TRP-03 Delete trip (DRIVE-131, F-HIS-02). */
 @OptIn(ExperimentalCoroutinesApi::class)
 class TripEditTest {
     private val trips = MutableStateFlow(
         listOf(trip("a", startedAt = toronto(2026, 11, 10, 8)).copy(vehicleId = "gti"), trip("b", startedAt = toronto(2026, 11, 9, 8))),
     )
-    private val corrections = FakeCorrections()
+    private val corrections = EditCorrections(trips)
     private val vehicles = FakeTripVehicles(trips)
     private val deletes = FakeTripDeletes(trips)
     private val analytics = RecordingAnalytics()
@@ -208,10 +234,51 @@ class TripEditTest {
 
         p.edit(TripEditAction.Undo)
         assertNull(p.state.value.editMessage)
-        assertEquals(listOf<Pair<String, String?>>("a" to "ioniq", "a" to "gti"), vehicles.moves)
+        assertEquals(listOf<Pair<String, String?>>("a" to "ioniq"), vehicles.moves)
+        assertEquals(listOf<Pair<String, String?>>("a" to "gti"), vehicles.restores)
         assertTrue(corrections.corrections.isEmpty())
         p.edit(TripEditAction.Undo)
-        assertEquals(2, vehicles.moves.size)
+        assertEquals(1, vehicles.restores.size)
+    }
+
+    @Test
+    fun `undo puts the trip back in a car retired since, and says so when it cannot`() = runTest(UnconfinedTestDispatcher()) {
+        val p = presenter()
+        p.edit(TripEditAction.Open("a", TripEditPage.CAR))
+        p.edit(TripEditAction.PickCar("ioniq"))
+        p.edit(TripEditAction.Save)
+        // The GTI leaves the garage: it is no longer offered, but Undo restores the trip to it.
+        vehicles.cars.value = vehicles.cars.value.drop(1)
+        p.edit(TripEditAction.Undo)
+        assertEquals(listOf<Pair<String, String?>>("a" to "gti"), vehicles.restores)
+        assertEquals("gti", trips.value.first { it.id == "a" }.vehicleId)
+        assertNull(p.state.value.editMessage)
+
+        vehicles.cars.value = vehicles.cars.value + TripVehicle("gti", "GTI", null, null, null, isDefault = true)
+        p.edit(TripEditAction.Open("a", TripEditPage.CAR))
+        p.edit(TripEditAction.PickCar("ioniq"))
+        p.edit(TripEditAction.Save)
+        vehicles.restoreResult = false
+        p.edit(TripEditAction.Undo)
+        assertEquals(
+            TripEditMessageUi("a", "Couldn’t undo that change. Edit the drive to fix it.", null),
+            p.state.value.editMessage,
+        )
+        p.edit(TripEditAction.DismissMessage)
+        assertNull(p.state.value.editMessage)
+    }
+
+    @Test
+    fun `a failed type undo is reported too`() = runTest(UnconfinedTestDispatcher()) {
+        val p = presenter()
+        p.edit(TripEditAction.Open("a", TripEditPage.TYPE))
+        p.edit(TripEditAction.PickType(TripEditType.PASSENGER))
+        p.edit(TripEditAction.Save)
+        corrections.fails = true
+        p.edit(TripEditAction.Undo)
+        assertEquals(listOf("a" to TripCorrection.PASSENGER, "a" to TripCorrection.DRIVER), corrections.corrections)
+        assertNull(p.state.value.editMessage?.undoLabel)
+        assertNotNull(p.state.value.editMessage)
     }
 
     @Test

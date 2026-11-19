@@ -79,13 +79,31 @@ class DrivesFiltersTest {
     private fun DrivesState.shownIds() = sections.flatMap { s -> s.rows.map { it.id } }
 
     @Test
-    fun `without filters the list is every drive and nothing is drawn for filters`() = runTest(UnconfinedTestDispatcher()) {
+    fun `without filters the list is every drive and the quick filters are offered`() = runTest(UnconfinedTestDispatcher()) {
         given()
         val p = presenter()
         val state = p.state.value
         assertEquals(listOf("a", "b", "c", "d", "e", "p"), state.shownIds())
-        assertEquals(HistoryFilterUi(), state.history)
         assertFalse(state.history.active)
+        assertTrue(state.history.applied.isEmpty())
+        assertNull(state.history.sheet)
+        assertNull(state.history.subtitle)
+        assertEquals(listOf("GTI", "Ioniq", "The Commute", "Gym run", "Passenger"), state.history.suggestions.map { it.label })
+        assertEquals("GTI, 3 drives", state.history.suggestions.first().accessibilityLabel)
+
+        // Clearing the last filter brings them back.
+        p.filter(HistoryFilterAction.Toggle(FilterKey(FilterGroup.CAR, "gti")))
+        p.filter(HistoryFilterAction.Toggle(FilterKey(FilterGroup.CAR, "gti")))
+        assertFalse(p.state.value.history.active)
+        assertEquals(5, p.state.value.history.suggestions.size)
+    }
+
+    @Test
+    fun `quick filters leave out cars without drives`() = runTest(UnconfinedTestDispatcher()) {
+        trips.value = listOf(trip("a").copy(vehicleId = "gti"), trip("b", startedAt = START - 86_400_000L).copy(vehicleId = "gti"))
+        val p = presenter()
+        // Both cars are in the garage, but the Ioniq has no drives, so only the GTI is offered.
+        assertEquals(listOf("GTI"), p.state.value.history.suggestions.map { it.label })
     }
 
     @Test

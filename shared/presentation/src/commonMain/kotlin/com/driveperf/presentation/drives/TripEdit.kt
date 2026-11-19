@@ -137,8 +137,11 @@ public data class DeleteTripUi(
     val error: String?,
 )
 
-/** The toast after S-TRP-02 saved: "Marked as passenger · scores updated" with "Undo". */
-public data class TripEditMessageUi(val tripId: String, val text: String, val undoLabel: String)
+/**
+ * The toast after S-TRP-02 saved: "Marked as passenger · scores updated" with "Undo"; or, without [undoLabel], why an
+ * Undo did not go through.
+ */
+public data class TripEditMessageUi(val tripId: String, val text: String, val undoLabel: String?)
 
 /** What the user does on S-TRP-02 and S-TRP-03 (sent as [DrivesIntent.Edit]). */
 public sealed interface TripEditAction {
@@ -214,6 +217,8 @@ internal class TripEditing(
         val draft: Draft? = null,
         val deletion: Deletion? = null,
         val undo: Undo? = null,
+        /** The trip whose Undo failed: its toast says so instead. */
+        val undoFailed: String? = null,
     )
 
     private val state = MutableStateFlow(State())
@@ -240,7 +245,7 @@ internal class TripEditing(
             TripEditAction.Save -> state.value.draft?.let(::save)
             TripEditAction.Close -> change { it.copy(draft = null) }
             TripEditAction.Undo -> undo()
-            TripEditAction.DismissMessage -> change { it.copy(undo = null) }
+            TripEditAction.DismissMessage -> change { it.copy(undo = null, undoFailed = null) }
             is TripEditAction.AskDelete, TripEditAction.CancelDelete, TripEditAction.ConfirmDelete -> deleteAction(action)
         }
     }
@@ -279,7 +284,7 @@ internal class TripEditing(
             if (movedCar) track("trip_car_changed", mapOf("source" to SOURCE))
             val message = TripEditCopy.savedMessage(toType, carName.takeIf { movedCar })
             val previous = (trip.correction ?: from.correction).takeIf { toType != null }
-            change { it.copy(undo = Undo(trip.id, previous, trip.vehicleId, movedCar, message)) }
+            change { it.copy(undo = Undo(trip.id, previous, trip.vehicleId, movedCar, message), undoFailed = null) }
         }
     }
 
@@ -287,8 +292,10 @@ internal class TripEditing(
         val undo = state.value.undo ?: return
         change { it.copy(undo = null) }
         scope.launch {
-            undo.correction?.let { corrections?.correct(undo.tripId, it) }
-            if (undo.carChanged) ports?.vehicles?.setVehicle(undo.tripId, undo.carId)
+            // The trip goes back to the car it had even if that car was retired since (restoreVehicle, not setVehicle).
+            val typeRestored = undo.correction?.let { corrections?.correct(undo.tripId, it) != null } ?: true
+            val carRestored = !undo.carChanged || ports?.vehicles?.restoreVehicle(undo.tripId, undo.carId) == true
+            if (!typeRestored || !carRestored) change { it.copy(undoFailed = undo.tripId) }
         }
     }
 
@@ -328,7 +335,10 @@ internal class TripEditing(
     }
 
     /** The toast of the last save, until it is dismissed or undone. */
-    fun messageUi(): TripEditMessageUi? = state.value.undo?.let { TripEditMessageUi(it.tripId, it.message, "Undo") }
+    fun messageUi(): TripEditMessageUi? = state.value.let { s ->
+        s.undo?.let { TripEditMessageUi(it.tripId, it.message, "Undo") }
+            ?: s.undoFailed?.let { TripEditMessageUi(it, TripEditCopy.UNDO_FAILED, null) }
+    }
 
     /** S-TRP-03, while it is open and its trip is still listed. */
     fun deleteUi(rows: TripRows): DeleteTripUi? {
@@ -346,6 +356,7 @@ internal class TripEditing(
 /** The words of S-TRP-02 and S-TRP-03. */
 internal object TripEditCopy {
     const val DELETED = "Drive deleted"
+    const val UNDO_FAILED = "Couldn’t undo that change. Edit the drive to fix it."
 
     fun title(type: TripEditType): String = when (type) {
         TripEditType.DRIVER -> "Driver"

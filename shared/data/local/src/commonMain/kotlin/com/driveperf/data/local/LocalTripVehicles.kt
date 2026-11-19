@@ -27,9 +27,16 @@ public class LocalTripVehicles(
             rows.map { TripVehicle(it.id, it.nickname, it.make, it.model, it.year?.toInt(), it.is_default != 0L) }
         }
 
-    override suspend fun setVehicle(tripId: String, vehicleId: String?): Boolean = withContext(io) {
+    override suspend fun setVehicle(tripId: String, vehicleId: String?): Boolean =
+        write(tripId, vehicleId) { q.isActiveVehicle(it).executeAsOne() > 0L }
+
+    override suspend fun restoreVehicle(tripId: String, vehicleId: String?): Boolean =
+        write(tripId, vehicleId) { q.vehicleExists(it).executeAsOne() > 0L }
+
+    /** Sets the trip's car when [allowed] accepts it (no car is always allowed); true when a finished trip changed. */
+    private suspend fun write(tripId: String, vehicleId: String?, allowed: (String) -> Boolean): Boolean = withContext(io) {
         db.transactionWithResult {
-            if (vehicleId != null && q.isActiveVehicle(vehicleId).executeAsOne() == 0L) return@transactionWithResult false
+            if (vehicleId != null && !allowed(vehicleId)) return@transactionWithResult false
             q.setTripVehicle(vehicleId, clock.wallMs(), tripId)
             q.changedRows().executeAsOne() > 0L
         }

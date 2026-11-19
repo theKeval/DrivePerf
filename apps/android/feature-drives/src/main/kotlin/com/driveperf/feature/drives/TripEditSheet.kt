@@ -83,7 +83,7 @@ internal fun TripEditOverlays(state: DrivesState, onAction: (DrivesIntent) -> Un
     }
 }
 
-/** "Marked as passenger · scores updated" with Undo, at the bottom of trip detail. */
+/** "Marked as passenger · scores updated" with Undo (or a failed Undo), at the bottom of trip detail. */
 @Composable
 internal fun TripEditMessage(message: TripEditMessageUi, onAction: (DrivesIntent) -> Unit, modifier: Modifier = Modifier) {
     LaunchedEffect(message) {
@@ -92,8 +92,8 @@ internal fun TripEditMessage(message: TripEditMessageUi, onAction: (DrivesIntent
     }
     Snackbar(
         modifier = modifier.padding(16.dp).semantics { liveRegion = LiveRegionMode.Polite },
-        action = {
-            TextButton(onClick = { onAction(DrivesIntent.Edit(TripEditAction.Undo)) }) { Text(message.undoLabel) }
+        action = message.undoLabel?.let { undo ->
+            { TextButton(onClick = { onAction(DrivesIntent.Edit(TripEditAction.Undo)) }) { Text(undo) } }
         },
     ) {
         Text(message.text)

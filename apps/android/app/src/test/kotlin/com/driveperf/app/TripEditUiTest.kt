@@ -164,6 +164,13 @@ class TripEditUiTest {
         assertEquals(listOf<TripEditAction>(TripEditAction.Undo), actions.map { it.edit() })
     }
 
+    @Test fun `a failed undo says so without offering Undo again`() {
+        val message = TripEditMessageUi("trip-7", "Couldn’t undo that change. Edit the drive to fix it.", null)
+        showDetail(DrivesState(loaded = true, detail = detail, canEdit = true, editMessage = message))
+        compose.onNodeWithText("Couldn’t undo that change. Edit the drive to fix it.").assertIsDisplayed()
+        compose.onNodeWithText("Undo").assertDoesNotExist()
+    }
+
     private val commute = FilterKey(FilterGroup.ROUTE, "r1")
     private val gti = FilterKey(FilterGroup.CAR, "gti")
     private val rows =

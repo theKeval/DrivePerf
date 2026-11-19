@@ -52,7 +52,8 @@ final class TripEditTests: XCTestCase {
         let model = TripListViewModel(presenter: await bridge([
             trip("a", day: 10), trip("p", day: 9, kind: .passenger), trip("b", day: 8),
         ]))
-        XCTAssertEqual(model.historyFilters, HistoryFilters())
+        XCTAssertFalse(model.historyFilters.isActive)
+        XCTAssertEqual(model.historyFilters.suggestions.map(\.label), ["Passenger"], "quick filters show before any filter")
         XCTAssertFalse(model.canEdit, "the fixture has no edit ports")
 
         let passenger = HistoryFilterKey(group: .type, value: "passenger")

@@ -184,18 +184,22 @@ internal class HistoryFiltering(
     /** All drives after the applied filters. [tripRows] are the cards of [HistoryData.trips], in the same order. */
     fun build(data: HistoryData, rows: TripRows, tripRows: List<TripRowUi>): HistoryResult {
         val s = state.value
-        if (s.applied.isEmpty() && s.draft == null) return HistoryResult(data.trips, tripRows, HistoryFilterUi())
         val facets = Facets(data)
+        val options = facets.options()
+        val suggestions = suggestions(options, s.applied)
+        // Without filters the list is the drives as they are; only the quick filters are worked out (one pass each).
+        if (s.applied.isEmpty() && s.draft == null) {
+            return HistoryResult(data.trips, tripRows, HistoryFilterUi(suggestions = suggestions))
+        }
         val trips = facets.matching(s.applied)
         val rowById = data.trips.indices.associate { data.trips[it].id to tripRows[it] }
         val shown = trips.map { rowById[it.id] ?: rows.row(it) }
-        val options = facets.options()
         val applied = s.applied.mapNotNull { key -> options.firstOrNull { it.key == key } }
         val ui = HistoryFilterUi(
             activeCount = s.applied.size,
             buttonAccessibilityLabel = if (s.applied.isEmpty()) "Filters" else "Filters, ${s.applied.size} applied",
             applied = applied.map { it.applied() },
-            suggestions = suggestions(options, facets, s.applied),
+            suggestions = suggestions,
             subtitle = if (s.applied.isEmpty()) null else "${drivesCount(trips.size)} · filtered",
             emptyTitle = if (s.applied.isNotEmpty() && trips.isEmpty()) "No drives match." else null,
             emptyBody = if (s.applied.isNotEmpty() && trips.isEmpty()) "Try fewer filters, or a different place or car." else null,
@@ -221,11 +225,11 @@ internal class HistoryFiltering(
     }
 
     /** Quick filters: each car (with two or more), the two most driven named routes and Passenger, unless applied. */
-    private fun suggestions(options: List<Option>, facets: Facets, applied: Set<FilterKey>): List<FilterChipUi> {
+    private fun suggestions(options: List<Option>, applied: Set<FilterKey>): List<FilterChipUi> {
         val cars = options.filter { it.key.group == FilterGroup.CAR && it.key.value != FilterKey.NONE }
         val routes = options.filter { it.key.group == FilterGroup.ROUTE && it.named && it.count > 0 }.take(QUICK_ROUTES)
-        val passenger = options.filter { it.key == FilterKey.type(TripEditType.PASSENGER) && it.count > 0 }
-        return (cars + routes + passenger).filter { it.key !in applied && facets.hasAny(it.key) }.map { it.quick() }
+        val passenger = options.filter { it.key == FilterKey.type(TripEditType.PASSENGER) }
+        return (cars + routes + passenger).filter { it.key !in applied && it.count > 0 }.map { it.quick() }
     }
 
     /** One chip's label and drive count; [named] marks a route the user named. */
@@ -268,8 +272,6 @@ internal class HistoryFiltering(
             if (byGroup.isEmpty()) return pool
             return pool.filter { trip -> byGroup.all { (group, values) -> value(trip, group) in values } }
         }
-
-        fun hasAny(key: FilterKey): Boolean = all.any { value(it, key.group) == key.value }
 
         private fun counts(group: FilterGroup): Map<String?, Int> = all.groupingBy { value(it, group) }.eachCount()
 
