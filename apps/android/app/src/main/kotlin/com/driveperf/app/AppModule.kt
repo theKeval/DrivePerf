@@ -11,10 +11,6 @@ import com.driveperf.app.bridge.PlatformCaptureController
 import com.driveperf.app.core.AndroidPlatformBindings
 import com.driveperf.app.core.ConsentOnboardingSettings
 import com.driveperf.app.core.DeviceId
-import com.driveperf.app.core.NetworkStatus
-import com.driveperf.feature.replay.ReplayMapConfig
-import com.driveperf.presentation.replay.ReplaySource
-import com.driveperf.feature.replay.ReplayViewModel
 import com.driveperf.app.core.WakePath
 import com.driveperf.di.CoreServices
 import com.driveperf.di.DrivePerfCore
@@ -27,8 +23,6 @@ import com.driveperf.domain.capture.TripRecorder
 import com.driveperf.domain.repository.TripRepository
 import com.driveperf.feature.capture.CaptureController
 import com.driveperf.feature.capture.CaptureViewModel
-import com.driveperf.feature.drives.DrivesViewModel
-import com.driveperf.feature.drives.JavaTimeDrivesFormatter
 import com.driveperf.feature.onboarding.ConsentChoices
 import com.driveperf.feature.onboarding.OnboardingSettings
 import com.driveperf.feature.onboarding.OnboardingViewModel
@@ -52,7 +46,7 @@ import org.koin.dsl.module
 
 /**
  * App-level bindings: the shared core on the platform adapters, bridges from feature interfaces to it, consent, crash
- * reporting, view models.
+ * reporting, view models. Each screen feature with a shared presenter has its own module in `app/di`.
  */
 val appModule = module {
     single { CoroutineScope(SupervisorJob() + Dispatchers.Default) }
@@ -90,21 +84,7 @@ val appModule = module {
     } bind CaptureController::class
 
     viewModel { CaptureViewModel(get(), System::currentTimeMillis, units = get()) }
-    // DRIVE-217: the shared presenter owns the Drives lists, sheets, answers and corrections (ADR-002 section 4).
-    viewModel {
-        val core = get<CoreServices>()
-        DrivesViewModel { scope -> core.drivesPresenter(JavaTimeDrivesFormatter(), Locale.getDefault().country, scope) }
-    }
-
-    // DRIVE-200 / DRIVE-61: Replay, from the shared model.
-    single { NetworkStatus(androidContext(), get()) }
-    single { ReplayMapConfig(BuildConfig.HAS_MAPS_KEY, BuildConfig.MAPS_MAP_ID.ifBlank { null }, get<NetworkStatus>().online) }
-    viewModel { (tripId: String) ->
-        // The shared presenter owns playback, the recording gate and analytics (ADR-002 section 4); the Pro lock is its
-        // ReplayUnavailable.LOCKED, unset until entitlements exist (ADR-006).
-        val core = get<CoreServices>()
-        ReplayViewModel({ scope -> core.replayPresenter(tripId, ReplaySource.TRIP_DETAIL, scope) }, get(), units = get())
-    }
+    // The Drives, Replay and Analysis view models are in app/di: DrivesModule, ReplayModule, AnalysisModule.
     single<OnboardingSettings> { ConsentOnboardingSettings(get()) }
     viewModel {
         val consent = get<ConsentSettings>()

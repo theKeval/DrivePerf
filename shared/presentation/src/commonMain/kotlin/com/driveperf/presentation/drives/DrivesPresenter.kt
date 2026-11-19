@@ -75,6 +75,7 @@ public class DrivesPresenter(
             DrivesIntent.CloseQuality -> change { it.copy(qualityId = null) }
             is DrivesIntent.Filter -> change { it.copy(filter = intent.filter) }
             is DrivesIntent.OpenReplay -> openReplay(intent.tripId)
+            is DrivesIntent.OpenAnalysis -> openAnalysis(intent.tripId)
             is DrivesIntent.Answer -> corrections?.let { port ->
                 scope.launch { port.answerSuspect(intent.tripId, if (intent.yes) SuspectAnswer.YES else SuspectAnswer.NO) }
             }
@@ -89,6 +90,13 @@ public class DrivesPresenter(
         change { it.copy(qualityId = null) }
         val rows = TripRows(i.units, format, clock.wallMs())
         emit(DrivesEffect.OpenReplay(tripId, rows.title(trip), "Map of your drive, ${distanceText(trip.distance, i.units)}."))
+    }
+
+    /** Analysis opens over the trip detail, which stays under it. */
+    private fun openAnalysis(tripId: String) {
+        val i = inputs.value
+        val trip = (i.trips.orEmpty() + i.notDrives).firstOrNull { it.id == tripId } ?: return
+        emit(DrivesEffect.OpenAnalysis(tripId, TripRows(i.units, format, clock.wallMs()).title(trip)))
     }
 
     /** Applies [change] to the inputs, then rebuilds the state from the newest inputs. */

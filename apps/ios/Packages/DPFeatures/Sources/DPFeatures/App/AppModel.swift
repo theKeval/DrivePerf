@@ -32,6 +32,8 @@ public struct AppDependencies {
     // DRIVE-200, DRIVE-61: S-RPL-01 Replay over the shared presenter. Nil hides the entry.
     public var replayPresenters: (any ReplayPresenterMaking)?
     public var connectivity: (any ConnectivityMonitoring)?
+    // S-ANL-01 Analysis over the shared presenter (DRIVE-45). Nil hides the entry.
+    public var analysisPresenters: (any AnalysisPresenterMaking)?
 
     public init(
         recorder: any TripRecording, history: any TripHistory, clock: any ClockBridge,
@@ -75,6 +77,8 @@ public final class AppModel {
     public let statusRequests: CaptureStatusRequests
     /// S-RPL-01, when the app has a replay source.
     public let replay: ReplayServices?
+    /// S-ANL-01, when the app has an analysis source.
+    public let analysis: (any AnalysisPresenterMaking)?
     public private(set) var onboarding: OnboardingViewModel?
     public var isSelfTestPresented: Bool
 
@@ -95,6 +99,7 @@ public final class AppModel {
         replay = dependencies.replayPresenters.map {
             ReplayServices(presenters: $0, connectivity: dependencies.connectivity, display: display)
         }
+        analysis = dependencies.analysisPresenters
         // The accessory and the status sheet read permissions on their own, so re-read them after every change here.
         let capture = capture
         // It reads the capture model's status, so the views that show the pause update with it.

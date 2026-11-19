@@ -39,7 +39,6 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.NavType
 import androidx.navigation.navArgument
-import com.driveperf.presentation.drives.DrivesEffect
 import com.driveperf.feature.capture.ContentTarget
 import com.driveperf.feature.replay.ReplayHeader
 import com.driveperf.feature.replay.ReplayRoute
@@ -130,17 +129,7 @@ internal class AppEnv(
     val capture: CaptureUiState,
     val services: AppServices,
     val fixLocation: () -> Unit,
-) {
-    /**
-     * The Drives presenter's navigation: Replay opens S-RPL-01. While a drive records, the in-drive gate covers the whole
-     * graph, so Replay can't open then (F-RPL-01 AC6).
-     */
-    fun onDrivesEffect(effect: DrivesEffect) {
-        when (effect) {
-            is DrivesEffect.OpenReplay -> navController.navigate(Routes.replay(effect.tripId, effect.title))
-        }
-    }
-}
+)
 
 /** The app-level singletons the destinations talk to. */
 internal class AppServices(
@@ -186,6 +175,8 @@ private fun AppNavHost(navController: NavHostController, captureViewModel: Captu
         settingsDestinations(env)
         recordingSettingsDestination(env)
         replayDestination(env)
+        scoreDestinations(env)
+        analysisDestination(env)
     }
 }
 

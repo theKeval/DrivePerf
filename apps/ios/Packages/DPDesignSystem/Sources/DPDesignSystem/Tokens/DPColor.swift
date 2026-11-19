@@ -95,6 +95,13 @@ public enum DPColor {
         public static let qualityUsable = Color(dark: 0x8FB8_FFFF, light: 0x2F5D_B8FF)
         public static let qualityLimited = Color(dark: 0xF5B6_48FF, light: 0x9A5F_00FF)
         public static let qualityUnscorable = Color(dark: 0x8C95_A3FF, light: 0x7A83_92FF)
+        /// `--dp-data-event-*`: event pins and chips (components.md §9).
+        public static let eventBrake = Color(dark: 0xFF7A_66FF, light: 0xA21F_16FF)
+        public static let eventAccel = Color(dark: 0xE58B_D0FF, light: 0xA33A_8CFF)
+        public static let eventCorner = Color(dark: 0xEAD5_4EFF, light: 0x9A8A_00FF)
+        /// `--dp-data-pin-glyph` and `--dp-data-pin-ring`: the mark and outline on a filled event pin.
+        public static let pinGlyph = Color(dark: 0x0B0E_13FF, light: 0xFFFF_FFFF)
+        public static let pinRing = Color(dark: 0xFFFF_FFFF, light: 0xFFFF_FFFF)
         /// `--dp-data-gap-stroke`: GPS gaps and interrupted stretches.
         public static let gapStroke = Color(dark: 0x7A83_92FF, light: 0x7A83_92FF)
         public static let speed = Color(dark: 0xD6DC_E4FF, light: 0x404A_58FF)

@@ -19,15 +19,16 @@ import com.driveperf.domain.trip.TripCorrections
 import com.driveperf.domain.capture.TripRecorder
 import com.driveperf.domain.tripfile.TripFileStore
 import com.driveperf.foundation.Clock
-import com.driveperf.domain.capture.RecorderState
 import com.driveperf.domain.settings.UnitSystem
-import com.driveperf.presentation.drives.DrivesFormatter
-import com.driveperf.presentation.drives.DrivesPresenter
-import com.driveperf.presentation.replay.ReplayPresenter
-import com.driveperf.presentation.replay.ReplaySource
-import kotlinx.coroutines.CoroutineScope
+import com.driveperf.data.local.db.DrivePerfDatabase
+import com.driveperf.domain.capture.PreviewStore
+import com.driveperf.domain.feedback.EventFeedbackStore
+import com.driveperf.domain.feedback.TripRescorer
+import com.driveperf.domain.repository.TripHistory
+import com.driveperf.domain.tripfile.AnalysisFileStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import kotlin.coroutines.CoroutineContext
 
 /**
  * The natively implemented ports (ADR-002 section 5). Swift supplies its adapters at app launch; Android supplies
@@ -71,9 +72,25 @@ public interface PlatformBindings {
     public fun resumeNotice(): AutoDetectResumeNotice = NoOpAutoDetectResumeNotice
 }
 
+/** The core's own wiring that the per-feature factories need. Built only by [DrivePerfCore]. */
+@Suppress("LongParameterList") // one property per store, like CoreServices
+internal class CoreInternals(
+    val db: DrivePerfDatabase,
+    val io: CoroutineContext,
+    val files: TripFileStore,
+    val previews: PreviewStore,
+    val history: TripHistory,
+    val analysisFiles: AnalysisFileStore,
+    val feedbackStore: EventFeedbackStore,
+    val rescorer: TripRescorer,
+)
+
 /**
  * What the apps use after start. [markEventNeeded] is "Was it needed?" / "Count it again" (F-SCO-05); feedback is read
  * through [trips]. [corrections] answers "Was this a bus or train?" and corrects what a trip was (F-CAP-04).
+ *
+ * The screen presenters are extensions, one file per feature (`DrivesServices.kt`, `ReplayServices.kt`,
+ * `AnalysisServices.kt`); Swift still sees them as methods. They build from the internal accessors below.
  */
 @Suppress("LongParameterList") // The core's ports for the apps: one property each, built only by DrivePerfCore.
 public class CoreServices internal constructor(
@@ -87,45 +104,25 @@ public class CoreServices internal constructor(
     /** Usage statistics behind the user's choice (F-ONB-08): events wait until the choice, and are dropped if declined. */
     public val analytics: Analytics,
     public val settings: com.driveperf.domain.settings.SettingsRepository,
-    private val clock: Clock,
+    internal val clock: Clock,
+    /**
+     * What the per-feature factories (`DrivesServices.kt`, `ReplayServices.kt`, `AnalysisServices.kt`) build from.
+     * Internal, so Swift never sees it.
+     */
+    private val internals: CoreInternals,
     private val onClose: () -> Unit,
 ) {
-    /**
-     * The shared Replay presenter for [tripId] (S-RPL-01), running in a child of [scope]. Android passes
-     * `viewModelScope`. Call `close()` when the screen goes away.
-     */
-    public fun replayPresenter(tripId: String, source: ReplaySource, scope: CoroutineScope): ReplayPresenter =
-        ReplayPresenter(
-            tripId = tripId,
-            source = source,
-            replays = replay,
-            isRecording = recordingCheck(tripId),
-            analytics = analytics,
-            monoNowNs = clock::monotonicNs,
-            scope = scope,
-        )
-
-    /** [replayPresenter] on the main thread with its own scope, for Swift. Call `close()` on deinit. */
-    public fun replayPresenter(tripId: String, source: ReplaySource): ReplayPresenter =
-        ReplayPresenter.onMain(tripId, source, replay, recordingCheck(tripId), analytics, clock::monotonicNs)
-
-    /**
-     * The shared Drives presenter (S-HOME-01, S-HIS-01, S-TRP-01, S-DQ-01), running in a child of [scope]. Android passes
-     * `viewModelScope`. [format] is the app's date and time formatting; [region] picks the default units when the user
-     * has not chosen (storefront country or locale region).
-     */
-    public fun drivesPresenter(format: DrivesFormatter, region: String, scope: CoroutineScope): DrivesPresenter =
-        DrivesPresenter(trips.observeTrips(), corrections, units(region), format, clock, scope)
-
-    /** [drivesPresenter] on the main thread with its own scope, for Swift. Call `close()` on deinit. */
-    public fun drivesPresenter(format: DrivesFormatter, region: String): DrivesPresenter =
-        DrivesPresenter.onMain(trips.observeTrips(), corrections, units(region), format, clock)
+    internal val db: DrivePerfDatabase get() = internals.db
+    internal val io: CoroutineContext get() = internals.io
+    internal val files: TripFileStore get() = internals.files
+    internal val previews: PreviewStore get() = internals.previews
+    internal val history: TripHistory get() = internals.history
+    internal val analysisFiles: AnalysisFileStore get() = internals.analysisFiles
+    internal val feedbackStore: EventFeedbackStore get() = internals.feedbackStore
+    internal val rescorer: TripRescorer get() = internals.rescorer
 
     /** The user's unit system, or the region's default until they choose one. */
-    private fun units(region: String): Flow<UnitSystem> = settings.state.map { it.effectiveUnits(region) }
-
-    private fun recordingCheck(tripId: String): () -> Boolean =
-        { recorder.status.value.let { it.tripId == tripId && it.state != RecorderState.IDLE } }
+    internal fun units(region: String): Flow<UnitSystem> = settings.state.map { it.effectiveUnits(region) }
 
     /** Stops the recorder's work and closes the database. Only for a scratch core; the app's core lives as long as the process. */
     public fun close() {
