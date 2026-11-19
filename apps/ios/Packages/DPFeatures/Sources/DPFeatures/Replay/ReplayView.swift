@@ -62,7 +62,6 @@ public struct ReplayView: View {
         }
         .task { await model.load() }
         .task { await model.observeConnectivity() }
-        .accessibilityIdentifier("replay.screen")
     }
 
     private var ready: some View {
@@ -238,7 +237,6 @@ private struct ReplayCanvasLayer: View {
         .padding(.horizontal, DPLayout.screenMargin)
         .padding(.top, 72)
         .padding(.bottom, 200)
-        .accessibilityIdentifier("replay.canvas")
     }
 }
 

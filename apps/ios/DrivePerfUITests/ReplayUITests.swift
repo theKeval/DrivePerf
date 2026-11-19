@@ -15,23 +15,24 @@ final class ReplayUITests: XCTestCase {
         return app
     }
 
+    /// Waits for `element`; on failure prints the screen's tree (CI is the only place these run) and stops the test.
+    @MainActor
+    private func require(_ element: XCUIElement, _ app: XCUIApplication, timeout: TimeInterval, _ message: String) {
+        guard element.waitForExistence(timeout: timeout) else {
+            print(app.debugDescription)
+            XCTFail(message)
+            return
+        }
+    }
+
     /// Drives tab → the fixture trip → Replay.
     @MainActor
     private func openReplay(_ app: XCUIApplication) {
         let trip = app.buttons["tripRow.synthetic-replay"]
-        guard trip.waitForExistence(timeout: 30) else {
-            // CI is the only place these run: leave the screen's tree in the log.
-            print(app.debugDescription)
-            XCTFail("the fixture trip is listed")
-            return
-        }
+        require(trip, app, timeout: 30, "the fixture trip is listed")
         trip.tap()
         let replay = app.buttons["tripDetail.replay"]
-        guard replay.waitForExistence(timeout: 10) else {
-            print(app.debugDescription)
-            XCTFail("trip detail offers Replay")
-            return
-        }
+        require(replay, app, timeout: 10, "trip detail offers Replay")
         replay.tap()
     }
 
@@ -40,7 +41,7 @@ final class ReplayUITests: XCTestCase {
         let app = launch()
         openReplay(app)
         let play = app.buttons["replay.playPause"]
-        XCTAssertTrue(play.waitForExistence(timeout: 15), "Replay shows its playback bar")
+        require(play, app, timeout: 15, "Replay shows its playback bar")
         XCTAssertEqual(play.label, "Play replay", "Replay opens paused")
         XCTAssertTrue(app.descendants(matching: .any)["replay.scrubber"].exists)
         play.tap()
@@ -48,11 +49,14 @@ final class ReplayUITests: XCTestCase {
         app.buttons["replay.playPause"].tap()
         XCTAssertEqual(app.buttons["replay.playPause"].label, "Play replay")
 
-        app.buttons["replay.legend"].tap()
-        XCTAssertTrue(app.staticTexts["On the map"].waitForExistence(timeout: 5), "the overlay legend opens")
-        XCTAssertTrue(app.staticTexts["Estimated"].exists)
-        XCTAssertTrue(app.staticTexts["No GPS"].exists)
-        XCTAssertTrue(app.staticTexts["Not scored"].exists)
+        let legend = app.buttons["replay.legend"]
+        require(legend, app, timeout: 5, "the legend button is in the toolbar")
+        legend.tap()
+        require(app.staticTexts["On the map"], app, timeout: 5, "the overlay legend opens")
+        // Each legend row is one combined element (swatch + word).
+        for word in ["Estimated", "No GPS", "Not scored"] {
+            XCTAssertTrue(app.descendants(matching: .any)[word].exists, "the legend names \(word)")
+        }
     }
 
     @MainActor
@@ -60,7 +64,7 @@ final class ReplayUITests: XCTestCase {
         let app = launch(offline: true)
         openReplay(app)
         let note = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "Map unavailable offline")).firstMatch
-        XCTAssertTrue(note.waitForExistence(timeout: 15), "the offline note shows over the canvas")
-        XCTAssertTrue(app.buttons["replay.playPause"].exists)
+        require(note, app, timeout: 15, "the offline note shows over the canvas")
+        require(app.buttons["replay.playPause"], app, timeout: 5, "the playback bar shows offline too")
     }
 }
