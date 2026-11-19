@@ -16,11 +16,12 @@ tools/run-ios.sh            # boots an iPhone simulator, builds without code sig
 Needs Xcode 26+, an iOS simulator runtime (`xcodebuild -downloadPlatform iOS` if none is installed), `jq`, and a JDK
 17+. Gradle (the repo's wrapper) builds the Kotlin framework for you.
 
-**Your iPhone (free Personal Team), temporary until the Apple Developer account exists (DRIVE-42):**
+**Your iPhone (the paid DrivePerf team, DRIVE-42):**
 
-1. Copy `Config/Local.xcconfig.example` to `Config/Local.xcconfig` (gitignored) and fill in your Team ID and a bundle
-   ID of your own, for example `com.thekeval.driveperf.dev`. The widget extension becomes `<that ID>.widgets`. Keep the
-   two `DP_ENTITLEMENTS_*` lines from the example too (see "No App Group on a Personal Team" below).
+1. Copy `Config/Local.xcconfig.example` to `Config/Local.xcconfig` (gitignored) and set `DEVELOPMENT_TEAM` to the
+   DrivePerf team's ID (developer.apple.com/account › Membership details). Leave the Personal Team lines commented
+   out. The Debug build then signs as `com.driveperf.app.dev`, the widget extension as `com.driveperf.app.dev.widgets`,
+   both with the App Group `group.com.driveperf.app`, under automatic signing.
 2. Build and install:
 
    ```bash
@@ -29,38 +30,51 @@ Needs Xcode 26+, an iOS simulator runtime (`xcodebuild -downloadPlatform iOS` if
    xcrun devicectl device install app --device <device UDID> build/DerivedData/Build/Products/Debug-iphoneos/DrivePerf.app
    ```
 
-3. On the phone, trust the developer profile once (Settings › General › VPN & Device Management), then **launch
-   DrivePerf from the Home Screen**, not from Xcode or `devicectl`, so background behaviour is real.
+   `-allowProvisioningUpdates` lets Xcode create or refresh the development profiles. It needs the Apple ID that
+   belongs to the team signed in under Xcode › Settings › Accounts. A new iPhone must be registered first: Xcode does
+   it when you pick the phone as the run destination, or add it under Devices in the developer portal.
+3. **Launch DrivePerf from the Home Screen**, not from Xcode or `devicectl`, so background behaviour is real.
 
-Rules for the override:
+What the paid team has registered (Certificates, Identifiers & Profiles):
 
-- **Never sign `com.driveperf.*` with a Personal Team.** It can claim those IDs and block the paid account. That is
-  why `Local.xcconfig` must set both the bundle ID and the team, and why Release builds ignore the local team and stay
-  on `com.driveperf.app`. The launch build is `com.driveperf.app`; the override disappears with DRIVE-42.
-- **No App Group on a Personal Team.** A free team cannot create `group.com.driveperf.app`, so signing fails on the
-  entitlement the widgets use (the F-CAP-10 widgets share a snapshot through it). `Local.xcconfig.example` therefore points
+| Item | Value |
+|---|---|
+| App IDs | `com.driveperf.app`, `com.driveperf.app.widgets`, `com.driveperf.app.dev`, `com.driveperf.app.dev.widgets`, each with App Groups |
+| App Group | `group.com.driveperf.app`, shared by all four (the F-CAP-10 widgets read the app's snapshot through it) |
+| Not needed as capabilities | background location (`UIBackgroundModes` in Info.plist) and Live Activities (`NSSupportsLiveActivities`, updated locally, no push) |
+| Not enabled yet | Sign in with Apple, Push Notifications: add them to the App IDs when their features are built (`DP_FEATURE_*` below) |
+
+Development profiles last a year and renew automatically with `-allowProvisioningUpdates`; there is no 7-day expiry
+any more. `xcrun devicectl list devices` gives the UDID.
+
+**Fallback: a free Personal Team.** For someone without access to the paid team, or if the membership lapses.
+`Local.xcconfig.example` has the three lines to uncomment, and they go together:
+
+- **Never sign `com.driveperf.*` with a Personal Team.** A Personal Team can claim those IDs and block them for the paid
+  team. The fallback therefore overrides `DP_APP_ID_DEBUG` with an ID of your own, for example `com.yourname.driveperf.dev`.
+  The widget extension becomes `<that ID>.widgets`. Release builds ignore the local team and stay on `com.driveperf.app`.
+- **No App Group on a Personal Team.** A free team cannot use `group.com.driveperf.app`, so the fallback points
   `DP_ENTITLEMENTS_APP` and `DP_ENTITLEMENTS_WIDGETS` at `Config/DrivePerf.personal-team.entitlements` and
-  `Config/DrivePerfWidgets.personal-team.entitlements`, which hold no App Group. The build settings default to the
-  shipping `DrivePerf.entitlements` and `DrivePerfWidgets.entitlements` in `Config/DrivePerf.xcconfig`, so the
-  committed Debug and Release config for `com.driveperf.*` is unchanged. Without the group the shared snapshot has no
-  container: the widget and the Control Center control show their empty state, the app skips writing the snapshot, and
-  nothing crashes. Everything else (capture, Live Activity, notifications) works as normal. Delete the two lines when
-  DRIVE-42 lands.
-- Personal Team profiles expire after 7 days: reinstall before then. Each new bundle ID uses one of the team's 10 App
-  IDs per week.
-- `xcrun devicectl device list devices` gives the UDID.
+  `Config/DrivePerfWidgets.personal-team.entitlements`, which hold no App Group. Without the group the shared snapshot
+  has no container: the widget and the Control Center control show their empty state, the app skips writing the
+  snapshot, and nothing crashes. Capture, the Live Activity and notifications work as normal.
+- Trust the developer profile once on the phone (Settings › General › VPN & Device Management). Personal Team profiles
+  expire after 7 days: reinstall before then. Each new bundle ID uses one of the team's 10 App IDs per week.
 
 ## Signing and identity
 
 | Build | Bundle ID | Signing |
 |---|---|---|
 | Debug, committed config (CI, simulator) | `com.driveperf.app.dev` | none (`CODE_SIGN_IDENTITY = -`) |
-| Debug with `Config/Local.xcconfig` | your override, e.g. `com.thekeval.driveperf.dev` | your Personal Team |
-| Release | `com.driveperf.app` | none until DRIVE-42 (the release lane sets it) |
+| Debug with `Config/Local.xcconfig` (default) | `com.driveperf.app.dev` | the paid DrivePerf team, automatic |
+| Debug with the Personal Team fallback | your override, e.g. `com.yourname.driveperf.dev` | your Personal Team |
+| Release | `com.driveperf.app` | none in the project; the release lane (`release-ios.yml`, Fastlane `match`, ADR-008) signs it |
 
 Build settings live in `Config/DrivePerf.xcconfig`. It also carries `DP_SENTRY_DSN` (empty: crash reporting is a stub
 until the Sentry EU project exists, ADR-007) and the flags `DP_FEATURE_SIGN_IN_WITH_APPLE`, `DP_FEATURE_PUSH` and
-`DP_FEATURE_TESTFLIGHT`, all `NO` until the Apple Developer account exists. Never commit a DSN or a Team ID.
+`DP_FEATURE_TESTFLIGHT`. They stay `NO` until each feature is built: Sign in with Apple and push need their capability
+on the App IDs first, and TestFlight needs the release lane. Never commit a DSN. The Team ID is not a secret, but it
+stays in the gitignored `Local.xcconfig` so the committed config stays unsigned for CI and simulator runs.
 
 ## Layout
 

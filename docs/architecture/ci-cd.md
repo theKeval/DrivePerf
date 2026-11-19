@@ -29,7 +29,7 @@ with `firebase deploy --only firestore:indexes --project <dev|prod>` (on Keval's
 |---|---|---|
 | Cloud Run deploy in `backend.yml` | Blaze upgrade, Artifact Registry, Workload Identity Federation (Phase 6, DRIVE-76) | repository variable `CLOUD_RUN_DEPLOY_ENABLED=true` plus `GCP_WIF_PROVIDER`, `GCP_DEPLOY_SA`, `GCP_PROJECT_ID`, `GCP_REGION` in the `dev` and `prod` environments. The steps are a sketch, untested until DRIVE-76 proves WIF |
 | `release-android.yml` | Play upload key, service account, Fastlane `supply`, Sentry mapping upload (DRIVE-72) | repository variable `RELEASE_ANDROID_ENABLED=true` |
-| `release-ios.yml` | Paid Apple Developer account, App Store Connect API key, Fastlane `match` repository, dSYM upload (DRIVE-67) | repository variable `RELEASE_IOS_ENABLED=true`, after replacing its placeholder step |
+| `release-ios.yml` | App Store Connect API key, Fastlane `match` repository and distribution certificate, the Fastlane lane, dSYM upload (DRIVE-67). The paid Apple Developer account exists and the App IDs are registered (DRIVE-42) | repository variable `RELEASE_IOS_ENABLED=true`, after replacing its placeholder step |
 | Maestro | the first flows in `.maestro/` | add the emulator and simulator jobs next to the flow check in `nightly.yml` |
 
 Both release workflows run in the `prod` environment, which requires Keval's approval. This repository variable gate means pushing a `v*` tag today only produces a skipped run. No secret is stored, read or required by anything in this folder.
