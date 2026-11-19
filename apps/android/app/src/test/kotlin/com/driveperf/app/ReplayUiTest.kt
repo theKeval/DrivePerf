@@ -1,6 +1,10 @@
 package com.driveperf.app
 
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.v2.createComposeRule
@@ -111,8 +115,7 @@ class ReplayUiTest {
         compose.onNodeWithTag("replay_canvas_map").assertIsDisplayed()
     }
 
-    @Test fun `Replay on the trip sheet closes the sheet, then opens Replay for that trip`() {
-        val actions = mutableListOf<DrivesAction>()
+    private fun tripSheet(actions: MutableList<DrivesAction>, open: () -> Boolean = { true }) {
         val detail = TripDetailUi("trip-7", "Today, 8:05 am", emptyList(), emptyList(), null, TripCorrection.DRIVER)
         compose.setContent {
             DrivePerfTheme(darkTheme = true) {
@@ -120,7 +123,7 @@ class ReplayUiTest {
                     state = DrivesUiState(
                         loaded = true,
                         trips = listOf(TripRowUi("trip-7", "Today, 8:05 am", "12 min · 8.1 km")),
-                        detail = detail,
+                        detail = detail.takeIf { open() },
                     ),
                     onSeeAll = {},
                     onAction = { actions += it },
@@ -128,8 +131,39 @@ class ReplayUiTest {
             }
         }
         compose.waitForIdle()
+    }
+
+    @Test fun `Replay on the trip sheet closes the sheet, then opens Replay for that trip`() {
+        val actions = mutableListOf<DrivesAction>()
+        tripSheet(actions)
         compose.onNodeWithTag(REPLAY_BUTTON_TAG).assertIsDisplayed().performClick()
         compose.waitForIdle()
         assertEquals(listOf<DrivesAction>(DrivesAction.OpenReplay("trip-7", "Today, 8:05 am")), actions)
+    }
+
+    @Test fun `Replay is disabled while the sheet slides away, so it opens once`() {
+        val actions = mutableListOf<DrivesAction>()
+        tripSheet(actions)
+        compose.mainClock.autoAdvance = false
+        compose.onNodeWithTag(REPLAY_BUTTON_TAG).performClick()
+        compose.mainClock.advanceTimeByFrame()
+        compose.onNodeWithTag(REPLAY_BUTTON_TAG).assertIsNotEnabled()
+        assertEquals("nothing goes out before the hide completes", emptyList<DrivesAction>(), actions)
+        compose.mainClock.autoAdvance = true
+        compose.waitForIdle()
+        assertEquals(listOf<DrivesAction>(DrivesAction.OpenReplay("trip-7", "Today, 8:05 am")), actions)
+    }
+
+    @Test fun `a hide cut short when the sheet goes away opens nothing`() {
+        val actions = mutableListOf<DrivesAction>()
+        var open by mutableStateOf(true)
+        tripSheet(actions) { open }
+        compose.mainClock.autoAdvance = false
+        compose.onNodeWithTag(REPLAY_BUTTON_TAG).performClick()
+        compose.mainClock.advanceTimeByFrame()
+        open = false
+        compose.mainClock.autoAdvance = true
+        compose.waitForIdle()
+        assertEquals(emptyList<DrivesAction>(), actions)
     }
 }
