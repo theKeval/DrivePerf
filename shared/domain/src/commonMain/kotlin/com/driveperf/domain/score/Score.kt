@@ -106,3 +106,53 @@ public data class Score(
     val algorithmVersion: String,
     val computedAt: Long,
 )
+
+/**
+ * pipeline-and-scoring.md §5.7 "Corrections" (F-HIS-02, F-SCO-05): after a trip's kind, an event's feedback or a
+ * deletion changes, re-derives the scores of that trip and every later one, in `(startedAt, id)` order, from the
+ * stored ledgers and without R1. Deterministic, and it never changes a score's [Score.algorithmVersion].
+ * Implemented in `:shared:pipeline`; the feedback store, the corrections and the trip deletion call it.
+ */
+public fun interface TripRecompute {
+    /** Re-derives the scores of trip [tripId] and every later trip. A trip that does not exist changes nothing. */
+    public suspend fun fromTrip(tripId: String)
+
+    public companion object {
+        /** Recomputes nothing: for scratch cores and tests that do not need it. */
+        public val NONE: TripRecompute = TripRecompute { }
+    }
+}
+
+/** One score a recompute changed: [before] as its walk read it, [after] as it recomputed it. */
+public data class ScoreChange(val before: Score, val after: Score)
+
+/** What [TripRecompute] reads and writes. Implemented in `:shared:data:local`. */
+public interface ScoreHistoryStore {
+    /**
+     * Finished, live trips that started at or after [startedAt], oldest first by `(startedAt, id)`, each with its
+     * score and route match.
+     */
+    public suspend fun finishedFrom(startedAt: Long): List<com.driveperf.domain.repository.ScoredTrip>
+
+    /**
+     * In one transaction, writes each change's [ScoreChange.after] to the `score` table while the stored score still
+     * equals its [ScoreChange.before], and returns the scores written. A score that changed after the walk read it, or
+     * whose trip was deleted, is left alone: a newer change wrote it, and that change's own recompute follows.
+     */
+    public suspend fun saveScores(changes: List<ScoreChange>): List<Score>
+}
+
+/**
+ * The `score_bucket` analytics value of a Smoothness score (analytics-crash-privacy.md §2): `lt_50`, `50_59`, `60_69`,
+ * `70_79`, `80_89` or `90_100`. Null when there is no score (unscorable or not a drive), so the property is left out.
+ */
+public fun scoreBucket(smoothness: Int?): String? = when {
+    smoothness == null -> null
+    smoothness < BUCKET_50 -> "lt_50"
+    smoothness >= BUCKET_90 -> "90_100"
+    else -> (smoothness / BUCKET_WIDTH * BUCKET_WIDTH).let { "${it}_${it + BUCKET_WIDTH - 1}" }
+}
+
+private const val BUCKET_50 = 50
+private const val BUCKET_90 = 90
+private const val BUCKET_WIDTH = 10

@@ -4,6 +4,12 @@ import com.driveperf.testing.SyntheticDrive
 
 /** The §8.3 scenarios, built with the shared generator. */
 internal object Goldens {
+    /**
+     * The scoring version the §8.3 table in `GoldenScenariosTest` was generated for. `ScoringReleaseGateTest` fails
+     * until it equals `Versions.SCORING`, so a version bump ships only with a regenerated table (DRIVE-108).
+     */
+    const val TABLE_VERSION: String = "smooth-1.0.0"
+
     fun trace(s: SyntheticDrive.Signals): R1Trace = R1Trace(
         lonG = s.lonG,
         latG = s.latG,
