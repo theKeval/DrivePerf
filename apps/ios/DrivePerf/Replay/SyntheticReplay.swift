@@ -3,7 +3,7 @@ import Foundation
 
 /// A synthetic replay that follows the shared Replay contract (DRIVE-200), with no real locations: an invented route
 /// with an estimated start, a 41 s GPS gap and a "phone moved" span. It backs the UI tests and simulator screenshots
-/// (`-replayFixture`) and stands in for `CoreServices.replay` until the shared model lands (see `ReplaySourceSeam`).
+/// (`-replayFixture`, `-replayFixtureAt`).
 final class SyntheticReplay: ReplayTrack, @unchecked Sendable {
     let tripId: String
     let durationS: Double
@@ -136,10 +136,3 @@ final class SyntheticReplayLoader: ReplayLoading {
     }
 }
 
-/// DRIVE-200 seam: where Replay reads trips from. The shared model (`CoreServices.replay`, built in parallel on
-/// `DRIVE-200-replay-model`) has not merged yet, so every trip shows the synthetic replay. When it merges this
-/// returns the Kotlin-backed loader instead and the fake stays for `-replayFixture` only.
-enum ReplaySourceSeam {
-    @MainActor
-    static func make() -> any ReplayLoading { SyntheticReplayLoader() }
-}

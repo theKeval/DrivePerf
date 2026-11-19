@@ -38,8 +38,9 @@ final class AppEnvironment {
     let recorder: CoreTripRecorder
     let surfaceRouter = TripSurfaceRouter()
     let corrections = CoreTripCorrections()
-    /// DRIVE-200, DRIVE-61: S-RPL-01.
-    let replaySource = ReplaySourceSeam.make()
+    /// DRIVE-200, DRIVE-61: S-RPL-01 reads `CoreServices.replay`; the Replay fixture reads the synthetic trip.
+    let coreReplay = CoreReplayLoader()
+    var replaySource: any ReplayLoading { ReplayFixture.isActive ? SyntheticReplayLoader() : coreReplay }
     let replayAnalytics = CoreReplayAnalytics()
     let connectivity: any ConnectivityMonitoring = ReplayFixture.isOffline
         ? FixedConnectivity(online: false) : NetworkConnectivity()
@@ -124,6 +125,7 @@ final class AppEnvironment {
         recorder.surfaceData?.updateLocation(canRecord: canRecordFromSystemSurface)
         corrections.attach(services.corrections)
         replayAnalytics.attach(services.analytics)
+        coreReplay.attach(services.replay)
         // The first launch after a restart re-arms the triggers and says why (F-CAP-14.3).
         recorder.onLaunch(reason: BootDetector().isFirstLaunchSinceBoot() ? .boot : .launch)
         updateTriggerAvailability()
