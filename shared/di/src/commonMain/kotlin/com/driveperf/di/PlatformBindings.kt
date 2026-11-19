@@ -23,7 +23,6 @@ import com.driveperf.domain.capture.RecorderState
 import com.driveperf.presentation.replay.ReplayPresenter
 import com.driveperf.presentation.replay.ReplaySource
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 
 /**
  * The natively implemented ports (ADR-002 section 5). Swift supplies its adapters at app launch; Android supplies
@@ -95,7 +94,7 @@ public class CoreServices internal constructor(
             tripId = tripId,
             source = source,
             replays = replay,
-            isRecording = { recorder.status.value.let { it.tripId == tripId && it.state != RecorderState.IDLE } },
+            isRecording = recordingCheck(tripId),
             analytics = analytics,
             monoNowNs = clock::monotonicNs,
             scope = scope,
@@ -103,7 +102,10 @@ public class CoreServices internal constructor(
 
     /** [replayPresenter] on the main thread with its own scope, for Swift. Call `close()` on deinit. */
     public fun replayPresenter(tripId: String, source: ReplaySource): ReplayPresenter =
-        replayPresenter(tripId, source, CoroutineScope(Dispatchers.Main))
+        ReplayPresenter.onMain(tripId, source, replay, recordingCheck(tripId), analytics, clock::monotonicNs)
+
+    private fun recordingCheck(tripId: String): () -> Boolean =
+        { recorder.status.value.let { it.tripId == tripId && it.state != RecorderState.IDLE } }
 
     /** Stops the recorder's work and closes the database. Only for a scratch core; the app's core lives as long as the process. */
     public fun close() {

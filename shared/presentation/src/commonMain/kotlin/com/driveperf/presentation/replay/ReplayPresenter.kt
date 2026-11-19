@@ -7,6 +7,9 @@ import com.driveperf.domain.replay.Replay
 import com.driveperf.domain.replay.ReplayRepository
 import com.driveperf.presentation.BasePresenter
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 
 /** Where Replay was opened from: the `source` of `replay_opened`. */
@@ -114,8 +117,16 @@ public class ReplayPresenter(
     private val monoNowNs: () -> Long,
     scope: CoroutineScope,
 ) : BasePresenter<ReplayState, ReplayIntent, ReplayEffect>(ReplayState(), scope) {
+    /** The scope [onMain] made for this presenter alone; [close] cancels it too. */
+    private var ownedScope: CoroutineScope? = null
+
     init {
         this.scope.launch { load() }
+    }
+
+    override fun close() {
+        super.close()
+        ownedScope?.cancel()
     }
 
     /** Monotonic now on the presenter's clock: pass it to [ReplayState.playheadAt] and [ReplayIntent.Tick]. */
@@ -131,7 +142,7 @@ public class ReplayPresenter(
             is ReplayIntent.ScrubTo -> scrubTo(intent.tS)
             ReplayIntent.ScrubEnd -> scrubEnd()
             is ReplayIntent.Tick -> tick(intent.nowNs)
-            ReplayIntent.OpenLegend -> track("quality_overlay_legend_opened")
+            ReplayIntent.OpenLegend -> analytics.replayEvent("quality_overlay_legend_opened")
         }
     }
 
@@ -143,7 +154,7 @@ public class ReplayPresenter(
         }
         val replay = replays.replay(tripId)
         update { it.copy(loading = false, replay = replay, unavailable = if (replay == null) ReplayUnavailable.NOT_FOUND else null) }
-        if (replay != null) track("replay_opened", "source" to source.key)
+        if (replay != null) analytics.replayEvent("replay_opened", "source" to source.key)
     }
 
     private fun play() {
@@ -153,7 +164,7 @@ public class ReplayPresenter(
         val duration = s.replay?.durationS ?: 0.0
         val from = s.playheadAt(now).let { if (it >= duration) 0.0 else it }
         update { it.copy(playing = true, scrubbing = false, anchorTS = from, anchorNs = now) }
-        track("replay_played", "speed" to s.speed.key)
+        analytics.replayEvent("replay_played", "speed" to s.speed.key)
     }
 
     /** Re-anchors at now, then applies [change], so the playhead never jumps. */
@@ -165,14 +176,14 @@ public class ReplayPresenter(
     private fun scrubStart() {
         if (state.value.scrubbing) return
         rebase { it.copy(scrubbing = true, resumeAfterScrub = it.playing, playing = false) }
-        track("replay_scrubbed")
+        analytics.replayEvent("replay_scrubbed")
     }
 
     private fun scrubTo(tS: Double) {
         val now = monoNowNs()
         val gesture = state.value.scrubbing
         update { it.copy(anchorTS = tS.coerceIn(0.0, it.replay?.durationS ?: 0.0), anchorNs = now) }
-        if (!gesture) track("replay_scrubbed")
+        if (!gesture) analytics.replayEvent("replay_scrubbed")
     }
 
     private fun scrubEnd() {
@@ -189,21 +200,42 @@ public class ReplayPresenter(
         val duration = s.replay?.durationS ?: return
         if (!s.playing || s.scrubbing || s.playheadAt(nowNs) < duration) return
         update { it.copy(playing = false, anchorTS = duration, anchorNs = nowNs) }
-        track("replay_completed")
+        analytics.replayEvent("replay_completed")
     }
 
-    private fun track(name: String, vararg properties: Pair<String, String>) {
-        analytics.track(ReplayEvent(name, properties.toMap()))
-    }
-
-    private val PlaybackSpeed.key: String
-        get() = when (this) {
-            PlaybackSpeed.AUTO -> "auto"
-            PlaybackSpeed.X1 -> "1x"
-            PlaybackSpeed.X10 -> "10x"
-            PlaybackSpeed.X30 -> "30x"
+    public companion object {
+        /**
+         * A presenter on the main thread in a scope of its own, for Swift, which cannot make a `CoroutineScope`. For
+         * the iOS UI-test fixture and previews: pass a `StaticReplayRepository` holding a synthetic `Replay`. The app
+         * itself uses `CoreServices.replayPresenter`. Call [close] on deinit; it cancels the scope.
+         */
+        @Suppress("LongParameterList") // the constructor's inputs, minus the scope
+        public fun onMain(
+            tripId: String,
+            source: ReplaySource,
+            replays: ReplayRepository,
+            isRecording: () -> Boolean,
+            analytics: Analytics,
+            monoNowNs: () -> Long,
+        ): ReplayPresenter {
+            val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+            return ReplayPresenter(tripId, source, replays, isRecording, analytics, monoNowNs, scope).also { it.ownedScope = scope }
         }
+    }
 }
+
+private fun Analytics.replayEvent(name: String, vararg properties: Pair<String, String>) {
+    track(ReplayEvent(name, properties.toMap()))
+}
+
+/** The `speed` value of `replay_played`. */
+private val PlaybackSpeed.key: String
+    get() = when (this) {
+        PlaybackSpeed.AUTO -> "auto"
+        PlaybackSpeed.X1 -> "1x"
+        PlaybackSpeed.X10 -> "10x"
+        PlaybackSpeed.X30 -> "30x"
+    }
 
 /** A Replay analytics event (PRD F-RPL-01, F-RPL-08): fixed keys and values only. */
 public data class ReplayEvent(override val name: String, override val properties: Map<String, String>) : AnalyticsEvent
