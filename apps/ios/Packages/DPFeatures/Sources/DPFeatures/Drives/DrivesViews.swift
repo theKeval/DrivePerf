@@ -63,6 +63,7 @@ struct DrivesHomeView: View {
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) { ProfileAvatarButton(action: onProfile) }
             }
+            .tripDeletedToast(trips: trips)
         }
     }
 }
@@ -123,6 +124,10 @@ struct AllDrivesView: View {
     var body: some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: DPLayout.sectionGap) {
+                if !trips.trips.isEmpty {
+                    DrivesFilterBar(trips: trips)
+                    DrivesFilterEmpty(trips: trips)
+                }
                 ForEach(trips.sections) { section in
                     VStack(alignment: .leading, spacing: DPSpace.s2) {
                         HStack {
@@ -159,6 +164,8 @@ struct AllDrivesView: View {
                 }
             }
         }
+        .drivesFilterSheet(trips: trips)
+        .tripDeletedToast(trips: trips)
     }
 }
 

@@ -85,6 +85,9 @@ final class CoreDrivesPresenter: DrivesPresenting {
         if let open = effect as? DrivesEffectOpenAnalysis {
             return .openAnalysis(tripId: open.tripId, title: open.title)
         }
+        if let deleted = effect as? DrivesEffectTripDeleted {
+            return .tripDeleted(tripId: deleted.tripId, message: deleted.message)
+        }
         return nil
     }
 
@@ -101,7 +104,10 @@ final class CoreDrivesPresenter: DrivesPresenting {
             corrections: s.corrections.map {
                 CorrectionChoice(correction: KotlinMapping.swift($0.correction), title: $0.title)
             },
-            explainer: s.explainer.map(explainer))
+            explainer: s.explainer.map(explainer),
+            canEdit: s.canEdit, edit: s.edit.map(editForm), deleting: s.deleting.map(deleteConfirmation),
+            editMessage: s.editMessage.map { TripEditToast(tripId: $0.tripId, text: $0.text, undoLabel: $0.undoLabel) },
+            history: history(s.history))
     }
 
     static func row(_ r: TripRowUi) -> TripRow {
@@ -258,6 +264,8 @@ final class CoreDrivesPresenter: DrivesPresenting {
         case .tapContributor(let id): DrivesIntentTapContributor(contributor: contributorID(id))
         case .answer(let tripId, let yes): DrivesIntentAnswer(tripId: tripId, yes: yes)
         case .correct(let tripId, let to): DrivesIntentCorrect(tripId: tripId, to: KotlinMapping.kotlin(to))
+        case .edit(let command): DrivesIntentEdit(action: kotlin(command))
+        case .history(let command): DrivesIntentHistory(action: kotlin(command))
         }
     }
 

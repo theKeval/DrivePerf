@@ -71,7 +71,7 @@ final class TripQualityTests: XCTestCase {
         XCTAssertEqual(model.countText, "3 drives")
         XCTAssertNotNil(model.sinceText)
         XCTAssertFalse(model.canCorrect)
-        XCTAssertEqual(model.corrections.map(\.correction), [.driver, .passenger, .transit, .bike, .walk, .other])
+        XCTAssertEqual(model.corrections.map(\.correction), [.driver, .passenger, .transit, .bike, .walk, .other, .taxi])
     }
 
     func testDetailAndQualityMapEveryField() async throws {
