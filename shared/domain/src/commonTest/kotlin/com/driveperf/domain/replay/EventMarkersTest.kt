@@ -25,7 +25,7 @@ class EventMarkersTest {
         EventFeedback(eventId = id, tripId = "t", needed = needed, inaccurate = inaccurate, at = 0L)
 
     @Test
-    fun `markers carry the event's type and times, ordered by peak then ID`() {
+    fun `markers carry the event's type and times ordered by peak then ID`() {
         val markers = EventMarkers.build(
             listOf(event("c", 30.0, EventType.CORNER), event("b", 10.0), event("a", 10.0, EventType.ACCEL)),
             emptyMap(),
@@ -50,7 +50,7 @@ class EventMarkersTest {
     }
 
     @Test
-    fun `no pin without a position (EC-GPS)`() {
+    fun `no pin without a position EC-GPS`() {
         val markers = EventMarkers.build(
             listOf(event("a", 1.0, lat = null), event("b", 2.0, lng = null), event("c", 3.0, lat = null, lng = null)),
             emptyMap(),
@@ -61,7 +61,7 @@ class EventMarkersTest {
     }
 
     @Test
-    fun `no pin when the peak is inside an estimated or excluded span, start inclusive and end exclusive`() {
+    fun `no pin when the peak is inside an estimated or excluded span with start inclusive and end exclusive`() {
         val spans = listOf(
             TripSegment(SegmentKind.ESTIMATED, 0.0, 10.0, null),
             TripSegment(SegmentKind.GAP, 20.0, 30.0, SegmentReason.TUNNEL),
