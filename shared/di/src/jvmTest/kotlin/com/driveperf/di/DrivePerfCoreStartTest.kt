@@ -6,6 +6,8 @@ import com.driveperf.domain.capture.LocationSample
 import com.driveperf.domain.capture.RecorderState
 import com.driveperf.domain.capture.WakeEvent
 import com.driveperf.domain.capture.WakeKind
+import com.driveperf.domain.replay.SegmentStyle
+import com.driveperf.presentation.replay.ReplaySource
 import com.driveperf.domain.trip.TripSource
 import com.driveperf.domain.tripfile.TripFileKind
 import com.driveperf.testing.FakeActivitySource
@@ -15,6 +17,7 @@ import com.driveperf.testing.FakeParkedRegionMonitor
 import com.driveperf.testing.FakePowerState
 import com.driveperf.testing.InMemoryTripFileStore
 import com.driveperf.testing.TestClock
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
@@ -22,7 +25,9 @@ import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
@@ -91,6 +96,20 @@ class DrivePerfCoreStartTest {
         val r1 = assertNotNull(bindings.files.describe(trip.id, TripFileKind.R1, withSha256 = false))
         assertTrue(r1.compressed, "R1 is gzip-compressed at finalisation")
         assertTrue(assertNotNull(bindings.files.describe(trip.id, TripFileKind.R0, withSha256 = false)).compressed)
+        // DRIVE-200: Replay reads the R1 fixes back; a manual trip has no estimated start.
+        val replay = assertNotNull(core.replay.replay(trip.id))
+        assertFalse(replay.summaryOnly)
+        assertTrue(replay.track.size > 20, "the 1 Hz fixes: ${replay.track.size}")
+        assertTrue(replay.spans.none { it.style == SegmentStyle.ESTIMATED })
+        assertNull(core.replay.replay("missing"))
+        // The shared presenter loads the same replay; a trip that is not recording is never sent to the drive screen.
+        val presenterScope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Default)
+        val presenter = core.replayPresenter(trip.id, ReplaySource.TRIP_DETAIL, presenterScope)
+        val loaded = withTimeout(5_000) { presenter.state.first { !it.loading } }
+        assertEquals(trip.id, loaded.replay?.tripId)
+        assertNull(loaded.unavailable)
+        presenter.close()
+        presenterScope.cancel()
     }
 
     @Test
