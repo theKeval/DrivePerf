@@ -21,6 +21,15 @@ fun mapsSetting(name: String): String = localProperties.getProperty(name) ?: pro
 val mapsApiKey = mapsSetting("MAPS_API_KEY")
 val mapsMapId = mapsSetting("MAPS_MAP_ID")
 
+// Release lane (DRIVE-218, ADR-008): release-android.yml sets the marketing version from the tag and the Play upload key
+// from the `prod` environment. Without the keystore the release bundle is unsigned, which is what local builds and pull
+// requests get. Play App Signing re-signs what users install. Steps: docs/launch/release-runbook.md.
+val releaseVersionName: String = providers.environmentVariable("DRIVEPERF_VERSION_NAME").orElse("0.1.0").get()
+val uploadKeystore: String? = providers.environmentVariable("DRIVEPERF_UPLOAD_KEYSTORE").orNull?.takeIf { it.isNotBlank() }
+
+fun uploadSetting(name: String): String = providers.environmentVariable(name).orNull?.takeIf { it.isNotBlank() }
+    ?: throw GradleException("$name is not set: the release lane signs with the upload key (docs/launch/release-runbook.md)")
+
 android {
     namespace = "com.driveperf.app"
     compileSdk = 37 // libraries need the newest APIs to compile; targetSdk stays 36 (ADR-001)
@@ -31,7 +40,7 @@ android {
         targetSdk = 36
         // Build number = CI run number (ADR-008); the marketing version is set at release time.
         versionCode = (System.getenv("GITHUB_RUN_NUMBER") ?: "1").toInt()
-        versionName = "0.1.0"
+        versionName = releaseVersionName
         buildConfigField("String", "SENTRY_DSN", "\"${sentryDsn.get()}\"")
         manifestPlaceholders["MAPS_API_KEY"] = mapsApiKey
         buildConfigField("boolean", "HAS_MAPS_KEY", mapsApiKey.isNotBlank().toString())
@@ -51,8 +60,20 @@ android {
         }
     }
 
+    signingConfigs {
+        if (uploadKeystore != null) {
+            create("upload") {
+                storeFile = file(uploadKeystore)
+                storePassword = uploadSetting("DRIVEPERF_UPLOAD_STORE_PASSWORD")
+                keyAlias = uploadSetting("DRIVEPERF_UPLOAD_KEY_ALIAS")
+                keyPassword = uploadSetting("DRIVEPERF_UPLOAD_KEY_PASSWORD")
+            }
+        }
+    }
+
     buildTypes {
         release {
+            signingConfigs.findByName("upload")?.let { signingConfig = it }
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")

@@ -46,13 +46,15 @@ Created on 19 Nov 2026 with Keval's choices: name **DrivePerf**, SKU `driveperf-
 English (U.S.), bundle ID `com.driveperf.app`, Full Access. The name can change until the first release.
 
 ADR-008 also puts `com.driveperf.app.dev` on an internal TestFlight group. That needs a second app record (for example
-"DrivePerf Dev") if dev builds should go to TestFlight too; decide when the release lane is built (DRIVE-67).
+"DrivePerf Dev") if dev builds should go to TestFlight too. DRIVE-218 decided against it for the v1 beta: see the
+[release runbook](release-runbook.md), "What goes to beta".
 
 ## Part B. Secrets for `release-ios.yml` (Keval, in a terminal and on GitHub)
 
-`release-ios.yml` is inert today (placeholder step, gated on the repository variable `RELEASE_IOS_ENABLED`). The lane
-ADR-008 describes, and DRIVE-67 builds, needs the items below in the GitHub environment **`prod`** (it exists and
-requires Keval's approval). Create them now or when DRIVE-67 lands; the secret names below are what the lane will read.
+`release-ios.yml` runs the Fastlane lane `ios beta` (DRIVE-218), gated on the repository variable
+`RELEASE_IOS_ENABLED`. It needs the items below in the GitHub environment **`prod`** (it exists and requires Keval's
+approval); the secret names below are what the lane reads. The TestFlight group, the switch and cutting a release are in
+the [release runbook](release-runbook.md).
 
 ### B1. App Store Connect API key (uploads to TestFlight, read-only `match`)
 
@@ -118,7 +120,7 @@ ever reads them (`readonly`). An individual account can hold a small number of d
 gh variable set APPLE_TEAM_ID --repo theKeval/DrivePerf --body N6H3394FM2
 ```
 
-`RELEASE_IOS_ENABLED=true` comes last, after DRIVE-67 replaces the placeholder step. `SENTRY_AUTH_TOKEN` (dSYM upload,
+`RELEASE_IOS_ENABLED=true` comes last ([release runbook](release-runbook.md) Part D). `SENTRY_AUTH_TOKEN` (dSYM upload,
 ADR-007) joins `prod` when the Sentry project exists.
 
 | Name | Kind | Where | From |
@@ -131,4 +133,4 @@ ADR-007) joins `prod` when the Sentry project exists.
 | `MATCH_GIT_URL` | variable | repository | B2 |
 | `APPLE_TEAM_ID` | variable | repository | B4 |
 | `SENTRY_AUTH_TOKEN` | secret | env `prod` | later (ADR-007) |
-| `RELEASE_IOS_ENABLED` | variable | repository | after DRIVE-67 |
+| `RELEASE_IOS_ENABLED` | variable | repository | [release runbook](release-runbook.md) Part D |

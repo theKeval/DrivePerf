@@ -1,31 +1,129 @@
 name: release-android
 
-# INERT: there is no upload key, Play service account or Fastlane lane yet (DRIVE-72). The job runs only when the
-# repository variable RELEASE_ANDROID_ENABLED is 'true' (it is not set), so pushing a tag today starts a run that
-# is skipped. It builds the release bundle and stops: signing, the Sentry mapping upload (ADR-007) and the Fastlane
-# `supply` push to the internal track are added with DRIVE-72, using secrets in the `prod` environment.
-# Nothing here creates tags or publishes. See docs/architecture/ci-cd.md.
+# Beta lane for Android (DRIVE-218, ADR-008): builds the prod release bundle (`com.driveperf.app`), signs it with the
+# upload key, keeps it and its R8 mapping as an artifact, and Fastlane `supply` uploads both to the Play internal
+# testing track. The job runs only when the repository variable RELEASE_ANDROID_ENABLED is 'true', in the `prod`
+# environment, which needs Keval's approval for every run. Every secret lives in that environment; the runbook lists
+# them and how Keval creates them: docs/launch/release-runbook.md. Without PLAY_SERVICE_ACCOUNT_JSON the run stops
+# after the signed bundle (for the first, manual Play upload). Nothing here creates tags. A pull request that touches
+# the lanes only loads them (no secrets, no environment).
 
 on:
   push:
     tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Marketing version, for example 0.2.0 (a tag run uses the tag instead)
+        required: true
+  pull_request:
+    paths:
+      - 'fastlane/**'
+      - '.github/workflows/release-android.yml'
 
 permissions:
   contents: read
 
+concurrency:
+  group: release-android-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  BUNDLE_GEMFILE: ${{ github.workspace }}/fastlane/Gemfile
+
 jobs:
-  bundle:
-    name: Build prod release bundle
-    if: vars.RELEASE_ANDROID_ENABLED == 'true'
+  lanes:
+    name: Load the Fastlane lanes
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
-    environment: prod   # requires Keval's approval (ADR-008)
     steps:
       - uses: actions/checkout@v7
+      - uses: ruby/setup-ruby@de492cf36cbab201753d720ce4f4e336cd688c94   # v1.336.0, pinned: this job holds prod secrets
+        with:
+          ruby-version: '4.0'
+          bundler-cache: true
+      - run: bundle exec fastlane lanes
+
+  internal:
+    name: Build, sign and upload to Play internal testing
+    if: github.event_name != 'pull_request' && vars.RELEASE_ANDROID_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    environment: prod   # requires Keval's approval (ADR-008)
+    env:
+      DRIVEPERF_RUN_NUMBER: ${{ github.run_number }}
+      HAS_PLAY_KEY: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON != '' }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Version
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          if [ "$GITHUB_REF_TYPE" = tag ]; then version="${GITHUB_REF_NAME#v}"; else version="$INPUT_VERSION"; fi
+          if ! printf '%s' "$version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "::error::The version must look like 1.2.3 (tag v1.2.3), got '$version'"; exit 1
+          fi
+          echo "DRIVEPERF_VERSION_NAME=$version" >> "$GITHUB_ENV"
+          echo "Version $version, version code $DRIVEPERF_RUN_NUMBER"
+
       - uses: ./.github/actions/setup-build
         with: { android: 'true' }
-      - name: Bundle (unsigned until DRIVE-72 adds the upload key)
+
+      # The upload key is written to the runner's temporary folder for the Gradle signing config and deleted at the end.
+      # Play App Signing holds the key that signs what users install (ADR-008).
+      - name: Upload key
+        env:
+          ANDROID_UPLOAD_KEYSTORE_BASE64: ${{ secrets.ANDROID_UPLOAD_KEYSTORE_BASE64 }}
+        run: |
+          if [ -z "$ANDROID_UPLOAD_KEYSTORE_BASE64" ]; then
+            echo "::error::ANDROID_UPLOAD_KEYSTORE_BASE64 is not set in the prod environment (docs/launch/release-runbook.md)"; exit 1
+          fi
+          keystore="$RUNNER_TEMP/driveperf-upload.jks"
+          printf '%s' "$ANDROID_UPLOAD_KEYSTORE_BASE64" | base64 --decode > "$keystore"
+          echo "DRIVEPERF_UPLOAD_KEYSTORE=$keystore" >> "$GITHUB_ENV"
+
+      - name: Bundle prodRelease (signed)
+        env:
+          DRIVEPERF_UPLOAD_STORE_PASSWORD: ${{ secrets.ANDROID_UPLOAD_STORE_PASSWORD }}
+          DRIVEPERF_UPLOAD_KEY_ALIAS: ${{ secrets.ANDROID_UPLOAD_KEY_ALIAS }}
+          DRIVEPERF_UPLOAD_KEY_PASSWORD: ${{ secrets.ANDROID_UPLOAD_KEY_PASSWORD }}
         run: ./gradlew --console=plain :apps:android:app:bundleProdRelease
+
+      - name: Check the bundle is signed with the upload key
+        run: |
+          aab=apps/android/app/build/outputs/bundle/prodRelease/app-prod-release.aab
+          jarsigner -verify "$aab" > /dev/null || { echo "::error::$aab is not signed"; exit 1; }
+          echo "Signed: $aab"
+
       - uses: actions/upload-artifact@v7
         with:
-          name: app-prod-release-bundle
-          path: apps/android/app/build/outputs/bundle/prodRelease/*.aab
+          name: android-prod-release-${{ env.DRIVEPERF_VERSION_NAME }}-${{ github.run_number }}
+          path: |
+            apps/android/app/build/outputs/bundle/prodRelease/*.aab
+            apps/android/app/build/outputs/mapping/prodRelease/mapping.txt
+          retention-days: 90
+
+      - uses: ruby/setup-ruby@de492cf36cbab201753d720ce4f4e336cd688c94   # v1.336.0, pinned: this job holds prod secrets
+        if: env.HAS_PLAY_KEY == 'true'
+        with:
+          ruby-version: '4.0'
+          bundler-cache: true
+
+      - name: Fastlane android internal
+        if: env.HAS_PLAY_KEY == 'true'
+        env:
+          PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+          PLAY_RELEASE_STATUS: ${{ vars.PLAY_RELEASE_STATUS || 'completed' }}
+          FASTLANE_SKIP_UPDATE_CHECK: '1'
+          FASTLANE_HIDE_CHANGELOG: '1'
+        run: bundle exec fastlane android internal
+
+      - name: Play upload skipped
+        if: env.HAS_PLAY_KEY != 'true'
+        run: |
+          echo "::warning::PLAY_SERVICE_ACCOUNT_JSON is not set: the signed bundle is in this run's artifacts and was not uploaded to Play (docs/launch/release-runbook.md C4)."
+
+      - name: Remove the upload key
+        if: always()
+        run: rm -f "$RUNNER_TEMP/driveperf-upload.jks"

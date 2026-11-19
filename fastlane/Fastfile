@@ -1,0 +1,162 @@
+# Release lanes for the beta (DRIVE-218, ADR-008). `release-ios.yml` and `release-android.yml` run them on a `v*` tag
+# or a manual dispatch, in the GitHub environment `prod` (Keval approves every run). Every credential comes from that
+# environment as an environment variable; nothing here creates, prints or stores one. The steps that create them are in
+# docs/launch/release-runbook.md.
+#
+#   ios beta          match (read-only) -> gym -> Sentry dSYM upload (when configured) -> pilot (TestFlight)
+#   android internal  supply: the signed prod release bundle and its R8 mapping to the Play internal testing track
+#
+# Run from the repository root: BUNDLE_GEMFILE=fastlane/Gemfile bundle exec fastlane <platform> <lane>
+
+default_platform(:ios)
+
+# Shipping identity (ADR-008). Only the prod app goes to beta: the dev app (`com.driveperf.app.dev`) stays a
+# device-only build, see docs/launch/release-runbook.md "What goes to beta".
+APP_ID = "com.driveperf.app"
+IOS_TARGETS = {
+  "DrivePerf" => APP_ID,
+  "DrivePerfWidgets" => "#{APP_ID}.widgets",
+}.freeze
+IOS_PROJECT = "apps/ios/DrivePerf.xcodeproj"
+IOS_OUTPUT = "build/ios-release"
+ANDROID_BUNDLE = "apps/android/app/build/outputs/bundle/prodRelease/app-prod-release.aab"
+ANDROID_MAPPING = "apps/android/app/build/outputs/mapping/prodRelease/mapping.txt"
+
+# sentry-cli for the dSYM upload (ADR-007), pinned and fetched with npx so no binary is committed or piped to a shell.
+SENTRY_CLI = "@sentry/cli@3.8.2"
+
+# Fails with the variable's name, never its value.
+def required_env(name)
+  value = ENV.fetch(name, "").strip
+  UI.user_error!("#{name} is not set. See docs/launch/release-runbook.md.") if value.empty?
+  value
+end
+
+# Marketing version and build number, set by the workflow from the tag (v1.2.3 -> 1.2.3) and the run number.
+def release_version
+  version = required_env("DRIVEPERF_VERSION_NAME")
+  UI.user_error!("DRIVEPERF_VERSION_NAME must look like 1.2.3") unless version.match?(/\A\d+\.\d+\.\d+\z/)
+  build = required_env("DRIVEPERF_BUILD_NUMBER")
+  UI.user_error!("DRIVEPERF_BUILD_NUMBER must be a whole number") unless build.match?(/\A\d+\z/)
+  [version, build]
+end
+
+platform :ios do
+  desc "Build com.driveperf.app (Release), upload its dSYMs to Sentry and the build to TestFlight"
+  lane :beta do
+    version, build = release_version
+    team_id = required_env("APPLE_TEAM_ID")
+
+    # A temporary keychain on CI, so the distribution certificate never lands in the login keychain.
+    setup_ci if ENV["CI"]
+
+    api_key = app_store_connect_api_key(
+      key_id: required_env("ASC_KEY_ID"),
+      issuer_id: required_env("ASC_ISSUER_ID"),
+      key_content: required_env("ASC_KEY_P8_BASE64"),
+      is_key_content_base64: true,
+      in_house: false,
+    )
+
+    # Read-only: CI never creates or renews certificates or profiles. Keval runs `match appstore` once on their Mac
+    # (docs/launch/apple-developer-setup.md B3). MATCH_PASSWORD is read from the environment by match itself.
+    required_env("MATCH_PASSWORD")
+    match(
+      type: "appstore",
+      readonly: true,
+      git_url: required_env("MATCH_GIT_URL"),
+      app_identifier: IOS_TARGETS.values,
+      team_id: team_id,
+      api_key: api_key,
+    )
+
+    # The committed project is unsigned (apps/ios/Config/DrivePerf.xcconfig). Sign the two shipping targets with the
+    # match profiles, in this CI checkout only.
+    profiles = IOS_TARGETS.to_h do |target, bundle_id|
+      profile = ENV["sigh_#{bundle_id}_appstore_profile-name"]
+      UI.user_error!("match returned no App Store profile for #{bundle_id}") if profile.to_s.empty?
+      update_code_signing_settings(
+        path: IOS_PROJECT,
+        targets: [target],
+        build_configurations: ["Release"],
+        use_automatic_signing: false,
+        team_id: team_id,
+        code_sign_identity: "Apple Distribution",
+        profile_name: profile,
+      )
+      [bundle_id, profile]
+    end
+
+    gym(
+      project: IOS_PROJECT,
+      scheme: "DrivePerf",
+      configuration: "Release",
+      export_method: "app-store",
+      export_team_id: team_id,
+      export_options: { signingStyle: "manual", provisioningProfiles: profiles },
+      output_directory: IOS_OUTPUT,
+      output_name: "DrivePerf",
+      clean: true,
+      include_symbols: true,
+      include_bitcode: false,
+      xcargs: "MARKETING_VERSION=#{version} CURRENT_PROJECT_VERSION=#{build} DP_FEATURE_TESTFLIGHT=YES",
+    )
+
+    upload_dsyms_to_sentry
+
+    upload_to_testflight(
+      api_key: api_key,
+      app_identifier: APP_ID,
+      ipa: lane_context[SharedValues::IPA_OUTPUT_PATH],
+      # Internal testers get the build through the group's automatic distribution once Apple has processed it, so the
+      # runner does not wait 10 to 30 minutes for processing. External testing needs Beta App Review: not used yet.
+      skip_waiting_for_build_processing: true,
+      distribute_external: false,
+    )
+  end
+
+  # ADR-007: dSYMs go to Sentry so crashes, including the shared Kotlin code statically linked into the app binary, are
+  # symbolicated. Source context stays off. Skipped with a warning until SENTRY_AUTH_TOKEN exists in `prod`.
+  private_lane :upload_dsyms_to_sentry do
+    if ENV.fetch("SENTRY_AUTH_TOKEN", "").strip.empty?
+      UI.important("SENTRY_AUTH_TOKEN is not set: dSYMs were not uploaded to Sentry (they are kept as a workflow artifact).")
+      next
+    end
+    # Ruby code in a Fastfile runs inside fastlane/, actions run from the repository root: resolve against the root.
+    dsym = lane_context[SharedValues::DSYM_OUTPUT_PATH].to_s
+    dsym = File.expand_path(dsym, "..") unless dsym.empty?
+    UI.user_error!("gym produced no dSYM archive") if dsym.empty? || !File.exist?(dsym)
+    sh(
+      "npx", "--yes", SENTRY_CLI, "debug-files", "upload",
+      "--org", required_env("SENTRY_ORG"),
+      "--project", required_env("SENTRY_PROJECT_IOS"),
+      dsym,
+    )
+  end
+end
+
+platform :android do
+  desc "Upload the signed prod release bundle and its R8 mapping to the Play internal testing track"
+  lane :internal do
+    # Ruby code in a Fastfile runs inside fastlane/; the paths above are relative to the repository root.
+    aab = File.expand_path(ANDROID_BUNDLE, "..")
+    UI.user_error!("No release bundle at #{ANDROID_BUNDLE}: run bundleProdRelease first") unless File.exist?(aab)
+    mapping = File.expand_path(ANDROID_MAPPING, "..")
+
+    upload_to_play_store(
+      package_name: APP_ID,
+      track: "internal",
+      aab: aab,
+      mapping: File.exist?(mapping) ? mapping : nil,
+      json_key_data: required_env("PLAY_SERVICE_ACCOUNT_JSON"),
+      # "completed" rolls the release out to the internal testers at once. Play only accepts "draft" until the app's
+      # first release has been rolled out from the Play Console (runbook C4), so the variable can switch it.
+      release_status: ENV.fetch("PLAY_RELEASE_STATUS", "completed"),
+      skip_upload_apk: true,
+      skip_upload_metadata: true,
+      skip_upload_changelogs: true,
+      skip_upload_images: true,
+      skip_upload_screenshots: true,
+    )
+  end
+end

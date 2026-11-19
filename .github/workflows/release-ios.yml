@@ -1,27 +1,119 @@
 name: release-ios
 
-# INERT: there is no Apple Developer account, App Store Connect API key, signing repository or Fastlane lane yet
-# (DRIVE-67). The job runs only when the repository variable RELEASE_IOS_ENABLED is 'true' (it is not set), and
-# even then it fails on purpose until DRIVE-67 replaces the step below with Fastlane `match` (read-only), `gym`,
-# `pilot` and the dSYM upload to Sentry (ADR-007, ADR-008). Nothing here creates tags or publishes.
-# See docs/architecture/ci-cd.md.
+# Beta lane for iOS (DRIVE-218, ADR-008): Fastlane `match` (read-only), `gym`, the dSYM upload to Sentry (ADR-007) and
+# `pilot` to TestFlight. It builds `com.driveperf.app` (Release) only. The job runs only when the repository variable
+# RELEASE_IOS_ENABLED is 'true', in the `prod` environment, which needs Keval's approval for every run. Every secret
+# lives in that environment; the runbook lists them and how Keval creates them: docs/launch/release-runbook.md.
+# Nothing here creates tags. A pull request that touches the lanes only loads them (no secrets, no environment).
 
 on:
   push:
     tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Marketing version, for example 0.2.0 (a tag run uses the tag instead)
+        required: true
+  pull_request:
+    paths:
+      - 'fastlane/**'
+      - '.github/workflows/release-ios.yml'
 
 permissions:
   contents: read
 
+concurrency:
+  group: release-ios-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  BUNDLE_GEMFILE: ${{ github.workspace }}/fastlane/Gemfile
+
 jobs:
-  testflight:
-    name: Build and upload to TestFlight
-    if: vars.RELEASE_IOS_ENABLED == 'true'
-    runs-on: macos-26
-    environment: prod   # requires Keval's approval (ADR-008)
+  lanes:
+    name: Load the Fastlane lanes
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - name: Not configured yet
+      - uses: ruby/setup-ruby@de492cf36cbab201753d720ce4f4e336cd688c94   # v1.336.0, pinned: this job holds prod secrets
+        with:
+          ruby-version: '4.0'
+          bundler-cache: true
+      - run: bundle exec fastlane lanes
+
+  testflight:
+    name: Build and upload to TestFlight
+    if: github.event_name != 'pull_request' && vars.RELEASE_IOS_ENABLED == 'true'
+    runs-on: macos-26
+    timeout-minutes: 90
+    environment: prod   # requires Keval's approval (ADR-008)
+    env:
+      DRIVEPERF_RUN_NUMBER: ${{ github.run_number }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Version
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
         run: |
-          echo "::error::release-ios is not configured: the Apple account, signing and Fastlane lanes arrive with DRIVE-67."
-          exit 1
+          if [ "$GITHUB_REF_TYPE" = tag ]; then version="${GITHUB_REF_NAME#v}"; else version="$INPUT_VERSION"; fi
+          if ! printf '%s' "$version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "::error::The version must look like 1.2.3 (tag v1.2.3), got '$version'"; exit 1
+          fi
+          echo "DRIVEPERF_VERSION_NAME=$version" >> "$GITHUB_ENV"
+          echo "DRIVEPERF_BUILD_NUMBER=$DRIVEPERF_RUN_NUMBER" >> "$GITHUB_ENV"
+          echo "Version $version, build $DRIVEPERF_RUN_NUMBER"
+
+      # JDK, Gradle and the Kotlin/Native cache: the Xcode Run Script phase builds the DrivePerfShared framework.
+      - uses: ./.github/actions/setup-build
+
+      - uses: ruby/setup-ruby@de492cf36cbab201753d720ce4f4e336cd688c94   # v1.336.0, pinned: this job holds prod secrets
+        with:
+          ruby-version: '4.0'
+          bundler-cache: true
+
+      # match reads the private certificates repository over SSH with a read-only deploy key. The key is held by
+      # ssh-agent only; GitHub's published host key is pinned instead of trusting the first scan.
+      - name: SSH access to the match repository
+        env:
+          MATCH_GIT_PRIVATE_KEY: ${{ secrets.MATCH_GIT_PRIVATE_KEY }}
+        run: |
+          if [ -z "$MATCH_GIT_PRIVATE_KEY" ]; then
+            echo "::error::MATCH_GIT_PRIVATE_KEY is not set in the prod environment (docs/launch/release-runbook.md)"; exit 1
+          fi
+          mkdir -p ~/.ssh && chmod 700 ~/.ssh
+          echo "github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl" >> ~/.ssh/known_hosts
+          eval "$(ssh-agent -s)" > /dev/null
+          printf '%s\n' "$MATCH_GIT_PRIVATE_KEY" | ssh-add - > /dev/null
+          echo "SSH_AUTH_SOCK=$SSH_AUTH_SOCK" >> "$GITHUB_ENV"
+          echo "SSH_AGENT_PID=$SSH_AGENT_PID" >> "$GITHUB_ENV"
+
+      - name: Fastlane ios beta
+        env:
+          APPLE_TEAM_ID: ${{ vars.APPLE_TEAM_ID }}
+          MATCH_GIT_URL: ${{ vars.MATCH_GIT_URL }}
+          MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_KEY_P8_BASE64: ${{ secrets.ASC_KEY_P8_BASE64 }}
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG: ${{ vars.SENTRY_ORG }}
+          SENTRY_PROJECT_IOS: ${{ vars.SENTRY_PROJECT_IOS }}
+          FASTLANE_SKIP_UPDATE_CHECK: '1'
+          FASTLANE_HIDE_CHANGELOG: '1'
+        run: bundle exec fastlane ios beta
+
+      # The dSYMs stay with the run, so a crash can be symbolicated even before the Sentry project exists. The IPA is
+      # not kept: TestFlight has it.
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: ios-dsyms-${{ env.DRIVEPERF_VERSION_NAME }}-${{ github.run_number }}
+          path: build/ios-release/*.dSYM.zip
+          if-no-files-found: ignore
+          retention-days: 90
+
+      - name: Remove the SSH key
+        if: always()
+        run: ssh-add -D 2>/dev/null || true
