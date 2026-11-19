@@ -20,9 +20,14 @@ import com.driveperf.domain.capture.TripRecorder
 import com.driveperf.domain.tripfile.TripFileStore
 import com.driveperf.foundation.Clock
 import com.driveperf.domain.capture.RecorderState
+import com.driveperf.domain.settings.UnitSystem
+import com.driveperf.presentation.drives.DrivesFormatter
+import com.driveperf.presentation.drives.DrivesPresenter
 import com.driveperf.presentation.replay.ReplayPresenter
 import com.driveperf.presentation.replay.ReplaySource
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
 
 /**
  * The natively implemented ports (ADR-002 section 5). Swift supplies its adapters at app launch; Android supplies
@@ -103,6 +108,21 @@ public class CoreServices internal constructor(
     /** [replayPresenter] on the main thread with its own scope, for Swift. Call `close()` on deinit. */
     public fun replayPresenter(tripId: String, source: ReplaySource): ReplayPresenter =
         ReplayPresenter.onMain(tripId, source, replay, recordingCheck(tripId), analytics, clock::monotonicNs)
+
+    /**
+     * The shared Drives presenter (S-HOME-01, S-HIS-01, S-TRP-01, S-DQ-01), running in a child of [scope]. Android passes
+     * `viewModelScope`. [format] is the app's date and time formatting; [region] picks the default units when the user
+     * has not chosen (storefront country or locale region).
+     */
+    public fun drivesPresenter(format: DrivesFormatter, region: String, scope: CoroutineScope): DrivesPresenter =
+        DrivesPresenter(trips.observeTrips(), corrections, units(region), format, clock, scope)
+
+    /** [drivesPresenter] on the main thread with its own scope, for Swift. Call `close()` on deinit. */
+    public fun drivesPresenter(format: DrivesFormatter, region: String): DrivesPresenter =
+        DrivesPresenter.onMain(trips.observeTrips(), corrections, units(region), format, clock)
+
+    /** The user's unit system, or the region's default until they choose one. */
+    private fun units(region: String): Flow<UnitSystem> = settings.state.map { it.effectiveUnits(region) }
 
     private fun recordingCheck(tripId: String): () -> Boolean =
         { recorder.status.value.let { it.tripId == tripId && it.state != RecorderState.IDLE } }
