@@ -1,0 +1,6 @@
+-- S-ANL-03 channel choice (F-RPL-05 AC4): a JSON array of channel keys in profile.analysis_channels ('[]' = defaults).
+analysisChannels:
+SELECT analysis_channels FROM profile WHERE id = 'local';
+
+saveAnalysisChannels:
+UPDATE profile SET analysis_channels = ?, updated_at = ? WHERE id = 'local';

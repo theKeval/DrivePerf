@@ -1,6 +1,8 @@
 package com.driveperf.data.local
 
 import com.driveperf.data.local.db.DrivePerfDatabase
+import com.driveperf.domain.analysis.AnalysisAxis
+import com.driveperf.domain.analysis.AnalysisChannel
 import com.driveperf.domain.analytics.Analytics
 import com.driveperf.domain.settings.Appearance
 import com.driveperf.domain.settings.SettingChanged
@@ -40,6 +42,7 @@ public class LocalSettingsRepository(
         val row = db.profileQueries.localSettings().executeAsOneOrNull() ?: return Settings(defaultVehicleId = garageDefault)
         val capture = json.decodeFromString<CaptureChoices>(row.capture_json)
         val display = json.decodeFromString<DisplayChoices>(row.units_json)
+        val channels = db.analysisChannelsQueries.analysisChannels().executeAsOneOrNull()?.let(::channels)
         return Settings(
             units = UnitSystem.entries.firstOrNull { it.name == display.units },
             appearance = Appearance.entries.firstOrNull { it.name.equals(row.appearance, ignoreCase = true) }
@@ -47,7 +50,19 @@ public class LocalSettingsRepository(
             batterySaverRecording = capture.batterySaverRecording,
             defaultVehicleId = garageDefault,
             dynamicColour = display.dynamicColour,
+            analysisChannels = channels ?: AnalysisChannel.DEFAULTS,
+            analysisAxis = AnalysisAxis.fromKey(display.analysisAxis) ?: AnalysisAxis.TIME,
         )
+    }
+
+    /** The stored channel keys; unknown keys are skipped, and an empty or unreadable list is the defaults. */
+    @Suppress("SwallowedException") // a damaged list falls back to the defaults
+    private fun channels(stored: String): Set<AnalysisChannel>? = try {
+        json.decodeFromString<List<String>>(stored).mapNotNull(AnalysisChannel::fromKey).toSet().ifEmpty { null }
+    } catch (bad: kotlinx.serialization.SerializationException) {
+        null
+    } catch (bad: IllegalArgumentException) {
+        null
     }
 
     override suspend fun update(settings: Settings): Boolean = withContext(io) {
@@ -81,7 +96,7 @@ public class LocalSettingsRepository(
             db.profileQueries.ensureLocalProfile(now, now, now)
             val stored = db.profileQueries.localSettings().executeAsOne()
             val display = json.parseToJsonElement(
-                json.encodeToString(DisplayChoices(settings.units?.name, settings.dynamicColour)),
+                json.encodeToString(DisplayChoices(settings.units?.name, settings.dynamicColour, settings.analysisAxis.key)),
             )
             val capture = json.parseToJsonElement(
                 json.encodeToString(CaptureChoices(settings.batterySaverRecording, settings.defaultVehicleId)),
@@ -91,6 +106,10 @@ public class LocalSettingsRepository(
                 JsonObject(json.parseToJsonElement(stored.capture_json).jsonObject + capture.jsonObject).toString(),
                 settings.appearance.name.lowercase(), now,
             )
+            if (settings.analysisChannels != state.value.analysisChannels) {
+                val keys = AnalysisChannel.entries.filter { it in settings.analysisChannels }.map { it.key }
+                db.analysisChannelsQueries.saveAnalysisChannels(json.encodeToString(keys), now)
+            }
             if (settings.defaultVehicleId != state.value.defaultVehicleId) {
                 db.vehicleQueries.setDefaultVehicle(settings.defaultVehicleId.orEmpty())
             }
@@ -114,5 +133,9 @@ public class LocalSettingsRepository(
         val batterySaverRecording: Boolean = false,
         val defaultVehicleId: String? = null,
     )
-    @Serializable private data class DisplayChoices(val units: String? = null, val dynamicColour: Boolean = false)
+    @Serializable private data class DisplayChoices(
+        val units: String? = null,
+        val dynamicColour: Boolean = false,
+        val analysisAxis: String? = null,
+    )
 }

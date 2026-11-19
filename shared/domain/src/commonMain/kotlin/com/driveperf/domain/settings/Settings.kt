@@ -1,5 +1,7 @@
 package com.driveperf.domain.settings
 
+import com.driveperf.domain.analysis.AnalysisAxis
+import com.driveperf.domain.analysis.AnalysisChannel
 import com.driveperf.domain.analytics.AnalyticsEvent
 import com.driveperf.domain.trip.DisplayUnit
 import kotlinx.coroutines.flow.StateFlow
@@ -25,12 +27,18 @@ public enum class UnitSystem {
 
 public enum class Appearance { SYSTEM, LIGHT, DARK }
 
+/**
+ * The user's local choices. [analysisChannels] and [analysisAxis] are what S-ANL-01 shows (F-RPL-05 AC3–4), kept per
+ * user in `profile.analysis_channels` and the display choices.
+ */
 public data class Settings(
     val units: UnitSystem? = null,
     val appearance: Appearance = Appearance.SYSTEM,
     val batterySaverRecording: Boolean = false,
     val defaultVehicleId: String? = null,
     val dynamicColour: Boolean = false,
+    val analysisChannels: Set<AnalysisChannel> = AnalysisChannel.DEFAULTS,
+    val analysisAxis: AnalysisAxis = AnalysisAxis.TIME,
 ) {
     public fun effectiveUnits(region: String): UnitSystem = units ?: UnitSystem.defaultFor(region)
 }
