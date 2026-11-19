@@ -37,7 +37,9 @@ final class AppEnvironment {
     private let backgroundAssertions = UIKitBackgroundAssertions()
     let recorder: CoreTripRecorder
     let surfaceRouter = TripSurfaceRouter()
-    let corrections = CoreTripCorrections()
+    /// DRIVE-217: the Drives screens run the shared `DrivesPresenter`; the Replay fixture runs it over the synthetic
+    /// trip.
+    let drives = CoreDrivesPresenter()
     /// DRIVE-200, DRIVE-61: S-RPL-01 runs the shared `ReplayPresenter`; the Replay fixture runs it over the synthetic
     /// trip.
     let coreReplay = CoreReplayPresenters()
@@ -69,7 +71,10 @@ final class AppEnvironment {
             autoDetectEnabled: preferences.preferences.autoTripsEnabled,
             renewMotionHistory: { [motion] in motion.recordAccelerometerHistory() })
         // The Replay fixture opens straight on the shell, in its own preferences suite.
-        if ReplayFixture.isActive { preferences.update { $0.onboardingCompleted = true } }
+        if ReplayFixture.isActive {
+            preferences.update { $0.onboardingCompleted = true }
+            drives.attach(ReplayFixture.drivesPresenter(clock: clock))
+        }
     }
 
     var dependencies: AppDependencies {
@@ -87,7 +92,7 @@ final class AppEnvironment {
             refreshCapture: { [weak self] in self?.refreshCapture() },
             runSelfTestOnLaunch: ProcessInfo.processInfo.arguments.contains("-selfTest"),
             movement: movement)
-            .withTripCorrections(corrections)
+            .withDrives(drives)
             .withStatusRequests(surfaceRouter.statusRequests)
             .withDisplaySettings(displaySettings)
             .withReplay(replayPresenters, connectivity: connectivity)
@@ -125,7 +130,7 @@ final class AppEnvironment {
         displaySettings.onChange = { [weak self] in self?.refreshDisplaySurfaces() }
         refreshDisplaySurfaces()
         recorder.surfaceData?.updateLocation(canRecord: canRecordFromSystemSurface)
-        corrections.attach(services.corrections)
+        drives.attach(services)
         coreReplay.attach(services)
         // The first launch after a restart re-arms the triggers and says why (F-CAP-14.3).
         recorder.onLaunch(reason: BootDetector().isFirstLaunchSinceBoot() ? .boot : .launch)
@@ -244,11 +249,10 @@ extension AppDependencies {
         return copy
     }
 
-    /// DRIVE-100, DRIVE-172 (S2): trip corrections and the shared provenance catalogue for the Drives screens.
-    fileprivate func withTripCorrections(_ corrections: CoreTripCorrections) -> AppDependencies {
+    /// DRIVE-217: the shared Drives presenter (lists, trip detail, data quality, answers and corrections).
+    fileprivate func withDrives(_ drives: CoreDrivesPresenter) -> AppDependencies {
         var copy = self
-        copy.corrections = corrections
-        copy.provenance = KotlinMapping.provenanceCatalog()
+        copy.drives = drives
         return copy
     }
 }

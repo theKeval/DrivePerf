@@ -32,11 +32,6 @@ public enum TripQuestion: String, Equatable, Sendable, Codable {
     case bike
 }
 
-/// Kotlin `NotDrives`.
-public enum NotDrives {
-    public static let retentionDays = 30
-}
-
 // MARK: - Data quality (F-DQ-04)
 
 /// Kotlin `QualityBadge`.
@@ -240,17 +235,4 @@ public struct ProvenanceCatalog: Equatable, Sendable {
     }
 
     public subscript(key: String) -> MetricInfo? { metrics[key] }
-}
-
-// MARK: - Ports
-
-/// Kotlin `TripCorrections`: answers and corrections about what a trip was (F-CAP-04).
-@MainActor
-public protocol TripCorrecting: AnyObject {
-    /// Trips corrected to not-a-drive and not yet purged, newest first, now and after every change.
-    func observeNotDrives() -> AsyncStream<[TripSummary]>
-    /// Answers the trip's open question. Yes moves it to "Not drives"; No keeps it a drive.
-    func answer(tripId: String, yes: Bool) async
-    /// Corrects what the trip was; `.driver` restores it as a drive.
-    func correct(tripId: String, to correction: TripCorrection) async
 }

@@ -1,0 +1,300 @@
+import Foundation
+
+// Swift mirrors of the shared Drives presenter's state, intents and effects (`com.driveperf.presentation.drives`,
+// DRIVE-217, ADR-002 §4). Everything is already formatted by the core; the app target maps the Kotlin values into
+// these (`CoreDrivesPresenter`). Features never see Kotlin.
+
+/// One trip card (components.md §12, reduced to what the app has: no route label, score or car yet).
+public struct TripRow: Identifiable, Equatable, Sendable {
+    public var id: String
+    /// "Thursday morning"
+    public var title: String
+    /// "5 Nov · 8:14 am"
+    public var subtitle: String
+    /// "37.9 km"
+    public var distance: String
+    /// "30 min"
+    public var duration: String
+    /// One line under the card: short, interrupted or started by you.
+    public var note: String?
+    public var accessibilityLabel: String
+    /// The compact data-quality badge (components.md §10.1); nil before analysis.
+    public var quality: QualityBadge?
+    /// "Usable"
+    public var qualityWord: String?
+    /// "Interrupted" tag (F-CAP-06).
+    public var isInterrupted: Bool
+    /// The open "Was this a bus or train?" question, answered on the card (F-CAP-04).
+    public var question: TripQuestion?
+    /// Passenger or not a drive: the card is dimmed and doesn't count.
+    public var isDimmed: Bool
+    /// "Passenger" / "Bus or train" chip in place of the stats emphasis.
+    public var kindLabel: String?
+
+    public init(
+        id: String, title: String, subtitle: String, distance: String, duration: String, note: String? = nil,
+        accessibilityLabel: String = "", quality: QualityBadge? = nil, qualityWord: String? = nil,
+        isInterrupted: Bool = false, question: TripQuestion? = nil, isDimmed: Bool = false, kindLabel: String? = nil
+    ) {
+        self.id = id
+        self.title = title
+        self.subtitle = subtitle
+        self.distance = distance
+        self.duration = duration
+        self.note = note
+        self.accessibilityLabel = accessibilityLabel
+        self.quality = quality
+        self.qualityWord = qualityWord
+        self.isInterrupted = isInterrupted
+        self.question = question
+        self.isDimmed = isDimmed
+        self.kindLabel = kindLabel
+    }
+}
+
+/// A week of All drives (S-HIS-01).
+public struct TripSection: Identifiable, Equatable, Sendable {
+    public var id: String
+    /// "This week", "Last week", "19–25 Oct"
+    public var title: String
+    /// "3 drives"
+    public var meta: String
+    public var rows: [TripRow]
+
+    public init(id: String, title: String, meta: String, rows: [TripRow]) {
+        self.id = id
+        self.title = title
+        self.meta = meta
+        self.rows = rows
+    }
+}
+
+/// One number with how it was obtained (F-DQ-05): long-press shows `provenance` and `meaning`.
+public struct ProvenancedValue: Identifiable, Equatable, Sendable {
+    public var id: String { metricKey }
+    public var metricKey: String
+    /// "Distance"
+    public var label: String
+    /// "39.0", already at the metric's precision, without "≈".
+    public var value: String
+    /// "km"; empty for counts.
+    public var unit: String
+    public var provenance: Provenance
+    /// The provenance's legend line: "Calculated from measured data, the same way every time."
+    public var provenanceMeaning: String
+    /// The metric's own line.
+    public var meaning: String
+    /// Drawn with the estimated token ("≈", 60 %).
+    public var isEstimated: Bool
+    /// A supporting line: "≈ 0.4 km estimated".
+    public var note: String?
+    /// The value lowered the quality badge (S-DQ-01 warn tone).
+    public var lowersBadge: Bool
+    /// "Distance, 39.0 kilometres. Derived."
+    public var accessibilityLabel: String
+
+    public init(
+        metricKey: String, label: String, value: String, unit: String, provenance: Provenance,
+        provenanceMeaning: String = "", meaning: String = "", isEstimated: Bool = false, note: String? = nil,
+        lowersBadge: Bool = false, accessibilityLabel: String = ""
+    ) {
+        self.metricKey = metricKey
+        self.label = label
+        self.value = value
+        self.unit = unit
+        self.provenance = provenance
+        self.provenanceMeaning = provenanceMeaning
+        self.meaning = meaning
+        self.isEstimated = isEstimated
+        self.note = note
+        self.lowersBadge = lowersBadge
+        self.accessibilityLabel = accessibilityLabel
+    }
+}
+
+/// A banner under the trip detail's title (S-TRP-01 state banners).
+public struct TripBanner: Equatable, Sendable {
+    public enum Tone: Equatable, Sendable { case info, attention }
+    public enum Action: Equatable, Sendable {
+        /// "Was this a bus or train?" Yes / No.
+        case answer(TripQuestion)
+        /// Restore a passenger or not-a-drive trip as a drive.
+        case restore
+    }
+
+    public var tone: Tone
+    public var text: String
+    public var action: Action?
+
+    public init(tone: Tone, text: String, action: Action? = nil) {
+        self.tone = tone
+        self.text = text
+        self.action = action
+    }
+}
+
+/// The trip detail's content (S-TRP-01).
+public struct TripDetail: Equatable, Sendable {
+    public var id: String
+    public var title: String
+    public var subtitle: String
+    public var banners: [TripBanner]
+    public var tiles: [ProvenancedValue]
+    public var quality: QualityBadge?
+    /// "Usable"
+    public var qualityWord: String?
+    /// The current answer to "What was this?", for the picker's checkmark.
+    public var correction: TripCorrection
+
+    public init(
+        id: String, title: String, subtitle: String, banners: [TripBanner] = [], tiles: [ProvenancedValue] = [],
+        quality: QualityBadge? = nil, qualityWord: String? = nil, correction: TripCorrection = .driver
+    ) {
+        self.id = id
+        self.title = title
+        self.subtitle = subtitle
+        self.banners = banners
+        self.tiles = tiles
+        self.quality = quality
+        self.qualityWord = qualityWord
+        self.correction = correction
+    }
+}
+
+/// One stretch of the S-DQ-01 coverage strip, as fractions of the drive.
+public struct CoverageSpan: Equatable, Sendable {
+    public var style: OverlayStyle
+    public var from: Double
+    public var to: Double
+
+    public init(style: OverlayStyle, from: Double, to: Double) {
+        self.style = style
+        self.from = from
+        self.to = to
+    }
+}
+
+/// The data-quality sheet's content (S-DQ-01).
+public struct DataQualityDetail: Equatable, Sendable {
+    public var badge: QualityBadge
+    /// "Usable data"
+    public var title: String
+    /// One honest sentence per badge.
+    public var hero: String
+    /// The estimated-start explanation, when there is one.
+    public var estimatedStart: String?
+    public var coverage: [CoverageSpan]
+    /// "Scored 31 of 34 min"
+    public var scoredLine: String
+    /// "Drive coverage, 33 minutes. Start estimated. 41 seconds without GPS."
+    public var coverageAccessibility: String
+    public var rows: [ProvenancedValue]
+    /// "What the labels mean": each provenance and its line.
+    public var legend: [(Provenance, String)]
+
+    public init(
+        badge: QualityBadge, title: String, hero: String, estimatedStart: String?, coverage: [CoverageSpan],
+        scoredLine: String, coverageAccessibility: String, rows: [ProvenancedValue], legend: [(Provenance, String)]
+    ) {
+        self.badge = badge
+        self.title = title
+        self.hero = hero
+        self.estimatedStart = estimatedStart
+        self.coverage = coverage
+        self.scoredLine = scoredLine
+        self.coverageAccessibility = coverageAccessibility
+        self.rows = rows
+        self.legend = legend
+    }
+
+    public static func == (a: Self, b: Self) -> Bool {
+        a.badge == b.badge && a.title == b.title && a.hero == b.hero && a.estimatedStart == b.estimatedStart
+            && a.coverage == b.coverage && a.scoredLine == b.scoredLine
+            && a.coverageAccessibility == b.coverageAccessibility && a.rows == b.rows
+            && a.legend.map(\.0) == b.legend.map(\.0) && a.legend.map(\.1) == b.legend.map(\.1)
+    }
+}
+
+/// One "What was this?" choice (S-TRP-02 type picker).
+public struct CorrectionChoice: Equatable, Sendable {
+    public var correction: TripCorrection
+    /// "I was a passenger"
+    public var title: String
+
+    public init(correction: TripCorrection, title: String) {
+        self.correction = correction
+        self.title = title
+    }
+}
+
+/// Kotlin `DrivesState`: what S-HOME-01, S-HIS-01, S-TRP-01 and S-DQ-01 draw.
+public struct DrivesScreenState: Equatable, Sendable {
+    /// The first trip list has arrived.
+    public var hasLoaded: Bool
+    /// Drives, newest first.
+    public var trips: [TripRow]
+    /// The Drives tab's "Latest drives".
+    public var latest: [TripRow]
+    /// Trips marked as not a drive, kept 30 days (F-CAP-04 AC3).
+    public var notDrives: [TripRow]
+    /// Drives grouped by calendar week, newest first.
+    public var sections: [TripSection]
+    /// Answers and corrections are possible.
+    public var canCorrect: Bool
+    /// The open trip detail, if any.
+    public var detail: TripDetail?
+    /// The open data-quality sheet, if any.
+    public var quality: DataQualityDetail?
+    /// "3 drives"
+    public var countText: String
+    /// "That’s every drive since 5 November."; nil without drives.
+    public var sinceText: String?
+    /// "What was this?" choices, in order.
+    public var corrections: [CorrectionChoice]
+
+    public init(
+        hasLoaded: Bool = false, trips: [TripRow] = [], latest: [TripRow]? = nil, notDrives: [TripRow] = [], sections: [TripSection] = [],
+        canCorrect: Bool = false, detail: TripDetail? = nil, quality: DataQualityDetail? = nil, countText: String = "0 drives",
+        sinceText: String? = nil, corrections: [CorrectionChoice] = []
+    ) {
+        self.hasLoaded = hasLoaded
+        self.trips = trips
+        self.latest = latest ?? trips
+        self.notDrives = notDrives
+        self.sections = sections
+        self.canCorrect = canCorrect
+        self.detail = detail
+        self.quality = quality
+        self.countText = countText
+        self.sinceText = sinceText
+        self.corrections = corrections
+    }
+}
+
+/// Kotlin `DrivesIntent`.
+public enum DrivesAction: Equatable, Sendable {
+    case open(tripId: String)
+    case closeDetail
+    case openQuality(tripId: String)
+    case closeQuality
+    case openReplay(tripId: String)
+    case answer(tripId: String, yes: Bool)
+    case correct(tripId: String, to: TripCorrection)
+}
+
+/// Kotlin `DrivesEffect`.
+public enum DrivesNavigation: Equatable, Sendable {
+    /// Open S-RPL-01: `title` is shown under "Replay", `mapSummary` is the map's accessibility summary.
+    case openReplay(tripId: String, title: String, mapSummary: String)
+}
+
+/// The shared Drives presenter as features see it (DRIVE-217).
+@MainActor
+public protocol DrivesPresenting: AnyObject {
+    var state: DrivesScreenState { get }
+    /// The current state first, then every change.
+    func states() -> AsyncStream<DrivesScreenState>
+    /// One-shot navigation.
+    func navigation() -> AsyncStream<DrivesNavigation>
+    func dispatch(_ action: DrivesAction)
+}

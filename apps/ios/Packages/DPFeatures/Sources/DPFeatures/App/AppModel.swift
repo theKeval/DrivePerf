@@ -23,9 +23,9 @@ public struct AppDependencies {
     public var runSelfTestOnLaunch: Bool
     /// The phone's movement after a trip, for the in-drive content hold (F-CAP-07.4). Nil: no signal, the hold is 60 s.
     public var movement: (any MovementMonitoring)?
-    // DRIVE-100, DRIVE-172 (S2): trip corrections and the provenance catalogue for the Drives screens.
-    public var corrections: (any TripCorrecting)?
-    public var provenance = ProvenanceCatalog()
+    // DRIVE-217: the shared Drives presenter (lists, trip detail, data quality, answers and corrections). Nil shows an
+    // empty list.
+    public var drives: (any DrivesPresenting)?
     public var displaySettings: (any DisplaySettingsStoring)?
     // DRIVE-150: requests to open the capture status sheet from outside the UI (the watchdog notification).
     public var statusRequests: CaptureStatusRequests?
@@ -89,8 +89,7 @@ public final class AppModel {
             recorder: dependencies.recorder, history: dependencies.history, permissions: dependencies.permissions,
             clock: dependencies.clock, movement: dependencies.movement, display: display)
         statusRequests = dependencies.statusRequests ?? CaptureStatusRequests()
-        trips = TripListViewModel(
-            history: dependencies.history, corrections: dependencies.corrections, catalog: dependencies.provenance, display: display)
+        trips = TripListViewModel(presenter: dependencies.drives ?? StaticDrivesPresenter())
         profile = ProfileViewModel(dependencies: dependencies)
         let display = display
         replay = dependencies.replayPresenters.map {
