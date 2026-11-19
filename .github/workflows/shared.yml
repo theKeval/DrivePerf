@@ -44,6 +44,19 @@ jobs:
         run: ./gradlew --console=plain assertModuleGraph detekt :shared:testing:jvmTest
       - name: SQLDelight migrations match the schema
         run: ./gradlew --console=plain verifySqlDelightMigration
+      - name: Scoring release gate (DRIVE-108, F-SCO-07 AC4)
+        # A scoring version ships only when the guardrails (G-06 complete stop, G-07 speed, G-11 pace band, the tip
+        # audit) and the golden suites (§8.3 table, fixture goldens) pass for it. Both goldens record the version, so a
+        # change to Versions.SCORING that was not re-run and regenerated fails here, under its own name.
+        run: >-
+          ./gradlew --console=plain :shared:pipeline:jvmTest
+          --tests 'com.driveperf.pipeline.ScoringReleaseGateTest'
+          --tests 'com.driveperf.pipeline.score.GoldenScenariosTest'
+          --tests 'com.driveperf.pipeline.fixtures.FixtureFilesTest'
+          --tests 'com.driveperf.pipeline.route.RouteMatchingTest'
+          --tests 'com.driveperf.pipeline.coach.TipAuditTest'
+          --tests 'com.driveperf.pipeline.score.HistoryRecomputeTest'
+          --tests 'com.driveperf.pipeline.score.HistoryRecomputeBudgetTest'
       - name: Unit tests (JVM and Android host)
         run: ./gradlew --console=plain jvmTest testAndroidHostTest
       - name: Coverage gate (at least 90 % on :shared:domain; :shared:pipeline joins in DRIVE-62)
