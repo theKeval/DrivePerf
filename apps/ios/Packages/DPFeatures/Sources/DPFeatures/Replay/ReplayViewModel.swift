@@ -48,26 +48,37 @@ public final class ReplayViewModel {
     public private(set) var stylesPresent: [ReplaySegmentStyle] = []
     /// The presenter asked for S-DRV-05: the trip is being recorded (AC6).
     public private(set) var driveScreenRequested = false
+    /// Event pins pulsing now, by event ID, with when the pulse started (F-RPL-03 AC2).
+    public private(set) var pulses: [String: Date] = [:]
+    /// S-RPL-02 while it is open.
+    public private(set) var evidence: EvidenceViewModel?
+    /// Short confirmations from the sheets ("Counted again · Smoothness recomputed").
+    public private(set) var toast: String?
 
     private let presenter: any ReplayPresenting
     private let connectivity: (any ConnectivityMonitoring)?
     private let display: DisplaySettingsModel
+    private let sheets: ReplaySheetSource?
     private var segmentCache: [Int: [ReplaySegment]] = [:]
+    private var evidenceTask: Task<Void, Never>?
 
     /// How much wider than the route the fitted map is.
     static let fitPadding = 1.3
 
     public init(
         presenter: any ReplayPresenting, connectivity: (any ConnectivityMonitoring)? = nil,
-        display: DisplaySettingsModel? = nil
+        display: DisplaySettingsModel? = nil, sheets: ReplaySheetSource? = nil
     ) {
         self.presenter = presenter
         self.connectivity = connectivity
         self.display = display ?? DisplaySettingsModel()
+        self.sheets = sheets
         apply(presenter.state)
     }
 
     isolated deinit {
+        evidenceTask?.cancel()
+        evidence?.close()
         presenter.close()
     }
 
@@ -83,6 +94,7 @@ public final class ReplayViewModel {
         for await event in presenter.navigation() {
             switch event {
             case .showDriveScreen: driveScreenRequested = true
+            case .openEvidence(let eventId): openEvidence(eventId)
             }
         }
     }
@@ -140,6 +152,13 @@ public final class ReplayViewModel {
     private func refresh(at now: Int64) {
         guard let track = state.track else { return }
         let t = presenter.playhead(at: now)
+        if state.playing, let overlay = state.overlay {
+            let passed = overlay.crossed(from: tS, to: t)
+            if !passed.isEmpty {
+                let at = Date()
+                for id in passed { pulses[id] = at }
+            }
+        }
         tS = t
         frame = track.frame(at: t)
         activeSpan = track.span(at: t)
@@ -170,6 +189,65 @@ public final class ReplayViewModel {
     public func step(by seconds: Double) { send(.scrubTo(tS + seconds)) }
 
     public func legendOpened() { send(.openLegend) }
+
+    // MARK: Pins and sheets (DRIVE-34, DRIVE-39, DRIVE-203)
+
+    public var overlay: (any ReplayOverlayReading)? { state.overlay }
+    public var selection: ReplaySelectionInfo? { state.selection }
+    public var pinSheet: ReplayPinSheetInfo? { state.pinSheet }
+
+    /// An event pin: pause there and open S-RPL-02.
+    public func selectEvent(_ id: String) { send(.selectEvent(id)) }
+    public func selectStop(_ number: Int) { send(.selectStop(number)) }
+    public func selectMaxSpeed() { send(.selectMaxSpeed) }
+    /// S-RPL-03 "Jump to this moment".
+    public func jumpToPin() { send(.jumpToPin) }
+    /// S-RPL-03 closed.
+    public func clearSelection() { send(.clearSelection) }
+
+    public func toastShown() { toast = nil }
+
+    /// Where the map centres while the evidence sheet is open (DRIVE-39 AC5).
+    public var focus: ReplayEventPinInfo? {
+        guard case .event(let id) = state.selection else { return nil }
+        return state.overlay?.eventPins.first { $0.id == id }
+    }
+
+    private func openEvidence(_ eventId: String) {
+        guard let sheets else { return }
+        closeEvidenceSession()
+        let model = EvidenceViewModel(presenter: sheets.evidence(eventId), tips: sheets.tip)
+        evidence = model
+        evidenceTask = Task { [weak self] in
+            for await event in model.navigationEvents() {
+                guard let self else { return }
+                self.onEvidence(event)
+            }
+        }
+    }
+
+    private func onEvidence(_ event: EvidenceNavigation) {
+        switch event {
+        case .showEvent(let id): send(.showEvent(id))
+        case .feedbackChanged: send(.reloadDetails)
+        case .openTip(let tipId, let eventId): evidence?.openTip(tipId: tipId, eventId: eventId)
+        case .toast(let text): toast = text
+        case .close: closeEvidence()
+        }
+    }
+
+    /// S-RPL-02 closed: the selection clears.
+    public func closeEvidence() {
+        closeEvidenceSession()
+        send(.clearSelection)
+    }
+
+    private func closeEvidenceSession() {
+        evidenceTask?.cancel()
+        evidenceTask = nil
+        evidence?.close()
+        evidence = nil
+    }
 
     /// The presenter updates its state at once; the marker is redrawn from it now rather than on the next frame.
     private func send(_ action: ReplayAction) {
@@ -234,6 +312,15 @@ public final class ReplayViewModel {
         let s = total % 60
         return h > 0 ? String(format: "%d:%02d:%02d", h, m, s) : String(format: "%d:%02d", m, s)
     }
+
+    /// The readout's speed number (the shared overlay's, in the user's units), "—" with no measured speed.
+    public var readoutSpeed: String {
+        guard let overlay = state.overlay else { return speedText }
+        return overlay.speedText(frame?.style == .noGps ? nil : frame?.speedMps)
+    }
+
+    /// The readout's distance so far, scaled to the trip's own distance (F-RPL-02 AC1).
+    public var readoutDistance: String? { state.overlay?.distanceText(at: tS) }
 
     /// The speed at the marker in the user's units; "—" in a GPS gap or with no speed (EC-GPS).
     public var speedText: String {

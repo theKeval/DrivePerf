@@ -14,8 +14,27 @@ final class CoreReplayPresenters: ReplayPresenterMaking {
 
     func presenter(tripId: String, source: ReplayOpenSource) -> any ReplayPresenting {
         guard let services else { return UnavailableReplayPresenter() }
-        return CoreReplayPresenter(services.replayPresenter(tripId: tripId, source: CoreReplayPresenter.kotlin(source)))
+        // DRIVE-34, DRIVE-203: the overload with the pins, stats and elevation.
+        return CoreReplayPresenter(
+            services.replayPresenter(
+                tripId: tripId, source: CoreReplayPresenter.kotlin(source), region: Self.region,
+                format: CoreReplayTimeFormat()))
     }
+
+    func evidencePresenter(tripId: String, eventId: String) -> any EvidencePresenting {
+        guard let services else { return UnavailableEvidencePresenter(eventId: eventId) }
+        return CoreEvidencePresenter(
+            services.evidencePresenter(tripId: tripId, eventId: eventId, region: Self.region, format: CoreReplayTimeFormat()))
+    }
+
+    func tipPresenter(tripId: String, tipId: String?, eventId: String?) -> any TipDetailPresenting {
+        guard let services else { return UnavailableTipPresenter() }
+        return CoreTipDetailPresenter(
+            services.tipDetailPresenter(tripId: tripId, tipId: tipId, eventId: eventId, region: Self.region))
+    }
+
+    /// The default units' region until the user chooses (as the Drives presenter uses).
+    private static var region: String { Locale.current.region?.identifier ?? "" }
 }
 
 /// One Kotlin `ReplayPresenter` (main-thread scope) as `ReplayPresenting`. The playhead and the end of the trip stay in
@@ -25,6 +44,8 @@ final class CoreReplayPresenter: ReplayPresenting {
     private let presenter: DrivePerfShared.ReplayPresenter
     /// One Swift track per Kotlin `Replay`, so a state change never rebuilds the route.
     private var cached: (replay: DrivePerfShared.Replay, track: CoreReplayTrack)?
+    /// One Swift overlay per Kotlin `ReplayOverlay`, so playback never rebuilds the pins.
+    private var cachedOverlay: (overlay: DrivePerfShared.ReplayOverlay, swift: CoreReplayOverlay)?
 
     init(_ presenter: DrivePerfShared.ReplayPresenter) {
         self.presenter = presenter
@@ -51,8 +72,12 @@ final class CoreReplayPresenter: ReplayPresenting {
         let flow = UncheckedSendable(presenter.effects)
         return AsyncStream { continuation in
             let task = Task { @MainActor in
-                for await effect in flow.value where effect is ReplayEffectShowDriveScreen {
-                    continuation.yield(.showDriveScreen)
+                for await effect in flow.value {
+                    if effect is ReplayEffectShowDriveScreen {
+                        continuation.yield(.showDriveScreen)
+                    } else if let open = effect as? ReplayEffectOpenEvidence {
+                        continuation.yield(.openEvidence(eventId: open.eventId))
+                    }
                 }
                 continuation.finish()
             }
@@ -76,7 +101,32 @@ final class CoreReplayPresenter: ReplayPresenting {
         guard let value else { return ReplayScreenState() }
         return ReplayScreenState(
             loading: value.loading, track: track(value.replay), missing: value.unavailable.map(Self.swift),
-            playing: value.playing, speed: CoreReplayTrack.swift(value.speed), scrubbing: value.scrubbing)
+            playing: value.playing, speed: CoreReplayTrack.swift(value.speed), scrubbing: value.scrubbing,
+            overlay: overlay(value.overlay), selection: value.selection.flatMap(Self.swift),
+            pinSheet: value.pinSheet.map(Self.swift))
+    }
+
+    private func overlay(_ overlay: DrivePerfShared.ReplayOverlay?) -> (any ReplayOverlayReading)? {
+        guard let overlay else { return nil }
+        if let cachedOverlay, cachedOverlay.overlay === overlay { return cachedOverlay.swift }
+        let swift = CoreReplayOverlay(overlay)
+        cachedOverlay = (overlay, swift)
+        return swift
+    }
+
+    static func swift(_ selection: any DrivePerfShared.ReplaySelection) -> ReplaySelectionInfo? {
+        if let event = selection as? ReplaySelectionEvent { return .event(event.eventId) }
+        if let stop = selection as? ReplaySelectionStop { return .stop(Int(stop.number)) }
+        if selection is ReplaySelectionMaxSpeed { return .maxSpeed }
+        return nil
+    }
+
+    static func swift(_ sheet: DrivePerfShared.ReplayPinSheet) -> ReplayPinSheetInfo {
+        ReplayPinSheetInfo(
+            kind: sheet.kind == .stop ? .stop : .maxSpeed, title: sheet.title, subtitle: sheet.subtitle,
+            value: sheet.value, unit: sheet.unit, provenance: CoreEvidenceMapping.swift(sheet.provenance),
+            rows: sheet.rows.map { ReplayPinSheetInfo.Row(label: $0.label, value: $0.value) }, note: sheet.note,
+            accessibilityLabel: sheet.accessibilityLabel)
     }
 
     private func track(_ replay: DrivePerfShared.Replay?) -> (any ReplayTrack)? {
@@ -112,6 +162,13 @@ final class CoreReplayPresenter: ReplayPresenting {
         case .scrubEnd: ReplayIntentScrubEnd.shared
         case .tick(let nowNs): ReplayIntentTick(nowNs: nowNs)
         case .openLegend: ReplayIntentOpenLegend.shared
+        case .selectEvent(let id): ReplayIntentSelectEvent(eventId: id)
+        case .showEvent(let id): ReplayIntentShowEvent(eventId: id)
+        case .selectStop(let number): ReplayIntentSelectStop(number: Int32(number))
+        case .selectMaxSpeed: ReplayIntentSelectMaxSpeed.shared
+        case .jumpToPin: ReplayIntentJumpToPin.shared
+        case .clearSelection: ReplayIntentClearSelection.shared
+        case .reloadDetails: ReplayIntentReloadDetails.shared
         }
     }
 }

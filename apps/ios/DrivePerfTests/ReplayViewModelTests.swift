@@ -231,6 +231,7 @@ final class FakeReplayPresenter: ReplayPresenting {
         case .scrubTo(let tS): playheadS = tS
         case .scrubEnd: state.scrubbing = false
         case .tick, .openLegend: break
+        case .selectEvent, .showEvent, .selectStop, .selectMaxSpeed, .jumpToPin, .clearSelection, .reloadDetails: break
         }
     }
 

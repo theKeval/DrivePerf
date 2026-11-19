@@ -70,6 +70,14 @@ public struct ReplayView: View {
         }
     }
 
+    private var pinSheetShown: Binding<Bool> {
+        Binding(get: { model.pinSheet != nil }, set: { if !$0, model.pinSheet != nil { model.clearSelection() } })
+    }
+
+    private var evidenceShown: Binding<Bool> {
+        Binding(get: { model.evidence != nil }, set: { if !$0, model.evidence != nil { model.closeEvidence() } })
+    }
+
     private var ready: some View {
         ZStack(alignment: .top) {
             Group {
@@ -80,10 +88,22 @@ public struct ReplayView: View {
                 }
             }
             .ignoresSafeArea(edges: .bottom)
-            .accessibilityElement(children: .ignore)
-            .accessibilityLabel(mapSummary)
-            // A sibling of the map, so VoiceOver reads the label and notes.
-            ReplayChips(model: model)
+            .accessibilityElement(children: .contain)
+            .accessibilityLabel(model.overlay?.mapSummary ?? mapSummary)
+            // A sibling of the map, so VoiceOver reads the readouts, label and notes.
+            VStack(spacing: DPSpace.s2) {
+                ReplayReadouts(model: model)
+                    .padding(.horizontal, DPLayout.screenMargin)
+                    .padding(.top, DPSpace.s1)
+                ReplayChips(model: model)
+            }
+        }
+        .overlay(alignment: .bottom) { ReplayToast(model: model) }
+        .sheet(isPresented: pinSheetShown) {
+            if let sheet = model.pinSheet { ReplayPinSheetView(sheet: sheet, model: model) }
+        }
+        .sheet(isPresented: evidenceShown) {
+            if let evidence = model.evidence { EvidenceSheetView(model: evidence) }
         }
         .safeAreaInset(edge: .bottom) {
             ReplayPlaybackBar(model: model)
@@ -137,6 +157,7 @@ private struct ReplayMapLayer: View {
         MapReader { proxy in
             Map(position: $position, interactionModes: [.pan, .zoom, .rotate]) {
                 ReplayRouteContent(polylines: model.polylines)
+                ReplayPinContent(model: model)
             }
             .mapStyle(.standard(elevation: .flat, emphasis: .muted, pointsOfInterest: .excludingAll))
             .mapControls {}
@@ -154,6 +175,15 @@ private struct ReplayMapLayer: View {
         }
         .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width = $0 }
         .onAppear { if let bounds = model.bounds { position = .region(Self.region(bounds)) } }
+        // DRIVE-39 AC5: the map centres on the event the evidence sheet is about, a little above the sheet.
+        .onChange(of: model.focus?.id) { _, _ in
+            guard let pin = model.focus, let lat = pin.lat, let lng = pin.lng else { return }
+            let current = camera ?? MapCamera(centerCoordinate: CLLocationCoordinate2D(latitude: lat, longitude: lng), distance: 3_000)
+            let focused = MapCamera(
+                centerCoordinate: CLLocationCoordinate2D(latitude: lat, longitude: lng), distance: current.distance,
+                heading: current.heading, pitch: 0)
+            withAnimation(.easeInOut(duration: 0.4)) { position = .camera(focused) }
+        }
     }
 
     /// The route's box with room for the chips and the playback bar.
@@ -236,6 +266,7 @@ private struct ReplayCanvasLayer: View {
                     ReplayCanvasRoute.draw(model.segments, in: &context, projection: projection)
                 }
                 ReplayMarkerLayer(model: model, heading: 0) { lat, lng in projection.point(lat: lat, lng: lng) }
+                ReplayCanvasPins(model: model) { lat, lng in projection.point(lat: lat, lng: lng) }
             }
         }
         .padding(.horizontal, DPLayout.screenMargin)

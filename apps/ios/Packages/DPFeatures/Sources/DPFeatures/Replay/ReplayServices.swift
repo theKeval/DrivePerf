@@ -22,7 +22,7 @@ public final class ReplayServices {
     func model(tripId: String, source: ReplayOpenSource) -> ReplayViewModel {
         ReplayViewModel(
             presenter: presenters.presenter(tripId: tripId, source: source), connectivity: connectivity,
-            display: display)
+            display: display, sheets: ReplaySheetSource(presenters: presenters, tripId: tripId))
     }
 }
 

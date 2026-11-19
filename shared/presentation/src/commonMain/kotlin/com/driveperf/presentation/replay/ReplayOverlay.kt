@@ -9,6 +9,8 @@ import com.driveperf.domain.trip.DisplayUnit
 import com.driveperf.domain.trip.EventType
 import com.driveperf.domain.trip.Metric
 import com.driveperf.domain.trip.Provenance
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flowOf
 import kotlin.math.roundToInt
 
 /**
@@ -24,6 +26,9 @@ public fun interface ReplayTimeFormat {
         public val None: ReplayTimeFormat = ReplayTimeFormat { "" }
     }
 }
+
+/** A unit system that never changes, for previews and UI-test fixtures (Swift cannot build a Kotlin `Flow`). */
+public fun fixedUnits(units: UnitSystem): Flow<UnitSystem> = flowOf(units)
 
 /** An event pin or timeline tick with the words VoiceOver and TalkBack read for it (S-RPL-01 accessibility). */
 public data class ReplayEventPin(val marker: EventMarker, val accessibilityLabel: String)

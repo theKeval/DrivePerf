@@ -250,4 +250,9 @@ class ReplayPinsTest {
         assertEquals("mph", ReplayCopy.spoken("mph").let { if (it == "miles per hour") "mph" else it })
         assertEquals("", ReplayTimeFormat.None.time(5L))
     }
+
+    @Test
+    fun fixedUnitsNeverChange() = runTest {
+        assertEquals(listOf(UnitSystem.IMPERIAL), fixedUnits(UnitSystem.IMPERIAL).toList())
+    }
 }
