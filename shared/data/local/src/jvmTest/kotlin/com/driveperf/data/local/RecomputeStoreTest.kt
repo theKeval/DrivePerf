@@ -117,6 +117,28 @@ class RecomputeStoreTest {
     }
 
     @Test
+    fun aTripDeletedDuringTheWalkGetsNoScoreRowAndTheOtherChangesCommit() = runTest {
+        save(trip("a", 1_000L))
+        save(trip("b", 2_000L))
+        save(trip("unscored", 3_000L), smoothness = null)
+        val walk = store.finishedFrom(0L)
+        // A walk changes only trips it read a score for (ScoreChange.before is never null), so "unscored" has no change.
+        assertNull(walk.single { it.trip.id == "unscored" }.score)
+        val read = walk.mapNotNull { it.score }.associateBy { it.tripId }
+        assertEquals(FileResult.OK, inner.delete("b"))
+        assertEquals(FileResult.OK, inner.delete("unscored"))
+
+        val written = store.saveScores(
+            listOf(ScoreChange(read.getValue("a"), score("a", 90)), ScoreChange(read.getValue("b"), score("b", 91))),
+        )
+
+        assertEquals(listOf("a"), written.map { it.tripId }, "no foreign-key failure rolls the transaction back")
+        assertEquals(90, inner.score("a")?.smoothness)
+        assertNull(db.tripQueries.scoreForTrip("b").executeAsOneOrNull(), "no orphan row for the deleted trip")
+        assertNull(db.tripQueries.scoreForTrip("unscored").executeAsOneOrNull())
+    }
+
+    @Test
     fun deletingATripPassesItsRecordOnAndRecomputesFromTheNextTrip() = runTest {
         val best = PersonalBest("r1", "a", 95, 1_000L, listOf(RecordEntry("a", 95, 1_000L)))
         save(trip("a", 1_000L), smoothness = 95, onRoute = true)
