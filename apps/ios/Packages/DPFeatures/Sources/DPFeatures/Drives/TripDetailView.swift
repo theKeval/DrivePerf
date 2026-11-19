@@ -20,14 +20,20 @@ struct TripDetailView: View {
     @State private var replayHeld = false
 
     var body: some View {
-        Group {
+        // A ZStack, not a Group: its lifecycle is its own, so `onAppear` fires even before the detail is open (a
+        // Group hands `onAppear` to its children, and while the detail is nil there may be none).
+        ZStack {
             if let detail = trips.detail(id: tripId) {
                 content(detail)
-            } else if !trips.contains(tripId) {
+            } else if trips.contains(tripId) {
+                // The presenter opens the detail within the frame; this never stays on screen.
+                ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
                 Text("This drive was deleted.").font(DPFont.body).foregroundStyle(DPColor.text2)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .dpScreenBackground()
         .navigationBarTitleDisplayMode(.inline)
         .onAppear { trips.open(tripId) }
