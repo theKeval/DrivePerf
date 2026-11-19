@@ -175,10 +175,18 @@ public struct ReplayScreenState: Sendable {
     public var playing: Bool
     public var speed: PlaybackSpeed
     public var scrubbing: Bool
+    /// Kotlin `ReplayOverlay`: pins, ticks, stats and elevation (DRIVE-34, DRIVE-203). Nil until they load.
+    public var overlay: (any ReplayOverlayReading)?
+    /// The pin the user tapped: it grows and the others dim.
+    public var selection: ReplaySelectionInfo?
+    /// S-RPL-03 for a tapped stop or the max speed.
+    public var pinSheet: ReplayPinSheetInfo?
 
     public init(
         loading: Bool = true, track: (any ReplayTrack)? = nil, missing: ReplayMissingReason? = nil,
-        playing: Bool = false, speed: PlaybackSpeed = .auto, scrubbing: Bool = false
+        playing: Bool = false, speed: PlaybackSpeed = .auto, scrubbing: Bool = false,
+        overlay: (any ReplayOverlayReading)? = nil, selection: ReplaySelectionInfo? = nil,
+        pinSheet: ReplayPinSheetInfo? = nil
     ) {
         self.loading = loading
         self.track = track
@@ -186,6 +194,9 @@ public struct ReplayScreenState: Sendable {
         self.playing = playing
         self.speed = speed
         self.scrubbing = scrubbing
+        self.overlay = overlay
+        self.selection = selection
+        self.pinSheet = pinSheet
     }
 }
 
@@ -199,12 +210,28 @@ public enum ReplayAction: Equatable, Sendable {
     /// A display frame at `nowNs` on the presenter's clock.
     case tick(Int64)
     case openLegend
+    /// An event pin was tapped: pause there and open S-RPL-02 (F-RPL-03, F-RPL-04 AC5).
+    case selectEvent(String)
+    /// The evidence sheet stepped to another event: the marker and the selection follow.
+    case showEvent(String)
+    /// A stop pin: S-RPL-03 for stop `n` (F-RPL-02 AC3).
+    case selectStop(Int)
+    /// The max-speed pin: S-RPL-03 (F-RPL-02 AC2).
+    case selectMaxSpeed
+    /// S-RPL-03 "Jump to this moment".
+    case jumpToPin
+    /// A sheet closed: the selection clears.
+    case clearSelection
+    /// Feedback on an event changed: the pins are read again.
+    case reloadDetails
 }
 
 /// Kotlin `ReplayEffect`.
 public enum ReplayNavigation: Equatable, Sendable {
     /// The trip is still being recorded: show S-DRV-05 (F-RPL-01 AC6).
     case showDriveScreen
+    /// Open S-RPL-02 for the event.
+    case openEvidence(eventId: String)
 }
 
 /// Kotlin `ReplayPresenter`: the shared playback state machine, which also sends the Replay analytics. The app target
@@ -227,6 +254,10 @@ public protocol ReplayPresenting: AnyObject {
 @MainActor
 public protocol ReplayPresenterMaking: AnyObject {
     func presenter(tripId: String, source: ReplayOpenSource) -> any ReplayPresenting
+    /// S-RPL-02 for one event (`CoreServices.evidencePresenter`).
+    func evidencePresenter(tripId: String, eventId: String) -> any EvidencePresenting
+    /// S-SCO-04 (`CoreServices.tipDetailPresenter`): the trip's own tip when `tipId` is nil.
+    func tipPresenter(tripId: String, tipId: String?, eventId: String?) -> any TipDetailPresenting
 }
 
 /// Whether the phone is online, for the map's offline fallback (F-RPL-01 AC5, EC-NET).

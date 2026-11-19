@@ -59,6 +59,28 @@ final class ReplayUITests: XCTestCase {
         }
     }
 
+    /// DRIVE-34 and DRIVE-203 on the offline canvas (fixed pin positions): event and stop pins are buttons, the stats
+    /// and elevation show, and a stop pin opens S-RPL-03, whose "Jump to this moment" closes it.
+    @MainActor
+    func testPinsStatsAndTheStopSheet() {
+        let app = launch(offline: true)
+        openReplay(app)
+        let event = app.buttons.matching(identifier: "replay.eventPin").firstMatch
+        require(event, app, timeout: 15, "event pins are buttons")
+        XCTAssertEqual(app.buttons.matching(identifier: "replay.eventPin").count, 2, "the event in the GPS gap is not pinned")
+        XCTAssertEqual(app.buttons.matching(identifier: "replay.eventTick").count, 3, "every event tick is a button")
+        XCTAssertTrue(app.descendants(matching: .any)["replay.readouts"].exists, "Speed · Elapsed · Distance")
+        XCTAssertTrue(app.staticTexts["replay.stats"].exists, "the stats line")
+        XCTAssertTrue(app.descendants(matching: .any)["replay.elevation"].exists, "the elevation profile")
+        let stop = app.buttons.matching(identifier: "replay.stopPin").firstMatch
+        require(stop, app, timeout: 5, "the stop pin")
+        stop.tap()
+        let jump = app.buttons["replay.pinSheet.jump"]
+        require(jump, app, timeout: 5, "S-RPL-03 opens")
+        jump.tap()
+        XCTAssertTrue(jump.waitForNonExistence(timeout: 5), "Jump to this moment closes the sheet")
+    }
+
     @MainActor
     func testWithNoNetworkReplayDrawsThePlainCanvas() {
         let app = launch(offline: true)

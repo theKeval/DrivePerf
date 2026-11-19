@@ -41,4 +41,26 @@
     <string name="replay_lock_title">Replay for drives older than 30 days is part of Pro. Nothing is deleted.</string>
     <string name="replay_lock_body">Your summary, score and Story stay free forever.</string>
     <string name="replay_lock_not_now">Not now</string>
+    <!-- Pins and ticks (DRIVE-34 F-RPL-03, DRIVE-203 F-RPL-02). Event pins read the shared presenter's words. -->
+    <plurals name="replay_stop_pin">
+        <item quantity="one">Stop %1$d of %2$d, stopped for %3$d second</item>
+        <item quantity="other">Stop %1$d of %2$d, stopped for %3$d seconds</item>
+    </plurals>
+    <string name="replay_max_speed_pin">Max speed</string>
+    <string name="replay_next_event">Next event</string>
+    <string name="replay_previous_event">Previous event</string>
+    <string name="replay_next_stop">Next stop</string>
+    <!-- An event tick on the scrubber, as a button: the pin's own label, then what it does. -->
+    <string name="replay_event_tick">%1$s Opens the evidence.</string>
+    <!-- S-RPL-02 evidence (DRIVE-39); the sheet's words come from the shared EvidencePresenter. -->
+    <string name="evidence_missing">This event is no longer on this drive.</string>
+    <string name="evidence_axis_before">−10 s</string>
+    <string name="evidence_axis_peak">Peak</string>
+    <string name="evidence_axis_after">+10 s</string>
+    <string name="evidence_legend_speed">Speed</string>
+    <string name="evidence_legend_long_g">Long G</string>
+    <string name="evidence_legend_lat_g">Lat G</string>
+    <string name="evidence_previous">Previous event</string>
+    <string name="evidence_next">Next event</string>
+    <string name="evidence_smoothness">Smoothness %1$d</string>
 </resources>

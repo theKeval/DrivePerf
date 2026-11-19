@@ -35,18 +35,78 @@ enum SyntheticReplay {
                 maxLng: lngs.max() ?? origin.lng),
             durationS: durationS, spans: spans, summaryOnly: false, track: track)
     }
+
+    /// Invented pins for the synthetic route (DRIVE-34, DRIVE-203): a braking event, a cornering event marked
+    /// "Needed", an acceleration in the GPS gap (ticked, not pinned), one stop, the max speed and a gentle elevation
+    /// profile. No real places.
+    static func details(for replay: DrivePerfShared.Replay) -> DrivePerfShared.ReplayDetails {
+        let d = replay.durationS
+        func at(_ t: Double) -> (lat: Double, lng: Double) {
+            let f = replay.frameAt(tS: t)
+            return (f.lat, f.lng)
+        }
+        func event(_ id: String, _ type: DrivePerfShared.EventType, _ t: Double, pinned: Bool) -> DrivePerfShared.DrivingEvent {
+            let p = at(t)
+            return DrivePerfShared.DrivingEvent(
+                id: id, tripId: replay.tripId, type: type, tPeakS: t, tStartS: t - 0.8, tEndS: t + 0.6, durationS: 1.4,
+                peakG: 0.42, direction: nil, lat: pinned ? KotlinDouble(value: p.lat) : nil,
+                lng: pinned ? KotlinDouble(value: p.lng) : nil, speedBeforeMps: KotlinDouble(value: 13.3),
+                speedAfterMps: KotlinDouble(value: 2), confidence: .high, algorithmVersion: "synthetic")
+        }
+        let events = [
+            event("syn-brake", .brake, (d * 0.2).rounded(), pinned: true),
+            event("syn-accel", .accel, (d * 0.35).rounded() + 20, pinned: false),
+            event("syn-corner", .corner, (d * 0.8).rounded(), pinned: true),
+        ]
+        let markers = events.map { e in
+            DrivePerfShared.EventMarker(
+                eventId: e.id, type: e.type, tStartS: e.tStartS, tPeakS: e.tPeakS, tEndS: e.tEndS, lat: e.lat, lng: e.lng,
+                needed: e.type == .corner, pinned: e.lat != nil)
+        }
+        let stopAt = (d * 0.5).rounded()
+        let stop = at(stopAt)
+        // Far enough from the stop that the two 44 pt pins never overlap on a phone-width canvas.
+        let maxAt = (d * 0.65).rounded()
+        let max = at(maxAt)
+        let elevation = stride(from: 0.0, through: d, by: d / 40).map {
+            DrivePerfShared.ElevationPoint(tS: $0, elevM: 80 + 30 * sin($0 / d * .pi * 2))
+        }
+        return DrivePerfShared.ReplayDetails(
+            markers: markers, events: Dictionary(uniqueKeysWithValues: events.map { ($0.id, $0) }),
+            maxSpeed: DrivePerfShared.MaxSpeedPin(tS: maxAt, speedMps: 28.6, lat: max.lat, lng: max.lng),
+            stops: [
+                DrivePerfShared.StopPin(
+                    number: 1, atS: stopAt, durationS: 34, lat: KotlinDouble(value: stop.lat),
+                    lng: KotlinDouble(value: stop.lng)),
+            ],
+            elevation: DrivePerfShared.ElevationProfile(points: elevation, gainM: 64, lossM: 58),
+            distance: DrivePerfShared.ReplayDistance(track: replay.track, tripDistanceM: KotlinDouble(value: 19_900)),
+            startedAtMs: Int64(ReplayFixture.trip.startedAt.timeIntervalSince1970 * 1000))
+    }
 }
 
 /// Presenters for the fixture trip: the real shared state machine over the synthetic replay, with no analytics.
 @MainActor
 final class SyntheticReplayPresenters: ReplayPresenterMaking {
     func presenter(tripId: String, source: ReplayOpenSource) -> any ReplayPresenting {
+        let replay = SyntheticReplay.make(tripId: tripId)
         let presenter = DrivePerfShared.ReplayPresenter.companion.onMain(
             tripId: tripId, source: CoreReplayPresenter.kotlin(source),
-            replays: StaticReplayRepository(replay: SyntheticReplay.make(tripId: tripId)),
+            replays: StaticReplayRepository(replay: replay),
             isRecording: { KotlinBoolean(value: false) }, analytics: SilentAnalytics(),
-            monoNowNs: { KotlinLong(value: Int64(clamping: DispatchTime.now().uptimeNanoseconds)) })
+            monoNowNs: { KotlinLong(value: Int64(clamping: DispatchTime.now().uptimeNanoseconds)) },
+            details: StaticReplayDetails(details: SyntheticReplay.details(for: replay)),
+            units: ReplayOverlayKt.fixedUnits(units: .metric), format: CoreReplayTimeFormat())
         return CoreReplayPresenter(presenter)
+    }
+
+    /// The fixture has no stored events, so there is no evidence to show.
+    func evidencePresenter(tripId: String, eventId: String) -> any EvidencePresenting {
+        UnavailableEvidencePresenter(eventId: eventId)
+    }
+
+    func tipPresenter(tripId: String, tipId: String?, eventId: String?) -> any TipDetailPresenting {
+        UnavailableTipPresenter()
     }
 }
 

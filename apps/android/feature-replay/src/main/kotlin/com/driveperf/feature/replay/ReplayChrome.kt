@@ -92,8 +92,12 @@ internal fun Readouts(state: ReplayUiState.Ready, time: DoubleState, modifier: M
         derivedStateOf { ReplayFormatting.speed(state.replay.frameAt(time.doubleValue).speedMps, units) }
     }
     val elapsed by remember { derivedStateOf { ReplayFormatting.clock(time.doubleValue) } }
-    val distance by remember(state.timeline, units) {
-        derivedStateOf { ReplayFormatting.distance(state.timeline.distanceAt(time.doubleValue), units) }
+    // DRIVE-203 AC1: with the details loaded, distance so far is scaled to the trip's own distance.
+    val distance by remember(state.timeline, state.overlay, units) {
+        derivedStateOf {
+            val t = time.doubleValue
+            ReplayFormatting.distance(state.overlay?.details?.distance?.at(t) ?: state.timeline.distanceAt(t), units)
+        }
     }
     Surface(shape = RoundedCornerShape(20.dp), color = MaterialTheme.colorScheme.surfaceContainerHigh, modifier = modifier) {
         // Intrinsic height: at XL text the labels wrap below the values instead of being clipped.

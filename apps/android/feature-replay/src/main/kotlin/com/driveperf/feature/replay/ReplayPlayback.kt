@@ -35,6 +35,7 @@ import com.driveperf.designsystem.DpIcons
 import com.driveperf.domain.replay.PlaybackSpeed
 
 internal const val PLAY_BUTTON_TAG = "replay_play"
+internal const val STATS_TAG = "replay_stats"
 
 /** Play/Pause, the speed group, the scrubber and the time labels (M3E floating toolbar, radius 28). */
 @Composable
@@ -47,8 +48,26 @@ internal fun PlaybackBar(state: ReplayUiState.Ready, time: DoubleState, controls
                 PlayButton(state.playing, controls::togglePlay)
                 SpeedGroup(state.speed, controls::setSpeed, Modifier.weight(1f))
             }
-            ReplayScrubber(time, state.replay, state.scrubbing, controls)
+            val overlay = state.overlay
+            val ticks = remember(overlay) {
+                overlay?.let { o ->
+                    val labels = o.ticks.associate { it.marker.eventId to it.accessibilityLabel }
+                    ScrubberTicks(o.ticks.map { it.marker }, o.details.stops, labels)
+                } ?: ScrubberTicks.None
+            }
+            ReplayScrubber(time, state.replay, state.scrubbing, controls, ticks = ticks)
             TimeLabels(time, state.replay.durationS)
+            overlay?.details?.elevation?.let { profile ->
+                ElevationRow(profile, state.replay.durationS, overlay.elevationText.orEmpty(), time)
+            }
+            overlay?.let { o ->
+                Text(
+                    o.statsLine(),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.testTag(STATS_TAG),
+                )
+            }
         }
     }
 }
