@@ -7,8 +7,8 @@ private struct AnalysisPresentersKey: EnvironmentKey {
 }
 
 extension EnvironmentValues {
-    /// S-ANL-01 presenters (`AppModel.analysis`). Nil where Analysis is not available (previews, tests, or until the
-    /// shell passes it down): trip detail then hides the Analysis button.
+    /// S-ANL-01 presenters (`AppModel.analysis`, passed down by `AppRootView`). Nil where Analysis is not available
+    /// (previews, tests): trip detail then hides the Analysis button.
     public var analysisPresenters: (any AnalysisPresenterMaking)? {
         get { self[AnalysisPresentersKey.self] }
         set { self[AnalysisPresentersKey.self] = newValue }

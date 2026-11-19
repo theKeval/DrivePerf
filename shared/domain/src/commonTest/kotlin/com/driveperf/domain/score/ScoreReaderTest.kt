@@ -7,15 +7,6 @@ import kotlin.test.assertTrue
 
 class ScoreReaderTest {
     @Test
-    fun scoreBucketsFollowTheAnalyticsBoundaries() {
-        val buckets = listOf(0, 49, 50, 59, 60, 69, 70, 79, 80, 89, 90, 100).map(::scoreBucket)
-        assertEquals(
-            listOf("lt_50", "lt_50", "50_59", "50_59", "60_69", "60_69", "70_79", "70_79", "80_89", "80_89", "90_100", "90_100"),
-            buckets,
-        )
-    }
-
-    @Test
     fun theEmptyLinesHaveNoTripsAndNoCars() {
         assertTrue(ScoreLines.EMPTY.lines.isEmpty())
         assertEquals(0, ScoreLines.EMPTY.carCount)

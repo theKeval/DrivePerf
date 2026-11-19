@@ -56,22 +56,3 @@ public interface ScoreReader {
 
     public fun observeDetail(tripId: String): Flow<TripScoreDetail>
 }
-
-private const val BUCKET_50 = 50
-private const val BUCKET_60 = 60
-private const val BUCKET_70 = 70
-private const val BUCKET_80 = 80
-private const val BUCKET_90 = 90
-
-/**
- * The `score_bucket` analytics property (analytics-crash-privacy.md §2): `lt_50`, `50_59`, `60_69`, `70_79`, `80_89` or
- * `90_100`. Analytics never carry the score itself.
- */
-public fun scoreBucket(smoothness: Int): String = when {
-    smoothness < BUCKET_50 -> "lt_50"
-    smoothness < BUCKET_60 -> "50_59"
-    smoothness < BUCKET_70 -> "60_69"
-    smoothness < BUCKET_80 -> "70_79"
-    smoothness < BUCKET_90 -> "80_89"
-    else -> "90_100"
-}
