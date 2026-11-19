@@ -4,6 +4,8 @@
 
     <!-- ADR-007: no advertising identifier, ever. Some SDKs add AD_ID through the manifest merger. -->
     <uses-permission android:name="com.google.android.gms.permission.AD_ID" tools:node="remove" />
+    <!-- DRIVE-200: Replay falls back to its plain canvas when offline (F-RPL-01 AC5). -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
     <application
         android:name=".DrivePerfApplication"
@@ -24,6 +26,9 @@
         <meta-data android:name="firebase_analytics_collection_enabled" android:value="false" />
         <meta-data android:name="google_analytics_adid_collection_enabled" android:value="false" />
         <meta-data android:name="google_analytics_default_allow_ad_personalization_signals" android:value="false" />
+
+        <!-- ADR-005 / DRIVE-200: the Maps key from local.properties or the environment (blank: Replay uses its canvas). -->
+        <meta-data android:name="com.google.android.geo.API_KEY" android:value="${MAPS_API_KEY}" />
 
         <activity
             android:name=".MainActivity"

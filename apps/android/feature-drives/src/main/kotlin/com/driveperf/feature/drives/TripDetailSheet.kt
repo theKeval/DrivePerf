@@ -19,6 +19,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.RichTooltip
@@ -44,6 +45,8 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipRect
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -63,6 +66,7 @@ import com.driveperf.designsystem.DpQualityGlyph
 import com.driveperf.designsystem.DrivePerfTheme
 import com.driveperf.designsystem.dpEstimated
 import com.driveperf.designsystem.dpQualityColor
+import com.driveperf.designsystem.rememberDpSheetState
 import com.driveperf.domain.trip.OverlayStyle
 import com.driveperf.domain.trip.Provenance
 import com.driveperf.domain.trip.QualityBadge
@@ -79,13 +83,22 @@ internal fun DrivesSheets(state: DrivesUiState, onAction: (DrivesAction) -> Unit
 /**
  * Trip sheet (S-TRP-01, the parts the shell has): banners (question, passenger or not a drive, interrupted, short,
  * unscorable), stat tiles with provenance on long-press (F-DQ-05), the data-quality row (→ S-DQ-01) and "What was
- * this?" (S-TRP-02). Map, score and events arrive with their own stories.
+ * this?" (S-TRP-02), and Replay (S-RPL-01, DRIVE-200): the sheet slides away first, and [DrivesAction.OpenReplay]
+ * goes out only once that hide completes. Map, score and events arrive with their own stories.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-internal fun TripDetailSheet(detail: TripDetailUi, canCorrect: Boolean, onAction: (DrivesAction) -> Unit) {
+internal fun TripDetailSheet(
+    detail: TripDetailUi,
+    canCorrect: Boolean,
+    onAction: (DrivesAction) -> Unit,
+) {
+    val sheetState = rememberDpSheetState()
+    val scope = rememberCoroutineScope()
+    var opening by remember { mutableStateOf(false) }
     DpModalBottomSheet(
         onDismissRequest = { onAction(DrivesAction.CloseDetail) },
+        sheetState = sheetState,
     ) {
         Column(
             modifier = Modifier
@@ -94,6 +107,19 @@ internal fun TripDetailSheet(detail: TripDetailUi, canCorrect: Boolean, onAction
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             Text(detail.title, style = MaterialTheme.typography.titleLarge, modifier = Modifier.semantics { heading() })
+            ReplayButton(enabled = !opening) {
+                // One transition at a time: the sheet slides away first, and Replay opens only if that finished.
+                // A cancelled hide (the sheet left composition, a competing gesture) throws here and opens nothing.
+                opening = true
+                scope.launch {
+                    try {
+                        sheetState.hide()
+                        onAction(DrivesAction.OpenReplay(detail.id, detail.title))
+                    } finally {
+                        opening = false
+                    }
+                }
+            }
             detail.banners.forEach { Banner(it, detail.id, onAction) }
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 detail.tiles.forEach { StatTile(it, Modifier.width(104.dp)) }
@@ -127,6 +153,22 @@ internal fun TripDetailSheet(detail: TripDetailUi, canCorrect: Boolean, onAction
         }
     }
 }
+
+/** The trip sheet's primary action (S-TRP-01 action row: Replay, filled primary, radius 28). */
+@Composable
+private fun ReplayButton(enabled: Boolean, onClick: () -> Unit) {
+    Button(
+        onClick = onClick,
+        enabled = enabled,
+        modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp).testTag(REPLAY_BUTTON_TAG),
+    ) {
+        Icon(painterResource(R.drawable.ic_drives_replay), contentDescription = null, modifier = Modifier.size(20.dp))
+        Text(stringResource(R.string.drives_replay), modifier = Modifier.padding(start = 8.dp))
+    }
+}
+
+/** Test tag of the trip sheet's Replay button. */
+const val REPLAY_BUTTON_TAG: String = "trip_detail_replay"
 
 @Composable
 private fun Banner(banner: TripBannerUi, tripId: String, onAction: (DrivesAction) -> Unit) {

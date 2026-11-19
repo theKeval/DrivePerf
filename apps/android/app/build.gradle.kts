@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     id("driveperf.android-application")
 }
@@ -7,6 +9,17 @@ plugins {
 val sentryDsn: Provider<String> = providers.gradleProperty("driveperf.sentryDsn")
     .orElse(providers.environmentVariable("DRIVEPERF_SENTRY_DSN"))
     .orElse("")
+
+// Google Maps (ADR-005, DRIVE-200): the restricted API key and the optional Night Drive Map ID come from local.properties
+// or the environment, never the repository (DRIVE-42 creates the key). Without a key Replay draws on the plain canvas.
+val localProperties = Properties().apply {
+    rootProject.file("local.properties").takeIf { it.isFile }?.inputStream()?.use { load(it) }
+}
+
+fun mapsSetting(name: String): String = localProperties.getProperty(name) ?: providers.environmentVariable(name).orNull ?: ""
+
+val mapsApiKey = mapsSetting("MAPS_API_KEY")
+val mapsMapId = mapsSetting("MAPS_MAP_ID")
 
 android {
     namespace = "com.driveperf.app"
@@ -20,6 +33,9 @@ android {
         versionCode = (System.getenv("GITHUB_RUN_NUMBER") ?: "1").toInt()
         versionName = "0.1.0"
         buildConfigField("String", "SENTRY_DSN", "\"${sentryDsn.get()}\"")
+        manifestPlaceholders["MAPS_API_KEY"] = mapsApiKey
+        buildConfigField("boolean", "HAS_MAPS_KEY", mapsApiKey.isNotBlank().toString())
+        buildConfigField("String", "MAPS_MAP_ID", "\"$mapsMapId\"")
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
@@ -121,7 +137,7 @@ dependencies {
 // android.yml runs `:apps:android:app:detekt` and `:apps:android:app:testDevDebugUnitTest` only. Hooking the library
 // modules onto those two tasks keeps their checks and unit tests in CI without a workflow change.
 val libraryModules = listOf("designsystem", "platform") + listOf(
-    "capture", "drives", "routes", "insights", "garage", "account", "onboarding", "settings",
+    "capture", "drives", "replay", "routes", "insights", "garage", "account", "onboarding", "settings",
 ).map { "feature-$it" }
 tasks.named("detekt") {
     dependsOn(libraryModules.map { ":apps:android:$it:detekt" })

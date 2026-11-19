@@ -72,6 +72,9 @@ sealed interface DrivesAction {
     data class OpenQuality(val tripId: String) : DrivesAction
     data object CloseQuality : DrivesAction
     data object CloseDetail : DrivesAction
+
+    /** Replay on the trip sheet (DRIVE-200): the sheet closes, and the app opens S-RPL-01 with the sheet's title. */
+    data class OpenReplay(val tripId: String, val title: String) : DrivesAction
     data class Answer(val tripId: String, val yes: Boolean) : DrivesAction
     data class Correct(val tripId: String, val to: TripCorrection) : DrivesAction
     data class Filter(val filter: DrivesFilter) : DrivesAction
@@ -125,7 +128,8 @@ class DrivesViewModel(
             is DrivesAction.Open -> selection.value = selection.value.copy(detailId = action.tripId)
             is DrivesAction.OpenQuality -> selection.value = selection.value.copy(qualityId = action.tripId)
             DrivesAction.CloseQuality -> selection.value = selection.value.copy(qualityId = null)
-            DrivesAction.CloseDetail -> selection.value = selection.value.copy(detailId = null, qualityId = null)
+            DrivesAction.CloseDetail, is DrivesAction.OpenReplay ->
+                selection.value = selection.value.copy(detailId = null, qualityId = null)
             is DrivesAction.Filter -> selection.value = selection.value.copy(filter = action.filter)
             is DrivesAction.Answer -> corrector?.let { c -> viewModelScope.launch { c.answer(action.tripId, action.yes) } }
             is DrivesAction.Correct -> corrector?.let { c -> viewModelScope.launch { c.correct(action.tripId, action.to) } }

@@ -1,5 +1,6 @@
 package com.driveperf.app.navigation
 
+import android.net.Uri
 import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
 import com.driveperf.app.R
@@ -26,4 +27,12 @@ object Routes {
     const val SETTINGS = "settings"
     const val UNITS_DISPLAY = "units_display"
     const val RECORDING_SETTINGS = "recording_settings"
+
+    const val REPLAY_TRIP = "tripId"
+    const val REPLAY_TITLE = "title"
+
+    /** S-RPL-01 Replay (DRIVE-200): the trip ID, and the trip sheet's title as the subtitle. */
+    const val REPLAY = "replay/{$REPLAY_TRIP}?$REPLAY_TITLE={$REPLAY_TITLE}"
+
+    fun replay(tripId: String, title: String): String = "replay/${Uri.encode(tripId)}?$REPLAY_TITLE=${Uri.encode(title)}"
 }

@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- S-RPL-01 Trip Replay (DRIVE-200, F-RPL-01) and its data-quality overlay (DRIVE-61, F-RPL-08). -->
+    <string name="replay_title">Replay</string>
+    <string name="replay_back">Back</string>
+    <string name="replay_legend">What the line styles mean</string>
+    <string name="replay_speed">Speed</string>
+    <string name="replay_elapsed">Elapsed</string>
+    <string name="replay_distance">Distance</string>
+    <string name="replay_no_value">—</string>
+    <string name="replay_play">Play replay</string>
+    <string name="replay_pause">Pause replay</string>
+    <string name="replay_hint">Play your drive</string>
+    <string name="replay_speed_auto">Auto</string>
+    <string name="replay_speed_x1">1×</string>
+    <string name="replay_speed_x10">10×</string>
+    <string name="replay_speed_x30">30×</string>
+    <string name="replay_position">Replay position, %1$d min of %2$d min.</string>
+    <string name="replay_back_30">Back 30 seconds</string>
+    <string name="replay_forward_30">Forward 30 seconds</string>
+    <string name="replay_map_label">Map of your drive, %1$s %2$s.</string>
+    <string name="replay_offline">Map unavailable offline. Your route, pins and data are all here.</string>
+    <string name="replay_loading_map">Loading map…</string>
+    <string name="replay_loading">Loading your drive…</string>
+    <string name="replay_error">Couldn’t load this drive’s detail. Your recording is safe.</string>
+    <string name="replay_try_again">Try again</string>
+    <string name="replay_summary_only">You removed the raw sensor data to save space. This is the summary route.</string>
+    <!-- Span labels (F-RPL-08 AC2) and legend rows (AC1). -->
+    <string name="replay_span_observed">Recorded</string>
+    <string name="replay_span_estimated">Estimated start</string>
+    <string name="replay_span_no_gps">No GPS</string>
+    <string name="replay_span_excluded">Phone moved — not scored</string>
+    <string name="replay_span_not_scored">Not scored</string>
+    <string name="replay_legend_title">Line styles</string>
+    <string name="replay_legend_observed">Solid: recorded by GPS.</string>
+    <string name="replay_legend_estimated">Dashed: filled in from your phone’s location history before recording started. Never scored.</string>
+    <string name="replay_legend_no_gps">Dotted: no GPS here, like a tunnel. The marker jumps the gap.</string>
+    <string name="replay_legend_excluded">Faded: left out of the score, for example when the phone moved in its mount.</string>
+    <string name="replay_legend_done">Done</string>
+    <!-- Lock (Free, older than 30 days): the Pro seam, ADR-006. -->
+    <string name="replay_lock_title">Replay for drives older than 30 days is part of Pro. Nothing is deleted.</string>
+    <string name="replay_lock_body">Your summary, score and Story stay free forever.</string>
+    <string name="replay_lock_not_now">Not now</string>
+</resources>
