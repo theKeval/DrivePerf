@@ -8,7 +8,6 @@ import com.driveperf.feature.settings.SettingsViewModel
 import java.util.Locale
 
 import com.driveperf.app.bridge.PlatformCaptureController
-import com.driveperf.app.bridge.PlatformTripListSource
 import com.driveperf.app.core.AndroidPlatformBindings
 import com.driveperf.app.core.ConsentOnboardingSettings
 import com.driveperf.app.core.DeviceId
@@ -29,8 +28,7 @@ import com.driveperf.domain.repository.TripRepository
 import com.driveperf.feature.capture.CaptureController
 import com.driveperf.feature.capture.CaptureViewModel
 import com.driveperf.feature.drives.DrivesViewModel
-import com.driveperf.feature.drives.TripCorrector
-import com.driveperf.feature.drives.TripListSource
+import com.driveperf.feature.drives.JavaTimeDrivesFormatter
 import com.driveperf.feature.onboarding.ConsentChoices
 import com.driveperf.feature.onboarding.OnboardingSettings
 import com.driveperf.feature.onboarding.OnboardingViewModel
@@ -50,7 +48,6 @@ import kotlinx.coroutines.SupervisorJob
 import org.koin.android.ext.koin.androidContext
 import org.koin.core.module.dsl.viewModel
 import org.koin.dsl.bind
-import org.koin.dsl.binds
 import org.koin.dsl.module
 
 /**
@@ -91,11 +88,13 @@ val appModule = module {
     single {
         PlatformCaptureController(androidContext(), get(), get(), get(), get(), get(), get(), get(), get<WakePath>()::refresh)
     } bind CaptureController::class
-    // DRIVE-100 (S2): the trip list also answers and corrects what a trip was.
-    single { PlatformTripListSource(get(), get<CoreServices>().corrections) } binds arrayOf(TripListSource::class, TripCorrector::class)
 
     viewModel { CaptureViewModel(get(), System::currentTimeMillis, units = get()) }
-    viewModel { DrivesViewModel(get(), corrector = get<TripCorrector>(), units = get()) }
+    // DRIVE-217: the shared presenter owns the Drives lists, sheets, answers and corrections (ADR-002 section 4).
+    viewModel {
+        val core = get<CoreServices>()
+        DrivesViewModel { scope -> core.drivesPresenter(JavaTimeDrivesFormatter(), Locale.getDefault().country, scope) }
+    }
 
     // DRIVE-200 / DRIVE-61: Replay, from the shared model.
     single { NetworkStatus(androidContext(), get()) }

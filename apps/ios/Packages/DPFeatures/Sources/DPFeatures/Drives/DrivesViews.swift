@@ -135,8 +135,8 @@ struct AllDrivesView: View {
                         TripCardStack(rows: section.rows, trips: trips)
                     }
                 }
-                if let first = trips.trips.last {
-                    Text("That’s every drive since \(first.startedAt.formatted(.dateTime.day().month(.wide))).")
+                if let since = trips.sinceText {
+                    Text(since)
                         .font(DPFont.meta).foregroundStyle(DPColor.text3)
                         .frame(maxWidth: .infinity)
                 }
@@ -174,7 +174,7 @@ struct NotDrivesView: View {
                     Text("Nothing here.").font(DPFont.body).foregroundStyle(DPColor.text3)
                         .frame(maxWidth: .infinity, minHeight: DPLayout.touchMin * 2)
                 } else {
-                    TripCardStack(rows: trips.notDriveRows, trips: trips)
+                    TripCardStack(rows: trips.notDrives, trips: trips)
                 }
             }
             .padding(.horizontal, DPLayout.screenMargin)
@@ -209,9 +209,7 @@ struct TripCardStack: View {
                     if trips.canCorrect { CorrectionMenu(trips: trips, tripId: row.id) }
                 }
                 if let question = row.question, trips.canCorrect {
-                    TripQuestionBar(question: question) { yes in
-                        Task { await trips.answer(tripId: row.id, yes: yes) }
-                    }
+                    TripQuestionBar(question: question) { yes in trips.answer(tripId: row.id, yes: yes) }
                     .padding(.horizontal, DPSpace.s4)
                     .padding(.bottom, DPSpace.s3)
                 }
@@ -228,22 +226,9 @@ struct CorrectionMenu: View {
 
     var body: some View {
         Menu("What was this?") {
-            ForEach(TripCorrection.allCases, id: \.self) { correction in
-                Button(Self.title(correction)) {
-                    Task { await trips.correct(tripId: tripId, to: correction) }
-                }
+            ForEach(trips.corrections, id: \.correction) { choice in
+                Button(choice.title) { trips.correct(tripId: tripId, to: choice.correction) }
             }
-        }
-    }
-
-    static func title(_ c: TripCorrection) -> String {
-        switch c {
-        case .driver: "I was driving"
-        case .passenger: "I was a passenger"
-        case .transit: "Bus or train"
-        case .bike: "Bike ride"
-        case .walk: "Walk"
-        case .other: "Something else"
         }
     }
 }
@@ -293,7 +278,7 @@ struct TripRowView: View {
                 .monospacedDigit()
                 .foregroundStyle(DPColor.text)
                 HStack(spacing: DPSpace.s2) {
-                    if let badge = row.quality { QualityBadgeLabel(badge: badge) }
+                    if let badge = row.quality { QualityBadgeLabel(badge: badge, word: row.qualityWord ?? "") }
                     if row.isInterrupted { TagLabel(text: "Interrupted") }
                     if let kind = row.kindLabel { TagLabel(text: kind) }
                 }
@@ -318,11 +303,13 @@ struct TripRowView: View {
 /// The compact quality badge on cards: glyph + word, never colour alone (components.md §10.1).
 struct QualityBadgeLabel: View {
     let badge: QualityBadge
+    /// "Usable"
+    let word: String
 
     var body: some View {
         HStack(spacing: DPSpace.s1) {
             DPQualityGlyph(badge.glyph, size: 14)
-            Text(TripPresenter.badgeWord(badge)).font(DPFont.caption.weight(.semibold)).foregroundStyle(DPColor.text2)
+            Text(word).font(DPFont.caption.weight(.semibold)).foregroundStyle(DPColor.text2)
         }
     }
 }

@@ -11,33 +11,50 @@ struct TripDetailView: View {
     let tripId: String
     @Environment(\.replayServices) private var replayServices
     @Environment(CaptureViewModel.self) private var capture: CaptureViewModel?
-    @State private var showsQuality = false
     @State private var shownProvenance: String?
     @State private var replay: ReplayViewModel?
+    /// The Replay the presenter handed over: its subtitle and map summary.
+    @State private var replayRequest: TripListViewModel.ReplayRequest?
     @State private var showsReplay = false
     /// Replay was asked for while the in-drive lock held it (S-DRV-05); it opens when the lock lifts.
     @State private var replayHeld = false
 
     var body: some View {
-        Group {
+        // A ZStack, not a Group: its lifecycle is its own, so `onAppear` fires even before the detail is open (a
+        // Group hands `onAppear` to its children, and while the detail is nil there may be none).
+        ZStack {
             if let detail = trips.detail(id: tripId) {
                 content(detail)
+            } else if trips.contains(tripId) {
+                // The presenter opens the detail within the frame; this never stays on screen.
+                ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 Text("This drive was deleted.").font(DPFont.body).foregroundStyle(DPColor.text2)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .dpScreenBackground()
         .navigationBarTitleDisplayMode(.inline)
-        .sheet(isPresented: $showsQuality) {
+        .onAppear { trips.open(tripId) }
+        .sheet(isPresented: Binding(
+            get: { trips.dataQuality(id: tripId) != nil }, set: { if !$0 { trips.closeQuality() } })
+        ) {
             if let quality = trips.dataQuality(id: tripId) { DataQualitySheet(detail: quality) }
         }
         .navigationDestination(isPresented: $showsReplay) {
-            if let replay, let detail = trips.detail(id: tripId) {
+            if let replay, let replayRequest {
                 ReplayView(
-                    model: replay, title: "Replay", subtitle: detail.title,
-                    mapSummary: "Map of your drive, \(trips.presenter.distanceText(trips.trip(id: tripId)?.distanceM ?? 0)).")
+                    model: replay, title: "Replay", subtitle: replayRequest.title, mapSummary: replayRequest.mapSummary)
             }
+        }
+        .onChange(of: trips.replayRequest) { _, request in
+            // The presenter handed this trip to Replay (DRIVE-200).
+            guard let request, request.tripId == tripId, let replayServices else { return }
+            trips.replayOpened()
+            replayRequest = request
+            replay = replayServices.model(tripId: tripId, source: .tripDetail)
+            showsReplay = true
         }
         .onChange(of: capture?.heldContent) { old, new in
             // The lock lifted and released what it held: open the Replay that was asked for.
@@ -58,9 +75,8 @@ struct TripDetailView: View {
     }
 
     private func openReplay() {
-        guard let replayServices, trips.trip(id: tripId) != nil else { return }
-        replay = replayServices.model(tripId: tripId, source: .tripDetail)
-        showsReplay = true
+        guard replayServices != nil, trips.contains(tripId) else { return }
+        trips.requestReplay(tripId)
     }
 
     private var replayButton: some View {
@@ -93,11 +109,11 @@ struct TripDetailView: View {
                     .font(DPFont.caption).foregroundStyle(DPColor.text3)
                 VStack(spacing: 0) {
                     if let badge = detail.quality {
-                        Button { showsQuality = true } label: {
+                        Button { trips.openQuality(tripId) } label: {
                             HStack {
                                 Text("Data quality").font(DPFont.body).foregroundStyle(DPColor.text)
                                 Spacer()
-                                QualityBadgeLabel(badge: badge)
+                                QualityBadgeLabel(badge: badge, word: detail.qualityWord ?? "")
                                 DPIcon.chevronRight.image.resizable().scaledToFit().frame(width: 12, height: 12)
                                     .foregroundStyle(DPColor.text3)
                             }
@@ -106,7 +122,7 @@ struct TripDetailView: View {
                             .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
-                        .accessibilityLabel("Data quality, \(TripPresenter.badgeWord(badge))")
+                        .accessibilityLabel("Data quality, \(detail.qualityWord ?? "")")
                         Rectangle().fill(DPColor.separator).frame(height: 0.5).padding(.leading, DPSpace.s4)
                     }
                     if trips.canCorrect {
@@ -132,14 +148,14 @@ struct TripDetailView: View {
             switch banner.action {
             case .answer(let question):
                 HStack(spacing: DPSpace.s3) {
-                    Button("Yes") { Task { await trips.answer(tripId: tripId, yes: true) } }
+                    Button("Yes") { trips.answer(tripId: tripId, yes: true) }
                         .buttonStyle(.bordered)
-                    Button("No") { Task { await trips.answer(tripId: tripId, yes: false) } }
+                    Button("No") { trips.answer(tripId: tripId, yes: false) }
                         .buttonStyle(.borderedProminent)
                 }
                 .accessibilityLabel(question == .transit ? "Was this a bus or train?" : "Was this a bike ride?")
             case .restore:
-                Button("Restore as a drive") { Task { await trips.correct(tripId: tripId, to: .driver) } }
+                Button("Restore as a drive") { trips.correct(tripId: tripId, to: .driver) }
                     .font(DPFont.body.weight(.semibold)).foregroundStyle(DPColor.accentText)
                     .frame(minHeight: DPLayout.touchMin)
             case nil:
@@ -185,14 +201,14 @@ private struct CorrectionPicker: View {
 
     var body: some View {
         Menu {
-            ForEach(TripCorrection.allCases, id: \.self) { correction in
+            ForEach(trips.corrections, id: \.correction) { choice in
                 Button {
-                    Task { await trips.correct(tripId: tripId, to: correction) }
+                    trips.correct(tripId: tripId, to: choice.correction)
                 } label: {
-                    if correction == current {
-                        Label(CorrectionMenu.title(correction), systemImage: "checkmark")
+                    if choice.correction == current {
+                        Label(choice.title, systemImage: "checkmark")
                     } else {
-                        Text(CorrectionMenu.title(correction))
+                        Text(choice.title)
                     }
                 }
             }
@@ -200,7 +216,7 @@ private struct CorrectionPicker: View {
             HStack {
                 Text("What was this?").font(DPFont.body).foregroundStyle(DPColor.text)
                 Spacer()
-                Text(CorrectionMenu.title(current)).font(DPFont.body).foregroundStyle(DPColor.text2)
+                Text(trips.correctionTitle(current)).font(DPFont.body).foregroundStyle(DPColor.text2)
             }
             .contentShape(Rectangle())
         }
@@ -249,7 +265,7 @@ struct ProvenancePopover: View {
                 DPProvenanceGlyph(value.provenance.glyph, size: 14)
                 Text(value.provenance.label).font(DPFont.cardTitle)
             }
-            Text(TripPresenter.fallbackLegend(value.provenance)).font(DPFont.bodySecondary).foregroundStyle(DPColor.text2)
+            Text(value.provenanceMeaning).font(DPFont.bodySecondary).foregroundStyle(DPColor.text2)
             if !value.meaning.isEmpty {
                 Text(value.meaning).font(DPFont.bodySecondary).foregroundStyle(DPColor.text)
             }
