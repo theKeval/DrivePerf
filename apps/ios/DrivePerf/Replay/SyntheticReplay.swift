@@ -1,142 +1,58 @@
 import DPSharedBridge
+import DrivePerfShared
 import Foundation
 
-/// A synthetic replay that follows the shared Replay contract (DRIVE-200), with no real locations: an invented route
-/// with an estimated start, a 41 s GPS gap and a "phone moved" span. It backs the UI tests and simulator screenshots
-/// (`-replayFixture`, `-replayFixtureAt`).
-final class SyntheticReplay: ReplayTrack, @unchecked Sendable {
-    let tripId: String
-    let durationS: Double
-    let summaryOnly: Bool
-    let spans: [ReplaySpan]
-    let bbox: ReplayBounds
-    /// 1 Hz fixes; nil inside the GPS gap.
-    private let fixes: [ReplayPoint?]
-    /// The last fix before the gap and the first after it.
-    private let gap: ClosedRange<Double>
-
-    /// - Parameters:
-    ///   - durationS: trip length in seconds.
-    ///   - estimatedS: length of the estimated start (0 for a manual trip).
-    init(tripId: String, durationS: Double = 1_800, estimatedS: Double = 40, summaryOnly: Bool = false) {
-        self.tripId = tripId
-        self.durationS = durationS
-        self.summaryOnly = summaryOnly
-        let gap = (durationS * 0.35).rounded()...(durationS * 0.35).rounded() + 41
-        let excluded = (durationS * 0.62).rounded()...(durationS * 0.62).rounded() + 180
-        self.gap = gap
-        var spans: [ReplaySpan] = []
-        if estimatedS > 0 { spans.append(ReplaySpan(style: .estimated, t0S: 0, t1S: estimatedS)) }
-        spans.append(ReplaySpan(style: .noGps, t0S: gap.lowerBound, t1S: gap.upperBound))
-        spans.append(ReplaySpan(style: .excluded, t0S: excluded.lowerBound, t1S: excluded.upperBound))
-        self.spans = spans
-        let count = Int(durationS) + 1
-        // An invented S-shaped drive of about 20 km, east-north-east.
+/// A synthetic Kotlin `Replay` with no real locations: an invented S-shaped route of about 20 km, a 40 s estimated
+/// start, a 41 s GPS gap and a three-minute "phone moved" span. The `-replayFixture` UI tests and `-replayFixtureAt`
+/// screenshots run it through the real shared `ReplayPresenter` (`ReplayPresenter.onMain`).
+enum SyntheticReplay {
+    static func make(tripId: String, durationS: Double = 1_800, estimatedS: Double = 40) -> DrivePerfShared.Replay {
+        let gapStart = (durationS * 0.35).rounded()
+        let gapEnd = gapStart + 41
+        let excludedStart = (durationS * 0.62).rounded()
         let origin = (lat: 43.6400, lng: -79.4600)
-        var fixes: [ReplayPoint?] = []
-        fixes.reserveCapacity(count)
-        for second in 0..<count {
+        var track: [DrivePerfShared.ReplayPoint] = []
+        for second in 0...Int(durationS) {
             let t = Double(second)
-            if t > gap.lowerBound, t < gap.upperBound {
-                fixes.append(nil)
-                continue
-            }
+            if t > gapStart, t < gapEnd { continue }
             let f = t / durationS
-            let lat = origin.lat + 0.045 * f + 0.012 * sin(f * .pi * 3)
-            let lng = origin.lng + 0.20 * f
-            let speed = 8 + 20 * sin(f * .pi) + 4 * sin(f * 40)
-            fixes.append(ReplayPoint(tS: t, lat: lat, lng: lng, speedMps: max(speed, 0)))
+            let speed = max(8 + 20 * sin(f * .pi) + 4 * sin(f * 40), 0)
+            track.append(
+                DrivePerfShared.ReplayPoint(
+                    tS: t, lat: origin.lat + 0.045 * f + 0.012 * sin(f * .pi * 3), lng: origin.lng + 0.20 * f,
+                    speedMps: t < estimatedS ? nil : KotlinDouble(value: speed)))
         }
-        self.fixes = fixes
-        let points = fixes.compactMap { $0 }
-        bbox = ReplayBounds(
-            minLat: points.map(\.lat).min() ?? origin.lat, minLng: points.map(\.lng).min() ?? origin.lng,
-            maxLat: points.map(\.lat).max() ?? origin.lat, maxLng: points.map(\.lng).max() ?? origin.lng)
-    }
-
-    /// How a fix is drawn: estimated or excluded by span, otherwise observed (the gap has no fixes).
-    private func drawStyle(at tS: Double) -> ReplaySegmentStyle {
-        spans.first { $0.style != .noGps && $0.contains(tS, durationS: durationS) }?.style ?? .observed
-    }
-
-    private func inGap(_ tS: Double) -> Bool { tS > gap.lowerBound && tS < gap.upperBound }
-
-    /// Runs of one style that meet at their boundary fix; the gap is a two-point `noGps` segment across it. Coarser
-    /// buckets keep every n-th fix but always each run's first and last.
-    func segments(zoomBucket: Int) -> [ReplaySegment] {
-        let stride = max(1, 1 << max(0, 16 - zoomBucket))
-        var out: [ReplaySegment] = []
-        var run: [ReplayPoint] = []
-        var runStyle: ReplaySegmentStyle?
-        var lastFix: ReplayPoint?
-        func close(at point: ReplayPoint?) {
-            if let point, run.last != point { run.append(point) }
-            if let runStyle, run.count > 1 { out.append(ReplaySegment(style: runStyle, points: run)) }
-            run = []
-        }
-        for (index, entry) in fixes.enumerated() {
-            guard let fix = entry else { continue }
-            if let previous = lastFix, fix.tS - previous.tS > 1 {
-                close(at: previous)
-                out.append(ReplaySegment(style: .noGps, points: [previous, fix]))
-                runStyle = nil
-            }
-            let style = drawStyle(at: fix.tS)
-            if style != runStyle {
-                if runStyle != nil, let previous = lastFix {
-                    close(at: previous)
-                    run = [previous]
-                }
-                runStyle = style
-            }
-            if run.isEmpty || index % stride == 0 { run.append(fix) }
-            lastFix = fix
-        }
-        close(at: lastFix)
-        return out
-    }
-
-    func frame(at tS: Double) -> ReplayFrame {
-        let t = min(max(tS, 0), durationS)
-        if inGap(t), let held = fixes[Int(gap.lowerBound)] {
-            return ReplayFrame(tS: t, lat: held.lat, lng: held.lng, style: .noGps)
-        }
-        let i = min(Int(t), fixes.count - 1)
-        guard let a = fixes[i] else { return ReplayFrame(tS: t, lat: 0, lng: 0, style: .noGps) }
-        guard i + 1 < fixes.count, let b = fixes[i + 1] else {
-            return ReplayFrame(tS: t, lat: a.lat, lng: a.lng, speedMps: a.speedMps, style: drawStyle(at: t))
-        }
-        let f = t - a.tS
-        let bearing = atan2((b.lng - a.lng) * cos(a.lat * .pi / 180), b.lat - a.lat) * 180 / .pi
-        return ReplayFrame(
-            tS: t, lat: a.lat + (b.lat - a.lat) * f, lng: a.lng + (b.lng - a.lng) * f,
-            speedMps: a.speedMps.map { $0 + ((b.speedMps ?? $0) - $0) * f },
-            bearingDeg: (bearing + 360).truncatingRemainder(dividingBy: 360), style: drawStyle(at: t))
-    }
-
-    func span(at tS: Double) -> ReplaySpan? {
-        spans.first { $0.contains(tS, durationS: durationS) }
-    }
-
-    func zoomBucket(longitudeDelta: Double, viewWidth: Double) -> Int {
-        ReplayZoomMath.bucket(longitudeDelta: longitudeDelta, viewWidth: viewWidth)
-    }
-
-    func playbackRate(_ speed: PlaybackSpeed) -> Double {
-        switch speed {
-        case .auto: durationS / 60
-        case .x1: 1
-        case .x10: 10
-        case .x30: 30
-        }
+        var spans: [DrivePerfShared.ReplaySpan] = []
+        if estimatedS > 0 { spans.append(DrivePerfShared.ReplaySpan(style: .estimated, t0S: 0, t1S: estimatedS)) }
+        spans.append(DrivePerfShared.ReplaySpan(style: .noGps, t0S: gapStart, t1S: gapEnd))
+        spans.append(DrivePerfShared.ReplaySpan(style: .excluded, t0S: excludedStart, t1S: excludedStart + 180))
+        let lats = track.map(\.lat)
+        let lngs = track.map(\.lng)
+        return DrivePerfShared.Replay(
+            tripId: tripId,
+            bbox: BoundingBox(
+                minLat: lats.min() ?? origin.lat, minLng: lngs.min() ?? origin.lng, maxLat: lats.max() ?? origin.lat,
+                maxLng: lngs.max() ?? origin.lng),
+            durationS: durationS, spans: spans, summaryOnly: false, track: track)
     }
 }
 
-/// Serves `SyntheticReplay` for any trip.
+/// Presenters for the fixture trip: the real shared state machine over the synthetic replay, with no analytics.
 @MainActor
-final class SyntheticReplayLoader: ReplayLoading {
-    func replay(tripId: String) async -> (any ReplayTrack)? {
-        SyntheticReplay(tripId: tripId)
+final class SyntheticReplayPresenters: ReplayPresenterMaking {
+    func presenter(tripId: String, source: ReplayOpenSource) -> any ReplayPresenting {
+        let presenter = DrivePerfShared.ReplayPresenter.companion.onMain(
+            tripId: tripId, source: CoreReplayPresenter.kotlin(source),
+            replays: StaticReplayRepository(replay: SyntheticReplay.make(tripId: tripId)),
+            isRecording: { KotlinBoolean(value: false) }, analytics: SilentAnalytics(),
+            monoNowNs: { KotlinLong(value: Int64(clamping: DispatchTime.now().uptimeNanoseconds)) })
+        return CoreReplayPresenter(presenter)
     }
 }
 
+/// The fixture sends nothing anywhere.
+private final class SilentAnalytics: NSObject, DrivePerfShared.Analytics, @unchecked Sendable {
+    func track(event: any AnalyticsEvent) {}
+    func setUsageConsent(allowed: Bool) {}
+    func resetId() {}
+}

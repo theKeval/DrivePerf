@@ -71,12 +71,13 @@ struct ReplayFixtureScreen: View {
         }
         .task {
             let model = ReplayViewModel(
-                tripId: ReplayFixture.tripId, loader: SyntheticReplayLoader(),
+                presenter: SyntheticReplayPresenters().presenter(tripId: ReplayFixture.tripId, source: .tripDetail),
                 connectivity: environment.connectivity, display: DisplaySettingsModel(storage: environment.displaySettings))
-            await model.load()
+            self.model = model
+            // The presenter loads on the main thread; seek once the replay is there.
+            while model.phase == .loading, !Task.isCancelled { try? await Task.sleep(for: .milliseconds(50)) }
             model.scrub(to: time)
             model.endScrub()
-            self.model = model
         }
     }
 }

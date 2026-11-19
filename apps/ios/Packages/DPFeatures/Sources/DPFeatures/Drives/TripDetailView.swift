@@ -58,8 +58,8 @@ struct TripDetailView: View {
     }
 
     private func openReplay() {
-        guard let replayServices, let trip = trips.trip(id: tripId) else { return }
-        replay = replayServices.model(for: trip, source: "trip_detail")
+        guard let replayServices, trips.trip(id: tripId) != nil else { return }
+        replay = replayServices.model(tripId: tripId, source: .tripDetail)
         showsReplay = true
     }
 

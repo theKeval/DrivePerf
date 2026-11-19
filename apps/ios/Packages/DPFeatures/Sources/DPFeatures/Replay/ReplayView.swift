@@ -13,6 +13,8 @@ public struct ReplayView: View {
     /// What VoiceOver says for the map: "Map of your drive, 39.0 km."
     let mapSummary: String
     @State private var isLegendPresented = false
+    @Environment(\.dismiss) private var dismiss
+    @Environment(CaptureViewModel.self) private var capture: CaptureViewModel?
 
     public init(model: ReplayViewModel, title: String, subtitle: String, mapSummary: String) {
         _model = State(initialValue: model)
@@ -28,14 +30,11 @@ public struct ReplayView: View {
             case .loading:
                 ProgressView("Loading replay\u{2026}").font(DPFont.bodySecondary).foregroundStyle(DPColor.text2)
             case .failed:
-                ReplayMessageCard(
-                    text: "Couldn\u{2019}t load this drive\u{2019}s detail. Your recording is safe.",
-                    action: ("Try again", { Task { await model.load() } }))
+                ReplayMessageCard(text: "Couldn\u{2019}t load this drive\u{2019}s detail. Your recording is safe.")
             case .locked:
                 ReplayMessageCard(
                     text: "Replay for drives older than 30 days is part of Pro. Nothing is deleted.\n"
-                        + "Your summary, score and Story stay free forever.",
-                    action: nil)
+                        + "Your summary, score and Story stay free forever.")
             case .ready:
                 ready
             }
@@ -60,8 +59,15 @@ public struct ReplayView: View {
                 }
             }
         }
-        .task { await model.load() }
+        .task { await model.observe() }
+        .task { await model.observeNavigation() }
         .task { await model.observeConnectivity() }
+        .onChange(of: model.driveScreenRequested) { _, requested in
+            // AC6: the trip is being recorded, so S-DRV-05 shows instead.
+            guard requested else { return }
+            dismiss()
+            capture?.requestContent(.replay)
+        }
     }
 
     private var ready: some View {
@@ -87,9 +93,7 @@ public struct ReplayView: View {
         // AC4: the display clock drives playback; paused, it stops ticking.
         .background {
             TimelineView(.animation(minimumInterval: nil, paused: !model.isPlaying)) { context in
-                Color.clear.onChange(of: context.date) { _, date in
-                    model.tick(at: date.timeIntervalSinceReferenceDate)
-                }
+                Color.clear.onChange(of: context.date) { _, _ in model.frameTick() }
             }
         }
     }
@@ -428,15 +432,11 @@ enum ReplayHatch {
 
 private struct ReplayMessageCard: View {
     let text: String
-    let action: (String, () -> Void)?
 
     var body: some View {
         VStack(spacing: DPSpace.s4) {
             Text(text).font(DPFont.body).foregroundStyle(DPColor.text).multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
-            if let action {
-                Button(action.0, action: action.1).buttonStyle(.glassProminent)
-            }
         }
         .padding(DPSpace.s6)
         .glassEffect(.regular, in: RoundedRectangle(cornerRadius: DPRadius.card))

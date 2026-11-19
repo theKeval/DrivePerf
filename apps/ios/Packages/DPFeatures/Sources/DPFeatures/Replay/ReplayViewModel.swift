@@ -3,19 +3,6 @@ import DPSharedBridge
 import Foundation
 import Observation
 
-/// The Pro lock for Replay of drives older than 30 days (F-RPL-01 Free/Pro, Gate 2 OQ-06). Entitlements do not exist
-/// yet, so the app passes `ReplayProLockNotBuilt` and every replay opens. The paywall work replaces it with a lock that
-/// reads the entitlement; S-RPL-01 already shows its Lock state when this returns true.
-public protocol ReplayProLock: Sendable {
-    func isLocked(tripStartedAt: Date, now: Date) -> Bool
-}
-
-/// The seam until entitlements exist: nothing is locked.
-public struct ReplayProLockNotBuilt: ReplayProLock {
-    public init() {}
-    public func isLocked(tripStartedAt: Date, now: Date) -> Bool { false }
-}
-
 /// One route stretch ready for MapKit, built when the zoom bucket changes, never per frame.
 public struct ReplayPolyline: Identifiable, Sendable {
     public var id: Int
@@ -23,8 +10,10 @@ public struct ReplayPolyline: Identifiable, Sendable {
     public var coordinates: [CLLocationCoordinate2D]
 }
 
-/// S-RPL-01 Trip Replay (F-RPL-01) with the data-quality overlay (F-RPL-08): loads the shared replay, plays it on the
-/// display clock, scrubs, and says which overlay span the marker is in.
+/// S-RPL-01 Trip Replay (F-RPL-01) with the data-quality overlay (F-RPL-08), as a thin wrapper over the shared
+/// `ReplayPresenter` (ADR-002 section 4). The presenter owns playback, scrubbing, the end of the trip, the Pro gate
+/// and the analytics; this owns the frame loop (each display frame reads the playhead, then the core's `frameAt` and
+/// `spanAt`), the map's zoom buckets and the offline switch.
 @MainActor
 @Observable
 public final class ReplayViewModel {
@@ -32,24 +21,16 @@ public final class ReplayViewModel {
         case loading, ready, locked, failed
     }
 
-    public let tripId: String
-    public private(set) var phase = Phase.loading
-    public private(set) var isPlaying = false
-    public private(set) var speed = PlaybackSpeed.auto
-    /// Trip seconds at the marker.
+    /// The presenter's state; it changes on load and on intents only.
+    public private(set) var state = ReplayScreenState()
+    /// Trip seconds at the marker, read from the presenter's playhead each frame.
     public private(set) var tS: Double = 0
-    /// The core's `frameAt` for the marker; iOS adds no interpolation of its own.
+    /// The core's `frameAt(tS)`; iOS adds no interpolation of its own.
     public private(set) var frame: ReplayFrame?
-    /// The core's `spanAt` for the chip (F-RPL-08 AC2), or nil on an observed stretch.
+    /// The core's `spanAt(tS)` for the chip (F-RPL-08 AC2), or nil on an observed stretch.
     public private(set) var activeSpan: ReplaySpan?
-    public private(set) var isScrubbing = false
     /// False with no network path: the plain canvas replaces the map (AC5).
     public private(set) var isOnline = true
-    public private(set) var durationS: Double = 0
-    public private(set) var spans: [ReplaySpan] = []
-    public private(set) var bounds: ReplayBounds?
-    /// Raw data was removed (EC-STO): the summary route only.
-    public private(set) var summaryOnly = false
     /// The route for the current zoom bucket.
     public private(set) var segments: [ReplaySegment] = [] {
         didSet {
@@ -65,84 +46,45 @@ public final class ReplayViewModel {
     public private(set) var zoomBucket = ReplayZoomMath.maxZoom
     /// The styles this trip draws, for the legend and its order.
     public private(set) var stylesPresent: [ReplaySegmentStyle] = []
+    /// The presenter asked for S-DRV-05: the trip is being recorded (AC6).
+    public private(set) var driveScreenRequested = false
 
-    private let loader: any ReplayLoading
-    private let analytics: (any ReplayAnalytics)?
+    private let presenter: any ReplayPresenting
     private let connectivity: (any ConnectivityMonitoring)?
     private let display: DisplaySettingsModel
-    private let lock: any ReplayProLock
-    private let tripStartedAt: Date?
-    private let source: String
-    private let now: @MainActor () -> Date
-    private var track: (any ReplayTrack)?
     private var segmentCache: [Int: [ReplaySegment]] = [:]
-    private var rate: Double = 1
-    private var lastTick: TimeInterval?
-    private var resumeAfterScrub = false
-    private var didScrub = false
-    private var opened = false
 
-    /// The longest display-clock step one tick may play, so a stall or a return from the background never leaps.
-    static let maxTickS: TimeInterval = 0.25
+    /// How much wider than the route the fitted map is.
+    static let fitPadding = 1.3
 
     public init(
-        tripId: String, loader: any ReplayLoading, analytics: (any ReplayAnalytics)? = nil,
-        connectivity: (any ConnectivityMonitoring)? = nil, display: DisplaySettingsModel? = nil,
-        lock: any ReplayProLock = ReplayProLockNotBuilt(), tripStartedAt: Date? = nil, source: String = "trip_detail",
-        now: @escaping @MainActor () -> Date = { Date() }
+        presenter: any ReplayPresenting, connectivity: (any ConnectivityMonitoring)? = nil,
+        display: DisplaySettingsModel? = nil
     ) {
-        self.tripId = tripId
-        self.loader = loader
-        self.analytics = analytics
+        self.presenter = presenter
         self.connectivity = connectivity
         self.display = display ?? DisplaySettingsModel()
-        self.lock = lock
-        self.tripStartedAt = tripStartedAt
-        self.source = source
-        self.now = now
+        apply(presenter.state)
     }
 
-    // MARK: Loading
-
-    /// AC1: fits the route, draws all of it, and puts the marker at the start, paused.
-    public func load() async {
-        if !opened {
-            opened = true
-            analytics?.track(.opened(source: source))
-        }
-        // Coming back to the screen keeps the position; only a first load or Try again fetches.
-        guard phase != .ready else { return }
-        if let tripStartedAt, lock.isLocked(tripStartedAt: tripStartedAt, now: now()) {
-            phase = .locked
-            return
-        }
-        phase = .loading
-        guard let track = await loader.replay(tripId: tripId) else {
-            phase = .failed
-            return
-        }
-        apply(track)
+    isolated deinit {
+        presenter.close()
     }
 
-    func apply(_ track: any ReplayTrack) {
-        self.track = track
-        durationS = track.durationS
-        spans = track.spans.sorted { $0.t0S < $1.t0S }
-        bounds = track.bbox
-        summaryOnly = track.summaryOnly
-        rate = track.playbackRate(speed)
-        segmentCache = [:]
-        // Until the map reports its camera: the fitted route on a phone-wide map.
-        zoomBucket = track.zoomBucket(
-            longitudeDelta: max(track.bbox.maxLng - track.bbox.minLng, 1e-4) * Self.fitPadding, viewWidth: 402)
-        segments = segments(for: zoomBucket)
-        let present = Set(segments.map(\.style)).union(spans.map(\.style))
-        stylesPresent = ReplaySegmentStyle.allCases.filter(present.contains)
-        tS = 0
-        isPlaying = false
-        lastTick = nil
-        seek(0)
-        phase = .ready
+    // MARK: Observing
+
+    /// Follows the presenter's state (`.task {}`).
+    public func observe() async {
+        for await next in presenter.states() { apply(next) }
+    }
+
+    /// Follows the presenter's one-shot navigation (`.task {}`).
+    public func observeNavigation() async {
+        for await event in presenter.navigation() {
+            switch event {
+            case .showDriveScreen: driveScreenRequested = true
+            }
+        }
     }
 
     /// Follows the network: offline shows the plain canvas.
@@ -151,12 +93,93 @@ public final class ReplayViewModel {
         for await online in connectivity.onlineUpdates() { isOnline = online }
     }
 
-    /// How much wider than the route the fitted map is.
-    static let fitPadding = 1.3
+    func apply(_ next: ReplayScreenState) {
+        let newTrack = next.track.map { ObjectIdentifier($0) } != state.track.map { ObjectIdentifier($0) }
+        state = next
+        if newTrack, let track = next.track { prepare(track) }
+        refresh(at: presenter.nowNs())
+    }
+
+    /// AC1: a new replay is fitted, drawn whole, and its marker sits at the start.
+    private func prepare(_ track: any ReplayTrack) {
+        segmentCache = [:]
+        zoomBucket = track.zoomBucket(
+            longitudeDelta: max(track.bbox.maxLng - track.bbox.minLng, 1e-4) * Self.fitPadding, viewWidth: 402)
+        segments = segments(for: zoomBucket)
+        let present = Set(segments.map(\.style)).union(track.spans.map(\.style))
+        stylesPresent = ReplaySegmentStyle.allCases.filter(present.contains)
+    }
+
+    public var phase: Phase {
+        if state.track != nil { return .ready }
+        switch state.missing {
+        case .locked: return .locked
+        case .notFound, .recording: return .failed
+        case nil: return .loading
+        }
+    }
+
+    public var isPlaying: Bool { state.playing }
+    public var isScrubbing: Bool { state.scrubbing }
+    public var speed: PlaybackSpeed { state.speed }
+    public var durationS: Double { state.track?.durationS ?? 0 }
+    public var spans: [ReplaySpan] { state.track?.spans ?? [] }
+    public var bounds: ReplayBounds? { state.track?.bbox }
+    public var summaryOnly: Bool { state.track?.summaryOnly ?? false }
+
+    // MARK: Frame loop (AC4)
+
+    /// One display frame: the playhead on the presenter's clock, the core's frame and span there, then a tick so the
+    /// presenter can stop at the end.
+    public func frameTick() {
+        let now = presenter.nowNs()
+        refresh(at: now)
+        presenter.dispatch(.tick(now))
+    }
+
+    private func refresh(at now: Int64) {
+        guard let track = state.track else { return }
+        let t = presenter.playhead(at: now)
+        tS = t
+        frame = track.frame(at: t)
+        activeSpan = track.span(at: t)
+    }
+
+    // MARK: Intents (AC2, AC3)
+
+    public func togglePlay() {
+        send(state.playing ? .pause : .play)
+    }
+
+    public func select(_ speed: PlaybackSpeed) {
+        guard speed != state.speed else { return }
+        send(.setSpeed(speed))
+    }
+
+    public func beginScrub() { send(.scrubStart) }
+
+    /// The marker follows the thumb in the same frame.
+    public func scrub(to tS: Double) {
+        if !state.scrubbing { send(.scrubStart) }
+        send(.scrubTo(tS))
+    }
+
+    public func endScrub() { send(.scrubEnd) }
+
+    /// VoiceOver and keyboard: ±30 s, a one-off seek.
+    public func step(by seconds: Double) { send(.scrubTo(tS + seconds)) }
+
+    public func legendOpened() { send(.openLegend) }
+
+    /// The presenter updates its state at once; the marker is redrawn from it now rather than on the next frame.
+    private func send(_ action: ReplayAction) {
+        presenter.dispatch(action)
+        apply(presenter.state)
+    }
 
     /// The camera settled: simplify for its zoom bucket (cached per bucket).
     public func cameraSettled(longitudeDelta: Double, viewWidth: Double) {
-        guard let track else { return }
+        guard let track = state.track else { return }
         let bucket = track.zoomBucket(longitudeDelta: longitudeDelta, viewWidth: viewWidth)
         guard bucket != zoomBucket else { return }
         zoomBucket = bucket
@@ -165,107 +188,9 @@ public final class ReplayViewModel {
 
     private func segments(for bucket: Int) -> [ReplaySegment] {
         if let cached = segmentCache[bucket] { return cached }
-        let value = track?.segments(zoomBucket: bucket) ?? []
+        let value = state.track?.segments(zoomBucket: bucket) ?? []
         segmentCache[bucket] = value
         return value
-    }
-
-    // MARK: Playback (AC2, AC4)
-
-    public func togglePlay() {
-        isPlaying ? pause() : play()
-    }
-
-    /// Plays from the marker; at the end it restarts.
-    public func play() {
-        guard phase == .ready, !isScrubbing, !isPlaying else { return }
-        if tS >= durationS { seek(0) }
-        isPlaying = true
-        lastTick = nil
-        analytics?.track(.played(speed: speed))
-    }
-
-    /// Stops in place.
-    public func pause() {
-        isPlaying = false
-        lastTick = nil
-    }
-
-    /// Changes the rate at once, playing or not.
-    public func select(_ speed: PlaybackSpeed) {
-        guard speed != self.speed else { return }
-        self.speed = speed
-        rate = track?.playbackRate(speed) ?? 1
-        if isPlaying { analytics?.track(.played(speed: speed)) }
-    }
-
-    /// One display frame (TimelineView `.animation`): `time` is the display clock in seconds. The marker and the chip
-    /// come from the core's `frameAt` and `spanAt` at the new time.
-    public func tick(at time: TimeInterval) {
-        guard isPlaying, track != nil else { return }
-        guard let last = lastTick else {
-            lastTick = time
-            return
-        }
-        lastTick = time
-        let dt = min(max(time - last, 0), Self.maxTickS)
-        var next = tS + dt * rate
-        var finished = false
-        if next >= durationS {
-            next = durationS
-            finished = true
-        }
-        seek(next)
-        if finished {
-            pause()
-            analytics?.track(.completed)
-        }
-    }
-
-    // MARK: Scrubbing (AC3)
-
-    /// The thumb was grabbed: playback holds, and resumes on release if it was playing.
-    public func beginScrub() {
-        guard phase == .ready, !isScrubbing else { return }
-        resumeAfterScrub = isPlaying
-        isPlaying = false
-        lastTick = nil
-        isScrubbing = true
-        didScrub = false
-    }
-
-    /// The marker and readouts follow the thumb in the same frame.
-    public func scrub(to tS: Double) {
-        guard phase == .ready else { return }
-        if !isScrubbing { beginScrub() }
-        didScrub = true
-        seek(tS)
-    }
-
-    /// Released: back to the previous play state.
-    public func endScrub() {
-        guard isScrubbing else { return }
-        isScrubbing = false
-        if didScrub { analytics?.track(.scrubbed) }
-        if resumeAfterScrub, tS < durationS {
-            isPlaying = true
-            lastTick = nil
-        }
-        resumeAfterScrub = false
-    }
-
-    /// VoiceOver and keyboard: ±30 s.
-    public func step(by seconds: Double) {
-        guard phase == .ready else { return }
-        seek(tS + seconds)
-        analytics?.track(.scrubbed)
-    }
-
-    private func seek(_ value: Double) {
-        let clamped = min(max(value, 0), durationS)
-        tS = clamped
-        frame = track?.frame(at: clamped)
-        activeSpan = track?.span(at: clamped)
     }
 
     // MARK: Overlay (F-RPL-08)
@@ -297,10 +222,6 @@ public final class ReplayViewModel {
         case .noGps: "No GPS"
         case .excluded: "Not scored"
         }
-    }
-
-    public func legendOpened() {
-        analytics?.track(.legendOpened)
     }
 
     // MARK: Text

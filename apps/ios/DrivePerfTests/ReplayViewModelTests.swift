@@ -4,212 +4,127 @@ import XCTest
 @testable import DPFeatures
 @testable import DrivePerf
 
-/// DRIVE-200 (F-RPL-01) and DRIVE-61 (F-RPL-08) on iOS: S-RPL-01's view model against the shared Replay contract.
+/// DRIVE-200 (F-RPL-01) and DRIVE-61 (F-RPL-08) on iOS: S-RPL-01's view model is a thin wrapper over the shared
+/// `ReplayPresenter` (its state machine is tested in `ReplayPresenterTest`). These check what the wrapper adds: the
+/// frame loop reads the playhead and the core's frame and span, intents go to the presenter, the map's zoom buckets,
+/// the offline switch, the phases and the drive-screen effect.
 @MainActor
 final class ReplayViewModelTests: XCTestCase {
-    private var loader: FakeReplayLoader!
-    private var analytics: FakeReplayAnalytics!
+    private var presenter: FakeReplayPresenter!
 
     override func setUp() {
-        loader = FakeReplayLoader(track: FakeReplayTrack())
-        analytics = FakeReplayAnalytics()
+        presenter = FakeReplayPresenter()
     }
 
-    private func model(
-        connectivity: (any ConnectivityMonitoring)? = nil, lock: any ReplayProLock = ReplayProLockNotBuilt()
-    ) -> ReplayViewModel {
-        ReplayViewModel(
-            tripId: "t1", loader: loader, analytics: analytics, connectivity: connectivity, lock: lock,
-            tripStartedAt: Date(timeIntervalSince1970: 0), source: "trip_detail",
-            now: { Date(timeIntervalSince1970: 3_600) })
-    }
-
-    private func loaded() async -> ReplayViewModel {
-        let model = model()
-        await model.load()
-        return model
+    private func loaded(connectivity: (any ConnectivityMonitoring)? = nil) -> ReplayViewModel {
+        presenter.state = ReplayScreenState(loading: false, track: FakeReplayTrack())
+        return ReplayViewModel(presenter: presenter, connectivity: connectivity)
     }
 
     // MARK: AC1
 
-    func testOpensFittedWithTheWholeRouteAndTheMarkerAtTheStartPaused() async {
-        let model = await loaded()
+    func testALoadedReplayIsDrawnWholeWithTheMarkerAtThePlayhead() {
+        let model = loaded()
         XCTAssertEqual(model.phase, .ready)
         XCTAssertFalse(model.isPlaying)
         XCTAssertEqual(model.tS, 0)
         XCTAssertEqual(model.frame?.lat, FakeReplayTrack.lat(0))
         XCTAssertEqual(model.bounds, FakeReplayTrack.bounds)
-        XCTAssertEqual(model.speed, .auto)
         XCTAssertEqual(model.segments.map(\.style), [.estimated, .observed, .noGps, .observed, .excluded, .observed])
         XCTAssertEqual(model.polylines.count, model.segments.count)
         XCTAssertEqual(model.stylesPresent, [.observed, .estimated, .noGps, .excluded])
-        XCTAssertEqual(analytics.events, [.opened(source: "trip_detail")])
     }
 
-    func testALoadThatFindsNothingShowsTheErrorAndTryAgainLoads() async {
-        loader.track = nil
-        let model = model()
-        await model.load()
-        XCTAssertEqual(model.phase, .failed)
-        loader.track = FakeReplayTrack()
-        await model.load()
+    func testTheReplayArrivesThroughThePresentersState() async {
+        presenter.updates = [ReplayScreenState(loading: false, track: FakeReplayTrack())]
+        let model = ReplayViewModel(presenter: presenter)
+        XCTAssertEqual(model.phase, .loading)
+        await model.observe()
         XCTAssertEqual(model.phase, .ready)
-        XCTAssertEqual(analytics.events, [.opened(source: "trip_detail")], "opened is sent once per screen")
+        XCTAssertFalse(model.segments.isEmpty)
     }
 
-    func testTheProLockSeamShowsTheLockWithoutLoading() async {
-        let model = model(lock: AlwaysLocked())
-        await model.load()
-        XCTAssertEqual(model.phase, .locked)
-        XCTAssertEqual(loader.calls, 0)
+    func testPhasesFollowWhyThereIsNoReplay() {
+        presenter.state = ReplayScreenState(loading: false, missing: .notFound)
+        XCTAssertEqual(ReplayViewModel(presenter: presenter).phase, .failed)
+        presenter.state = ReplayScreenState(loading: false, missing: .locked)
+        XCTAssertEqual(ReplayViewModel(presenter: presenter).phase, .locked, "the shared Pro gate shows the Lock state")
     }
 
-    func testNothingIsLockedUntilEntitlementsExist() {
-        XCTAssertFalse(ReplayProLockNotBuilt().isLocked(tripStartedAt: .distantPast, now: Date()))
+    func testARecordingTripAsksForTheDriveScreen() async {
+        presenter.navigationEvents = [.showDriveScreen]
+        let model = ReplayViewModel(presenter: presenter)
+        await model.observeNavigation()
+        XCTAssertTrue(model.driveScreenRequested)
     }
 
-    // MARK: AC2, AC4
-
-    func testPlayAdvancesOnTheDisplayClockAtTheAutoRate() async {
-        let model = await loaded()
-        model.play()
-        XCTAssertTrue(model.isPlaying)
-        model.tick(at: 100)
-        XCTAssertEqual(model.tS, 0, "the first tick only sets the clock")
-        model.tick(at: 100.1)
-        // Auto plays 600 s in 60 s: 10 trip seconds per second.
-        XCTAssertEqual(model.tS, 1, accuracy: 1e-9)
-        XCTAssertEqual(model.frame?.lat ?? 0, FakeReplayTrack.lat(1), accuracy: 1e-9)
-        XCTAssertEqual(analytics.events.last, .played(speed: .auto))
+    func testThePresenterIsClosedWithTheScreen() {
+        var model: ReplayViewModel? = loaded()
+        XCTAssertNotNil(model)
+        model = nil
+        XCTAssertTrue(presenter.closed)
     }
 
-    func testPauseStopsInPlace() async {
-        let model = await loaded()
-        model.play()
-        model.tick(at: 0)
-        model.tick(at: 0.2)
-        model.pause()
-        let at = model.tS
-        model.tick(at: 5)
-        XCTAssertFalse(model.isPlaying)
-        XCTAssertEqual(model.tS, at)
-    }
+    // MARK: AC2 to AC4: intents and the frame loop
 
-    func testSpeedChangesTheRateAtOnce() async {
-        let model = await loaded()
-        model.play()
-        model.tick(at: 0)
-        model.select(.x30)
-        model.tick(at: 0.1)
-        XCTAssertEqual(model.tS, 3, accuracy: 1e-9)
-        model.select(.x1)
-        model.tick(at: 0.2)
-        XCTAssertEqual(model.tS, 3.1, accuracy: 1e-9)
-        XCTAssertEqual(analytics.events.suffix(2), [.played(speed: .x30), .played(speed: .x1)])
-    }
-
-    func testAStalledFrameNeverLeaps() async {
-        let model = await loaded()
-        model.play()
-        model.tick(at: 0)
-        model.tick(at: 30)
-        XCTAssertEqual(model.tS, ReplayViewModel.maxTickS * 10, accuracy: 1e-9)
-    }
-
-    func testTheEndPausesAndCompletesAndPlayRestarts() async {
-        let model = await loaded()
-        model.select(.x30)
-        model.play()
-        model.scrub(to: 599.9)
-        model.endScrub()
-        model.tick(at: 0)
-        model.tick(at: 0.2)
-        XCTAssertEqual(model.tS, 600)
-        XCTAssertFalse(model.isPlaying)
-        XCTAssertEqual(analytics.events.last, .completed)
-        model.play()
-        XCTAssertEqual(model.tS, 0)
-        XCTAssertTrue(model.isPlaying)
-    }
-
-    // MARK: AC3
-
-    func testReleasingTheScrubberResumesPlaying() async {
-        let model = await loaded()
-        model.play()
-        model.beginScrub()
-        XCTAssertFalse(model.isPlaying)
-        XCTAssertTrue(model.isScrubbing)
-        model.scrub(to: 300)
-        XCTAssertEqual(model.tS, 300)
-        XCTAssertEqual(model.frame?.lat ?? 0, FakeReplayTrack.lat(300), accuracy: 1e-9)
-        model.endScrub()
-        XCTAssertTrue(model.isPlaying)
-        XCTAssertFalse(model.isScrubbing)
-        XCTAssertEqual(analytics.events.last, .scrubbed)
-    }
-
-    func testReleasingTheScrubberStaysPausedWhenItWasPaused() async {
-        let model = await loaded()
-        model.scrub(to: 120)
-        model.endScrub()
-        XCTAssertFalse(model.isPlaying)
+    func testEachFrameReadsThePlayheadThenTheCoresFrameAndTicks() {
+        let model = loaded()
+        presenter.playheadS = 120
+        presenter.now = 42
+        model.frameTick()
         XCTAssertEqual(model.tS, 120)
+        XCTAssertEqual(model.frame?.lat ?? 0, FakeReplayTrack.lat(120), accuracy: 1e-12)
+        XCTAssertEqual(presenter.actions.last, .tick(42))
     }
 
-    func testScrubbingClampsToTheTripAndStepsThirtySeconds() async {
-        let model = await loaded()
-        model.scrub(to: -5)
-        XCTAssertEqual(model.tS, 0)
-        model.scrub(to: 5_000)
-        XCTAssertEqual(model.tS, 600)
+    func testPlayPauseAndSpeedGoToThePresenter() {
+        let model = loaded()
+        model.togglePlay()
+        XCTAssertEqual(presenter.actions.last, .play)
+        XCTAssertTrue(model.isPlaying)
+        model.togglePlay()
+        XCTAssertEqual(presenter.actions.last, .pause)
+        model.select(.x30)
+        XCTAssertEqual(presenter.actions.last, .setSpeed(.x30))
+        let count = presenter.actions.count
+        model.select(.x30)
+        XCTAssertEqual(presenter.actions.count, count, "the selected speed is not sent again")
+    }
+
+    func testScrubbingMovesTheMarkerInTheSameFrame() {
+        let model = loaded()
+        model.scrub(to: 300)
+        XCTAssertEqual(presenter.actions, [.scrubStart, .scrubTo(300)])
+        XCTAssertEqual(model.tS, 300)
+        XCTAssertEqual(model.frame?.lat ?? 0, FakeReplayTrack.lat(300), accuracy: 1e-12)
+        model.scrub(to: 310)
+        XCTAssertEqual(presenter.actions.suffix(1), [.scrubTo(310)], "one ScrubStart per gesture")
+        XCTAssertEqual(presenter.actions.filter { $0 == .scrubStart }.count, 1)
         model.endScrub()
-        model.step(by: -30)
-        XCTAssertEqual(model.tS, 570)
+        XCTAssertEqual(presenter.actions.last, .scrubEnd)
     }
 
-    // MARK: F-RPL-08
-
-    func testTheSpanLabelFollowsTheMarker() async {
-        let model = await loaded()
-        model.scrub(to: 10)
-        XCTAssertEqual(model.spanLabel, "Estimated start")
-        model.scrub(to: 100)
-        XCTAssertNil(model.spanLabel)
-        model.scrub(to: 210)
-        XCTAssertEqual(model.spanLabel, "No GPS")
-        XCTAssertTrue(model.isMarkerHidden, "the marker hides in a GPS gap")
-        XCTAssertEqual(model.speedText, "\u{2014}")
-        model.scrub(to: 420)
-        XCTAssertEqual(model.spanLabel, "Phone moved \u{2014} not scored")
-        XCTAssertFalse(model.isMarkerHidden)
+    func testAccessibilityStepsAreOneOffSeeks() {
+        let model = loaded()
+        presenter.playheadS = 100
+        model.frameTick()
+        model.step(by: 30)
+        XCTAssertEqual(presenter.actions.last, .scrubTo(130))
     }
 
-    func testTheLegendIsCounted() async {
-        let model = await loaded()
+    func testTheLegendIsForwarded() {
+        let model = loaded()
         model.legendOpened()
-        XCTAssertEqual(analytics.events.last, .legendOpened)
+        XCTAssertEqual(presenter.actions.last, .openLegend)
     }
 
-    // MARK: AC5
+    // MARK: F-RPL-08: the marker and chip are the core's
 
-    func testNoNetworkSwitchesToThePlainCanvas() async {
-        let model = model(connectivity: FakeConnectivity(states: [true, false]))
-        await model.load()
-        XCTAssertTrue(model.isOnline)
-        await model.observeConnectivity()
-        XCTAssertFalse(model.isOnline)
-    }
-
-    // MARK: Frames and zoom
-
-    func testTheMarkerIsTheCoresFrameRightUpToASpanBoundary() async {
-        // The estimated start ends at 30 s and has no measured speed: just before it the marker is still estimated.
-        let model = await loaded()
+    func testTheMarkerIsTheCoresFrameRightUpToASpanBoundary() {
+        let model = loaded()
         model.scrub(to: 29.75)
         XCTAssertEqual(model.frame?.style, .estimated)
         XCTAssertNil(model.frame?.speedMps)
-        XCTAssertEqual(model.frame?.lat ?? 0, FakeReplayTrack.lat(29.75), accuracy: 1e-12)
         XCTAssertEqual(model.spanLabel, "Estimated start")
         model.scrub(to: 30)
         XCTAssertEqual(model.frame?.style, .observed)
@@ -217,13 +132,33 @@ final class ReplayViewModelTests: XCTestCase {
         XCTAssertNil(model.spanLabel)
     }
 
-    func testTheMarkerJumpsTheGapAsTheCoreSays() async {
-        let model = await loaded()
-        model.scrub(to: 220.2)
-        XCTAssertEqual(model.frame?.lat ?? 0, FakeReplayTrack.lat(200), accuracy: 1e-12, "held at the last fix")
-        model.scrub(to: 240.25)
-        XCTAssertEqual(model.frame?.style, .observed)
-        XCTAssertEqual(model.frame?.lat ?? 0, FakeReplayTrack.lat(240.25), accuracy: 1e-12, "on the far side")
+    func testInAGapTheMarkerHidesAndSpeedIsADash() {
+        let model = loaded()
+        model.scrub(to: 220)
+        XCTAssertEqual(model.spanLabel, "No GPS")
+        XCTAssertTrue(model.isMarkerHidden)
+        XCTAssertEqual(model.speedText, "\u{2014}")
+        model.scrub(to: 420)
+        XCTAssertEqual(model.spanLabel, "Phone moved \u{2014} not scored")
+        XCTAssertFalse(model.isMarkerHidden)
+    }
+
+    func testTheCoreLabelWinsOverTheStyleText() {
+        let track = FakeReplayTrack()
+        track.spans[2].label = "Not scored"
+        presenter.state = ReplayScreenState(loading: false, track: track)
+        let model = ReplayViewModel(presenter: presenter)
+        model.scrub(to: 420)
+        XCTAssertEqual(model.spanLabel, "Not scored")
+    }
+
+    // MARK: AC5 and zoom
+
+    func testNoNetworkSwitchesToThePlainCanvas() async {
+        let model = loaded(connectivity: FakeConnectivity(states: [true, false]))
+        XCTAssertTrue(model.isOnline)
+        await model.observeConnectivity()
+        XCTAssertFalse(model.isOnline)
     }
 
     func testZoomBucketsMatchTheCoreFormula() {
@@ -234,56 +169,75 @@ final class ReplayViewModelTests: XCTestCase {
         XCTAssertEqual(ReplayZoomMath.bucket(longitudeDelta: 1e-9, viewWidth: 402), 22)
     }
 
-    func testACameraChangeAsksTheCoreForThatBucketOnce() async {
-        let model = await loaded()
-        let track = loader.track as? FakeReplayTrack
+    func testACameraChangeAsksTheCoreForThatBucketOnce() {
+        let track = FakeReplayTrack()
+        presenter.state = ReplayScreenState(loading: false, track: track)
+        let model = ReplayViewModel(presenter: presenter)
         model.cameraSettled(longitudeDelta: 360, viewWidth: 256 * 32)
         model.cameraSettled(longitudeDelta: 0.01, viewWidth: 402)
         model.cameraSettled(longitudeDelta: 360, viewWidth: 256 * 32)
         XCTAssertEqual(model.zoomBucket, 5)
-        XCTAssertEqual(track?.bucketsAsked.filter { $0 == 5 }.count, 1)
+        XCTAssertEqual(track.bucketsAsked.filter { $0 == 5 }.count, 1)
     }
 
-    func testTheCoreLabelWinsOverTheStyleText() async {
+    func testAStateChangeKeepsTheRoute() {
         let track = FakeReplayTrack()
-        track.spans[2].label = "Not scored"
-        loader.track = track
-        let model = await loaded()
-        model.scrub(to: 420)
-        XCTAssertEqual(model.spanLabel, "Not scored")
-    }
-
-    // MARK: Analytics keys
-
-    func testEventsCarryOnlyTheirKeys() {
-        XCTAssertEqual(ReplayAnalyticsEvent.opened(source: "trip_detail").name, "replay_opened")
-        XCTAssertEqual(ReplayAnalyticsEvent.opened(source: "trip_detail").properties, ["source": "trip_detail"])
-        XCTAssertEqual(ReplayAnalyticsEvent.played(speed: .x10).properties, ["speed": "10x"])
-        XCTAssertEqual(ReplayAnalyticsEvent.scrubbed.name, "replay_scrubbed")
-        XCTAssertEqual(ReplayAnalyticsEvent.completed.name, "replay_completed")
-        XCTAssertEqual(ReplayAnalyticsEvent.legendOpened.name, "quality_overlay_legend_opened")
-        XCTAssertEqual(ReplayAnalyticsEvent.completed.properties, [:])
-    }
-
-    // MARK: The synthetic fake keeps the contract
-
-    func testTheSyntheticReplayKeepsStyleBoundariesAndTheAutoRate() {
-        let replay = SyntheticReplay(tripId: "s", durationS: 600, estimatedS: 30)
-        XCTAssertEqual(replay.playbackRate(.auto), 10)
-        let segments = replay.segments(zoomBucket: 8)
-        XCTAssertEqual(segments.first?.style, .estimated)
-        XCTAssertTrue(segments.contains { $0.style == .noGps })
-        XCTAssertTrue(segments.contains { $0.style == .excluded })
-        for (a, b) in zip(segments, segments.dropFirst()) {
-            XCTAssertEqual(a.points.last?.tS, b.points.first?.tS, "segments meet, so styles never leave a hole")
-        }
-        XCTAssertEqual(replay.frame(at: 220).style, .noGps)
-        XCTAssertEqual(replay.frame(at: 100).style, .observed)
-        XCTAssertEqual(replay.frame(at: 10).style, .estimated)
+        presenter.state = ReplayScreenState(loading: false, track: track)
+        let model = ReplayViewModel(presenter: presenter)
+        let asked = track.bucketsAsked.count
+        model.togglePlay()
+        XCTAssertEqual(track.bucketsAsked.count, asked, "playing does not rebuild the route")
     }
 }
 
 // MARK: - Fakes
+
+/// A presenter that records intents and answers the playhead it is given. It has no state machine of its own: it only
+/// flips `playing` and `scrubbing` so the wrapper's reads can be checked.
+@MainActor
+final class FakeReplayPresenter: ReplayPresenting {
+    var state = ReplayScreenState()
+    var updates: [ReplayScreenState] = []
+    var navigationEvents: [ReplayNavigation] = []
+    var playheadS: Double = 0
+    var now: Int64 = 0
+    private(set) var actions: [ReplayAction] = []
+    private(set) var closed = false
+
+    func states() -> AsyncStream<ReplayScreenState> {
+        let values = [state] + updates
+        if let last = updates.last { state = last }
+        return AsyncStream { continuation in
+            values.forEach { continuation.yield($0) }
+            continuation.finish()
+        }
+    }
+
+    func navigation() -> AsyncStream<ReplayNavigation> {
+        let events = navigationEvents
+        return AsyncStream { continuation in
+            events.forEach { continuation.yield($0) }
+            continuation.finish()
+        }
+    }
+
+    func dispatch(_ action: ReplayAction) {
+        actions.append(action)
+        switch action {
+        case .play: state.playing = true
+        case .pause: state.playing = false
+        case .setSpeed(let speed): state.speed = speed
+        case .scrubStart: state.scrubbing = true
+        case .scrubTo(let tS): playheadS = tS
+        case .scrubEnd: state.scrubbing = false
+        case .tick, .openLegend: break
+        }
+    }
+
+    func nowNs() -> Int64 { now }
+    func playhead(at nowNs: Int64) -> Double { playheadS }
+    func close() { closed = true }
+}
 
 /// 600 s along a straight line north: estimated 0–30 s, a GPS gap 200–240 s, excluded 400–460 s.
 final class FakeReplayTrack: ReplayTrack, @unchecked Sendable {
@@ -313,7 +267,7 @@ final class FakeReplayTrack: ReplayTrack, @unchecked Sendable {
     }
 
     func frame(at tS: Double) -> ReplayFrame {
-        let style = spans.first { $0.contains(tS, durationS: durationS) }?.style ?? .observed
+        let style = span(at: tS)?.style ?? .observed
         let t = style == .noGps ? 200 : tS
         let speed: Double? = style == .noGps || style == .estimated ? nil : 15
         return ReplayFrame(tS: tS, lat: Self.lat(t), lng: 0, speedMps: speed, bearingDeg: 0, style: style)
@@ -326,34 +280,6 @@ final class FakeReplayTrack: ReplayTrack, @unchecked Sendable {
     func zoomBucket(longitudeDelta: Double, viewWidth: Double) -> Int {
         ReplayZoomMath.bucket(longitudeDelta: longitudeDelta, viewWidth: viewWidth)
     }
-
-    func playbackRate(_ speed: PlaybackSpeed) -> Double {
-        switch speed {
-        case .auto: durationS / 60
-        case .x1: 1
-        case .x10: 10
-        case .x30: 30
-        }
-    }
-}
-
-@MainActor
-final class FakeReplayLoader: ReplayLoading {
-    var track: (any ReplayTrack)?
-    private(set) var calls = 0
-
-    init(track: (any ReplayTrack)?) { self.track = track }
-
-    func replay(tripId: String) async -> (any ReplayTrack)? {
-        calls += 1
-        return track
-    }
-}
-
-@MainActor
-final class FakeReplayAnalytics: ReplayAnalytics {
-    private(set) var events: [ReplayAnalyticsEvent] = []
-    func track(_ event: ReplayAnalyticsEvent) { events.append(event) }
 }
 
 @MainActor
@@ -367,8 +293,4 @@ final class FakeConnectivity: ConnectivityMonitoring {
             continuation.finish()
         }
     }
-}
-
-struct AlwaysLocked: ReplayProLock {
-    func isLocked(tripStartedAt: Date, now: Date) -> Bool { true }
 }

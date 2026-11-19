@@ -38,10 +38,12 @@ final class AppEnvironment {
     let recorder: CoreTripRecorder
     let surfaceRouter = TripSurfaceRouter()
     let corrections = CoreTripCorrections()
-    /// DRIVE-200, DRIVE-61: S-RPL-01 reads `CoreServices.replay`; the Replay fixture reads the synthetic trip.
-    let coreReplay = CoreReplayLoader()
-    var replaySource: any ReplayLoading { ReplayFixture.isActive ? SyntheticReplayLoader() : coreReplay }
-    let replayAnalytics = CoreReplayAnalytics()
+    /// DRIVE-200, DRIVE-61: S-RPL-01 runs the shared `ReplayPresenter`; the Replay fixture runs it over the synthetic
+    /// trip.
+    let coreReplay = CoreReplayPresenters()
+    var replayPresenters: any ReplayPresenterMaking {
+        ReplayFixture.isActive ? SyntheticReplayPresenters() : coreReplay
+    }
     let connectivity: any ConnectivityMonitoring = ReplayFixture.isOffline
         ? FixedConnectivity(online: false) : NetworkConnectivity()
     private(set) lazy var corePorts = CorePorts(
@@ -88,7 +90,7 @@ final class AppEnvironment {
             .withTripCorrections(corrections)
             .withStatusRequests(surfaceRouter.statusRequests)
             .withDisplaySettings(displaySettings)
-            .withReplay(replaySource, analytics: replayAnalytics, connectivity: connectivity)
+            .withReplay(replayPresenters, connectivity: connectivity)
     }
 
     /// Recreate location sessions in `didFinishLaunching`, then open the core off the main actor. Location events
@@ -124,8 +126,7 @@ final class AppEnvironment {
         refreshDisplaySurfaces()
         recorder.surfaceData?.updateLocation(canRecord: canRecordFromSystemSurface)
         corrections.attach(services.corrections)
-        replayAnalytics.attach(services.analytics)
-        coreReplay.attach(services.replay)
+        coreReplay.attach(services)
         // The first launch after a restart re-arms the triggers and says why (F-CAP-14.3).
         recorder.onLaunch(reason: BootDetector().isFirstLaunchSinceBoot() ? .boot : .launch)
         updateTriggerAvailability()
@@ -220,13 +221,12 @@ enum TripIntentHandler {
 }
 
 extension AppDependencies {
-    /// DRIVE-200, DRIVE-61: Replay's source, its analytics and the network state for the offline canvas.
+    /// DRIVE-200, DRIVE-61: Replay's presenters and the network state for the offline canvas.
     fileprivate func withReplay(
-        _ source: any ReplayLoading, analytics: any ReplayAnalytics, connectivity: any ConnectivityMonitoring
+        _ presenters: any ReplayPresenterMaking, connectivity: any ConnectivityMonitoring
     ) -> AppDependencies {
         var copy = self
-        copy.replay = source
-        copy.replayAnalytics = analytics
+        copy.replayPresenters = presenters
         copy.connectivity = connectivity
         return copy
     }

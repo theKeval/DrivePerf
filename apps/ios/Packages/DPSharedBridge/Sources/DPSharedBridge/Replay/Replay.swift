@@ -100,16 +100,6 @@ public enum PlaybackSpeed: String, Equatable, Sendable, CaseIterable, Identifiab
         case .x30: "30\u{00D7}"
         }
     }
-
-    /// The analytics value for `replay_played {speed}`.
-    public var analyticsValue: String {
-        switch self {
-        case .auto: "auto"
-        case .x1: "1x"
-        case .x10: "10x"
-        case .x30: "30x"
-        }
-    }
 }
 
 /// Kotlin `BoundingBox`, for fitting the map.
@@ -127,7 +117,7 @@ public struct ReplayBounds: Equatable, Sendable {
     }
 }
 
-/// Kotlin `Replay`: one trip, ready to draw and play.
+/// Kotlin `Replay`: one trip, ready to draw. Playback lives in the shared presenter (`ReplayPresenting`).
 public protocol ReplayTrack: AnyObject, Sendable {
     var tripId: String { get }
     var bbox: ReplayBounds { get }
@@ -138,18 +128,16 @@ public protocol ReplayTrack: AnyObject, Sendable {
     var summaryOnly: Bool { get }
     /// The route simplified for a zoom bucket (Douglas–Peucker, ADR-005). Style boundaries are kept.
     func segments(zoomBucket: Int) -> [ReplaySegment]
-    /// The marker at `tS`. Never interpolates across a `noGps` gap.
+    /// Kotlin `Replay.frameAt`: the marker at `tS`. Never interpolates across a `noGps` gap.
     func frame(at tS: Double) -> ReplayFrame
     /// Kotlin `Replay.spanAt`: the overlay span at `tS` for the marker's chip, or nil on an observed stretch.
     func span(at tS: Double) -> ReplaySpan?
-    /// Trip seconds per wall-clock second.
-    func playbackRate(_ speed: PlaybackSpeed) -> Double
     /// Kotlin `Replay.zoomBucketFor`: the simplification bucket for a map `viewWidth` points wide showing
     /// `longitudeDelta` degrees of longitude.
     func zoomBucket(longitudeDelta: Double, viewWidth: Double) -> Int
 }
 
-/// Kotlin `Replay.MAX_ZOOM` and the web-Mercator bucket formula, for fakes and previews that have no core.
+/// Kotlin `Replay.MAX_ZOOM` and the web-Mercator bucket formula, for tests that have no core.
 public enum ReplayZoomMath {
     public static let maxZoom = 22
 
@@ -161,44 +149,84 @@ public enum ReplayZoomMath {
     }
 }
 
-/// Kotlin `ReplayRepository`.
-@MainActor
-public protocol ReplayLoading: AnyObject {
-    /// The replay for a trip, or nil when there is nothing to draw.
-    func replay(tripId: String) async -> (any ReplayTrack)?
+// MARK: - The shared presenter (Kotlin `com.driveperf.presentation.replay`, ADR-002 section 4)
+
+/// Kotlin `ReplaySource`: where Replay was opened from (`replay_opened {source}`).
+public enum ReplayOpenSource: String, Equatable, Sendable {
+    case tripDetail, story
 }
 
-/// The Replay analytics events (S-RPL-01, F-RPL-01, F-RPL-08). Only these keys, with no values beyond them.
-public enum ReplayAnalyticsEvent: Equatable, Sendable {
-    case opened(source: String)
-    case played(speed: PlaybackSpeed)
-    case scrubbed
-    case completed
-    case legendOpened
+/// Kotlin `ReplayUnavailable`: why there is no replay to show.
+public enum ReplayMissingReason: String, Equatable, Sendable {
+    /// The trip is gone, discarded, or has no position at all.
+    case notFound
+    /// The trip is being recorded: the drive screen shows instead (F-RPL-01 AC6).
+    case recording
+    /// The Pro gate for drives older than 30 days (S-SUB-03). The shared presenter never sets it yet.
+    case locked
+}
 
-    public var name: String {
-        switch self {
-        case .opened: "replay_opened"
-        case .played: "replay_played"
-        case .scrubbed: "replay_scrubbed"
-        case .completed: "replay_completed"
-        case .legendOpened: "quality_overlay_legend_opened"
-        }
-    }
+/// Kotlin `ReplayState` without the play anchor: the anchor stays in the core, read through
+/// `ReplayPresenting.playhead(at:)`.
+public struct ReplayScreenState: Sendable {
+    public var loading: Bool
+    public var track: (any ReplayTrack)?
+    public var missing: ReplayMissingReason?
+    public var playing: Bool
+    public var speed: PlaybackSpeed
+    public var scrubbing: Bool
 
-    public var properties: [String: String] {
-        switch self {
-        case .opened(let source): ["source": source]
-        case .played(let speed): ["speed": speed.analyticsValue]
-        case .scrubbed, .completed, .legendOpened: [:]
-        }
+    public init(
+        loading: Bool = true, track: (any ReplayTrack)? = nil, missing: ReplayMissingReason? = nil,
+        playing: Bool = false, speed: PlaybackSpeed = .auto, scrubbing: Bool = false
+    ) {
+        self.loading = loading
+        self.track = track
+        self.missing = missing
+        self.playing = playing
+        self.speed = speed
+        self.scrubbing = scrubbing
     }
 }
 
-/// Sends Replay events through the consent-gated core analytics.
+/// Kotlin `ReplayIntent`.
+public enum ReplayAction: Equatable, Sendable {
+    case play, pause
+    case setSpeed(PlaybackSpeed)
+    case scrubStart
+    case scrubTo(Double)
+    case scrubEnd
+    /// A display frame at `nowNs` on the presenter's clock.
+    case tick(Int64)
+    case openLegend
+}
+
+/// Kotlin `ReplayEffect`.
+public enum ReplayNavigation: Equatable, Sendable {
+    /// The trip is still being recorded: show S-DRV-05 (F-RPL-01 AC6).
+    case showDriveScreen
+}
+
+/// Kotlin `ReplayPresenter`: the shared playback state machine, which also sends the Replay analytics. The app target
+/// wraps the Kotlin object; S-RPL-01 draws from it.
 @MainActor
-public protocol ReplayAnalytics: AnyObject {
-    func track(_ event: ReplayAnalyticsEvent)
+public protocol ReplayPresenting: AnyObject {
+    var state: ReplayScreenState { get }
+    /// The current state first, then every change. It changes on load and on intents, never per frame.
+    func states() -> AsyncStream<ReplayScreenState>
+    func navigation() -> AsyncStream<ReplayNavigation>
+    func dispatch(_ action: ReplayAction)
+    /// Monotonic now on the presenter's clock.
+    func nowNs() -> Int64
+    /// Kotlin `ReplayState.playheadAt(nowNs)`: trip seconds at the marker.
+    func playhead(at nowNs: Int64) -> Double
+    func close()
+}
+
+/// Makes one presenter per Replay screen (`CoreServices.replayPresenter`).
+@MainActor
+public protocol ReplayPresenterMaking: AnyObject {
+    func presenter(tripId: String, source: ReplayOpenSource) -> any ReplayPresenting
 }
 
 /// Whether the phone is online, for the map's offline fallback (F-RPL-01 AC5, EC-NET).

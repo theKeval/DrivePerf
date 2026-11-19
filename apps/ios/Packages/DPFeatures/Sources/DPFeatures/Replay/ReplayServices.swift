@@ -5,29 +5,24 @@ import SwiftUI
 /// What S-RPL-01 needs, built once by `AppModel` and handed to the Drives screens through the environment.
 @MainActor
 public final class ReplayServices {
-    let loader: any ReplayLoading
-    let analytics: (any ReplayAnalytics)?
+    let presenters: any ReplayPresenterMaking
     let connectivity: (any ConnectivityMonitoring)?
-    let lock: any ReplayProLock
     let display: DisplaySettingsModel
 
     public init(
-        loader: any ReplayLoading, analytics: (any ReplayAnalytics)? = nil,
-        connectivity: (any ConnectivityMonitoring)? = nil, lock: any ReplayProLock = ReplayProLockNotBuilt(),
+        presenters: any ReplayPresenterMaking, connectivity: (any ConnectivityMonitoring)? = nil,
         display: DisplaySettingsModel
     ) {
-        self.loader = loader
-        self.analytics = analytics
+        self.presenters = presenters
         self.connectivity = connectivity
-        self.lock = lock
         self.display = display
     }
 
-    /// A fresh Replay for [trip], opened from [source] (`replay_opened {source}`).
-    func model(for trip: TripSummary, source: String) -> ReplayViewModel {
+    /// A fresh Replay for [tripId], opened from [source] (the shared presenter sends `replay_opened {source}`).
+    func model(tripId: String, source: ReplayOpenSource) -> ReplayViewModel {
         ReplayViewModel(
-            tripId: trip.id, loader: loader, analytics: analytics, connectivity: connectivity, display: display,
-            lock: lock, tripStartedAt: trip.startedAt, source: source)
+            presenter: presenters.presenter(tripId: tripId, source: source), connectivity: connectivity,
+            display: display)
     }
 }
 

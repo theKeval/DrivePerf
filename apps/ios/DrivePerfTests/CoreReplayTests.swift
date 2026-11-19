@@ -5,7 +5,8 @@ import XCTest
 @testable import DPFeatures
 @testable import DrivePerf
 
-/// DRIVE-200: `CoreReplayTrack` maps the shared Kotlin `Replay` into the Swift mirror S-RPL-01 reads.
+/// DRIVE-200: `CoreReplayTrack` maps the shared Kotlin `Replay` into the Swift mirror S-RPL-01 reads, and
+/// `CoreReplayPresenter` drives the real shared `ReplayPresenter`.
 final class CoreReplayTests: XCTestCase {
     /// 0–10 s estimated start, 10–40 s observed, a gap 40–60 s, 60–100 s observed with 80–100 s excluded.
     private func kotlinReplay() -> DrivePerfShared.Replay {
@@ -41,7 +42,7 @@ final class CoreReplayTests: XCTestCase {
         XCTAssertEqual(styles.last, .excluded)
     }
 
-    func testFramesJumpTheGapAndPlaybackRatesComeFromTheCore() {
+    func testFramesAndSpansComeFromTheCore() {
         let track = CoreReplayTrack(kotlinReplay())
         let inGap = track.frame(at: 50)
         XCTAssertEqual(inGap.style, .noGps)
@@ -52,8 +53,6 @@ final class CoreReplayTests: XCTestCase {
         XCTAssertEqual(track.span(at: 5)?.label, "Estimated start")
         XCTAssertNil(track.span(at: 20))
         XCTAssertEqual(track.span(at: 100)?.style, .excluded, "a span that runs to the end includes the end")
-        XCTAssertEqual(track.playbackRate(.auto), 100.0 / 60, accuracy: 1e-9)
-        XCTAssertEqual(track.playbackRate(.x30), 30)
     }
 
     func testZoomBucketsMatchTheSwiftFormulaUsedByTheFakes() {
@@ -63,5 +62,38 @@ final class CoreReplayTests: XCTestCase {
                 track.zoomBucket(longitudeDelta: delta, viewWidth: width),
                 ReplayZoomMath.bucket(longitudeDelta: delta, viewWidth: width), "delta \(delta)")
         }
+    }
+
+    /// The real shared presenter over the synthetic replay (`ReplayPresenter.onMain`, the UI-test fixture's path).
+    @MainActor
+    func testThePresenterAdapterPlaysScrubsAndCloses() async {
+        let presenter = SyntheticReplayPresenters().presenter(tripId: "syn", source: .tripDetail)
+        var loaded: ReplayScreenState?
+        for await state in presenter.states() where state.track != nil {
+            loaded = state
+            break
+        }
+        XCTAssertEqual(loaded?.track?.durationS, 1_800)
+        XCTAssertFalse(loaded?.playing ?? true, "a replay opens paused")
+        XCTAssertEqual(presenter.playhead(at: presenter.nowNs()), 0)
+
+        presenter.dispatch(.setSpeed(.x30))
+        presenter.dispatch(.play)
+        XCTAssertTrue(presenter.state.playing)
+        XCTAssertEqual(presenter.state.speed, .x30)
+        let start = presenter.nowNs()
+        XCTAssertEqual(presenter.playhead(at: start + 1_000_000_000), presenter.playhead(at: start) + 30, accuracy: 1e-6)
+
+        presenter.dispatch(.scrubStart)
+        presenter.dispatch(.scrubTo(600))
+        XCTAssertEqual(presenter.playhead(at: presenter.nowNs()), 600)
+        presenter.dispatch(.scrubEnd)
+        XCTAssertTrue(presenter.state.playing, "releasing the scrubber resumes playing")
+
+        let later = presenter.nowNs() + 3_600_000_000_000
+        presenter.dispatch(.tick(later))
+        XCTAssertFalse(presenter.state.playing, "the end of the trip pauses")
+        XCTAssertEqual(presenter.playhead(at: later), 1_800)
+        presenter.close()
     }
 }
