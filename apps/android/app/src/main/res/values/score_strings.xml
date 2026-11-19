@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The score destinations' titles (DRIVE-87, DRIVE-113). Session A's own file, so the shared strings.xml stays untouched. -->
+<resources>
+    <string name="score_breakdown_title">Smoothness</string>
+    <string name="how_scores_work_title">How scores work</string>
+</resources>

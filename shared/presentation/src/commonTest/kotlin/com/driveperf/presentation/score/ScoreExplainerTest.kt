@@ -37,6 +37,8 @@ class ScoreExplainerTest {
         )
         assertEquals(EventType.entries, content.thresholds.map { it.type })
         assertEquals("Scoring version smooth-1.0.0 · updated 10 November 2026", content.versionLine)
+        assertEquals(listOf("Observed", "Derived", "Estimated"), content.provenance.map { it.label })
+        assertTrue(content.provenance.all { it.meaning.isNotBlank() })
         assertEquals(85, content.exampleScore)
         assertEquals(83, content.exampleBaseline)
     }

@@ -252,6 +252,7 @@ class DrivesScoresTest {
         assertEquals(ComparisonTone.LOWER, s.comparison?.tone)
         assertEquals("New route record · beat 78 from 14 Oct", s.recordLine)
         assertEquals("Unusual pace — not counted for records", s.paceNote)
+        assertTrue(s.accessibilityLabel.endsWith("Unusual pace — not counted for records."))
         assertNull(s.basedOn)
         assertEquals("Compared with your usual highway drives: 83.", d.breakdown?.basisLine)
         assertEquals("Its route doesn’t have three earlier runs yet", d.breakdown?.options?.first()?.detail)

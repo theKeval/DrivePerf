@@ -1,6 +1,7 @@
 package com.driveperf.presentation.score
 
 import com.driveperf.domain.trip.EventType
+import com.driveperf.domain.trip.Provenance
 
 /** A scoring version and the day it shipped (S-SCO-02 footer, F-SCO-08 AC2). */
 public data class ScoringVersion(val id: String, val releasedAtMs: Long)
@@ -11,7 +12,7 @@ public data class ScoringVersion(val id: String, val releasedAtMs: Long)
  * `Versions.SCORING`; `ScoreExplainerAlignmentTest` in `:shared:di` fails when either changes without this.
  */
 public object ScoreExplainer {
-    /** `smooth-1.0.0`, shipped on 10 November 2026 (DRIVE-62; midday UTC, so every time zone shows that day). A new version replaces it. */
+    /** `smooth-1.0.0`, shipped on 10 November 2026 (DRIVE-62), stored as midday UTC. A new version replaces it. */
     public val CURRENT: ScoringVersion = ScoringVersion("smooth-1.0.0", 1_794_312_000_000L)
 
     /** The entry thresholds in g (pipeline-and-scoring.md §4.1): braking, acceleration, cornering (sideways). */
@@ -35,6 +36,7 @@ public object ScoreExplainer {
             ThresholdUi(EventType.ACCEL, ScoreCopy.eventLabel(EventType.ACCEL), "${g(ACCEL_G)} g or more"),
             ThresholdUi(EventType.CORNER, ScoreCopy.eventLabel(EventType.CORNER), "${g(CORNER_G)} g or more sideways"),
         ),
+        provenance = Provenance.entries.map { ProvenanceLineUi(it, it.label, it.meaning) },
         versionLine = "Scoring version ${CURRENT.id} · updated ${date(CURRENT.releasedAtMs)}",
     )
 

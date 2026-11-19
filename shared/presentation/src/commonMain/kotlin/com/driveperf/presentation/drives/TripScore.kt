@@ -145,6 +145,7 @@ internal class TripScore(
             }
             recordLine?.let { append(" $it.") }
             basedOn?.let { append(" $it.") }
+            if (detail.recordIneligible == IneligibleReason.PACE_BAND) append(" ${ScoreCopy.UNUSUAL_PACE}.")
         }
         return ScoreUi(
             smoothness = smoothness,

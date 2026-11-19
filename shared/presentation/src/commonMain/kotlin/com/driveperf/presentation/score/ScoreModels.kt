@@ -165,6 +165,9 @@ public data class ExplainerSectionUi(
 /** One event threshold on S-SCO-02: "Hard braking · 0.30 g or more". */
 public data class ThresholdUi(val type: EventType, val label: String, val text: String)
 
+/** One provenance with its meaning, for S-SCO-02 "Where numbers come from". */
+public data class ProvenanceLineUi(val provenance: com.driveperf.domain.trip.Provenance, val label: String, val meaning: String)
+
 /** S-SCO-02 How scores work. */
 public data class HowScoresWorkUi(
     val title: String,
@@ -179,6 +182,8 @@ public data class HowScoresWorkUi(
     /** Your usual · What moves it · Events · Was it needed? · Fair by design · Data quality · … */
     val sections: List<ExplainerSectionUi>,
     val thresholds: List<ThresholdUi>,
+    /** Observed, Derived and Estimated with their meanings. */
+    val provenance: List<ProvenanceLineUi>,
     /** "Scoring version smooth-1.0.0 · updated 10 November 2026" */
     val versionLine: String,
 )
