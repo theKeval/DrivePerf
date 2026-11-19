@@ -1052,7 +1052,11 @@ Run the §4–§5 stage on the same drives decimated to 25 Hz and at 50 Hz (usin
 
 **Precision and recall harness (DRIVE-93 AC2).** `EventHarness` matches detected events one-to-one with labelled ones of the same type whose peak is within ±1.0 s, nearest first, and checks the targets above per type over the whole set. A labelled trip is a §8.2 fixture `<id>.csv` with `<id>.labels.csv` beside it (`type,t_peak_s`, trip time). Both files start with `# privacy-trimmed` (ADR-008), A19 files included. `LabelledSetTest` runs the committed synthetic set (`shared/pipeline/src/jvmTest/resources/labelled`: three hard pull-aways, turns and stops among gentle driving, labelled by construction). The A19 set stays off the repository and runs with `./gradlew :shared:pipeline:jvmTest --tests '*LabelledSetTest' -PlabelledSet=<dir>`.
 
-**Analytics.** At trip end, `ScoreAnalyticsFinaliser` sends `events_detected {type, count_bucket}` once per type for every scored drive (buckets `0`, `1`, `2_3`, `4_9`, `10_plus`), and `baseline_established {trips}` on the first drive compared with a baseline, with the scored drives it took (`lt_4`, `4`, `5_6`, `7_10`, `11_20`, `gt_20`).
+**Analytics.** At trip end, `ScoreAnalyticsFinaliser` sends three events, with the buckets of `research/analytics-crash-privacy.md` §2. Re-scores and recomputes never pass through it.
+
+- `trip_finalised {mode, trigger, quality, duration_bucket, distance_bucket, score_bucket}`: once for every finalised trip. `score_bucket` comes from `scoreBucket(smoothness)` (`lt_50` … `90_100`) and is left out without a score. `quality` maps the Limited badge to `poor`.
+- `events_detected {type, count_bucket}`: once per type for every scored drive.
+- `baseline_established {trips}`: on the first drive compared with a baseline, with the scored drives it took (`lt_4`, `4`, `5_6`, `7_10`, `11_20`, `gt_20`).
 
 **Deliberate extreme manoeuvres happen only in controlled environments.** Ordinary-road testing must never ask a driver to create a dangerous event.
 

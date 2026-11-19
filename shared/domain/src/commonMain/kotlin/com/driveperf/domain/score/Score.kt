@@ -134,3 +134,18 @@ public interface ScoreHistoryStore {
     /** Replaces these scores in one transaction. Every score write goes to the `score` table. */
     public suspend fun saveScores(scores: List<Score>)
 }
+
+/**
+ * The `score_bucket` analytics value of a Smoothness score (analytics-crash-privacy.md §2): `lt_50`, `50_59`, `60_69`,
+ * `70_79`, `80_89` or `90_100`. Null when there is no score (unscorable or not a drive), so the property is left out.
+ */
+public fun scoreBucket(smoothness: Int?): String? = when {
+    smoothness == null -> null
+    smoothness < BUCKET_50 -> "lt_50"
+    smoothness >= BUCKET_90 -> "90_100"
+    else -> (smoothness / BUCKET_WIDTH * BUCKET_WIDTH).let { "${it}_${it + BUCKET_WIDTH - 1}" }
+}
+
+private const val BUCKET_50 = 50
+private const val BUCKET_90 = 90
+private const val BUCKET_WIDTH = 10
