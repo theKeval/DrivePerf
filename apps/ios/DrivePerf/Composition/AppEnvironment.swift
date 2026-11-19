@@ -130,6 +130,8 @@ final class AppEnvironment {
         displaySettings.attach(services)
         recorder.attach(KotlinCore(services))
         recorder.surfaceData = TripSurfaceData(trips: services.trips)
+        let analytics = services.analytics
+        recorder.trackNotice = { analytics.track(event: NoticeAnalyticsEvent($0)) }
         displaySettings.onChange = { [weak self] in self?.refreshDisplaySurfaces() }
         refreshDisplaySurfaces()
         recorder.surfaceData?.updateLocation(canRecord: canRecordFromSystemSurface)
@@ -281,5 +283,20 @@ extension AppEnvironment {
 extension NotificationAdapter {
     func postDriveDecoded(tripId: String, smoothness: Int?) {
         LocalNotifier().postDriveDecoded(tripId: tripId, smoothness: smoothness)
+    }
+
+    /// DRIVE-137: the recording notice with its own category for automatic trips, reporting when it was shown.
+    func postRecordingNotice(tripId: String, automatic: Bool, posted: @escaping @MainActor () -> Void) {
+        LocalNotifier().postRecordingNotice(tripId: tripId, automatic: automatic, onPosted: posted)
+    }
+}
+
+/// An F-CAP-11 notice event as the Kotlin `AnalyticsEvent` type the consent-gated `Analytics` port accepts.
+final class NoticeAnalyticsEvent: NSObject, DrivePerfShared.AnalyticsEvent {
+    let name: String
+    let properties: [String: String] = [:]
+
+    init(_ event: AutoTripNoticeEvent) {
+        name = event.rawValue
     }
 }

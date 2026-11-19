@@ -121,13 +121,24 @@ class CaptureNotifications(
             .setOnlyAlertOnce(true)
             .setCategory(NotificationCompat.CATEGORY_STATUS)
             .setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)
-            .setContentIntent(openAppIntent())
+            .setContentIntent(openAppIntent(isManual))
             .addAction(0, context.getString(R.string.capture_notification_stop), stopIntent())
 
-    private fun openAppIntent(): PendingIntent {
-        val launch = context.packageManager.getLaunchIntentForPackage(context.packageName)
-            ?.addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP)
-        return PendingIntent.getActivity(context, 0, launch ?: Intent(), PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
+    /**
+     * Opens the app, whose in-drive gate shows S-DRV-01 while a trip records (never content, F-CAP-11 AC2). The automatic
+     * trip's notice is marked so [AutoTripNoticeTaps] can count the tap; it has its own request code so the two intents'
+     * extras never overwrite each other.
+     */
+    private fun openAppIntent(isManual: Boolean): PendingIntent {
+        val launch = (context.packageManager.getLaunchIntentForPackage(context.packageName) ?: Intent())
+            .addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+            .apply { if (!isManual) putExtra(AutoTripNoticeTaps.EXTRA_SOURCE, AutoTripNoticeTaps.SOURCE_AUTO_TRIP) }
+        return PendingIntent.getActivity(
+            context,
+            if (isManual) MANUAL_REQUEST_CODE else AUTO_REQUEST_CODE,
+            launch,
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+        )
     }
 
     private fun stopIntent(): PendingIntent = PendingIntent.getService(
@@ -141,6 +152,8 @@ class CaptureNotifications(
         const val CHANNEL_ID = "capture"
         const val NOTIFICATION_ID = 7001
         internal const val AUTO_CHANNEL_ID = "capture_auto"
+        private const val MANUAL_REQUEST_CODE = 0
+        private const val AUTO_REQUEST_CODE = 2
         private const val MAX_CHIP_MINUTES = 999L
         private const val MAX_CHIP_HOURS = 9999L
         private const val MINUTES_PER_HOUR = 60L
