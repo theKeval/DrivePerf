@@ -259,7 +259,10 @@ private class FakeMaps : TripMapSource {
             widthM = 100.0,
             heightM = 200.0,
             segments = emptyList(),
-            pins = listOf(MapPin("e1", EventType.BRAKE, false, MapPoint(1.0, 2.0)), MapPin("e3", EventType.CORNER, false, MapPoint(3.0, 4.0))),
+            pins = listOf(
+                MapPin("e1", EventType.BRAKE, false, MapPoint(1.0, 2.0)),
+                MapPin("e3", EventType.CORNER, false, MapPoint(3.0, 4.0)),
+            ),
             stops = listOf(MapPoint(5.0, 6.0)),
             maxSpeed = null,
         )

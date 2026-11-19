@@ -91,7 +91,9 @@ class TripCrossLinksUiTest {
     private val detail = TripDetailUi(
         "trip-7", "The Commute", emptyList(), emptyList(), QualityBadge.GOOD, TripCorrection.DRIVER, "Tuesday morning · 10 Nov",
         score = score, breakdown = breakdown,
-        events = TripEventsUi("Events · 3", listOf(EventCountUi(EventType.BRAKE, "Braking", 1)), listOf(pinned, unpinned, excluded), "", ""),
+        events = TripEventsUi(
+            "Events · 3", listOf(EventCountUi(EventType.BRAKE, "Braking", 1)), listOf(pinned, unpinned, excluded), "", "",
+        ),
         tip = tip, map = map,
     )
 

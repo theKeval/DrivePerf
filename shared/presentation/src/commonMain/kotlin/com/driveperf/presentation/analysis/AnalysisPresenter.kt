@@ -201,8 +201,7 @@ public class AnalysisPresenter(
             is AnalysisIntent.ShowEvent -> showEvent(intent.eventId)
             AnalysisIntent.OpenReplay -> emit(AnalysisEffect.OpenReplay(tripId))
             AnalysisIntent.Back -> Unit
-            is AnalysisIntent.OpenEvidence -> openEvidence(intent.eventId)
-            AnalysisIntent.Reload -> scope.launch { load(report = false) }
+            is AnalysisIntent.OpenEvidence, AnalysisIntent.Reload -> evidenceIntent(intent)
         }
     }
 
@@ -320,6 +319,15 @@ public class AnalysisPresenter(
         val marker = analysis?.markers?.firstOrNull { it.eventId == eventId } ?: return
         update { it.copy(ggExpanded = false) }
         moveCursor(marker.tPeakS)
+    }
+
+    /** The link to S-RPL-02 and the reload after feedback given there (DRIVE-39 AC1). */
+    private fun evidenceIntent(intent: AnalysisIntent) {
+        when (intent) {
+            is AnalysisIntent.OpenEvidence -> openEvidence(intent.eventId)
+            AnalysisIntent.Reload -> scope.launch { load(report = false) }
+            else -> Unit
+        }
     }
 
     /** Only an event that is on the timeline: one reported "Not accurate?" has no tick and no evidence. */

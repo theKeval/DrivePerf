@@ -128,6 +128,7 @@ public class DrivesPresenter(
         ownedScope?.cancel()
     }
 
+    @Suppress("CyclomaticComplexMethod") // one branch per intent; the score and cross-link ones are grouped
     override fun dispatch(intent: DrivesIntent) {
         when (intent) {
             is DrivesIntent.Open -> change { it.copy(detailId = intent.tripId, pendingOpened = true, pendingView = Surface.TRIP_DETAIL) }

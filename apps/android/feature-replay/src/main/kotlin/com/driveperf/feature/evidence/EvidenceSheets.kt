@@ -161,6 +161,7 @@ fun EvidenceSheetsHost(viewModel: EvidenceSheetsViewModel, modifier: Modifier = 
 }
 
 /** Replay's sheet controls without a replay: only the sheets' own actions do anything. */
+@Suppress("TooManyFunctions") // ReplayControls' members, most of them no-ops here
 private class SheetControls(private val sheets: EvidenceSheetsViewModel) : ReplayControls {
     override fun togglePlay() = Unit
 
