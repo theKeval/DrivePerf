@@ -53,7 +53,8 @@ class TripEditUiTest {
 
     private val actions = mutableListOf<DrivesIntent>()
 
-    private val detail = TripDetailUi("trip-7", "The Commute", emptyList(), emptyList(), null, TripCorrection.DRIVER, "Tuesday morning · 10 Nov")
+    private val detail =
+        TripDetailUi("trip-7", "The Commute", emptyList(), emptyList(), null, TripCorrection.DRIVER, "Tuesday morning · 10 Nov")
 
     private fun type(type: TripEditType, title: String, detail: String, selected: Boolean = false, current: Boolean = false) =
         TripTypeOptionUi(type, title, detail, selected, current, "$title. $detail.")
@@ -71,7 +72,9 @@ class TripEditUiTest {
         carValue = "GTI", carDetail = "2019 Volkswagen Golf GTI",
         cars = listOf(
             CarOptionUi("gti", "GTI", "2019 Volkswagen Golf GTI", isDefault = true, selected = true, current = true, "GTI. Selected."),
-            CarOptionUi("ioniq", "Ioniq", "2023 Hyundai Ioniq 5", isDefault = false, selected = false, current = false, "Ioniq. Not selected."),
+            CarOptionUi(
+                "ioniq", "Ioniq", "2023 Hyundai Ioniq 5", isDefault = false, selected = false, current = false, "Ioniq. Not selected.",
+            ),
         ),
         carNote = "Drives go to your default car unless you change them here or on the Story.",
         changedBanner = null, changed = false, caption = "Fix a drive after the fact.", deleteLabel = "Delete drive",
@@ -163,7 +166,8 @@ class TripEditUiTest {
 
     private val commute = FilterKey(FilterGroup.ROUTE, "r1")
     private val gti = FilterKey(FilterGroup.CAR, "gti")
-    private val rows = listOf(TripRowUi("trip-7", "The Commute", "Tuesday morning · 10 Nov", "8.1 km", "12 min", accessibilityLabel = "The Commute card"))
+    private val rows =
+        listOf(TripRowUi("trip-7", "The Commute", "Tuesday morning · 10 Nov", "8.1 km", "12 min", accessibilityLabel = "The Commute card"))
 
     private fun showList(history: HistoryFilterUi) {
         compose.setContent {
@@ -205,7 +209,9 @@ class TripEditUiTest {
         val sheet = FilterSheetUi(
             "Filter drives", "1 filter · 3 drives",
             listOf(
-                FilterGroupUi(FilterGroup.CAR, "Car", listOf(FilterChipUi(gti, "GTI", 3, true, accessibilityLabel = "GTI, 3 drives, selected"))),
+                FilterGroupUi(
+                    FilterGroup.CAR, "Car", listOf(FilterChipUi(gti, "GTI", 3, true, accessibilityLabel = "GTI, 3 drives, selected")),
+                ),
                 FilterGroupUi(FilterGroup.QUALITY, "Data quality", listOf(
                     FilterChipUi(FilterKey.quality(QualityBadge.GOOD), "Good", 2, false, QualityBadge.GOOD, "Good, 2 drives, not selected"),
                 )),

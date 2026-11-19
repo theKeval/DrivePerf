@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
@@ -51,7 +52,10 @@ const val DRIVES_FILTERS_TAG: String = "drives_filters"
 /** Test tag of S-HIS-02's "Show n drives" button. */
 const val DRIVES_FILTERS_SHOW_TAG: String = "drives_filters_show"
 
-/** "Filters" then the applied filters (× removes one), "Clear" and the quick filters, with "8 drives · filtered". */
+/**
+ * "Filters" then the applied filters (× removes one), "Clear" and the quick filters, with "8 drives · filtered". S-HIS-02
+ * opens from here, so it is hosted here too.
+ */
 @Composable
 internal fun DrivesFilterRow(history: HistoryFilterUi, onAction: (DrivesIntent) -> Unit, modifier: Modifier = Modifier) {
     val send = { action: HistoryFilterAction -> onAction(DrivesIntent.History(action)) }
@@ -86,6 +90,7 @@ internal fun DrivesFilterRow(history: HistoryFilterUi, onAction: (DrivesIntent) 
                 )
             }
         }
+        history.sheet?.let { DrivesFilterSheet(it, onAction) }
         history.subtitle?.let {
             Text(
                 it,
@@ -95,6 +100,12 @@ internal fun DrivesFilterRow(history: HistoryFilterUi, onAction: (DrivesIntent) 
             )
         }
     }
+}
+
+/** The filter row and the no-match state at the top of All drives. */
+internal fun LazyListScope.drivesFilterItems(history: HistoryFilterUi, onAction: (DrivesIntent) -> Unit) {
+    item(key = "filters") { DrivesFilterRow(history, onAction) }
+    item(key = "filters-empty") { DrivesFilterEmpty(history, onAction) }
 }
 
 /** "No drives match." with "Clear filters". */

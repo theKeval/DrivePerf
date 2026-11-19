@@ -83,17 +83,6 @@ internal fun TripEditOverlays(state: DrivesState, onAction: (DrivesIntent) -> Un
     }
 }
 
-/** "Edit" in trip detail's action row (S-TRP-01 → S-TRP-02). */
-@Composable
-internal fun TripEditButton(tripId: String, onAction: (DrivesIntent) -> Unit, modifier: Modifier = Modifier) {
-    OutlinedButton(
-        onClick = { onAction(DrivesIntent.Edit(TripEditAction.Open(tripId, TripEditPage.MAIN))) },
-        modifier = modifier.heightIn(min = 56.dp).testTag(TRIP_EDIT_BUTTON_TAG),
-    ) {
-        Text(stringResource(R.string.trip_edit_action))
-    }
-}
-
 /** "Marked as passenger · scores updated" with Undo, at the bottom of trip detail. */
 @Composable
 internal fun TripEditMessage(message: TripEditMessageUi, onAction: (DrivesIntent) -> Unit, modifier: Modifier = Modifier) {
@@ -294,32 +283,4 @@ private fun InfoBanner(text: String) {
     Surface(shape = MaterialTheme.shapes.medium, color = MaterialTheme.colorScheme.surfaceContainerHigh) {
         Text(text, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.fillMaxWidth().padding(12.dp))
     }
-}
-
-/** S-TRP-03: an M3 alert with the trash icon, the drive, and Cancel · Delete (error colour). */
-@Composable
-private fun DeleteTripDialog(dialog: DeleteTripUi, send: (TripEditAction) -> Unit) {
-    AlertDialog(
-        onDismissRequest = { send(TripEditAction.CancelDelete) },
-        icon = { Icon(painterResource(R.drawable.ic_trip_edit_trash), null, Modifier.size(24.dp)) },
-        title = { Text(dialog.title, textAlign = TextAlign.Center) },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text(dialog.message)
-                Column {
-                    Text(dialog.tripTitle, style = MaterialTheme.typography.titleSmall)
-                    Text(dialog.tripSubtitle, style = MaterialTheme.typography.bodySmall, color = DrivePerfTheme.extendedColors.text2)
-                }
-                dialog.error?.let { Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite }) }
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = { send(TripEditAction.ConfirmDelete) }, enabled = !dialog.deleting) {
-                Text(dialog.confirm, color = MaterialTheme.colorScheme.error)
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = { send(TripEditAction.CancelDelete) }, enabled = !dialog.deleting) { Text(dialog.cancel) }
-        },
-    )
 }

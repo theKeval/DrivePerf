@@ -10,6 +10,4 @@
     <string name="trip_edit_car">Car</string>
     <string name="trip_edit_current">Current</string>
     <string name="trip_edit_default">Default</string>
-    <string name="drives_filters_close">Close filters</string>
-    <string name="drives_filters_remove">Remove</string>
 </resources>
