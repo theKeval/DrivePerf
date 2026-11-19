@@ -115,7 +115,8 @@ private struct EmptyDrivesCard: View {
     }
 }
 
-/// S-HIS-01 All drives: grouped by week, newest first.
+/// S-HIS-01 All drives: grouped by week, newest first, with each week's average Smoothness. The stack is lazy, so
+/// 1,000 drives build only the rows on screen (DRIVE-126 AC2).
 struct AllDrivesView: View {
     let trips: TripListViewModel
 
@@ -131,7 +132,9 @@ struct AllDrivesView: View {
                         }
                         .foregroundStyle(DPColor.text2)
                         .padding(.horizontal, DPSpace.s1)
-                        .accessibilityElement(children: .combine)
+                        .accessibilityElement(children: .ignore)
+                        .accessibilityLabel(section.accessibilityLabel)
+                        .accessibilityAddTraits(.isHeader)
                         TripCardStack(rows: section.rows, trips: trips)
                     }
                 }
@@ -281,6 +284,7 @@ struct TripRowView: View {
                     if let badge = row.quality { QualityBadgeLabel(badge: badge, word: row.qualityWord ?? "") }
                     if row.isInterrupted { TagLabel(text: "Interrupted") }
                     if let kind = row.kindLabel { TagLabel(text: kind) }
+                    if let car = row.car { TagLabel(text: car) }
                 }
                 .padding(.top, DPSpace.s1)
                 if let note = row.note {
@@ -288,6 +292,7 @@ struct TripRowView: View {
                 }
             }
             Spacer(minLength: 0)
+            if let score = row.score { ScoreBadgeView(badge: score).padding(.top, DPSpace.s1) }
             DPIcon.chevronRight.image.resizable().scaledToFit().frame(width: 12, height: 12)
                 .foregroundStyle(DPColor.text3).padding(.top, DPSpace.s4)
         }

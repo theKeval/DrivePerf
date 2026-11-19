@@ -5,9 +5,11 @@ import com.driveperf.domain.trip.Metric
 import com.driveperf.domain.trip.NotDrives
 import com.driveperf.domain.trip.Provenance
 import com.driveperf.domain.trip.QualityBadge
+import com.driveperf.domain.trip.RawState
 import com.driveperf.domain.trip.Trip
 import com.driveperf.domain.trip.TripCorrection
 import com.driveperf.domain.trip.TripKind
+import com.driveperf.domain.trip.TripSource
 import com.driveperf.domain.trip.openQuestion
 
 /** Values at their catalogue precision and provenance (DRIVE-172), in the user's units. */
@@ -39,11 +41,11 @@ internal class MetricValues(private val units: UnitSystem) {
     }
 }
 
-/** The trip sheet (S-TRP-01, the parts the app has): state banners and stat tiles. */
+/** Trip detail (S-TRP-01) without its score: state banners, the meta row and the stat tiles. */
 internal class TripSheet(units: UnitSystem, private val format: DrivesFormatter) {
     private val values = MetricValues(units)
 
-    fun detail(trip: Trip, title: String, subtitle: String): TripDetailUi = TripDetailUi(
+    fun detail(trip: Trip, title: String, subtitle: String, car: String? = null): TripDetailUi = TripDetailUi(
         id = trip.id,
         title = title,
         banners = banners(trip),
@@ -51,6 +53,14 @@ internal class TripSheet(units: UnitSystem, private val format: DrivesFormatter)
         quality = trip.quality?.badge,
         correction = trip.correction ?: if (trip.kind == TripKind.PASSENGER) TripCorrection.PASSENGER else TripCorrection.DRIVER,
         subtitle = subtitle,
+        meta = TripMetaUi(
+            car = car,
+            passenger = trip.kind == TripKind.PASSENGER || trip.correction == TripCorrection.PASSENGER,
+            source = if (trip.source == TripSource.MANUAL) "Started by you" else "Auto-detected",
+            timeRange = "${format.time(trip.startedAt)}–${format.time(trip.endMs)}",
+        ),
+        scoresHidden = !trip.scoresShown,
+        canAnalyse = trip.rawState != RawState.SUMMARY_ONLY,
     )
 
     /** S-TRP-01 state banners: the open question, passenger or not a drive, interrupted, short, Unscorable. */

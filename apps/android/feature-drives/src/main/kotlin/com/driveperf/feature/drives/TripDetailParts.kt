@@ -1,25 +1,18 @@
 package com.driveperf.feature.drives
 
-import androidx.compose.foundation.Canvas
+// Trip detail's building blocks (S-TRP-01): banners, the type picker row, stat tiles with provenance, glyph mappings.
+
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.RichTooltip
@@ -39,155 +32,31 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.CornerRadius
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.drawscope.clipRect
-import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.customActions
-import androidx.compose.ui.semantics.heading
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.driveperf.designsystem.DpEstimated
-import com.driveperf.designsystem.DpModalBottomSheet
 import com.driveperf.designsystem.DpProvenance
 import com.driveperf.designsystem.DpProvenanceGlyph
 import com.driveperf.designsystem.DpQuality
-import com.driveperf.designsystem.DpQualityGlyph
 import com.driveperf.designsystem.DrivePerfTheme
 import com.driveperf.designsystem.dpEstimated
-import com.driveperf.designsystem.dpQualityColor
-import com.driveperf.designsystem.rememberDpSheetState
-import com.driveperf.domain.trip.OverlayStyle
 import com.driveperf.domain.trip.Provenance
 import com.driveperf.domain.trip.QualityBadge
 import com.driveperf.domain.trip.TripCorrection
 import com.driveperf.presentation.drives.BannerAction
 import com.driveperf.presentation.drives.DrivesIntent
-import com.driveperf.presentation.drives.DrivesState
 import com.driveperf.presentation.drives.ProvenancedValue
 import com.driveperf.presentation.drives.TripBannerUi
 import com.driveperf.presentation.drives.TripCopy
-import com.driveperf.presentation.drives.TripDetailUi
 import kotlinx.coroutines.launch
 
-/** The trip sheet and the data-quality sheet, when the state opens them. */
 @Composable
-internal fun DrivesSheets(state: DrivesState, onAction: (DrivesIntent) -> Unit) {
-    state.detail?.let { TripDetailSheet(it, state.canCorrect, onAction) }
-    state.quality?.let { QualitySheet(it, onDismiss = { onAction(DrivesIntent.CloseQuality) }) }
-}
-
-/**
- * Trip sheet (S-TRP-01, the parts the shell has): banners (question, passenger or not a drive, interrupted, short,
- * unscorable), stat tiles with provenance on long-press (F-DQ-05), the data-quality row (→ S-DQ-01) and "What was
- * this?" (S-TRP-02), and Replay (S-RPL-01, DRIVE-200): the sheet slides away first, and [DrivesIntent.OpenReplay]
- * goes out only once that hide completes. Map, score and events arrive with their own stories.
- */
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-internal fun TripDetailSheet(
-    detail: TripDetailUi,
-    canCorrect: Boolean,
-    onAction: (DrivesIntent) -> Unit,
-) {
-    val sheetState = rememberDpSheetState()
-    val scope = rememberCoroutineScope()
-    var opening by remember { mutableStateOf(false) }
-    DpModalBottomSheet(
-        onDismissRequest = { onAction(DrivesIntent.CloseDetail) },
-        sheetState = sheetState,
-    ) {
-        Column(
-            modifier = Modifier
-                .verticalScroll(rememberScrollState())
-                .padding(start = 16.dp, end = 16.dp, bottom = 32.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-        ) {
-            SheetTitle(detail)
-            ReplayButton(enabled = !opening) {
-                // One transition at a time: the sheet slides away first, and Replay opens only if that finished.
-                // A cancelled hide (the sheet left composition, a competing gesture) throws here and opens nothing.
-                opening = true
-                scope.launch {
-                    try {
-                        sheetState.hide()
-                        onAction(DrivesIntent.OpenReplay(detail.id))
-                    } finally {
-                        opening = false
-                    }
-                }
-            }
-            detail.banners.forEach { Banner(it, detail.id, onAction) }
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                detail.tiles.forEach { StatTile(it, Modifier.width(104.dp)) }
-            }
-            Text(
-                stringResource(R.string.drives_provenance_hint),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Surface(shape = MaterialTheme.shapes.large, color = MaterialTheme.colorScheme.surfaceContainer) {
-                Column {
-                    detail.quality?.let { badge ->
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .heightIn(min = 56.dp)
-                                .clickable { onAction(DrivesIntent.OpenQuality(detail.id)) }
-                                .padding(horizontal = 16.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Text(stringResource(R.string.drives_data_quality), Modifier.weight(1f))
-                            QualityBadgeChip(badge)
-                        }
-                    }
-                    if (canCorrect) {
-                        if (detail.quality != null) HorizontalDivider()
-                        CorrectionRow(detail.correction) { onAction(DrivesIntent.Correct(detail.id, it)) }
-                    }
-                }
-            }
-        }
-    }
-}
-
-/** "Thursday morning" over "5 Nov · 8:14 AM". */
-@Composable
-private fun SheetTitle(detail: TripDetailUi) {
-    Column {
-        Text(detail.title, style = MaterialTheme.typography.titleLarge, modifier = Modifier.semantics { heading() })
-        Text(detail.subtitle, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-    }
-}
-
-/** The trip sheet's primary action (S-TRP-01 action row: Replay, filled primary, radius 28). */
-@Composable
-private fun ReplayButton(enabled: Boolean, onClick: () -> Unit) {
-    Button(
-        onClick = onClick,
-        enabled = enabled,
-        modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp).testTag(REPLAY_BUTTON_TAG),
-    ) {
-        Icon(painterResource(R.drawable.ic_drives_replay), contentDescription = null, modifier = Modifier.size(20.dp))
-        Text(stringResource(R.string.drives_replay), modifier = Modifier.padding(start = 8.dp))
-    }
-}
-
-/** Test tag of the trip sheet's Replay button. */
-const val REPLAY_BUTTON_TAG: String = "trip_detail_replay"
-
-@Composable
-private fun Banner(banner: TripBannerUi, tripId: String, onAction: (DrivesIntent) -> Unit) {
+internal fun Banner(banner: TripBannerUi, tripId: String, onAction: (DrivesIntent) -> Unit) {
     Surface(
         shape = MaterialTheme.shapes.medium,
         color = if (banner.attention) DrivePerfTheme.extendedColors.warningContainer else MaterialTheme.colorScheme.surfaceContainerHigh,
@@ -209,7 +78,7 @@ private fun Banner(banner: TripBannerUi, tripId: String, onAction: (DrivesIntent
 }
 
 @Composable
-private fun CorrectionRow(current: TripCorrection, onPick: (TripCorrection) -> Unit) {
+internal fun CorrectionRow(current: TripCorrection, onPick: (TripCorrection) -> Unit) {
     var open by remember { mutableStateOf(false) }
     Box {
         Row(
@@ -230,7 +99,7 @@ private fun CorrectionRow(current: TripCorrection, onPick: (TripCorrection) -> U
 /** One number tile (components.md §5) with its provenance glyph; long-press shows the provenance tooltip. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun StatTile(value: ProvenancedValue, modifier: Modifier = Modifier) {
+internal fun StatTile(value: ProvenancedValue, modifier: Modifier = Modifier) {
     val tooltip = rememberTooltipState(isPersistent = true)
     val scope = rememberCoroutineScope()
     val showHow = stringResource(R.string.drives_show_how_measured)
@@ -302,4 +171,3 @@ internal fun Provenance.dp(): DpProvenance = when (this) {
     Provenance.DERIVED -> DpProvenance.DERIVED
     Provenance.ESTIMATED -> DpProvenance.ESTIMATED
 }
-

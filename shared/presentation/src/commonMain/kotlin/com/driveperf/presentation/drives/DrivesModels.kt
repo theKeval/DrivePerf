@@ -5,6 +5,13 @@ import com.driveperf.domain.trip.Provenance
 import com.driveperf.domain.trip.QualityBadge
 import com.driveperf.domain.trip.Suspect
 import com.driveperf.domain.trip.TripCorrection
+import com.driveperf.presentation.score.BreakdownUi
+import com.driveperf.presentation.score.EventCountUi
+import com.driveperf.presentation.score.EventRowUi
+import com.driveperf.presentation.score.HowScoresWorkUi
+import com.driveperf.presentation.score.ScoreBadgeUi
+import com.driveperf.presentation.score.ScoreUi
+import com.driveperf.presentation.score.TipUi
 
 // What the Drives screens draw (S-HOME-01 latest drives, S-HIS-01 all drives, S-TRP-01 trip sheet, S-DQ-01 data
 // quality), already formatted. Copy is from docs/design (components.md §5, §10, §12; DRIVE-100, DRIVE-109, DRIVE-170,
@@ -16,12 +23,12 @@ public const val LATEST_DRIVES: Int = 5
 /** Which list All drives shows (S-HIS-01 filter, F-CAP-04 AC3). */
 public enum class DrivesFilter { DRIVES, NOT_DRIVES }
 
-/** One trip card (components.md §12, reduced to what the app has: no route label, score or car yet). */
+/** One trip card (components.md §12). */
 public data class TripRowUi(
     val id: String,
-    /** "Thursday morning" */
+    /** The route label ("The Commute") when the trip has one, else "Thursday morning". */
     val title: String,
-    /** "5 Nov · 8:14 a.m." */
+    /** "Thursday morning · 5 Nov" under a route label, else "5 Nov · 8:14 a.m." */
     val subtitle: String,
     /** "37.9 km" */
     val distance: String = "",
@@ -40,6 +47,10 @@ public data class TripRowUi(
     val question: Suspect? = null,
     /** "Passenger", "Bus or train"…: the card is dimmed and doesn't count. */
     val kindLabel: String? = null,
+    /** The score badge; null when the score is hidden (passenger, not a drive) or before analysis. */
+    val score: ScoreBadgeUi? = null,
+    /** The car chip ("GTI"), only when the user has more than one car. */
+    val car: String? = null,
 ) {
     /** Passenger or not a drive: drawn at 60 %. */
     val dimmed: Boolean get() = kindLabel != null
@@ -56,9 +67,11 @@ public data class TripSectionUi(
     val id: String,
     /** "This week", "Last week", "19–25 Oct" */
     val title: String,
-    /** "3 drives" */
+    /** "3 drives · avg 84" (the average of the week's scored drives, when there is one). */
     val meta: String,
     val rows: List<TripRowUi>,
+    /** "This week, 3 drives, average 84" */
+    val accessibilityLabel: String = "$title, $meta",
 )
 
 /** One number with how it was obtained (F-DQ-05); long-press shows [provenance] and [meaning]. */
@@ -97,7 +110,32 @@ public sealed interface BannerAction {
 /** A banner under the trip sheet's title (S-TRP-01 state banners). */
 public data class TripBannerUi(val text: String, val attention: Boolean = false, val action: BannerAction? = null)
 
-/** The trip sheet's content (S-TRP-01, the parts the app has). */
+/** S-TRP-01 "Events · n": counts by type and the event rows, by time. */
+public data class TripEventsUi(
+    /** "Events · 3" */
+    val title: String,
+    val counts: List<EventCountUi>,
+    val rows: List<EventRowUi>,
+    /** "No abrupt inputs on this drive." when there are none. */
+    val emptyTitle: String,
+    val emptyBody: String,
+    /** "Events aren’t detected when the phone moves around freely." on an Unscorable drive. */
+    val note: String? = null,
+)
+
+/** The meta row under the trip detail's title: car chip, how it started, start and end time. */
+public data class TripMetaUi(
+    /** "GTI"; null without a car. */
+    val car: String?,
+    /** The car chip reads "Passenger" instead. */
+    val passenger: Boolean,
+    /** "Auto-detected" or "Started by you" */
+    val source: String,
+    /** "8:14 a.m.–8:52 a.m." */
+    val timeRange: String,
+)
+
+/** Trip detail (S-TRP-01): a push screen (DRIVE-55). */
 public data class TripDetailUi(
     val id: String,
     /** "Thursday morning" */
@@ -109,6 +147,22 @@ public data class TripDetailUi(
     val correction: TripCorrection,
     /** "5 Nov · 8:14 a.m." */
     val subtitle: String = "",
+    val meta: TripMetaUi? = null,
+    /**
+     * Passenger or not a drive: the score, contributors, events and tip are hidden and a banner says why
+     * (F-RPL-07 AC4). The Pro lock on older trips is deferred to the Subscription epic.
+     */
+    val scoresHidden: Boolean = false,
+    /** The Smoothness card; null while hidden or before the score has been read. */
+    val score: ScoreUi? = null,
+    /** S-SCO-01 beyond the hero; null like [score]. */
+    val breakdown: BreakdownUi? = null,
+    val events: TripEventsUi? = null,
+    /** The positive card first: "1.2 km with no abrupt inputs." */
+    val cleanest: String? = null,
+    val tip: TipUi? = null,
+    /** Analysis needs the detailed data; false once it was removed to save space. */
+    val canAnalyse: Boolean = true,
 ) {
     /** "Usable"; null before analysis. */
     val qualityWord: String? get() = quality?.let(TripCopy::badgeWord)
@@ -162,6 +216,8 @@ public data class DrivesState(
     val countText: String = "0 drives",
     /** S-HIS-01 footer: "That’s every drive since 5 November."; null without drives. */
     val sinceText: String? = null,
+    /** S-SCO-02 How scores work. */
+    val explainer: HowScoresWorkUi? = null,
 ) {
     val isEmpty: Boolean get() = loaded && trips.isEmpty()
 
@@ -183,8 +239,29 @@ public data class DrivesState(
 
 /** What the user does on the Drives screens. */
 public sealed interface DrivesIntent {
-    /** Opens the trip sheet (S-TRP-01). */
+    /** Shows trip [tripId] in the trip detail (S-TRP-01): the state's `detail` follows it. */
     public data class Open(val tripId: String) : DrivesIntent
+
+    /**
+     * A trip card was tapped: [DrivesEffect.OpenTrip] asks the app to push S-TRP-01, whose own presenter then sends
+     * [Open]. iOS pushes with a navigation link and sends [Open] directly.
+     */
+    public data class OpenTrip(val tripId: String) : DrivesIntent
+
+    /** "Smoothness breakdown" (S-SCO-01) was tapped: [DrivesEffect.OpenBreakdown] asks the app to push it. */
+    public data class OpenBreakdown(val tripId: String) : DrivesIntent
+
+    /**
+     * S-SCO-01 is showing trip [tripId]: the state's `detail` follows it, and `score_viewed {surface: breakdown}` is
+     * recorded once its score has been read.
+     */
+    public data class ShowBreakdown(val tripId: String) : DrivesIntent
+
+    /** An ⓘ or "How scores work" (S-SCO-02): records `scores_explainer_viewed {source}` and emits [DrivesEffect.OpenHowScoresWork]. */
+    public data class OpenHowScoresWork(val source: ExplainerSource) : DrivesIntent
+
+    /** A contributor row was opened on S-SCO-01: records `contributor_tapped {contributor}`. */
+    public data class TapContributor(val contributor: com.driveperf.domain.score.ContributorId) : DrivesIntent
 
     /** Closes the trip sheet and the data-quality sheet over it. */
     public data object CloseDetail : DrivesIntent
@@ -219,4 +296,19 @@ public sealed interface DrivesEffect {
 
     /** Open S-ANL-01 for [tripId]. [title] is the trip detail's title ("Thursday morning"), shown under "Analysis". */
     public data class OpenAnalysis(val tripId: String, val title: String) : DrivesEffect
+
+    /** Push S-TRP-01 for [tripId] (Android: `Routes.tripDetail`). */
+    public data class OpenTrip(val tripId: String) : DrivesEffect
+
+    /** Push S-SCO-01 for [tripId]. */
+    public data class OpenBreakdown(val tripId: String) : DrivesEffect
+
+    /** Push S-SCO-02. */
+    public data object OpenHowScoresWork : DrivesEffect
+}
+
+/** Where S-SCO-02 was opened from (`scores_explainer_viewed {source}`). */
+public enum class ExplainerSource(internal val key: String) {
+    TRIP_DETAIL("trip_detail"),
+    BREAKDOWN("breakdown"),
 }

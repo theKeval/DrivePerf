@@ -20,6 +20,7 @@ public struct AppRootView: View {
                 ShellView(model: model)
                     .environment(model.capture)
                     .environment(\.replayServices, model.replay)
+                    .environment(\.analysisPresenters, model.analysis)
             }
         }
         .task { await model.display.observe() }

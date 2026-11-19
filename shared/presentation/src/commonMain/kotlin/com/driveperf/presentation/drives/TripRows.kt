@@ -1,11 +1,15 @@
 package com.driveperf.presentation.drives
 
+import com.driveperf.domain.score.ScoreLine
+import com.driveperf.domain.score.ScoreLines
 import com.driveperf.domain.settings.UnitSystem
 import com.driveperf.domain.trip.DisplayUnit
 import com.driveperf.domain.trip.Trip
 import com.driveperf.domain.trip.TripSource
 import com.driveperf.domain.trip.TripStatus
 import com.driveperf.domain.trip.openQuestion
+import com.driveperf.presentation.score.ComparisonCopy
+import com.driveperf.presentation.score.ScoreCopy
 import kotlin.math.roundToInt
 
 /** How a listed trip ended (F-CAP-06): complete, cut short by the OS, or a manual trip too short to score (§1.6). */
@@ -68,21 +72,49 @@ internal fun spokenDuration(seconds: Double): String {
 /** "1 drive", "3 drives". */
 internal fun drivesCount(n: Int): String = if (n == 1) "1 drive" else "$n drives"
 
-/** Builds the trip cards and the week sections (S-HOME-01, S-HIS-01) at [nowMs]. */
+/**
+ * Builds the trip cards and the week sections (S-HOME-01, S-HIS-01) at [nowMs]. [scores] holds each trip's score
+ * line (score badge, route, car); a card names its car only when the user has more than one.
+ */
 internal class TripRows(
     private val units: UnitSystem,
     private val format: DrivesFormatter,
     private val nowMs: Long,
+    private val scores: ScoreLines = ScoreLines.EMPTY,
 ) {
-    /** "Thursday morning" */
-    fun title(trip: Trip): String = "${format.weekday(trip.startedAt)} ${partOfDay(format.hour(trip.startedAt))}"
+    private val score = TripScore(units, format) { null }
 
-    /** "5 Nov · 8:14 a.m." */
-    fun subtitle(trip: Trip): String =
+    /** "Thursday morning" */
+    fun partOfDayTitle(trip: Trip): String = "${format.weekday(trip.startedAt)} ${partOfDay(format.hour(trip.startedAt))}"
+
+    /** The route label ("The Commute", "Home → Work") when the trip has one, else "Thursday morning". */
+    fun title(trip: Trip): String = label(trip) ?: partOfDayTitle(trip)
+
+    /** "Thursday morning · 5 Nov" under a route label (components.md §12), else "5 Nov · 8:14 a.m.". */
+    fun subtitle(trip: Trip): String = if (label(trip) != null) {
+        "${partOfDayTitle(trip)} · ${format.dayOfMonth(trip.startedAt)} ${format.month(trip.startedAt)}"
+    } else {
         "${format.dayOfMonth(trip.startedAt)} ${format.month(trip.startedAt)} · ${format.time(trip.startedAt)}"
+    }
+
+    /**
+     * The trip's own label, else its named route's, else "From → To" from its place labels; null without any (no
+     * geocoder in v1, so unnamed places have no label).
+     */
+    fun label(trip: Trip): String? {
+        val from = trip.fromLabel?.takeIf { it.isNotBlank() }
+        val to = trip.toLabel?.takeIf { it.isNotBlank() }
+        return trip.labelOverride?.takeIf { it.isNotBlank() }
+            ?: ComparisonCopy.routeName(scores.lines[trip.id]?.route)
+            ?: if (from != null && to != null) "$from → $to" else null
+    }
+
+    fun line(trip: Trip): ScoreLine? = scores.lines[trip.id]
 
     fun row(trip: Trip): TripRowUi {
         val title = title(trip)
+        val line = line(trip)
+        val car = line?.car?.takeIf { scores.carCount > 1 }
         val distance = distanceText(trip.distance, units)
         val status = trip.listedStatus
         val note = when (status) {
@@ -100,24 +132,32 @@ internal class TripRows(
             duration = durationText(trip.seconds),
             note = note,
             accessibilityLabel = listOfNotNull(
-                title, distance, spokenDuration(trip.seconds), kindLabel, note, quality?.let { "${TripCopy.badgeWord(it)} data" },
+                title, if (title == partOfDayTitle(trip)) null else partOfDayTitle(trip), distance, spokenDuration(trip.seconds),
+                score.spokenBadge(trip, line), car, kindLabel, note, quality?.let { "${TripCopy.badgeWord(it)} data" },
             ).joinToString(", "),
             quality = quality,
             interrupted = status == ListedStatus.INTERRUPTED,
             short = status == ListedStatus.SHORT,
             question = trip.openQuestion,
             kindLabel = kindLabel,
+            score = score.badge(trip, line),
+            car = car,
         )
     }
+
 
     /** [trips] (newest first) and their [rows], grouped by the locale's calendar week. */
     fun sections(trips: List<Trip>, rows: List<TripRowUi>): List<TripSectionUi> =
         trips.indices.groupBy { format.weekStart(trips[it].startedAt) }.map { (weekStart, indices) ->
+            val scored = indices.map { trips[it] }.filter { it.scoresShown }.mapNotNull { line(it)?.smoothness }
+            val average = if (scored.isEmpty()) null else (scored.sum().toDouble() / scored.size).roundToInt()
+            val title = weekTitle(weekStart)
             TripSectionUi(
                 id = weekStart.toString(),
-                title = weekTitle(weekStart),
-                meta = drivesCount(indices.size),
+                title = title,
+                meta = drivesCount(indices.size) + (average?.let { " · avg $it" } ?: ""),
                 rows = indices.map(rows::get),
+                accessibilityLabel = "$title, ${drivesCount(indices.size)}" + (average?.let { ", average $it" } ?: ""),
             )
         }
 
