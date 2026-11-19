@@ -1,5 +1,7 @@
 package com.driveperf.app
 
+import androidx.compose.ui.test.junit4.ComposeContentTestRule
+import com.driveperf.domain.analytics.Analytics
 import com.driveperf.domain.replay.Replay
 import com.driveperf.domain.replay.ReplayPoint
 import com.driveperf.domain.replay.ReplayRepository
@@ -7,6 +9,10 @@ import com.driveperf.domain.replay.ReplaySpan
 import com.driveperf.domain.replay.SegmentStyle
 import com.driveperf.domain.trip.BoundingBox
 import com.driveperf.domain.trip.SegmentReason
+import com.driveperf.feature.replay.ReplayMapConfig
+import com.driveperf.feature.replay.ReplayViewModel
+import com.driveperf.presentation.replay.ReplayPresenter
+import com.driveperf.presentation.replay.ReplaySource
 import kotlin.math.sin
 
 /**
@@ -49,3 +55,32 @@ internal class SyntheticReplays : ReplayRepository {
         const val SPEED_MPS = 14.0
     }
 }
+
+/**
+ * A Replay view model on the shared presenter, loading [SyntheticReplays], with the presenter's clock tied to the
+ * compose test clock so frame-driven playback is deterministic.
+ */
+internal fun replayViewModel(maps: ReplayMapConfig, analytics: Analytics, compose: ComposeContentTestRule): ReplayViewModel =
+    ReplayViewModel(
+        presenterFactory = { scope ->
+            ReplayPresenter(
+                tripId = "synthetic",
+                source = ReplaySource.TRIP_DETAIL,
+                replays = SyntheticReplays(),
+                isRecording = { false },
+                analytics = analytics,
+                monoNowNs = { compose.mainClock.currentTime * NANOS_PER_MILLI },
+                scope = scope,
+            )
+        },
+        maps = maps,
+    )
+
+/** A tap on the scrubber at [tS]: a scrub with no drag. */
+internal fun ReplayViewModel.seekTo(tS: Double) {
+    scrubStart()
+    scrubTo(tS)
+    scrubEnd()
+}
+
+private const val NANOS_PER_MILLI = 1_000_000L

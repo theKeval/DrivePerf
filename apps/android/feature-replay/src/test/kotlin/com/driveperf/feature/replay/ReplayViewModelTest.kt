@@ -1,128 +1,114 @@
 package com.driveperf.feature.replay
 
+import app.cash.turbine.test
 import com.driveperf.domain.replay.PlaybackSpeed
-import com.driveperf.domain.replay.SegmentStyle
 import com.driveperf.domain.settings.UnitSystem
+import com.driveperf.presentation.replay.ReplayEffect
+import com.driveperf.presentation.replay.ReplayPresenter
+import com.driveperf.presentation.replay.ReplaySource
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
-import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 
+/**
+ * The Android wrapper only: the frame clock, the playhead as snapshot state, the legend, the renderer choice and
+ * Try again. Playback rules, scrub-resume and analytics are the shared presenter's (ReplayPresenterTest).
+ */
 @OptIn(ExperimentalCoroutinesApi::class)
 class ReplayViewModelTest {
     private val analytics = RecordingAnalytics()
     private val repository = FakeReplayRepository()
     private val online = MutableStateFlow(true)
+    private var nowNs = 1_000_000_000L
+    private var recording = false
 
     @Before fun setUp() = Dispatchers.setMain(UnconfinedTestDispatcher())
 
     @After fun tearDown() = Dispatchers.resetMain()
 
-    private fun viewModel(
-        hasKey: Boolean = true,
-        lock: ReplayProLock = ReplayProLock.NotBuilt,
-        units: MutableStateFlow<UnitSystem> = MutableStateFlow(UnitSystem.METRIC),
-    ) = ReplayViewModel(ReplayRequest("t1"), repository, analytics, ReplayMapConfig(hasKey, null, online), proLock = lock, units = units)
+    private fun viewModel(hasKey: Boolean = true, units: MutableStateFlow<UnitSystem> = MutableStateFlow(UnitSystem.METRIC)) =
+        ReplayViewModel(
+            presenterFactory = { scope ->
+                ReplayPresenter("t1", ReplaySource.TRIP_DETAIL, repository, { recording }, analytics, { nowNs }, scope)
+            },
+            maps = ReplayMapConfig(hasKey, null, online),
+            units = units,
+        )
 
     private val ReplayViewModel.ready: ReplayUiState.Ready get() = state.value as ReplayUiState.Ready
 
-    @Test fun `opens paused at the start, on Auto, and reports where it was opened from`() {
-        val vm = viewModel()
-        assertFalse(vm.ready.playing)
-        assertEquals(PlaybackSpeed.AUTO, vm.ready.speed)
-        assertEquals(0.0, vm.time.doubleValue, 0.0)
-        assertEquals("replay_opened", analytics.events.first().name)
-        assertEquals(mapOf("source" to "trip_detail"), analytics.events.first().properties)
+    private fun ReplayViewModel.frameAfter(seconds: Double) {
+        nowNs += (seconds * 1e9).toLong()
+        onFrame()
     }
 
-    @Test fun `play moves the marker at the Auto rate, and pause stops it in place`() {
+    @Test fun `frames move the playhead on the presenter's clock, and pause holds it`() {
         val vm = viewModel()
-        vm.advance(1.0)
-        assertEquals("paused: frames do nothing", 0.0, vm.time.doubleValue, 0.0)
+        assertFalse(vm.ready.playing)
         vm.togglePlay()
         assertTrue(vm.ready.playing)
-        assertEquals(mapOf("speed" to "auto"), analytics.events.last().properties)
-        vm.advance(1.0)
-        assertEquals("Auto plays the whole trip in about 60 s", TestReplays.DURATION / 60, vm.time.doubleValue, 1e-9)
+        vm.frameAfter(1.0)
+        assertEquals("Auto plays the whole trip in about 60 s", TestReplays.DURATION / 60, vm.time.doubleValue, 1e-6)
         vm.togglePlay()
-        vm.advance(5.0)
+        vm.frameAfter(5.0)
         assertFalse(vm.ready.playing)
-        assertEquals(TestReplays.DURATION / 60, vm.time.doubleValue, 1e-9)
+        assertEquals(TestReplays.DURATION / 60, vm.time.doubleValue, 1e-6)
     }
 
-    @Test fun `speed changes the rate immediately`() {
+    @Test fun `speed and scrubbing reach the playhead in the same call`() {
         val vm = viewModel()
-        vm.togglePlay()
         vm.setSpeed(PlaybackSpeed.X10)
-        vm.advance(2.0)
-        assertEquals(20.0, vm.time.doubleValue, 1e-9)
-        vm.setSpeed(PlaybackSpeed.X1)
-        vm.advance(1.0)
-        assertEquals(21.0, vm.time.doubleValue, 1e-9)
-        vm.setSpeed(PlaybackSpeed.X30)
-        vm.togglePlay()
-        vm.togglePlay()
-        assertEquals(mapOf("speed" to "30x"), analytics.events.last().properties)
-    }
-
-    @Test fun `reaching the end pauses there, and Play at the end restarts`() {
-        val vm = viewModel()
-        vm.togglePlay()
-        vm.advance(120.0)
-        assertFalse(vm.ready.playing)
-        assertEquals(TestReplays.DURATION, vm.time.doubleValue, 0.0)
-        assertEquals(1, analytics.names.count { it == "replay_completed" })
-        vm.togglePlay()
-        assertEquals(0.0, vm.time.doubleValue, 0.0)
-        assertTrue(vm.ready.playing)
-    }
-
-    @Test fun `releasing the scrubber resumes playing when it was playing`() {
-        val vm = viewModel()
-        vm.togglePlay()
+        assertEquals(PlaybackSpeed.X10, vm.ready.speed)
         vm.scrubStart()
-        assertFalse("the marker follows the finger, not the clock", vm.ready.playing)
-        assertTrue(vm.ready.scrubbing)
         vm.scrubTo(300.0)
-        vm.advance(1.0)
         assertEquals(300.0, vm.time.doubleValue, 0.0)
+        assertTrue(vm.ready.scrubbing)
         vm.scrubEnd()
-        assertTrue(vm.ready.playing)
         assertFalse(vm.ready.scrubbing)
-        assertEquals("replay_scrubbed", analytics.names.last())
     }
 
-    @Test fun `releasing the scrubber stays paused when it was paused, and clamps to the trip`() {
+    @Test fun `the end is sent to the presenter once, when the playhead reaches it`() {
         val vm = viewModel()
-        vm.scrubStart()
-        vm.scrubTo(-50.0)
-        assertEquals(0.0, vm.time.doubleValue, 0.0)
-        vm.scrubTo(10_000.0)
+        vm.togglePlay()
+        vm.frameAfter(30.0)
+        assertTrue("half way, still playing", vm.ready.playing)
+        vm.frameAfter(40.0)
+        assertFalse(vm.ready.playing)
         assertEquals(TestReplays.DURATION, vm.time.doubleValue, 0.0)
-        vm.scrubEnd()
-        assertFalse(vm.ready.playing)
-        vm.seek(120.0)
-        assertEquals(120.0, vm.time.doubleValue, 0.0)
-        assertFalse(vm.ready.playing)
-        assertEquals(2, analytics.names.count { it == "replay_scrubbed" })
+        vm.frameAfter(1.0)
+        assertEquals(1, analytics.names.count { it == "replay_completed" })
     }
 
-    @Test fun `the span label follows the marker through each overlay span`() {
+    @Test fun `analytics come from the shared presenter only, each once`() {
         val vm = viewModel()
-        assertEquals(SegmentStyle.ESTIMATED, vm.spanAt(30.0)?.style)
-        assertNull("observed data has no label", vm.spanAt(100.0))
-        assertEquals(SegmentStyle.NO_GPS, vm.spanAt(220.0)?.style)
-        assertEquals(SegmentStyle.EXCLUDED, vm.spanAt(420.0)?.style)
-        assertNull(vm.spanAt(450.0))
+        vm.togglePlay()
+        vm.scrubStart()
+        vm.scrubTo(10.0)
+        vm.scrubEnd()
+        vm.openLegend()
+        vm.openLegend()
+        assertEquals(
+            listOf("replay_opened", "replay_played", "replay_scrubbed", "quality_overlay_legend_opened"),
+            analytics.names,
+        )
+    }
+
+    @Test fun `the legend opens and closes`() {
+        val vm = viewModel()
+        vm.openLegend()
+        assertTrue(vm.ready.legendOpen)
+        vm.closeLegend()
+        assertFalse(vm.ready.legendOpen)
     }
 
     @Test fun `without a Maps key Replay draws the plain canvas, with no offline note while online`() {
@@ -150,35 +136,23 @@ class ReplayViewModelTest {
         assertEquals(UnitSystem.IMPERIAL, vm.ready.units)
     }
 
-    @Test fun `a missing or broken replay shows the error, and Try again reloads`() {
+    @Test fun `a missing trip shows the error, and Try again loads it with a fresh presenter`() {
         repository.result = { null }
         val vm = viewModel()
-        assertEquals(ReplayUiState.Error, vm.state.value)
-        repository.result = { error("corrupt trip file") }
-        vm.retry()
         assertEquals(ReplayUiState.Error, vm.state.value)
         repository.result = { TestReplays.trip() }
         vm.retry()
         assertTrue(vm.state.value is ReplayUiState.Ready)
-        assertEquals(3, repository.calls)
-    }
-
-    @Test fun `the Pro lock seam shows the lock and loads nothing`() {
-        val vm = viewModel(lock = { true })
-        assertEquals(ReplayUiState.Locked, vm.state.value)
-        assertEquals(0, repository.calls)
         vm.togglePlay()
-        assertEquals(ReplayUiState.Locked, vm.state.value)
+        assertTrue("the new presenter takes the controls", vm.ready.playing)
+        assertEquals(2, repository.calls)
     }
 
-    @Test fun `the legend reports its opening once per opening`() {
+    @Test fun `a recording trip asks for the drive screen`() = runTest {
+        recording = true
         val vm = viewModel()
-        vm.openLegend()
-        vm.openLegend()
-        assertTrue(vm.ready.legendOpen)
-        vm.closeLegend()
-        vm.openLegend()
-        assertEquals(2, analytics.names.count { it == "quality_overlay_legend_opened" })
-        assertTrue(analytics.events.all { it.properties.keys.all { key -> key in setOf("source", "speed") } })
+        vm.effects.test { assertEquals(ReplayEffect.ShowDriveScreen, awaitItem()) }
+        assertEquals(ReplayUiState.Loading, vm.state.value)
+        assertEquals(0, repository.calls)
     }
 }

@@ -39,6 +39,8 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.NavType
 import androidx.navigation.navArgument
 import com.driveperf.feature.drives.DrivesAction
+import com.driveperf.feature.capture.ContentTarget
+import com.driveperf.feature.replay.ReplayHeader
 import com.driveperf.feature.replay.ReplayRoute
 import com.driveperf.feature.replay.ReplayViewModel
 import org.koin.core.parameter.parametersOf
@@ -258,11 +260,19 @@ private fun NavGraphBuilder.replayDestination(env: AppEnv) {
     ) { entry ->
         val tripId = entry.arguments?.getString(Routes.REPLAY_TRIP).orEmpty()
         val viewModel: ReplayViewModel = koinViewModel { parametersOf(tripId) }
-        ReplayRoute(
-            viewModel = viewModel,
+        val header = ReplayHeader(
             subtitle = entry.arguments?.getString(Routes.REPLAY_TITLE).orEmpty(),
             mapId = BuildConfig.MAPS_MAP_ID.ifBlank { null },
             onBack = { env.navController.popBackStack() },
+        )
+        ReplayRoute(
+            viewModel = viewModel,
+            header = header,
+            // F-RPL-01 AC6: the trip is recording, so the in-drive gate shows S-DRV-05 with Replay held.
+            onShowDriveScreen = {
+                env.captureViewModel.requestContent(ContentTarget.REPLAY)
+                env.navController.popBackStack()
+            },
         )
     }
 }

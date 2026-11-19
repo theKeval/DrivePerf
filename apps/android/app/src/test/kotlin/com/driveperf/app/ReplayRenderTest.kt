@@ -16,7 +16,7 @@ import com.driveperf.designsystem.DrivePerfTheme
 import com.driveperf.domain.analytics.Analytics
 import com.driveperf.domain.analytics.AnalyticsEvent
 import com.driveperf.feature.replay.ReplayMapConfig
-import com.driveperf.feature.replay.ReplayRequest
+import com.driveperf.feature.replay.ReplayHeader
 import com.driveperf.feature.replay.ReplayRoute
 import com.driveperf.feature.replay.ReplayViewModel
 import java.io.File
@@ -53,7 +53,9 @@ class ReplayRenderTest {
         compose.setContent {
             CompositionLocalProvider(LocalDensity provides Density(LocalDensity.current.density, case.scale)) {
                 DrivePerfTheme(darkTheme = case.dark) {
-                    key(vm) { ReplayRoute(vm, "Synthetic trip", mapId = null, onBack = {}) }
+                    key(vm) {
+                        ReplayRoute(vm, ReplayHeader("Synthetic trip", mapId = null, onBack = {}), onShowDriveScreen = {})
+                    }
                 }
             }
         }
@@ -64,7 +66,7 @@ class ReplayRenderTest {
             }
             compose.waitForIdle()
             for ((moment, t) in MOMENTS) {
-                compose.runOnIdle { vm.seek(t) }
+                compose.runOnIdle { vm.seekTo(t) }
                 compose.waitForIdle()
                 val bitmap = compose.onRoot().captureToImage().asAndroidBitmap()
                 assertTrue(bitmap.width > 0 && bitmap.height > 0)
@@ -73,11 +75,10 @@ class ReplayRenderTest {
         }
     }
 
-    private fun viewModel(online: Boolean) = ReplayViewModel(
-        ReplayRequest("synthetic"),
-        SyntheticReplays(),
-        analytics,
+    private fun viewModel(online: Boolean) = replayViewModel(
         ReplayMapConfig(hasMapsKey = false, mapId = null, online = MutableStateFlow(online)),
+        analytics,
+        compose,
     )
 
     private data class Case(val name: String, val dark: Boolean, val scale: Float, val online: Boolean)

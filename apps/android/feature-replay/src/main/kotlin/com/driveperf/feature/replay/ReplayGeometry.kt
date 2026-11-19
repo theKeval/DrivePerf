@@ -70,7 +70,7 @@ class ReplayProjection(bbox: BoundingBox, width: Float, height: Float, insets: I
  * Per-trip lookups the screen needs every frame, computed once when the replay loads: distance so far (readout) and
  * the quality span at a time (F-RPL-08 AC2 label). Lookups are allocation-free.
  */
-class ReplayTimeline(private val replay: Replay) {
+class ReplayTimeline(val replay: Replay) {
     private val times: DoubleArray
     private val distances: DoubleArray
     val durationS: Double = replay.durationS

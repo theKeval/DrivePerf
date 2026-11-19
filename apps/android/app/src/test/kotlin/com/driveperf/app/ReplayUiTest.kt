@@ -23,7 +23,7 @@ import com.driveperf.feature.drives.REPLAY_BUTTON_TAG
 import com.driveperf.feature.drives.TripDetailUi
 import com.driveperf.feature.drives.TripRowUi
 import com.driveperf.feature.replay.ReplayMapConfig
-import com.driveperf.feature.replay.ReplayRequest
+import com.driveperf.feature.replay.ReplayHeader
 import com.driveperf.feature.replay.ReplayRoute
 import com.driveperf.feature.replay.ReplayViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -53,14 +53,15 @@ class ReplayUiTest {
     }
 
     private fun replay(online: Boolean = true): ReplayViewModel {
-        val vm = ReplayViewModel(
-            ReplayRequest("t1"),
-            SyntheticReplays(),
-            analytics,
-            ReplayMapConfig(hasMapsKey = false, mapId = null, online = MutableStateFlow(online)),
-        )
+        val vm = replayViewModel(
+        ReplayMapConfig(hasMapsKey = false, mapId = null, online = MutableStateFlow(online)),
+        analytics,
+        compose,
+    )
         compose.setContent {
-            DrivePerfTheme(darkTheme = true) { ReplayRoute(vm, subtitle = "Thursday evening", mapId = null, onBack = {}) }
+            DrivePerfTheme(darkTheme = true) {
+                ReplayRoute(vm, ReplayHeader("Thursday evening", mapId = null, onBack = {}), onShowDriveScreen = {})
+            }
         }
         compose.waitForIdle()
         return vm
@@ -93,11 +94,11 @@ class ReplayUiTest {
 
     @Test fun `the span label follows the marker, and the legend opens in a sheet`() {
         val vm = replay()
-        vm.seek(380.0)
+        vm.seekTo(380.0)
         compose.waitForIdle()
         compose.onNodeWithText("No GPS").assertIsDisplayed()
         compose.onNodeWithText("—").assertIsDisplayed()
-        vm.seek(630.0)
+        vm.seekTo(630.0)
         compose.waitForIdle()
         compose.onNodeWithText("Phone moved — not scored").assertIsDisplayed()
         compose.onNodeWithContentDescription("What the line styles mean").performClick()

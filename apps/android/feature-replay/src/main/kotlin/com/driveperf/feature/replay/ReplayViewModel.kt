@@ -4,20 +4,25 @@ import androidx.compose.runtime.DoubleState
 import androidx.compose.runtime.mutableDoubleStateOf
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.driveperf.domain.analytics.Analytics
 import com.driveperf.domain.replay.PlaybackSpeed
 import com.driveperf.domain.replay.Replay
-import com.driveperf.domain.replay.ReplayRepository
-import com.driveperf.domain.replay.ReplaySpan
 import com.driveperf.domain.settings.UnitSystem
-import kotlinx.coroutines.CancellationException
+import com.driveperf.presentation.replay.ReplayEffect
+import com.driveperf.presentation.replay.ReplayIntent
+import com.driveperf.presentation.replay.ReplayPresenter
+import com.driveperf.presentation.replay.ReplayState
+import com.driveperf.presentation.replay.ReplayUnavailable
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
-import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.launch
 
 /** What S-RPL-01 shows. The playback position is not here: it is [ReplayViewModel.time], read in the draw phase. */
 sealed interface ReplayUiState {
@@ -26,7 +31,7 @@ sealed interface ReplayUiState {
     /** "Couldn't load this drive's detail" with Try again (S-RPL-01 Err). */
     data object Error : ReplayUiState
 
-    /** Free, older than 30 days (S-RPL-01 Lock); see [ReplayProLock]. */
+    /** Free, older than 30 days (S-RPL-01 Lock): the shared presenter's `ReplayUnavailable.LOCKED`, not set yet. */
     data object Locked : ReplayUiState
 
     data class Ready(
@@ -47,8 +52,8 @@ interface ReplayControls {
 
     fun setSpeed(speed: PlaybackSpeed)
 
-    /** Wall-clock seconds since the last frame, from the display-linked loop while playing (AC4). */
-    fun advance(frameSeconds: Double)
+    /** One display frame while playing (AC4): reads the playhead from the shared presenter's clock. */
+    fun onFrame()
 
     fun scrubStart()
 
@@ -72,7 +77,7 @@ interface ReplayControls {
 
             override fun setSpeed(speed: PlaybackSpeed) = Unit
 
-            override fun advance(frameSeconds: Double) = Unit
+            override fun onFrame() = Unit
 
             override fun scrubStart() = Unit
 
@@ -91,143 +96,124 @@ interface ReplayControls {
     }
 }
 
-/** Which trip to replay, and from where it was opened (`replay_opened {source}`). */
-data class ReplayRequest(val tripId: String, val source: ReplaySource = ReplaySource.TRIP_DETAIL)
-
 /**
- * State holder for S-RPL-01 Replay (F-RPL-01) with the data-quality overlay (F-RPL-08). The screen's frame loop calls
- * [advance] from `withFrameNanos`; everything else is a user action. Opens paused at the start (AC1).
+ * The Android side of S-RPL-01 (F-RPL-01, F-RPL-08): a thin wrapper around the shared [ReplayPresenter] (ADR-002
+ * section 4), which owns playback, scrubbing, loading, the recording gate and analytics. This keeps only what is
+ * Android's: the frame clock ([onFrame] from `withFrameNanos`), the playhead as Compose snapshot state, the legend sheet,
+ * and which renderer draws the map (Maps key, network, tiles).
  */
-@Suppress("TooManyFunctions") // one function per user action on the screen
+@OptIn(ExperimentalCoroutinesApi::class)
+@Suppress("TooManyFunctions") // one override per screen control (ReplayControls), plus the presenter plumbing
 class ReplayViewModel(
-    private val request: ReplayRequest,
-    private val repository: ReplayRepository,
-    private val analytics: Analytics,
+    private val presenterFactory: (CoroutineScope) -> ReplayPresenter,
     private val maps: ReplayMapConfig,
-    private val proLock: ReplayProLock = ReplayProLock.NotBuilt,
     units: StateFlow<UnitSystem> = MutableStateFlow(UnitSystem.METRIC),
 ) : ViewModel(), ReplayControls {
-    private val content = MutableStateFlow<ReplayUiState>(ReplayUiState.Loading)
+    private val current = MutableStateFlow(presenterFactory(viewModelScope))
+    private val presenter: ReplayPresenter get() = current.value
+    private val legendOpen = MutableStateFlow(false)
     private val tilesFailed = MutableStateFlow(false)
     private val position = mutableDoubleStateOf(0.0)
+    private var timeline: ReplayTimeline? = null
 
     /** Playback position in trip seconds. Snapshot state, so the map redraws the marker without recomposing. */
     val time: DoubleState get() = position
 
-    /** Play state before the current scrub, restored on release (AC3). */
-    private var resumeAfterScrub = false
+    /** One-shot navigation from the presenter: the trip is recording, so show the drive screen (AC6). */
+    val effects: Flow<ReplayEffect> = current.flatMapLatest { it.effects }
 
-    val state: StateFlow<ReplayUiState> = combine(content, maps.online, tilesFailed, units) { c, online, failed, u ->
-        if (c is ReplayUiState.Ready) c.copy(renderer = renderer(online, failed), units = u) else c
-    }.stateIn(viewModelScope, SharingStarted.Eagerly, ReplayUiState.Loading)
+    val state: StateFlow<ReplayUiState> = combine(
+        current.flatMapLatest { it.state },
+        legendOpen,
+        combine(maps.online, tilesFailed, ::renderer),
+        units,
+    ) { shared, legend, renderer, u -> ui(shared, legend, renderer, u) }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, ReplayUiState.Loading)
 
     init {
-        analytics.track(ReplayEvent.Opened(request.source))
-        load()
+        // A load (or any presenter-side change) moves the playhead too; intents also sync it at once, below.
+        current.flatMapLatest { it.state }.onEach { sync() }.launchIn(viewModelScope)
     }
 
-    override fun retry() = load()
+    override fun togglePlay() = send(if (presenter.state.value.playing) ReplayIntent.Pause else ReplayIntent.Play)
 
-    override fun togglePlay() {
-        val ready = ready() ?: return
-        if (ready.playing) {
-            update { it.copy(playing = false) }
-            return
-        }
-        if (position.doubleValue >= ready.replay.durationS) position.doubleValue = 0.0 // Play at the end restarts
-        update { it.copy(playing = true) }
-        analytics.track(ReplayEvent.Played(ready.speed))
+    override fun setSpeed(speed: PlaybackSpeed) = send(ReplayIntent.SetSpeed(speed))
+
+    /**
+     * Each frame: the playhead on the presenter's own clock. The presenter's Tick only detects the end, so it goes out
+     * once the playhead reaches it, not every frame (no per-frame intent).
+     */
+    override fun onFrame() {
+        val shared = presenter.state.value
+        val now = presenter.nowNs()
+        val t = shared.playheadAt(now)
+        position.doubleValue = t
+        val duration = shared.replay?.durationS ?: return
+        if (shared.playing && t >= duration) send(ReplayIntent.Tick(now))
     }
 
-    /** Changes the rate immediately, playing or not. */
-    override fun setSpeed(speed: PlaybackSpeed) = update { it.copy(speed = speed) }
+    override fun scrubStart() = send(ReplayIntent.ScrubStart)
 
-    /** Moves playback on by [frameSeconds] of wall-clock time at the current rate. Reaching the end pauses there. */
-    override fun advance(frameSeconds: Double) {
-        val ready = ready() ?: return
-        if (!ready.playing || ready.scrubbing) return
-        val next = position.doubleValue + frameSeconds * ready.replay.playbackRate(ready.speed)
-        if (next >= ready.replay.durationS) {
-            position.doubleValue = ready.replay.durationS
-            update { it.copy(playing = false) }
-            analytics.track(ReplayEvent.Completed)
-        } else {
-            position.doubleValue = next
-        }
-    }
+    override fun scrubTo(tS: Double) = send(ReplayIntent.ScrubTo(tS))
 
-    override fun scrubStart() {
-        val ready = ready() ?: return
-        if (ready.scrubbing) return
-        resumeAfterScrub = ready.playing
-        update { it.copy(scrubbing = true, playing = false) }
-    }
-
-    /** Moves the marker to [tS] while the finger is down (AC3: same frame). */
-    override fun scrubTo(tS: Double) {
-        val ready = ready() ?: return
-        position.doubleValue = tS.coerceIn(0.0, ready.replay.durationS)
-    }
-
-    /** Release: back to the play state from before the drag, unless the drag ended at the very end. */
-    override fun scrubEnd() {
-        val ready = ready() ?: return
-        if (!ready.scrubbing) return
-        val resume = resumeAfterScrub && position.doubleValue < ready.replay.durationS
-        update { it.copy(scrubbing = false, playing = resume) }
-        analytics.track(ReplayEvent.Scrubbed)
-    }
-
-    /** A tap or an accessibility step on the scrubber: a scrub with no drag. */
-    fun seek(tS: Double) {
-        scrubStart()
-        scrubTo(tS)
-        scrubEnd()
-    }
-
-    /** The overlay span under the marker, for its label (F-RPL-08 AC2). */
-    fun spanAt(tS: Double): ReplaySpan? = ready()?.timeline?.spanAt(tS)
+    override fun scrubEnd() = send(ReplayIntent.ScrubEnd)
 
     override fun openLegend() {
-        if (ready()?.legendOpen != false) return
-        update { it.copy(legendOpen = true) }
-        analytics.track(ReplayEvent.LegendOpened)
+        if (legendOpen.value) return
+        legendOpen.value = true
+        send(ReplayIntent.OpenLegend)
     }
 
-    override fun closeLegend() = update { it.copy(legendOpen = false) }
+    override fun closeLegend() {
+        legendOpen.value = false
+    }
 
-    /** The map never finished loading its tiles: draw the plain canvas with the offline note (AC5). */
     override fun onMapTilesFailed() {
         tilesFailed.value = true
     }
 
-    private fun load() {
-        content.value = ReplayUiState.Loading
-        viewModelScope.launch {
-            content.value = try {
-                when {
-                    proLock.isLocked(request.tripId) -> ReplayUiState.Locked
-                    else -> repository.replay(request.tripId)?.let { ReplayUiState.Ready(it, ReplayTimeline(it)) } ?: ReplayUiState.Error
-                }
-            } catch (e: CancellationException) {
-                throw e
-            } catch (@Suppress("TooGenericExceptionCaught", "SwallowedException") e: Exception) {
-                // A broken trip file must not crash the app: show Err ("Your recording is safe") with Try again.
-                ReplayUiState.Error
-            }
-            position.doubleValue = 0.0
+    /** Try again after Err: a fresh presenter loads the trip again. */
+    override fun retry() {
+        presenter.close()
+        timeline = null
+        current.value = presenterFactory(viewModelScope)
+    }
+
+    private fun send(intent: ReplayIntent) {
+        presenter.dispatch(intent)
+        sync()
+    }
+
+    private fun sync() {
+        position.doubleValue = presenter.state.value.playheadAt(presenter.nowNs())
+    }
+
+    private fun ui(shared: ReplayState, legend: Boolean, renderer: MapRenderer, units: UnitSystem): ReplayUiState {
+        val replay = shared.replay
+        return when {
+            replay != null -> ReplayUiState.Ready(
+                replay = replay,
+                timeline = timelineFor(replay),
+                playing = shared.playing,
+                speed = shared.speed,
+                scrubbing = shared.scrubbing,
+                renderer = renderer,
+                legendOpen = legend,
+                units = units,
+            )
+            shared.unavailable == ReplayUnavailable.LOCKED -> ReplayUiState.Locked
+            shared.unavailable == ReplayUnavailable.NOT_FOUND -> ReplayUiState.Error
+            // Loading, or RECORDING: the screen leaves through ShowDriveScreen.
+            else -> ReplayUiState.Loading
         }
     }
+
+    private fun timelineFor(replay: Replay): ReplayTimeline =
+        timeline?.takeIf { it.replay === replay } ?: ReplayTimeline(replay).also { timeline = it }
 
     private fun renderer(online: Boolean, failed: Boolean): MapRenderer = when {
         !online || (maps.hasMapsKey && failed) -> MapRenderer.CANVAS_OFFLINE
         !maps.hasMapsKey -> MapRenderer.CANVAS
         else -> MapRenderer.GOOGLE
-    }
-
-    private fun ready(): ReplayUiState.Ready? = content.value as? ReplayUiState.Ready
-
-    private fun update(change: (ReplayUiState.Ready) -> ReplayUiState.Ready) {
-        content.update { if (it is ReplayUiState.Ready) change(it) else it }
     }
 }

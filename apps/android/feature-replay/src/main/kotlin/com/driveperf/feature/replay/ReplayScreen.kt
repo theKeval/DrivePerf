@@ -35,12 +35,20 @@ import com.driveperf.domain.replay.ReplaySpan
 import com.driveperf.domain.replay.SegmentStyle
 import com.driveperf.domain.settings.UnitSystem
 import com.driveperf.domain.trip.BoundingBox
+import com.driveperf.presentation.replay.ReplayEffect
 
-/** S-RPL-01 Trip Replay, bound to its view model. [subtitle] is the trip sheet's title (part of day and label). */
+/**
+ * S-RPL-01 Trip Replay, bound to its view model. [header] carries the trip sheet's title as the subtitle.
+ * [onShowDriveScreen] runs when the trip turns out to be recording (F-RPL-01 AC6).
+ */
 @Composable
-fun ReplayRoute(viewModel: ReplayViewModel, subtitle: String, mapId: String?, onBack: () -> Unit) {
+fun ReplayRoute(viewModel: ReplayViewModel, header: ReplayHeader, onShowDriveScreen: () -> Unit) {
     val state by viewModel.state.collectAsStateWithLifecycle()
-    ReplayScreen(state, viewModel.time, ReplayHeader(subtitle, mapId, onBack), viewModel)
+    val showDrive by rememberUpdatedState(onShowDriveScreen)
+    LaunchedEffect(viewModel) {
+        viewModel.effects.collect { effect -> if (effect == ReplayEffect.ShowDriveScreen) showDrive() }
+    }
+    ReplayScreen(state, viewModel.time, header, viewModel)
 }
 
 /** What the screen shows around the trip: the title's subtitle, the Night Drive Map ID, and Back. */
@@ -65,7 +73,7 @@ private val MapInsets = PaddingValues(start = 24.dp, top = 220.dp, end = 24.dp, 
 
 @Composable
 private fun Ready(state: ReplayUiState.Ready, time: DoubleState, header: ReplayHeader, controls: ReplayControls) {
-    if (state.playing) PlaybackLoop(controls::advance)
+    if (state.playing) PlaybackLoop(controls::onFrame)
     val label = stringResource(
         R.string.replay_map_label,
         ReplayFormatting.distance(state.timeline.totalM, state.units),
@@ -106,25 +114,16 @@ private fun Ready(state: ReplayUiState.Ready, time: DoubleState, header: ReplayH
 }
 
 private const val DARK_LUMINANCE = 0.5f
-private const val NANOS_PER_SECOND = 1e9
-
 /**
- * The display-linked clock (AC4): one `withFrameNanos` per frame while playing. The stepper is a single object, so the
- * loop itself allocates nothing per frame.
+ * The display-linked clock (AC4): one `withFrameNanos` per frame while playing. The playhead comes from the shared
+ * presenter's clock, so the frame time itself is not used; the frame callback is one object, built once.
  */
 @Composable
-private fun PlaybackLoop(onFrame: (Double) -> Unit) {
+private fun PlaybackLoop(onFrame: () -> Unit) {
     val latest by rememberUpdatedState(onFrame)
     LaunchedEffect(Unit) {
-        val stepper = object : (Long) -> Unit {
-            var last = -1L
-
-            override fun invoke(now: Long) {
-                if (last >= 0) latest((now - last) / NANOS_PER_SECOND)
-                last = now
-            }
-        }
-        while (true) withFrameNanos(stepper)
+        val frame: (Long) -> Unit = { latest() }
+        while (true) withFrameNanos(frame)
     }
 }
 

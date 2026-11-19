@@ -13,11 +13,8 @@ import com.driveperf.app.core.AndroidPlatformBindings
 import com.driveperf.app.core.ConsentOnboardingSettings
 import com.driveperf.app.core.DeviceId
 import com.driveperf.app.core.NetworkStatus
-import com.driveperf.domain.replay.ReplayRepository
 import com.driveperf.feature.replay.ReplayMapConfig
-import com.driveperf.feature.replay.ReplayProLock
-import com.driveperf.feature.replay.ReplayRequest
-import com.driveperf.feature.replay.ReplaySource
+import com.driveperf.presentation.replay.ReplaySource
 import com.driveperf.feature.replay.ReplayViewModel
 import com.driveperf.app.core.WakePath
 import com.driveperf.di.CoreServices
@@ -102,11 +99,12 @@ val appModule = module {
 
     // DRIVE-200 / DRIVE-61: Replay, from the shared model.
     single { NetworkStatus(androidContext(), get()) }
-    single<ReplayRepository> { get<CoreServices>().replay }
     single { ReplayMapConfig(BuildConfig.HAS_MAPS_KEY, BuildConfig.MAPS_MAP_ID.ifBlank { null }, get<NetworkStatus>().online) }
     viewModel { (tripId: String) ->
-        // ReplayProLock.NotBuilt: no entitlements yet (ADR-006); bind the 30-day Pro check here when they exist.
-        ReplayViewModel(ReplayRequest(tripId, ReplaySource.TRIP_DETAIL), get(), get(), get(), ReplayProLock.NotBuilt, units = get())
+        // The shared presenter owns playback, the recording gate and analytics (ADR-002 section 4); the Pro lock is its
+        // ReplayUnavailable.LOCKED, unset until entitlements exist (ADR-006).
+        val core = get<CoreServices>()
+        ReplayViewModel({ scope -> core.replayPresenter(tripId, ReplaySource.TRIP_DETAIL, scope) }, get(), units = get())
     }
     single<OnboardingSettings> { ConsentOnboardingSettings(get()) }
     viewModel {

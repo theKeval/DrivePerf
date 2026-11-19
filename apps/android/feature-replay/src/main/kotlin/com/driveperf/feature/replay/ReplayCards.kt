@@ -97,7 +97,10 @@ internal fun ErrorCard(onRetry: () -> Unit) = Centered {
     }
 }
 
-/** S-RPL-01 Lock (Free, older than 30 days), shown when [ReplayProLock] says so. See plans arrives with the paywall. */
+/**
+ * S-RPL-01 Lock (Free, older than 30 days), shown when the shared presenter reports `ReplayUnavailable.LOCKED`. See
+ * plans arrives with the paywall.
+ */
 @Composable
 internal fun LockCard(onNotNow: () -> Unit) = Centered {
     Surface(shape = MaterialTheme.shapes.large, color = MaterialTheme.colorScheme.surfaceContainerHigh) {
