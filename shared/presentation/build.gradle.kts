@@ -7,4 +7,7 @@ kotlin {
         implementation(projects.shared.foundation)
         implementation(projects.shared.domain)
     }
+    sourceSets.commonTest.dependencies {
+        implementation(libs.kotlinx.coroutines.test)
+    }
 }
