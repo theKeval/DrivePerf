@@ -5,8 +5,11 @@
 #
 #   ios beta          match (read-only) -> gym -> Sentry dSYM upload (when configured) -> pilot (TestFlight)
 #   android internal  supply: the signed prod release bundle and its R8 mapping to the Play internal testing track
+#   android sentry_mapping  the same R8 mapping to Sentry, under the UUID the build embedded (DRIVE-196)
 #
 # Run from the repository root: BUNDLE_GEMFILE=fastlane/Gemfile bundle exec fastlane <platform> <lane>
+
+require "shellwords"
 
 default_platform(:ios)
 
@@ -22,7 +25,8 @@ IOS_OUTPUT = "build/ios-release"
 ANDROID_BUNDLE = "apps/android/app/build/outputs/bundle/prodRelease/app-prod-release.aab"
 ANDROID_MAPPING = "apps/android/app/build/outputs/mapping/prodRelease/mapping.txt"
 
-# sentry-cli for the dSYM upload (ADR-007), pinned and fetched with npx so no binary is committed or piped to a shell.
+# sentry-cli for the dSYM and R8 mapping uploads (ADR-007), pinned and fetched with npx so no binary is committed or
+# piped to a shell.
 SENTRY_CLI = "@sentry/cli@3.8.2"
 
 # Fails with the variable's name, never its value.
@@ -39,6 +43,15 @@ def release_version
   build = required_env("DRIVEPERF_BUILD_NUMBER")
   UI.user_error!("DRIVEPERF_BUILD_NUMBER must be a whole number") unless build.match?(/\A\d+\z/)
   [version, build]
+end
+
+# Build settings for the release archive. The Sentry DSN (DRIVE-196) is not secret but never committed: with
+# SENTRY_DSN_IOS unset the build carries none and crash reporting stays off (ConsentGatedCrashReporter: notConfigured).
+def ios_build_settings(version, build)
+  settings = ["MARKETING_VERSION=#{version}", "CURRENT_PROJECT_VERSION=#{build}", "DP_FEATURE_TESTFLIGHT=YES"]
+  dsn = ENV.fetch("SENTRY_DSN_IOS", "").strip
+  settings << "DP_SENTRY_DSN=#{dsn}" unless dsn.empty?
+  settings.map { |setting| Shellwords.escape(setting) }.join(" ")
 end
 
 platform :ios do
@@ -99,7 +112,7 @@ platform :ios do
       clean: true,
       include_symbols: true,
       include_bitcode: false,
-      xcargs: "MARKETING_VERSION=#{version} CURRENT_PROJECT_VERSION=#{build} DP_FEATURE_TESTFLIGHT=YES",
+      xcargs: ios_build_settings(version, build),
     )
 
     upload_dsyms_to_sentry
@@ -157,6 +170,21 @@ platform :android do
       skip_upload_changelogs: true,
       skip_upload_images: true,
       skip_upload_screenshots: true,
+    )
+  end
+
+  desc "Upload the prod release R8 mapping to Sentry under the UUID embedded in the bundle (DRIVE-196)"
+  lane :sentry_mapping do
+    uuid = required_env("DRIVEPERF_SENTRY_PROGUARD_UUID")
+    mapping = File.expand_path(ANDROID_MAPPING, "..")
+    UI.user_error!("No R8 mapping at #{ANDROID_MAPPING}: run bundleProdRelease first") unless File.exist?(mapping)
+    sh(
+      "npx", "--yes", SENTRY_CLI, "proguard", "upload",
+      "--org", required_env("SENTRY_ORG"),
+      "--project", required_env("SENTRY_PROJECT_ANDROID"),
+      "--uuid", uuid,
+      "--require-one",
+      mapping,
     )
   end
 end
