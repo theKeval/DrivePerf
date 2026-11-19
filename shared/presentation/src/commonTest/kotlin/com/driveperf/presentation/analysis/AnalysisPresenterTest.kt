@@ -4,7 +4,7 @@ import com.driveperf.domain.analysis.AnalysisAxis
 import com.driveperf.domain.analysis.AnalysisChannel
 import com.driveperf.domain.analysis.AnalysisRepository
 import com.driveperf.domain.analysis.TripAnalysis
-import com.driveperf.domain.settings.Settings
+import com.driveperf.domain.analysis.AnalysisChoices
 import com.driveperf.domain.settings.UnitSystem
 import com.driveperf.domain.trip.EventType
 import kotlinx.coroutines.Dispatchers
@@ -28,7 +28,7 @@ import kotlin.test.assertTrue
 @OptIn(ExperimentalCoroutinesApi::class) // setMain, runCurrent
 class AnalysisPresenterTest {
     private val events = RecordedAnalytics()
-    private val settings = FakeSettings()
+    private val settings = FakePreferences()
     private val units = MutableStateFlow(UnitSystem.METRIC)
 
     private fun TestScope.presenter(found: TripAnalysis? = AnalysisTestData.analysis()): AnalysisPresenter =
@@ -107,7 +107,7 @@ class AnalysisPresenterTest {
         val t = p.state.value.timeline!!
         assertEquals(AnalysisAxis.DISTANCE, t.axis)
         assertEquals("4.0 km", t.axisTicks.last().label)
-        assertEquals(AnalysisAxis.DISTANCE, settings.saved.last().analysisAxis)
+        assertEquals(AnalysisAxis.DISTANCE, settings.saved.last().axis)
         assertEquals(mapOf("axis" to "distance"), events.tracked.last().properties)
         p.dispatch(AnalysisIntent.SetAxis(AnalysisAxis.DISTANCE))
         assertEquals(2, events.tracked.size)
@@ -115,7 +115,7 @@ class AnalysisPresenterTest {
 
     @Test
     fun theSavedChoicesOpenTheScreen() = runTest {
-        settings.update(Settings(analysisAxis = AnalysisAxis.DISTANCE, analysisChannels = setOf(AnalysisChannel.ELEVATION)))
+        settings.stored = AnalysisChoices(setOf(AnalysisChannel.ELEVATION), AnalysisAxis.DISTANCE)
         val t = presenter().state.value.timeline!!
         assertEquals(AnalysisAxis.DISTANCE, t.axis)
         assertEquals(listOf(AnalysisChannel.ELEVATION), t.lanes.map { it.channel })
@@ -174,7 +174,7 @@ class AnalysisPresenterTest {
         assertTrue(AnalysisChannel.ELEVATION in p.state.value.channels)
         assertEquals(4, p.state.value.timeline!!.lanes.size)
         assertEquals(setOf(AnalysisChannel.SPEED, AnalysisChannel.LON_G, AnalysisChannel.LAT_G, AnalysisChannel.ELEVATION),
-            settings.saved.last().analysisChannels)
+            settings.saved.last().channels)
         assertEquals(mapOf("channel" to "elevation"), events.tracked.last().properties)
         listOf(AnalysisChannel.SPEED, AnalysisChannel.LON_G, AnalysisChannel.LAT_G).forEach {
             p.dispatch(AnalysisIntent.ToggleChannel(it))

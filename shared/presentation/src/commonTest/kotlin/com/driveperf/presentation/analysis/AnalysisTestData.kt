@@ -1,6 +1,8 @@
 package com.driveperf.presentation.analysis
 
+import com.driveperf.domain.analysis.AnalysisChoices
 import com.driveperf.domain.analysis.AnalysisDataBuilder
+import com.driveperf.domain.analysis.AnalysisPreferences
 import com.driveperf.domain.analysis.TripAnalysis
 import com.driveperf.domain.analytics.Analytics
 import com.driveperf.domain.analytics.AnalyticsEvent
@@ -10,9 +12,6 @@ import com.driveperf.domain.replay.ReplayPoint
 import com.driveperf.domain.replay.ReplaySpan
 import com.driveperf.domain.replay.SegmentStyle
 import com.driveperf.domain.score.Score
-import com.driveperf.domain.settings.Settings
-import com.driveperf.domain.settings.SettingsRepository
-import com.driveperf.domain.settings.SettingsVehicle
 import com.driveperf.domain.trip.BoundingBox
 import com.driveperf.domain.trip.Confidence
 import com.driveperf.domain.trip.DrivingEvent
@@ -29,8 +28,6 @@ import com.driveperf.domain.trip.TripSource
 import com.driveperf.domain.trip.TripStatus
 import com.driveperf.domain.tripfile.AnalysisFix
 import com.driveperf.domain.tripfile.AnalysisTrace
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
 import kotlin.math.PI
 import kotlin.math.sin
 
@@ -102,16 +99,14 @@ internal class RecordedAnalytics : Analytics {
     fun names(): List<String> = tracked.map { it.name }
 }
 
-internal class FakeSettings(initial: Settings = Settings()) : SettingsRepository {
-    private val mutable = MutableStateFlow(initial)
-    override val state: StateFlow<Settings> = mutable
-    val saved = mutableListOf<Settings>()
+internal class FakePreferences(var stored: AnalysisChoices = AnalysisChoices()) : AnalysisPreferences {
+    val saved = mutableListOf<AnalysisChoices>()
 
-    override suspend fun update(settings: Settings): Boolean {
-        saved += settings
-        mutable.value = settings
+    override suspend fun read(): AnalysisChoices = stored
+
+    override suspend fun save(choices: AnalysisChoices): Boolean {
+        saved += choices
+        stored = choices
         return true
     }
-
-    override suspend fun vehicles(): List<SettingsVehicle> = emptyList()
 }

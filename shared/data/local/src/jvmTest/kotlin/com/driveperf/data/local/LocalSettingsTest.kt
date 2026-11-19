@@ -1,7 +1,5 @@
 package com.driveperf.data.local
 
-import com.driveperf.domain.analysis.AnalysisAxis
-import com.driveperf.domain.analysis.AnalysisChannel
 import com.driveperf.domain.analytics.Analytics
 import com.driveperf.domain.analytics.AnalyticsEvent
 import com.driveperf.domain.settings.Appearance
@@ -63,29 +61,5 @@ class LocalSettingsTest {
         assertEquals(selected, repo.state.value)
         assertTrue(repo.update(Settings()))
         assertEquals(Settings(), repository().state.value)
-    }
-
-    @Test fun analysisChannelsAndAxisPersistWithoutSettingChangedEvents() = runTest {
-        val repo = repository()
-        assertEquals(AnalysisChannel.DEFAULTS, repo.state.value.analysisChannels)
-        assertEquals(AnalysisAxis.TIME, repo.state.value.analysisAxis)
-        val chosen = repo.state.value.copy(
-            analysisChannels = setOf(AnalysisChannel.ELEVATION, AnalysisChannel.SPEED),
-            analysisAxis = AnalysisAxis.DISTANCE,
-        )
-        assertTrue(repo.update(chosen))
-        assertEquals("[\"speed\",\"elevation\"]", db.analysisChannelsQueries.analysisChannels().executeAsOne())
-        assertEquals(chosen, repository().state.value)
-        assertTrue(events.isEmpty())
-    }
-
-    @Test fun anEmptyOrDamagedChannelListReadsAsTheDefaults() = runTest {
-        db.profileQueries.ensureLocalProfile(1, 1, 1)
-        db.analysisChannelsQueries.saveAnalysisChannels("[\"gone\"]", 2)
-        assertEquals(AnalysisChannel.DEFAULTS, repository().state.value.analysisChannels)
-        db.analysisChannelsQueries.saveAnalysisChannels("not json", 3)
-        assertEquals(AnalysisChannel.DEFAULTS, repository().state.value.analysisChannels)
-        db.analysisChannelsQueries.saveAnalysisChannels("[\"jerk\"]", 4)
-        assertEquals(setOf(AnalysisChannel.JERK), repository().state.value.analysisChannels)
     }
 }

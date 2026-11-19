@@ -2,12 +2,12 @@ package com.driveperf.presentation.analysis
 
 import com.driveperf.domain.analysis.AnalysisAxis
 import com.driveperf.domain.analysis.AnalysisChannel
+import com.driveperf.domain.analysis.AnalysisChoices
+import com.driveperf.domain.analysis.AnalysisPreferences
 import com.driveperf.domain.analysis.AnalysisRepository
 import com.driveperf.domain.analysis.TripAnalysis
 import com.driveperf.domain.analytics.Analytics
 import com.driveperf.domain.analytics.AnalyticsEvent
-import com.driveperf.domain.settings.Settings
-import com.driveperf.domain.settings.SettingsRepository
 import com.driveperf.domain.settings.UnitSystem
 import com.driveperf.domain.trip.EventType
 import com.driveperf.presentation.BasePresenter
@@ -18,6 +18,8 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlin.coroutines.CoroutineContext
 
@@ -135,7 +137,7 @@ public class AnalysisPresenter(
     private val tripId: String,
     private val source: AnalysisSource,
     private val analyses: AnalysisRepository,
-    private val settings: SettingsRepository?,
+    private val preferences: AnalysisPreferences?,
     private val units: Flow<UnitSystem>,
     private val analytics: Analytics?,
     scope: CoroutineScope,
@@ -149,9 +151,9 @@ public class AnalysisPresenter(
     private var ownedScope: CoroutineScope? = null
     private var analysis: TripAnalysis? = null
     private var unitSystem: UnitSystem = UnitSystem.METRIC
+    private val saving = Mutex()
 
     init {
-        settings?.state?.value?.let { s -> update { it.copy(axis = s.analysisAxis, channels = s.analysisChannels) } }
         this.scope.launch { load() }
         this.scope.launch {
             units.collect { u ->
@@ -190,8 +192,16 @@ public class AnalysisPresenter(
         // The channels, their pyramids and the G-G grid are all built here, off the main thread, in one state: the
         // screen never sees "loaded" without its timeline.
         val ready = withContext(compute) {
+            val choices = preferences?.read() ?: AnalysisChoices()
             analyses.analysis(tripId)?.let { a ->
-                a to views(a, state.value.copy(loading = false, summaryOnly = a.data.summaryOnly, map = AnalysisMap.of(a)), null)
+                val loaded = state.value.copy(
+                    loading = false,
+                    summaryOnly = a.data.summaryOnly,
+                    map = AnalysisMap.of(a),
+                    axis = choices.axis,
+                    channels = choices.channels,
+                )
+                a to views(a, loaded, null)
             }
         }
         if (ready == null) {
@@ -229,7 +239,7 @@ public class AnalysisPresenter(
         if (axis == state.value.axis) return
         update { it.copy(axis = axis) }
         rebuild()
-        save { it.copy(analysisAxis = axis) }
+        save()
         track("analysis_axis", "axis" to axis.key)
     }
 
@@ -269,7 +279,7 @@ public class AnalysisPresenter(
         }
         update { it.copy(channels = next) }
         rebuild(state.value.timeline?.x0)
-        save { it.copy(analysisChannels = next) }
+        save()
         track("analysis_channel_toggled", "channel" to channel.key)
     }
 
@@ -300,9 +310,12 @@ public class AnalysisPresenter(
         ChannelOption(c, title, desc, c in on, c.pro, enabled, "$title, ${AnalysisCopy.channelPattern(c)}. $desc. $stateWord.")
     }
 
-    private fun save(change: (Settings) -> Settings) {
-        val repo = settings ?: return
-        scope.launch { repo.update(change(repo.state.value)) }
+    /** Persists the current axis and channels; saves run one at a time and each writes the latest choices. */
+    private fun save() {
+        val prefs = preferences ?: return
+        scope.launch {
+            saving.withLock { prefs.save(AnalysisChoices(state.value.channels, state.value.axis)) }
+        }
     }
 
     private fun track(name: String, vararg properties: Pair<String, String>) {
@@ -327,12 +340,12 @@ public class AnalysisPresenter(
             tripId: String,
             source: AnalysisSource,
             analyses: AnalysisRepository,
-            settings: SettingsRepository?,
+            preferences: AnalysisPreferences?,
             units: Flow<UnitSystem>,
             analytics: Analytics?,
         ): AnalysisPresenter {
             val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
-            return AnalysisPresenter(tripId, source, analyses, settings, units, analytics, scope).also { it.ownedScope = scope }
+            return AnalysisPresenter(tripId, source, analyses, preferences, units, analytics, scope).also { it.ownedScope = scope }
         }
     }
 }
