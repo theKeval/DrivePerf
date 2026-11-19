@@ -4,7 +4,9 @@ import android.graphics.Bitmap
 import androidx.core.graphics.createBitmap
 import android.graphics.Canvas
 import android.graphics.Paint
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DoubleState
 import androidx.compose.runtime.LaunchedEffect
@@ -16,6 +18,7 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Density
@@ -59,8 +62,17 @@ internal class MapEvents(val onLoaded: () -> Unit, val onTilesFailed: () -> Unit
  * SDK's own dark or light scheme. Fits the route on load (AC1). The marker is a native flat marker moved from a
  * snapshot of [time], so playback does not recompose the map.
  */
+@Suppress("LongParameterList") // the map, its look and events, plus the pins it hosts
 @Composable
-internal fun ReplayGoogleMap(replay: Replay, time: DoubleState, look: GoogleMapLook, events: MapEvents, modifier: Modifier = Modifier) {
+internal fun ReplayGoogleMap(
+    replay: Replay,
+    time: DoubleState,
+    look: GoogleMapLook,
+    events: MapEvents,
+    modifier: Modifier = Modifier,
+    focus: LatLng? = null,
+    pins: @Composable (MapProjector) -> Unit = {},
+) {
     val camera = rememberCameraPositionState()
     val density = LocalDensity.current
     var loaded by remember { mutableStateOf(false) }
@@ -70,24 +82,41 @@ internal fun ReplayGoogleMap(replay: Replay, time: DoubleState, look: GoogleMapL
         if (!loaded) latestFailed()
     }
     val bucket by remember { derivedStateOf { camera.position.zoom.toInt() } }
-    GoogleMap(
-        modifier = modifier,
-        cameraPositionState = camera,
-        contentDescription = look.contentDescription,
-        googleMapOptionsFactory = { GoogleMapOptions().apply { look.mapId?.let { mapId(it) } } },
-        uiSettings = ReplayUiSettings,
-        contentPadding = look.insets,
-        mapColorScheme = if (look.dark) ComposeMapColorScheme.DARK else ComposeMapColorScheme.LIGHT,
-        onMapLoaded = {
-            loaded = true
-            val box = replay.bbox
-            val bounds = LatLngBounds(LatLng(box.minLat, box.minLng), LatLng(box.maxLat, box.maxLng))
-            camera.move(CameraUpdateFactory.newLatLngBounds(bounds, with(density) { FIT_MARGIN.roundToPx() }))
-            events.onLoaded()
-        },
-    ) {
-        RouteLines(replay, bucket, density)
-        ReplayMarker(replay, time, density)
+    // DRIVE-39 AC5: the map centres on the event the evidence sheet is about.
+    LaunchedEffect(focus, loaded) {
+        if (loaded && focus != null) camera.animate(CameraUpdateFactory.newLatLng(focus))
+    }
+    Box(modifier) {
+        GoogleMap(
+            modifier = Modifier.fillMaxSize(),
+            cameraPositionState = camera,
+            contentDescription = look.contentDescription,
+            googleMapOptionsFactory = { GoogleMapOptions().apply { look.mapId?.let { mapId(it) } } },
+            uiSettings = ReplayUiSettings,
+            contentPadding = look.insets,
+            mapColorScheme = if (look.dark) ComposeMapColorScheme.DARK else ComposeMapColorScheme.LIGHT,
+            onMapLoaded = {
+                loaded = true
+                val box = replay.bbox
+                val bounds = LatLngBounds(LatLng(box.minLat, box.minLng), LatLng(box.maxLat, box.maxLng))
+                camera.move(CameraUpdateFactory.newLatLngBounds(bounds, with(density) { FIT_MARGIN.roundToPx() }))
+                events.onLoaded()
+            },
+        ) {
+            RouteLines(replay, bucket, density)
+            ReplayMarker(replay, time, density)
+        }
+        if (loaded) {
+            // Keyed on the camera position, so the pins follow every pan and zoom.
+            val position = camera.position
+            val projector = remember(position) {
+                val projection = camera.projection
+                MapProjector { lat, lng ->
+                    projection?.toScreenLocation(LatLng(lat, lng))?.let { Offset(it.x.toFloat(), it.y.toFloat()) }
+                }
+            }
+            pins(projector)
+        }
     }
 }
 

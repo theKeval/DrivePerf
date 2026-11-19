@@ -2,6 +2,7 @@ package com.driveperf.feature.replay
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
@@ -9,6 +10,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DoubleState
@@ -22,7 +25,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
@@ -36,6 +42,9 @@ import com.driveperf.domain.replay.SegmentStyle
 import com.driveperf.domain.settings.UnitSystem
 import com.driveperf.domain.trip.BoundingBox
 import com.driveperf.presentation.replay.ReplayEffect
+import com.driveperf.presentation.replay.ReplayOverlay
+import com.driveperf.presentation.replay.ReplaySelection
+import com.google.android.gms.maps.model.LatLng
 
 /**
  * S-RPL-01 Trip Replay, bound to its view model. [header] carries the trip sheet's title as the subtitle.
@@ -45,10 +54,17 @@ import com.driveperf.presentation.replay.ReplayEffect
 fun ReplayRoute(viewModel: ReplayViewModel, header: ReplayHeader, onShowDriveScreen: () -> Unit) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val showDrive by rememberUpdatedState(onShowDriveScreen)
+    val snackbar = remember { SnackbarHostState() }
     LaunchedEffect(viewModel) {
         viewModel.effects.collect { effect -> if (effect == ReplayEffect.ShowDriveScreen) showDrive() }
     }
-    ReplayScreen(state, viewModel.time, header, viewModel)
+    LaunchedEffect(viewModel) {
+        viewModel.messages.collect { snackbar.showSnackbar(it) }
+    }
+    Box(Modifier.fillMaxSize()) {
+        ReplayScreen(state, viewModel.time, header, viewModel)
+        SnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(16.dp))
+    }
 }
 
 /** What the screen shows around the trip: the title's subtitle, the Night Drive Map ID, and Back. */
@@ -79,19 +95,24 @@ private fun Ready(state: ReplayUiState.Ready, time: DoubleState, header: ReplayH
         ReplayFormatting.distance(state.timeline.totalM, state.units),
         ReplayFormatting.distanceUnit(state.units),
     )
+    val mapLabel = state.overlay?.mapSummary ?: label
     var mapLoaded by remember { mutableStateOf(false) }
     Box(Modifier.fillMaxSize()) {
         if (state.renderer == MapRenderer.GOOGLE) {
             ReplayGoogleMap(
                 replay = state.replay,
                 time = time,
-                look = GoogleMapLook(header.mapId, MaterialTheme.colorScheme.surface.luminance() < DARK_LUMINANCE, MapInsets, label),
+                look = GoogleMapLook(header.mapId, MaterialTheme.colorScheme.surface.luminance() < DARK_LUMINANCE, MapInsets, mapLabel),
                 events = MapEvents(onLoaded = { mapLoaded = true }, onTilesFailed = controls::onMapTilesFailed),
                 modifier = Modifier.fillMaxSize(),
-            )
+                focus = focusOf(state),
+            ) { projector ->
+                state.overlay?.let { ReplayPinLayer(it, state.selection, time, projector, controls) }
+            }
         }
         if (state.renderer != MapRenderer.GOOGLE || !mapLoaded) {
-            ReplayCanvas(state.replay, time, MapInsets, label, Modifier.fillMaxSize().testTag(CANVAS_MAP_TAG))
+            ReplayCanvas(state.replay, time, MapInsets, mapLabel, Modifier.fillMaxSize().testTag(CANVAS_MAP_TAG))
+            state.overlay?.let { CanvasPinLayer(state, it, time, controls) }
         }
         Column(Modifier.fillMaxWidth()) {
             TopBar(header, onLegend = controls::openLegend)
@@ -110,7 +131,49 @@ private fun Ready(state: ReplayUiState.Ready, time: DoubleState, header: ReplayH
             PlaybackBar(state, time, controls)
         }
     }
+    Sheets(state, controls)
+}
+
+/** The sheets over Replay: the legend, S-RPL-03, S-RPL-02 (with S-SCO-03) and S-SCO-04. */
+@Composable
+private fun Sheets(state: ReplayUiState.Ready, controls: ReplayControls) {
     if (state.legendOpen) LegendSheet(controls::closeLegend)
+    state.pinSheet?.let { PinSheet(it, controls) }
+    state.evidence?.let { EvidenceSheet(it, controls) }
+    state.tip?.let { TipDetailSheet(it, controls) }
+}
+
+/** The plain canvas's pins, projected with the same fit as the route. */
+@Composable
+private fun CanvasPinLayer(state: ReplayUiState.Ready, overlay: ReplayOverlay, time: DoubleState, controls: ReplayControls) {
+    val direction = LocalLayoutDirection.current
+    val density = LocalDensity.current
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+        val w = constraints.maxWidth.toFloat()
+        val h = constraints.maxHeight.toFloat()
+        val projector = remember(state.replay, w, h, direction) {
+            val insets = with(density) {
+                ReplayProjection.Insets(
+                    MapInsets.calculateLeftPadding(direction).toPx(),
+                    MapInsets.calculateTopPadding().toPx(),
+                    MapInsets.calculateRightPadding(direction).toPx(),
+                    MapInsets.calculateBottomPadding().toPx(),
+                )
+            }
+            val projection = ReplayProjection(state.replay.bbox, w, h, insets)
+            MapProjector { lat, lng -> Offset(projection.x(lng), projection.y(lat)) }
+        }
+        ReplayPinLayer(overlay, state.selection, time, projector, controls)
+    }
+}
+
+/** Where the map centres while the evidence sheet is open: the selected event (DRIVE-39 AC5). */
+private fun focusOf(state: ReplayUiState.Ready): LatLng? {
+    val selected = (state.selection as? ReplaySelection.Event)?.eventId
+    val marker = selected?.let { state.overlay?.details?.marker(it) }?.takeIf { it.pinned }
+    val lat = marker?.lat
+    val lng = marker?.lng
+    return if (lat != null && lng != null) LatLng(lat, lng) else null
 }
 
 private const val DARK_LUMINANCE = 0.5f

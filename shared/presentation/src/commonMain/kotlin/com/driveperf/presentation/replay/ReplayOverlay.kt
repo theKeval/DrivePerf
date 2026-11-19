@@ -8,6 +8,7 @@ import com.driveperf.domain.settings.UnitSystem
 import com.driveperf.domain.trip.DisplayUnit
 import com.driveperf.domain.trip.EventType
 import com.driveperf.domain.trip.Metric
+import com.driveperf.domain.trip.Provenance
 import kotlin.math.roundToInt
 
 /**
@@ -43,7 +44,7 @@ public data class ReplayPinSheet(
     val subtitle: String,
     val value: String,
     val unit: String,
-    val provenance: String,
+    val provenance: Provenance,
     val rows: List<ReplayPinRow>,
     val note: String,
     val tS: Double,
@@ -187,7 +188,7 @@ public object ReplayCopy {
             val minutes = (stop.durationS / SECONDS_PER_MINUTE).roundToInt()
             Triple("$minutes", "min", "$minutes minutes")
         }
-        val provenance = Metric.STOPS.provenance().label
+        val provenance = Metric.STOPS.provenance()
         return ReplayPinSheet(
             kind = ReplayPinKind.STOP,
             title = "Stop",
@@ -198,7 +199,7 @@ public object ReplayCopy {
             rows = listOf(ReplayPinRow("Into the drive", clock(stop.atS)), ReplayPinRow("Stop", "${stop.number} of $of")),
             note = STOP_NOTE,
             tS = stop.atS,
-            accessibilityLabel = "Stopped for $spoken. $provenance.",
+            accessibilityLabel = "Stopped for $spoken. ${provenance.label}.",
         )
     }
 
@@ -206,7 +207,7 @@ public object ReplayCopy {
     public fun maxSpeedSheet(pin: MaxSpeedPin, units: UnitSystem, startedAtMs: Long, format: ReplayTimeFormat): ReplayPinSheet {
         val unit = units.display(DisplayUnit.KM_PER_HOUR)
         val value = unit.format(pin.speedMps)
-        val provenance = Metric.MAX_SPEED.provenance().label
+        val provenance = Metric.MAX_SPEED.provenance()
         return ReplayPinSheet(
             kind = ReplayPinKind.MAX_SPEED,
             title = "Max speed",
@@ -217,7 +218,7 @@ public object ReplayCopy {
             rows = emptyList(),
             note = MAX_NOTE,
             tS = pin.tS,
-            accessibilityLabel = "Max speed $value ${spoken(unit.symbol)}. $provenance.",
+            accessibilityLabel = "Max speed $value ${spoken(unit.symbol)}. ${provenance.label}.",
         )
     }
 }
