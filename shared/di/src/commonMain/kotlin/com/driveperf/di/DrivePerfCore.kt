@@ -19,6 +19,7 @@ import com.driveperf.domain.analytics.ConsentGatedAnalytics
 import com.driveperf.domain.feedback.MarkEventNeeded
 import com.driveperf.domain.hello.GetHelloMessage
 import com.driveperf.domain.hello.HelloMessage
+import com.driveperf.domain.replay.TripReplayRepository
 import com.driveperf.foundation.platformDescription
 import com.driveperf.pipeline.PipelineFinaliser
 import com.driveperf.pipeline.QualityAnalyticsFinaliser
@@ -71,6 +72,7 @@ public object DrivePerfCore {
     ): CoreServices = build(platform, database, io, null, capture)
 
     @OptIn(ExperimentalCoroutinesApi::class)
+    @Suppress("LongMethod") // the composition root: every service is wired here, in one place
     private fun build(
         platform: PlatformBindings,
         database: DatabaseDriverFactory,
@@ -125,6 +127,7 @@ public object DrivePerfCore {
             recorder = recorder,
             trips = trips,
             routes = routes,
+            replay = TripReplayRepository(trips, ProtoAnalysisFileStore(files, io), previews),
             markEventNeeded = MarkEventNeeded(
                 trips, routes, LocalEventFeedbackStore(db, io), FeedbackRescorer(history, previews), clock,
             ),
