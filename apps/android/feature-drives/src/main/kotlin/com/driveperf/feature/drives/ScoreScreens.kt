@@ -64,9 +64,10 @@ fun ScoreBreakdownScreen(
     modifier: Modifier = Modifier,
     onAction: (DrivesIntent) -> Unit = {},
 ) {
-    val detail = state.detail?.takeIf { it.id == tripId } ?: return
-    val score = detail.score ?: return
-    val breakdown = detail.breakdown ?: return
+    val detail = state.detail?.takeIf { it.id == tripId }
+    val score = detail?.score
+    val breakdown = detail?.breakdown
+    if (score == null || breakdown == null) return
     Column(
         modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 32.dp),
         verticalArrangement = Arrangement.spacedBy(20.dp),
@@ -78,7 +79,8 @@ fun ScoreBreakdownScreen(
             WhatMovedIt(score.contributors, breakdown.contributorsFooter) { onAction(DrivesIntent.TapContributor(it)) }
             Runs(breakdown)
         } else {
-            breakdown.notScoredFooter?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = DrivePerfTheme.extendedColors.text2) }
+            breakdown.notScoredFooter?.let { Text(it, style = MaterialTheme.typography.bodySmall,
+                color = DrivePerfTheme.extendedColors.text2) }
         }
         TextButton(onClick = { onAction(DrivesIntent.OpenHowScoresWork(ExplainerSource.BREAKDOWN)) }) {
             Text(stringResource(R.string.score_how_scores_work))
@@ -86,7 +88,8 @@ fun ScoreBreakdownScreen(
         if (score.isScored) {
             Column {
                 Text(stringResource(R.string.score_needed_title), style = MaterialTheme.typography.titleSmall)
-                Text(stringResource(R.string.score_needed_body), style = MaterialTheme.typography.bodyMedium, color = DrivePerfTheme.extendedColors.text2)
+                Text(stringResource(R.string.score_needed_body), style = MaterialTheme.typography.bodyMedium,
+                    color = DrivePerfTheme.extendedColors.text2)
             }
         }
     }
@@ -163,7 +166,8 @@ private fun WhatMovedIt(contributors: List<ContributorUi>, footer: String, onTap
                                 Modifier
                             },
                         ),
-                        trailing = if (hasEvents) ({ Text(if (isOpen) "⌃" else "⌄", style = MaterialTheme.typography.titleMedium) }) else null,
+                        trailing = if (hasEvents) ({ Text(if (isOpen) "⌃" else "⌄",
+                            style = MaterialTheme.typography.titleMedium) }) else null,
                     )
                     if (isOpen) contributor.events.forEach { EventRow(it, Modifier.padding(start = 8.dp)) }
                 }
@@ -211,8 +215,10 @@ fun HowScoresWorkScreen(explainer: HowScoresWorkUi, modifier: Modifier = Modifie
         verticalArrangement = Arrangement.spacedBy(20.dp),
     ) {
         Surface(shape = MaterialTheme.shapes.extraLarge, color = cardColor, modifier = Modifier.fillMaxWidth()) {
-            Row(Modifier.padding(16.dp), horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                ScoreRing(explainer.exampleScore, explainer.exampleBaseline, 120.dp, Modifier.clearAndSetSemantics { contentDescription = explainer.exampleAccessibility })
+            Row(Modifier.padding(16.dp), horizontalArrangement = Arrangement.spacedBy(16.dp),
+                verticalAlignment = Alignment.CenterVertically) {
+                ScoreRing(explainer.exampleScore, explainer.exampleBaseline, 120.dp,
+                    Modifier.clearAndSetSemantics { contentDescription = explainer.exampleAccessibility })
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text(explainer.heroTitle, style = MaterialTheme.typography.titleMedium)
                     Text(explainer.heroBody, style = MaterialTheme.typography.bodyMedium)
@@ -238,11 +244,13 @@ private fun ExplainerSection(section: ExplainerSectionUi, explainer: HowScoresWo
                             DpEventGlyph(threshold.type.dp(), size = 28.dp)
                             Column {
                                 Text(threshold.label, style = MaterialTheme.typography.titleSmall)
-                                Text(threshold.text, style = MaterialTheme.typography.bodySmall, color = DrivePerfTheme.extendedColors.text2)
+                                Text(threshold.text, style = MaterialTheme.typography.bodySmall,
+                                    color = DrivePerfTheme.extendedColors.text2)
                             }
                         }
                     }
-                    ExplainerSectionKind.QUALITY -> FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    ExplainerSectionKind.QUALITY -> FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         QualityBadge.entries.forEach { badge ->
                             Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
                                 DpQualityGlyph(badge.dp(), size = 18.dp, ink = MaterialTheme.colorScheme.surface)

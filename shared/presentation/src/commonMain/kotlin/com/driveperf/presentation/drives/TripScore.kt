@@ -2,6 +2,7 @@ package com.driveperf.presentation.drives
 
 import com.driveperf.domain.route.IneligibleReason
 import com.driveperf.domain.score.Contributor
+import com.driveperf.domain.score.Score
 import com.driveperf.domain.score.ScoreBasis
 import com.driveperf.domain.score.ScoreLine
 import com.driveperf.domain.score.TripScoreDetail
@@ -11,11 +12,11 @@ import com.driveperf.domain.trip.DrivingEvent
 import com.driveperf.domain.trip.EventType
 import com.driveperf.domain.trip.QualityBadge
 import com.driveperf.domain.trip.Trip
+import com.driveperf.domain.trip.TripCorrection
 import com.driveperf.domain.trip.TripKind
-import com.driveperf.presentation.score.BasisOptionUi
-import com.driveperf.presentation.score.BreakdownUi
 import com.driveperf.presentation.score.ComparisonTone
 import com.driveperf.presentation.score.ComparisonUi
+import com.driveperf.presentation.score.ComparisonCopy
 import com.driveperf.presentation.score.ContributorUi
 import com.driveperf.presentation.score.EventCountUi
 import com.driveperf.presentation.score.EventRowUi
@@ -24,78 +25,77 @@ import com.driveperf.presentation.score.ScoreCopy
 import com.driveperf.presentation.score.ScoreUi
 import com.driveperf.presentation.score.TipCopy
 import com.driveperf.presentation.score.TipUi
+import kotlin.math.abs
 import kotlin.math.roundToInt
 
 /** A trip whose score is shown: a driver trip nobody marked otherwise (F-RPL-07 AC4, EC-PAS). */
-internal val Trip.scoresShown: Boolean get() = kind == TripKind.DRIVER && (correction == null || correction == com.driveperf.domain.trip.TripCorrection.DRIVER)
+internal val Trip.scoresShown: Boolean
+    get() = kind == TripKind.DRIVER && (correction == null || correction == TripCorrection.DRIVER)
 
 private const val MS_PER_S = 1_000L
-private const val RUNS_FOR_TREND = 3
+
 private const val G_HUNDREDTHS = 100.0
 private const val TENTHS = 10.0
+private const val HUNDRED = 100
+private const val TEN = 10
 
 /**
- * Builds the score surfaces of one trip (S-TRP-01 score card, events and tip; S-SCO-01) from the reader's
- * [TripScoreDetail]. [firstScoredEver] is the trip with the user's first score: its calibrating chip says "Your baseline".
+ * Builds the score surfaces of one trip (S-TRP-01 score card, events and tip; S-SCO-01) and its card badge from the
+ * reader's data. [startedAtOf] finds a trip's start, for the date of the route record a drive beat.
  */
 internal class TripScore(
     private val units: UnitSystem,
     private val format: DrivesFormatter,
     private val startedAtOf: (String) -> Long?,
 ) {
-    /** The comparison chip for a scored, shown trip; null without one. */
-    fun comparison(
-        smoothness: Int?,
-        delta: Int?,
-        calibrating: com.driveperf.domain.score.Calibrating?,
-        onRoute: Boolean,
-        routeName: String?,
-        trip: Trip,
-        firstScoredEver: Boolean,
-    ): ComparisonUi? {
-        if (smoothness == null) return null
+    /** The comparison chip of a scored trip: "Your baseline" on the first scored drive ever, then k of 3, then the delta. */
+    private fun comparison(score: Score, routeName: String?, trip: Trip, firstScoredEver: Boolean): ComparisonUi? {
+        val calibrating = score.calibrating
+        val delta = score.delta
         return when {
-            calibrating != null && calibrating.k <= 1 && firstScoredEver ->
-                ComparisonUi(ComparisonTone.CALIBRATING, "", ScoreCopy.FIRST_DRIVE, calibrating.k, calibrating.of)
-            calibrating != null ->
-                ComparisonUi(ComparisonTone.CALIBRATING, "", ScoreCopy.calibratingText(calibrating.k, calibrating.of), calibrating.k, calibrating.of)
+            calibrating != null -> ComparisonUi(
+                ComparisonTone.CALIBRATING,
+                "",
+                if (calibrating.k <= 1 && firstScoredEver) {
+                    ComparisonCopy.FIRST_DRIVE
+                } else {
+                    ComparisonCopy.calibratingText(calibrating.k, calibrating.of)
+                },
+                calibrating.k,
+                calibrating.of,
+            )
             delta == null -> null
             else -> ComparisonUi(
-                tone = when {
-                    delta > 0 -> ComparisonTone.BETTER
-                    delta < 0 -> ComparisonTone.LOWER
-                    else -> ComparisonTone.SAME
-                },
+                tone = tone(delta),
                 glyph = when {
                     delta > 0 -> "▲"
                     delta < 0 -> "▼"
                     else -> "●"
                 },
-                text = ScoreCopy.comparisonText(delta, onRoute, routeName, trip.context),
+                text = ComparisonCopy.comparisonText(delta, score.basis == ScoreBasis.ROUTE, routeName, trip.context),
             )
         }
     }
 
-    /** The trip card's badge (components.md §12); null for a trip whose score is hidden. */
+    private fun tone(delta: Int?): ComparisonTone = when {
+        delta == null -> ComparisonTone.CALIBRATING
+        delta > 0 -> ComparisonTone.BETTER
+        delta < 0 -> ComparisonTone.LOWER
+        else -> ComparisonTone.SAME
+    }
+
+    /**
+     * The trip card's badge (components.md §12); null for a trip whose score is hidden, and before analysis (only a
+     * finished analysis can say "Not scored").
+     */
     fun badge(trip: Trip, line: ScoreLine?): ScoreBadgeUi? {
-        if (!trip.scoresShown) return null
         val smoothness = line?.smoothness
-        if (smoothness == null) {
-            // Only a finished analysis can say "Not scored"; before it the card shows nothing.
-            return if (trip.quality == null) null else ScoreBadgeUi(null, null, ComparisonTone.SAME, notScoredText = ScoreCopy.NOT_SCORED)
+        val delta = line?.delta?.takeIf { line.calibrating == null }
+        return when {
+            !trip.scoresShown -> null
+            smoothness == null -> trip.quality?.let { ScoreBadgeUi(null, null, ComparisonTone.SAME, notScoredText = ScoreCopy.NOT_SCORED) }
+            else -> ScoreBadgeUi(smoothness.toString(), delta?.let(ComparisonCopy::signed), tone(delta), line.newRecord)
         }
-        val delta = line.delta.takeIf { line.calibrating == null }
-        return ScoreBadgeUi(
-            score = smoothness.toString(),
-            delta = delta?.let(ScoreCopy::signed),
-            tone = when {
-                delta == null -> ComparisonTone.CALIBRATING
-                delta > 0 -> ComparisonTone.BETTER
-                delta < 0 -> ComparisonTone.LOWER
-                else -> ComparisonTone.SAME
-            },
-            newRecord = line.newRecord,
-        )
     }
 
     /** "Smoothness 85, 2 above your usual." for the card's accessibility label; null without a score. */
@@ -125,8 +125,8 @@ internal class TripScore(
             )
         }
         val onRoute = score.basis == ScoreBasis.ROUTE
-        val routeName = ScoreCopy.routeName(detail.route)
-        val comparison = comparison(smoothness, score.delta, score.calibrating, onRoute, routeName, trip, firstScoredEver)
+        val routeName = ComparisonCopy.routeName(detail.route)
+        val comparison = comparison(score, routeName, trip, firstScoredEver)
         val record = score.recordState?.takeIf { it.isNew }
         val recordLine = record?.let { r ->
             val previous = r.previousScore ?: return@let "New route record"
@@ -141,7 +141,7 @@ internal class TripScore(
             append("Smoothness $smoothness. ")
             when {
                 score.calibrating != null -> append("${comparison?.text}.")
-                score.delta != null -> append(ScoreCopy.spokenComparison(score.delta ?: 0, onRoute, routeName, trip.context))
+                score.delta != null -> append(ComparisonCopy.spokenComparison(score.delta ?: 0, onRoute, routeName, trip.context))
             }
             recordLine?.let { append(" $it.") }
             basedOn?.let { append(" $it.") }
@@ -215,7 +215,8 @@ internal class TripScore(
         val unscored = trip.quality?.badge == QualityBadge.UNSCORABLE
         return TripEventsUi(
             title = "Events · ${detail.events.size}",
-            counts = EventType.entries.map { type -> EventCountUi(type, ScoreCopy.eventCountLabel(type), detail.events.count { it.type == type }) },
+            counts = EventType.entries.map { type -> EventCountUi(type, ScoreCopy.eventCountLabel(type),
+                detail.events.count { it.type == type }) },
             rows = detail.events.sortedWith(compareBy({ it.tPeakS }, { it.id })).map { event(trip, it, detail) },
             emptyTitle = ScoreCopy.NO_EVENTS_TITLE,
             emptyBody = ScoreCopy.NO_EVENTS_BODY,
@@ -225,86 +226,27 @@ internal class TripScore(
 
     /** The trip's tip card, when it has a tip with copy (none on unscored or passenger trips). */
     fun tip(detail: TripScoreDetail): TipUi? {
-        val tip = detail.score?.takeIf { it.smoothness != null }?.tip ?: return null
-        val text = TipCopy.text(tip.tipId) ?: return null
-        return TipUi(tip.tipId, tip.category, ScoreCopy.TIP_KICKER, text.title, text.nextTime, text.why)
+        val tip = detail.score?.takeIf { it.smoothness != null }?.tip
+        val text = tip?.let { TipCopy.text(it.tipId) }
+        return if (tip == null || text == null) null else TipUi(tip.tipId, tip.category, ScoreCopy.TIP_KICKER, text.title,
+            text.nextTime, text.why)
     }
 
     /** "1.2 km with no abrupt inputs." (the positive card first, F-SCO-06 AC2; no road names in v1). */
-    fun cleanest(trip: Trip, detail: TripScoreDetail): String? {
-        if (detail.score?.smoothness == null) return null
-        val stretch = trip.cleanest ?: return null
-        return "${distanceText(stretch.distanceM, units)} with no abrupt inputs."
-    }
-
-    /** S-SCO-01 beyond the hero. */
-    fun breakdown(trip: Trip, detail: TripScoreDetail): BreakdownUi {
-        val score = detail.score
-        val smoothness = score?.smoothness
-        val routeName = ScoreCopy.routeName(detail.route)
-        val context = ScoreCopy.contextWord(trip.context)
-        val usualKind = context?.let { "Your usual $it drives" } ?: "Your usual drives"
-        val calibrating = score?.calibrating
-        val basisLine = when {
-            smoothness == null -> ""
-            calibrating != null -> ScoreCopy.calibratingLine(calibrating.k, calibrating.of)
-            score.basis == ScoreBasis.ROUTE -> "Compared with your usual on ${routeName ?: "this route"}: ${score.baseline}."
-            else -> "Compared with your usual ${context?.let { "$it drives" } ?: "drives"}: ${score.baseline}."
-        }
-        val options = if (smoothness == null || calibrating != null) {
-            emptyList()
-        } else if (score.basis == ScoreBasis.ROUTE) {
-            listOf(
-                BasisOptionUi("Your runs of ${routeName ?: "this route"}", "This drive matched a route, so it’s compared on that route", true, "usual ${score.baseline}"),
-                BasisOptionUi(usualKind, "Used when a drive isn’t on a route", false, null),
-            )
-        } else {
-            val onNewRoute = detail.route != null
-            listOf(
-                BasisOptionUi(
-                    usualKind,
-                    if (onNewRoute) "Its route doesn’t have three earlier runs yet" else "This drive didn’t match a route",
-                    true,
-                    "usual ${score.baseline}",
-                ),
-                BasisOptionUi(
-                    routeName ?: "A route",
-                    if (onNewRoute) "From its fourth run, it’s compared on its route" else "Drive the same trip twice and it becomes a route",
-                    false,
-                    null,
-                ),
-            )
-        }
-        val runs = detail.runs.takeIf { smoothness != null && it.size >= RUNS_FOR_TREND }.orEmpty()
-        return BreakdownUi(
-            basisLine = basisLine,
-            options = options,
-            optionsFooter = ScoreCopy.COMPARISON_FOOTER,
-            runsTitle = if (runs.isEmpty()) null else "Your last ${runs.size} runs of ${routeName ?: "this route"}",
-            runs = runs,
-            runsSummary = if (runs.isEmpty()) null else "Smoothness on your last ${runs.size} runs: ${runs.joinToString(", ")}.",
-            contributorsFooter = ScoreCopy.CONTRIBUTORS_FOOTER,
-            notScoredText = if (smoothness == null) {
-                "${trip.quality?.let { TripCopy.reasonText(it.reason) } ?: "Not enough good data"}. When we can’t tell the " +
-                    "phone’s movement from the car’s, any score would be a guess."
-            } else {
-                null
-            },
-            notScoredFooter = ScoreCopy.NOT_SCORED_FOOTER.takeIf { smoothness == null },
-        )
-    }
+    fun cleanest(trip: Trip, detail: TripScoreDetail): String? =
+        trip.cleanest?.takeIf { detail.score?.smoothness != null }?.let { "${distanceText(it.distanceM, units)} with no abrupt inputs." }
 
     private companion object {
         /** "0.42" */
         fun gText(g: Double): String {
-            val h = (kotlin.math.abs(g) * G_HUNDREDTHS).roundToInt()
-            return "${h / 100}.${(h % 100).toString().padStart(2, '0')}"
+            val h = (abs(g) * G_HUNDREDTHS).roundToInt()
+            return "${h / HUNDRED}.${(h % HUNDRED).toString().padStart(2, '0')}"
         }
 
         /** "1.4" */
         fun tenths(s: Double): String {
             val t = (s * TENTHS).roundToInt()
-            return "${t / 10}.${t % 10}"
+            return "${t / TEN}.${t % TEN}"
         }
     }
 }

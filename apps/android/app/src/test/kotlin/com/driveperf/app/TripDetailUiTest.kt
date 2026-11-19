@@ -53,10 +53,13 @@ class TripDetailUiTest {
 
     private val actions = mutableListOf<DrivesIntent>()
 
-    private val event = EventRowUi("e1", EventType.BRAKE, "Hard braking", "8:14 AM", "0.42 g · 1.4 s", accessibilityLabel = "Hard braking at 8:14 AM.")
+    private val event = EventRowUi("e1", EventType.BRAKE, "Hard braking", "8:14 AM", "0.42 g · 1.4 s",
+        accessibilityLabel = "Hard braking at 8:14 AM.")
     private val contributors = listOf(
-        ContributorUi(ContributorId.BRAKING, "Braking", Band.ROUGHER, "▼", "Rougher than usual", "1 abrupt stop", listOf(event), "Braking, rougher than usual. 1 abrupt stop. Show events."),
-        ContributorUi(ContributorId.CONSISTENCY, "Consistency", Band.USUAL, "●", "Usual", "Your usual rhythm", emptyList(), "Consistency, usual. Your usual rhythm."),
+        ContributorUi(ContributorId.BRAKING, "Braking", Band.ROUGHER, "▼", "Rougher than usual", "1 abrupt stop", listOf(event),
+            "Braking, rougher than usual. 1 abrupt stop. Show events."),
+        ContributorUi(ContributorId.CONSISTENCY, "Consistency", Band.USUAL, "●", "Usual", "Your usual rhythm", emptyList(),
+            "Consistency, usual. Your usual rhythm."),
     )
     private val score = ScoreUi(
         85, 83, ComparisonUi(ComparisonTone.BETTER, "▲", "+2 vs your usual on The Commute"), null, null,
@@ -72,7 +75,8 @@ class TripDetailUiTest {
         score = score, breakdown = breakdown,
         events = TripEventsUi("Events · 1", listOf(EventCountUi(EventType.BRAKE, "Braking", 1)), listOf(event), "", ""),
         cleanest = "9.5 km with no abrupt inputs.",
-        tip = TipUi("brake_light", TipCategory.BRAKING, "One thing for next time", "Ease off earlier", "Next time, ease off a little earlier.", "Why."),
+        tip = TipUi("brake_light", TipCategory.BRAKING, "One thing for next time", "Ease off earlier",
+            "Next time, ease off a little earlier.", "Why."),
     )
 
     private fun show(detail: TripDetailUi = this.detail) {
@@ -125,7 +129,8 @@ class TripDetailUiTest {
                         loaded = true,
                         trips = listOf(
                             TripRowUi(
-                                "trip-7", "The Commute", "Tuesday morning · 10 Nov", "8.1 km", "12 min", accessibilityLabel = "The Commute card",
+                                "trip-7", "The Commute", "Tuesday morning · 10 Nov", "8.1 km", "12 min",
+                                accessibilityLabel = "The Commute card",
                                 score = ScoreBadgeUi("85", "+2", ComparisonTone.BETTER),
                             ),
                         ),

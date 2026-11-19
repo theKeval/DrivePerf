@@ -39,7 +39,7 @@ final class CoreDrivesPresenter: DrivesPresenting {
             for await effect in effects.value {
                 // iOS pushes trip detail and the score screens with navigation links, so only Replay and Analysis
                 // come back as navigation.
-                guard let self, let navigation = Self.navigation(effect) else { continue }
+                guard let self, let effect, let navigation = Self.navigation(effect) else { continue }
                 if navigationObservers.isEmpty {
                     pendingNavigation.append(navigation)
                 } else {

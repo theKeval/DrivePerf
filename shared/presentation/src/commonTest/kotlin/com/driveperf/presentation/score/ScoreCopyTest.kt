@@ -14,7 +14,8 @@ class ScoreCopyTest {
     @Test
     fun everyReasonKeyHasCopyWithoutAPlaceName() {
         val reasons = ContributorId.entries.flatMap { id ->
-            Band.entries.map { band -> "${id.name.lowercase()}.${band.name.lowercase()}" to ScoreCopy.reason(id, "${id.name.lowercase()}.${band.name.lowercase()}", 2) }
+            Band.entries.map { band -> "${id.name.lowercase()}.${band.name.lowercase()}" to ScoreCopy.reason(id,
+                "${id.name.lowercase()}.${band.name.lowercase()}", 2) }
         }.toMap()
         assertEquals(
             mapOf(
@@ -49,28 +50,28 @@ class ScoreCopyTest {
 
     @Test
     fun comparisonsAreAgainstTheUsersOwnRouteOrDrivesOfTheSameKind() {
-        assertEquals("+2 vs your usual on The Commute", ScoreCopy.comparisonText(2, true, "The Commute", DriveContext.CITY))
-        assertEquals("−3 vs your usual on this route", ScoreCopy.comparisonText(-3, true, null, null))
-        assertEquals("+4 vs your usual highway drives", ScoreCopy.comparisonText(4, false, "The Commute", DriveContext.HIGHWAY))
-        assertEquals("−1 vs your usual drives", ScoreCopy.comparisonText(-1, false, null, null))
-        assertEquals("Right on your usual", ScoreCopy.comparisonText(0, false, null, DriveContext.MIXED))
-        assertEquals("Calibrating your baseline · 2 of 3", ScoreCopy.calibratingText(2, 3))
-        assertEquals("3 below your usual city drives.", ScoreCopy.spokenComparison(-3, false, null, DriveContext.CITY))
-        assertEquals("2 above your usual on Gym.", ScoreCopy.spokenComparison(2, true, "Gym", null))
-        assertEquals("Right on your usual.", ScoreCopy.spokenComparison(0, true, "Gym", null))
+        assertEquals("+2 vs your usual on The Commute", ComparisonCopy.comparisonText(2, true, "The Commute", DriveContext.CITY))
+        assertEquals("−3 vs your usual on this route", ComparisonCopy.comparisonText(-3, true, null, null))
+        assertEquals("+4 vs your usual highway drives", ComparisonCopy.comparisonText(4, false, "The Commute", DriveContext.HIGHWAY))
+        assertEquals("−1 vs your usual drives", ComparisonCopy.comparisonText(-1, false, null, null))
+        assertEquals("Right on your usual", ComparisonCopy.comparisonText(0, false, null, DriveContext.MIXED))
+        assertEquals("Calibrating your baseline · 2 of 3", ComparisonCopy.calibratingText(2, 3))
+        assertEquals("3 below your usual city drives.", ComparisonCopy.spokenComparison(-3, false, null, DriveContext.CITY))
+        assertEquals("2 above your usual on Gym.", ComparisonCopy.spokenComparison(2, true, "Gym", null))
+        assertEquals("Right on your usual.", ComparisonCopy.spokenComparison(0, true, "Gym", null))
     }
 
     @Test
     fun routesAreNamedByTheUserOrTheirPreset() {
-        assertEquals("Morning loop", ScoreCopy.routeName(RouteName("r", "Morning loop", RoutePreset.GYM)))
-        assertEquals("The Commute", ScoreCopy.routeName(RouteName("r", " ", RoutePreset.COMMUTE)))
-        assertEquals("Gym", ScoreCopy.routeName(RouteName("r", null, RoutePreset.GYM)))
-        assertEquals("School run", ScoreCopy.routeName(RouteName("r", null, RoutePreset.SCHOOL_RUN)))
-        assertNull(ScoreCopy.routeName(RouteName("r", null, RoutePreset.CUSTOM)))
-        assertNull(ScoreCopy.routeName(RouteName("r", null, null)))
-        assertNull(ScoreCopy.routeName(null))
-        assertEquals("+5", ScoreCopy.signed(5))
-        assertEquals("−5", ScoreCopy.signed(-5))
-        assertEquals("0", ScoreCopy.signed(0))
+        assertEquals("Morning loop", ComparisonCopy.routeName(RouteName("r", "Morning loop", RoutePreset.GYM)))
+        assertEquals("The Commute", ComparisonCopy.routeName(RouteName("r", " ", RoutePreset.COMMUTE)))
+        assertEquals("Gym", ComparisonCopy.routeName(RouteName("r", null, RoutePreset.GYM)))
+        assertEquals("School run", ComparisonCopy.routeName(RouteName("r", null, RoutePreset.SCHOOL_RUN)))
+        assertNull(ComparisonCopy.routeName(RouteName("r", null, RoutePreset.CUSTOM)))
+        assertNull(ComparisonCopy.routeName(RouteName("r", null, null)))
+        assertNull(ComparisonCopy.routeName(null))
+        assertEquals("+5", ComparisonCopy.signed(5))
+        assertEquals("−5", ComparisonCopy.signed(-5))
+        assertEquals("0", ComparisonCopy.signed(0))
     }
 }

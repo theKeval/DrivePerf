@@ -38,7 +38,8 @@ class LocalScoreReaderTest {
     private val driver = JvmDatabaseDriverFactory().create()
     private val db = openDatabase(driver)
 
-    private fun trip(id: String, startedAt: Long, kind: TripKind = TripKind.DRIVER, vehicle: String? = null, spans: List<TripSegment> = emptyList()) =
+    private fun trip(id: String, startedAt: Long, kind: TripKind = TripKind.DRIVER, vehicle: String? = null,
+        spans: List<TripSegment> = emptyList()) =
         Trip(
             id = id, status = TripStatus.FINALISED, kind = kind, source = TripSource.AUTO, vehicleId = vehicle,
             startedAt = startedAt, startTzOffsetMin = 0, endedAt = startedAt + 600_000L, distanceM = 5_000.0, durationS = 600.0,
@@ -81,7 +82,8 @@ class LocalScoreReaderTest {
         addCar("gti", "GTI", "Volkswagen", "Golf GTI")
         addCar("ioniq", null, "Hyundai", "Ioniq 5")
         addCar("old", "Old", null, null, active = false)
-        store.saveFinalised(FinalisedTrip(trip("t1", 1_000L, vehicle = "gti"), score = score("t1", 85, record = true), routeMatch = match("t1"), newRoute = route))
+        store.saveFinalised(FinalisedTrip(trip("t1", 1_000L, vehicle = "gti"), score = score("t1", 85, record = true),
+            routeMatch = match("t1"), newRoute = route))
         store.saveFinalised(FinalisedTrip(trip("t2", 2_000L, vehicle = "ioniq"), score = score("t2", null)))
         store.saveFinalised(FinalisedTrip(trip("t3", 3_000L)))
 
@@ -107,10 +109,13 @@ class LocalScoreReaderTest {
     @Test
     fun theDetailFollowsTheScoreEventsFeedbackAndRouteRuns() = runTest {
         val store = LocalTripStore(db, "d", coroutineContext)
-        val event = DrivingEvent("e1", "t3", EventType.BRAKE, 40.0, 39.0, 41.0, 2.0, 0.41, null, null, null, 12.0, 0.0, Confidence.HIGH, "smooth-1.0.0")
+        val event = DrivingEvent("e1", "t3", EventType.BRAKE, 40.0, 39.0, 41.0, 2.0, 0.41, null, null, null, 12.0, 0.0,
+            Confidence.HIGH, "smooth-1.0.0")
         store.saveFinalised(FinalisedTrip(trip("t1", 1_000L), score = score("t1", 70), routeMatch = match("t1"), newRoute = route))
-        store.saveFinalised(FinalisedTrip(trip("t2", 2_000L, kind = TripKind.PASSENGER), score = score("t2", null), routeMatch = match("t2", false, IneligibleReason.PASSENGER), newRoute = route))
-        store.saveFinalised(FinalisedTrip(trip("t3", 3_000L), listOf(event), score("t3", 85), match("t3", false, IneligibleReason.PACE_BAND), route))
+        store.saveFinalised(FinalisedTrip(trip("t2", 2_000L, kind = TripKind.PASSENGER), score = score("t2", null),
+            routeMatch = match("t2", false, IneligibleReason.PASSENGER), newRoute = route))
+        store.saveFinalised(FinalisedTrip(trip("t3", 3_000L), listOf(event), score("t3", 85), match("t3", false,
+            IneligibleReason.PACE_BAND), route))
         store.saveFinalised(FinalisedTrip(trip("t4", 4_000L), score = score("t4", 90), routeMatch = match("t4"), newRoute = route))
         db.tripQueries.upsertFeedback(Event_feedback("e1", "t3", 1L, null, 5L))
 
@@ -130,6 +135,30 @@ class LocalScoreReaderTest {
         assertNull(missing.score)
         assertNull(missing.route)
         assertTrue(missing.runs.isEmpty())
+    }
+
+    @Test
+    fun aThousandTripsReadWithTheirSpansAndScoresWellUnderASecond() = runTest {
+        val store = LocalTripStore(db, "d", coroutineContext)
+        val gap = TripSegment(SegmentKind.GAP, 200.0, 290.0, SegmentReason.TUNNEL, "gap.tunnel")
+        repeat(1_000) { i ->
+            val id = "t$i"
+            store.saveFinalised(FinalisedTrip(trip(id, 1_000L + i, spans = listOf(gap, gap.copy(t0S = 400.0, t1S = 410.0))),
+                score = score(id, 80)))
+        }
+        val trips = LocalTripRepository(db, InMemoryTripFileStore(), coroutineContext)
+        val reader = LocalScoreReader(db, coroutineContext)
+        trips.observeTrips().first()
+        reader.observeLines().first()
+        // DRIVE-126 AC2: the list opens in 1 s on a reference phone. Two queries, not 1,001: warm, this is tens of ms.
+        val start = System.nanoTime()
+        val listed = trips.observeTrips().first()
+        val lines = reader.observeLines().first()
+        val ms = (System.nanoTime() - start) / 1_000_000
+        assertEquals(1_000, listed.size)
+        assertTrue(listed.all { it.quality?.spans?.size == 2 })
+        assertEquals(1_000, lines.lines.size)
+        assertTrue(ms < 1_000, "1,000 trips read in $ms ms")
     }
 
     @Test

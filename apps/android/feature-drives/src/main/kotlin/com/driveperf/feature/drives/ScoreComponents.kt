@@ -83,14 +83,16 @@ internal fun ScoreRing(score: Int?, baseline: Int?, size: Dp, modifier: Modifier
             )
             if (score != null) {
                 rotate(TOP) {
-                    drawArc(arc, 0f, FULL_CIRCLE * score / MAX_SCORE, false, topLeft, arcSize, style = Stroke(stroke, cap = StrokeCap.Round))
+                    drawArc(arc, 0f, FULL_CIRCLE * score / MAX_SCORE, false, topLeft, arcSize, style = Stroke(stroke,
+                        cap = StrokeCap.Round))
                 }
             }
             if (score != null && baseline != null) {
                 // A 2 dp tick across the track at the baseline, drawn at 12 o'clock and turned into place.
                 rotate(FULL_CIRCLE * baseline / MAX_SCORE) {
                     val x = this.size.width / 2
-                    drawLine(notch, Offset(x, -stroke * NOTCH_OVERHANG), Offset(x, stroke * (1 + NOTCH_OVERHANG)), strokeWidth = 2.dp.toPx())
+                    drawLine(notch, Offset(x, -stroke * NOTCH_OVERHANG), Offset(x, stroke * (1 + NOTCH_OVERHANG)),
+                        strokeWidth = 2.dp.toPx())
                 }
             }
         }
@@ -112,7 +114,7 @@ internal fun ComparisonChip(comparison: ComparisonUi, modifier: Modifier = Modif
     Surface(
         modifier = modifier,
         shape = MaterialTheme.shapes.small,
-        color = if (better) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f) else MaterialTheme.colorScheme.surfaceContainerHighest,
+        color = chipColor(better),
         contentColor = if (better) MaterialTheme.colorScheme.primary else DrivePerfTheme.extendedColors.text2,
     ) {
         Row(
@@ -171,7 +173,11 @@ internal fun ScoreBadge(badge: ScoreBadgeUi, modifier: Modifier = Modifier) {
                 Text(
                     it,
                     style = MaterialTheme.typography.labelMedium,
-                    color = if (badge.tone == ComparisonTone.BETTER) MaterialTheme.colorScheme.primary else DrivePerfTheme.extendedColors.text2,
+                    color = if (badge.tone == ComparisonTone.BETTER) {
+                        MaterialTheme.colorScheme.primary
+                    } else {
+                        DrivePerfTheme.extendedColors.text2
+                    },
                 )
             }
         }
@@ -189,7 +195,8 @@ internal fun ContributorRow(contributor: ContributorUi, modifier: Modifier = Mod
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(contributor.label, style = MaterialTheme.typography.titleSmall)
-                contributor.bandText?.let { BandChip(contributor.bandGlyph.orEmpty(), it, contributor.band == com.driveperf.domain.score.Band.SMOOTHER) }
+                contributor.bandText?.let { BandChip(contributor.bandGlyph.orEmpty(), it,
+                    contributor.band == com.driveperf.domain.score.Band.SMOOTHER) }
             }
             Text(contributor.reason, style = MaterialTheme.typography.bodyMedium, color = DrivePerfTheme.extendedColors.text2)
         }
@@ -201,7 +208,7 @@ internal fun ContributorRow(contributor: ContributorUi, modifier: Modifier = Mod
 private fun BandChip(glyph: String, text: String, better: Boolean) {
     Surface(
         shape = MaterialTheme.shapes.small,
-        color = if (better) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f) else MaterialTheme.colorScheme.surfaceContainerHighest,
+        color = chipColor(better),
         contentColor = if (better) MaterialTheme.colorScheme.primary else DrivePerfTheme.extendedColors.text2,
     ) {
         Text("$glyph $text", style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp))
@@ -237,6 +244,11 @@ internal fun EventType.dp(): DpEvent = when (this) {
     EventType.ACCEL -> DpEvent.ACCEL
     EventType.CORNER -> DpEvent.CORNER
 }
+
+/** Better is tinted with the accent; everything else is neutral grey, never red (components.md §4). */
+@Composable
+private fun chipColor(better: Boolean): Color =
+    if (better) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f) else MaterialTheme.colorScheme.surfaceContainerHighest
 
 /** A quiet card colour for the score surfaces. */
 internal val cardColor: Color @Composable get() = MaterialTheme.colorScheme.surfaceContainer

@@ -8,6 +8,7 @@ import com.driveperf.domain.trip.Trip
 import com.driveperf.domain.trip.TripSource
 import com.driveperf.domain.trip.TripStatus
 import com.driveperf.domain.trip.openQuestion
+import com.driveperf.presentation.score.ComparisonCopy
 import com.driveperf.presentation.score.ScoreCopy
 import kotlin.math.roundToInt
 
@@ -101,11 +102,11 @@ internal class TripRows(
      * geocoder in v1, so unnamed places have no label).
      */
     fun label(trip: Trip): String? {
-        trip.labelOverride?.takeIf { it.isNotBlank() }?.let { return it }
-        ScoreCopy.routeName(scores.lines[trip.id]?.route)?.let { return it }
         val from = trip.fromLabel?.takeIf { it.isNotBlank() }
         val to = trip.toLabel?.takeIf { it.isNotBlank() }
-        return if (from != null && to != null) "$from → $to" else null
+        return trip.labelOverride?.takeIf { it.isNotBlank() }
+            ?: ComparisonCopy.routeName(scores.lines[trip.id]?.route)
+            ?: if (from != null && to != null) "$from → $to" else null
     }
 
     fun line(trip: Trip): ScoreLine? = scores.lines[trip.id]

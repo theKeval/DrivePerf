@@ -110,14 +110,9 @@ public class DrivesPresenter(
     override fun dispatch(intent: DrivesIntent) {
         when (intent) {
             is DrivesIntent.Open -> change { it.copy(detailId = intent.tripId, pendingOpened = true, pendingView = Surface.TRIP_DETAIL) }
-            is DrivesIntent.OpenTrip -> emit(DrivesEffect.OpenTrip(intent.tripId))
-            is DrivesIntent.OpenBreakdown -> emit(DrivesEffect.OpenBreakdown(intent.tripId))
-            is DrivesIntent.ShowBreakdown -> change { it.copy(detailId = intent.tripId, pendingView = Surface.BREAKDOWN) }
-            is DrivesIntent.OpenHowScoresWork -> {
-                track("scores_explainer_viewed", "source" to intent.source.key)
-                emit(DrivesEffect.OpenHowScoresWork)
-            }
-            is DrivesIntent.TapContributor -> track("contributor_tapped", "contributor" to intent.contributor.name.lowercase())
+            is DrivesIntent.OpenTrip, is DrivesIntent.OpenBreakdown, is DrivesIntent.ShowBreakdown,
+            is DrivesIntent.OpenHowScoresWork, is DrivesIntent.TapContributor,
+            -> scoreIntent(intent)
             DrivesIntent.CloseDetail -> change { it.copy(detailId = null, qualityId = null) }
             is DrivesIntent.OpenQuality -> change { it.copy(qualityId = intent.tripId) }
             DrivesIntent.CloseQuality -> change { it.copy(qualityId = null) }
@@ -128,6 +123,21 @@ public class DrivesPresenter(
                 scope.launch { port.answerSuspect(intent.tripId, if (intent.yes) SuspectAnswer.YES else SuspectAnswer.NO) }
             }
             is DrivesIntent.Correct -> corrections?.let { port -> scope.launch { port.correct(intent.tripId, intent.to) } }
+        }
+    }
+
+    /** The pushes to the score screens and their analytics (DRIVE-55, DRIVE-87, DRIVE-113). */
+    private fun scoreIntent(intent: DrivesIntent) {
+        when (intent) {
+            is DrivesIntent.OpenTrip -> emit(DrivesEffect.OpenTrip(intent.tripId))
+            is DrivesIntent.OpenBreakdown -> emit(DrivesEffect.OpenBreakdown(intent.tripId))
+            is DrivesIntent.ShowBreakdown -> change { it.copy(detailId = intent.tripId, pendingView = Surface.BREAKDOWN) }
+            is DrivesIntent.OpenHowScoresWork -> {
+                track("scores_explainer_viewed", "source" to intent.source.key)
+                emit(DrivesEffect.OpenHowScoresWork)
+            }
+            is DrivesIntent.TapContributor -> track("contributor_tapped", "contributor" to intent.contributor.name.lowercase())
+            else -> Unit
         }
     }
 
@@ -163,11 +173,12 @@ public class DrivesPresenter(
             inputs.update { it.copy(pendingOpened = false) }
             track("trip_detail_opened", "source" to "drives", "age_bucket" to ageBucket(clock.wallMs() - trip.startedAt))
         }
-        val surface = i.pendingView ?: return
-        if (trip == null) return
-        val detail = i.detailScore?.takeIf { it.tripId == trip.id } ?: return
-        inputs.update { it.copy(pendingView = null) }
-        if (trip.scoresShown && detail.score?.smoothness != null) track("score_viewed", "surface" to surface.key)
+        val surface = i.pendingView
+        val detail = i.detailScore?.takeIf { trip != null && it.tripId == trip.id }
+        if (surface != null && trip != null && detail != null) {
+            inputs.update { it.copy(pendingView = null) }
+            if (trip.scoresShown && detail.score?.smoothness != null) track("score_viewed", "surface" to surface.key)
+        }
     }
 
     private fun track(name: String, vararg properties: Pair<String, String>) {
@@ -205,7 +216,7 @@ public class DrivesPresenter(
         val firstScored = trips.lastOrNull { it.scoresShown && i.lines.lines[it.id]?.smoothness != null }
         return base.copy(
             score = score.score(trip, scoreDetail, firstScoredEver = firstScored?.id == trip.id),
-            breakdown = score.breakdown(trip, scoreDetail),
+            breakdown = TripBreakdown.build(trip, scoreDetail),
             events = score.events(trip, scoreDetail),
             cleanest = score.cleanest(trip, scoreDetail),
             tip = score.tip(scoreDetail),

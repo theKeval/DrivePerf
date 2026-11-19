@@ -93,15 +93,20 @@ class DrivesScoresTest {
         DrivesPresenter(trips, null, MutableStateFlow(UnitSystem.METRIC), JavaTimeFormatter(), clock, backgroundScope, reader, analytics)
 
     private val route = RouteName("r1", null, RoutePreset.COMMUTE)
-    private val brake1 = DrivingEvent("e1", "t", EventType.BRAKE, 120.0, 119.0, 121.4, 1.4, -0.42, null, null, null, 14.0, 0.0, Confidence.HIGH, "smooth-1.0.0")
+    private val brake1 = DrivingEvent("e1", "t", EventType.BRAKE, 120.0, 119.0, 121.4, 1.4, -0.42, null, null, null, 14.0, 0.0,
+        Confidence.HIGH, "smooth-1.0.0")
     private val brake2 = brake1.copy(id = "e2", tPeakS = 600.0, peakG = -0.35, confidence = Confidence.LOW)
     private val corner = brake1.copy(id = "e3", type = EventType.CORNER, tPeakS = 300.0, peakG = 0.4, durationS = 2.0)
 
     private fun contributors(calibrating: Boolean = false) = listOf(
-        Contributor(ContributorId.BRAKING, 70.0, 1.0, Band.ROUGHER.takeUnless { calibrating }, "braking.rougher".takeUnless { calibrating }, listOf("e2", "e1")),
-        Contributor(ContributorId.ACCELERATION, 95.0, 0.1, Band.SMOOTHER.takeUnless { calibrating }, "acceleration.smoother".takeUnless { calibrating }, emptyList()),
-        Contributor(ContributorId.CORNERING, 88.0, 0.4, Band.USUAL.takeUnless { calibrating }, "cornering.usual".takeUnless { calibrating }, listOf("e3")),
-        Contributor(ContributorId.CONSISTENCY, 90.0, 0.2, Band.SMOOTHER.takeUnless { calibrating }, "consistency.smoother".takeUnless { calibrating }, emptyList()),
+        Contributor(ContributorId.BRAKING, 70.0, 1.0, Band.ROUGHER.takeUnless { calibrating },
+            "braking.rougher".takeUnless { calibrating }, listOf("e2", "e1")),
+        Contributor(ContributorId.ACCELERATION, 95.0, 0.1, Band.SMOOTHER.takeUnless { calibrating },
+            "acceleration.smoother".takeUnless { calibrating }, emptyList()),
+        Contributor(ContributorId.CORNERING, 88.0, 0.4, Band.USUAL.takeUnless { calibrating },
+            "cornering.usual".takeUnless { calibrating }, listOf("e3")),
+        Contributor(ContributorId.CONSISTENCY, 90.0, 0.2, Band.SMOOTHER.takeUnless { calibrating },
+            "consistency.smoother".takeUnless { calibrating }, emptyList()),
     )
 
     private fun score(
@@ -111,13 +116,17 @@ class DrivesScoresTest {
         calibrating: Calibrating? = null,
         record: RecordState? = null,
     ) = Score(
-        id, smoothness, smoothness?.toDouble(), if (calibrating == null) 83 else null, if (calibrating == null) smoothness?.minus(83) else null,
+        id, smoothness, smoothness?.toDouble(), if (calibrating == null) 83 else null,
+        if (calibrating == null) smoothness?.minus(83) else null,
         basis, "r1", calibrating, contributors(calibrating != null), null, null,
         Tip("brake_light", TipCategory.BRAKING, "e1", "p1"), record, "smooth-1.0.0", 1L,
     )
 
-    private fun scored(t: Trip, s: Score, events: List<DrivingEvent> = listOf(brake1, brake2, corner), runs: List<Int> = emptyList(), ineligible: IneligibleReason? = null, feedback: Map<String, EventFeedback> = emptyMap()) {
-        reader.details.value += t.id to TripScoreDetail(t.id, s, events.map { it.copy(tripId = t.id) }, feedback, route, ineligible, "GTI", runs)
+    @Suppress("LongParameterList") // one knob per part of the detail the tests vary
+    private fun scored(t: Trip, s: Score, events: List<DrivingEvent> = listOf(brake1, brake2, corner), runs: List<Int> = emptyList(),
+        ineligible: IneligibleReason? = null, feedback: Map<String, EventFeedback> = emptyMap()) {
+        reader.details.value += t.id to TripScoreDetail(t.id, s, events.map { it.copy(tripId = t.id) }, feedback, route, ineligible,
+            "GTI", runs)
     }
 
     @Test
@@ -243,7 +252,8 @@ class DrivesScoresTest {
         val earlier = trip("t0", startedAt = toronto(2026, 10, 14, 8))
         val t = trip(quality = quality(QualityBadge.GOOD).copy(scoredS = 1_980.0)).copy(context = DriveContext.HIGHWAY)
         trips.value = listOf(t, earlier)
-        scored(t, score(smoothness = 80, basis = ScoreBasis.CONTEXT, record = RecordState(true, 78, "t0")), events = emptyList(), ineligible = IneligibleReason.PACE_BAND)
+        scored(t, score(smoothness = 80, basis = ScoreBasis.CONTEXT, record = RecordState(true, 78, "t0")), events = emptyList(),
+            ineligible = IneligibleReason.PACE_BAND)
         val p = presenter()
         p.dispatch(DrivesIntent.Open("t"))
         val d = assertNotNull(p.state.value.detail)
@@ -268,7 +278,8 @@ class DrivesScoresTest {
         val second = trip("t2", startedAt = toronto(2026, 11, 2, 8))
         trips.value = listOf(second, first)
         reader.lines.value = ScoreLines(
-            mapOf("t1" to ScoreLine("t1", 76, null, Calibrating(1, 3), false, null, null), "t2" to ScoreLine("t2", 78, null, Calibrating(2, 3), false, null, null)),
+            mapOf("t1" to ScoreLine("t1", 76, null, Calibrating(1, 3), false, null, null), "t2" to ScoreLine("t2", 78, null,
+                Calibrating(2, 3), false, null, null)),
             0,
         )
         scored(first, score("t1", 76, null, Calibrating(1, 3)))
@@ -376,16 +387,34 @@ class DrivesScoresTest {
     }
 
     @Test
+    fun `a thousand drives render in well under a second`() = runTest(UnconfinedTestDispatcher()) {
+        val many = (0 until 1_000).map { trip("t$it", startedAt = toronto(2026, 11, 10, 8) - it * 3_600_000L,
+            quality = quality(QualityBadge.GOOD)) }
+        reader.lines.value = ScoreLines(many.associate { it.id to ScoreLine(it.id, 70 + it.id.length, 1, null, false, route, "GTI") }, 2)
+        val p = presenter()
+        trips.value = many.drop(1)
+        // DRIVE-126 AC2: building every card and week, warm.
+        val start = System.nanoTime()
+        trips.value = many
+        val ms = (System.nanoTime() - start) / 1_000_000
+        assertEquals(1_000, p.state.value.trips.size)
+        assertEquals(1_000, p.state.value.sections.sumOf { it.rows.size })
+        assertTrue(ms < 1_000, "1,000 drives rendered in $ms ms")
+    }
+
+    @Test
     fun `trip age buckets`() {
         val day = 86_400_000L
-        assertEquals(listOf("lt_1d", "1_7d", "1_7d", "8_30d", "8_30d", "gt_30d"), listOf(0L, day, 7 * day, 8 * day, 30 * day, 31 * day).map(::ageBucket))
+        assertEquals(listOf("lt_1d", "1_7d", "1_7d", "8_30d", "8_30d", "gt_30d"), listOf(0L, day, 7 * day, 8 * day, 30 * day,
+            31 * day).map(::ageBucket))
     }
 
     @Test
     fun `the manual source and the event tags`() = runTest(UnconfinedTestDispatcher()) {
         val t = trip(source = TripSource.MANUAL, quality = quality(QualityBadge.GOOD))
         trips.value = listOf(t)
-        scored(t, score(), feedback = mapOf("e1" to EventFeedback("e1", "t", false, com.driveperf.domain.trip.InaccurateReason.PHONE_MOVED, 1L)))
+        scored(t, score(), feedback = mapOf("e1" to EventFeedback("e1", "t", false,
+            com.driveperf.domain.trip.InaccurateReason.PHONE_MOVED, 1L)))
         val p = presenter()
         p.dispatch(DrivesIntent.Open("t"))
         val d = assertNotNull(p.state.value.detail)
@@ -395,6 +424,7 @@ class DrivesScoresTest {
         assertTrue(rows.getValue("e1").excluded)
         assertEquals("Low confidence", rows.getValue("e2").tag)
         assertNull(rows.getValue("e3").tag)
-        assertEquals("Hard cornering at ${JavaTimeFormatter().time(t.startedAt + 300_000)}. Peak 0.40 g over 2.0 seconds.", rows.getValue("e3").accessibilityLabel)
+        assertEquals("Hard cornering at ${JavaTimeFormatter().time(t.startedAt + 300_000)}. Peak 0.40 g over 2.0 seconds.",
+            rows.getValue("e3").accessibilityLabel)
     }
 }
