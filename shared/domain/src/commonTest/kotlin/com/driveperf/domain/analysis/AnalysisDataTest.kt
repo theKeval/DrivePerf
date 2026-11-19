@@ -103,6 +103,21 @@ class AnalysisDataTest {
     }
 
     @Test
+    fun withoutATraceNoGpsSpansStillBreakThePreviewSpeed() {
+        // Rows every 5 s, all positioned (no gap row), but no GPS from 6 s to 9 s and from 14 s to 16 s (the 15 s row in it).
+        val spans = listOf(ReplaySpan(SegmentStyle.NO_GPS, 6.0, 9.0), ReplaySpan(SegmentStyle.NO_GPS, 14.0, 16.0))
+        val speed = AnalysisDataBuilder.build(20.0, null, null, AnalysisFixtures.preview(5), spans).speed!!.series
+        assertEquals(10.0, speed.valueAt(2.5))
+        assertTrue(speed.valueAt(7.5).isNaN())
+        assertEquals(10.0, speed.valueAt(10.0))
+        assertTrue(speed.valueAt(15.0).isNaN())
+        assertTrue(speed.valueAt(17.0).isNaN())
+        assertEquals(10.0, speed.valueAt(20.0))
+        val bridged = AnalysisDataBuilder.build(20.0, null, null, AnalysisFixtures.preview(5), emptyList()).speed!!.series
+        assertEquals(10.0, bridged.valueAt(7.5))
+    }
+
+    @Test
     fun aTripWithNoFixesHasNoSpeedLaneAndAFlatDistanceAxis() {
         val data = AnalysisDataBuilder.build(5.0, null, AnalysisFixtures.trace(5, fixes = emptyList()), emptyList(), emptyList())
         assertNull(data.speed)

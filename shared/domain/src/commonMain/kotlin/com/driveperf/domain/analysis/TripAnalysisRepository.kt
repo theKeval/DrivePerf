@@ -4,11 +4,15 @@ import com.driveperf.domain.capture.PreviewStore
 import com.driveperf.domain.replay.EventMarker
 import com.driveperf.domain.replay.EventMarkers
 import com.driveperf.domain.replay.Replay
+import com.driveperf.domain.replay.ReplayBuilder
 import com.driveperf.domain.replay.ReplayRepository
+import com.driveperf.domain.replay.ReplaySpan
+import com.driveperf.domain.replay.SegmentStyle
 import com.driveperf.domain.repository.TripRepository
 import com.driveperf.domain.score.Score
 import com.driveperf.domain.trip.DrivingEvent
 import com.driveperf.domain.trip.RawState
+import com.driveperf.domain.trip.SegmentKind
 import com.driveperf.domain.trip.Trip
 import com.driveperf.domain.trip.TripStatus
 import com.driveperf.domain.tripfile.AnalysisFileStore
@@ -48,9 +52,29 @@ public class TripAnalysisRepository(
         val trace = if (trip.rawState == RawState.SUMMARY_ONLY) null else analysisFiles.read(tripId)
         val preview = previews.read(tripId).orEmpty()
         val duration = maxOf(trip.durationS ?: 0.0, replay?.durationS ?: 0.0, trace?.let { it.size.toDouble() / it.rateHz } ?: 0.0)
-        val data = AnalysisDataBuilder.build(duration, trip.distanceM, trace, preview, replay?.spans.orEmpty())
+        val data = AnalysisDataBuilder.build(duration, trip.distanceM, trace, preview, replay?.spans ?: qualitySpans(trip, duration))
         val events = trips.events(tripId)
         val markers = EventMarkers.build(events, trips.feedback(tripId), trip.quality?.spans.orEmpty())
         return TripAnalysis(trip, replay, data, markers, events, trips.score(tripId))
+    }
+
+    /**
+     * The trip's own quality spans, styled and resolved as Replay does them. Used when there is no Replay (a trip with
+     * motion data but no position), so the hatching, the span chips and the G-G exclusion banner still show.
+     */
+    private fun qualitySpans(trip: Trip, duration: Double): List<ReplaySpan> {
+        val raw = trip.quality?.spans.orEmpty().mapNotNull { s ->
+            val style = when (s.kind) {
+                SegmentKind.ESTIMATED -> SegmentStyle.ESTIMATED
+                SegmentKind.GAP, SegmentKind.INTERRUPTED -> SegmentStyle.NO_GPS
+                SegmentKind.EXCLUDED -> SegmentStyle.EXCLUDED
+                SegmentKind.PAUSED -> null
+            }
+            style?.let { st ->
+                val reason = s.reason.takeIf { st == SegmentStyle.EXCLUDED }
+                ReplaySpan(st, s.t0S.coerceIn(0.0, duration), s.t1S.coerceIn(0.0, duration), reason)
+            }
+        }
+        return ReplayBuilder.resolve(raw, duration)
     }
 }

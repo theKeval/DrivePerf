@@ -13,10 +13,16 @@ import com.driveperf.domain.trip.Confidence
 import com.driveperf.domain.trip.DrivingEvent
 import com.driveperf.domain.trip.EventFeedback
 import com.driveperf.domain.trip.EventType
+import com.driveperf.domain.trip.Placement
 import com.driveperf.domain.trip.PreviewRow
+import com.driveperf.domain.trip.QualityBadge
 import com.driveperf.domain.trip.RawState
+import com.driveperf.domain.trip.SegmentKind
+import com.driveperf.domain.trip.SegmentReason
 import com.driveperf.domain.trip.Trip
 import com.driveperf.domain.trip.TripKind
+import com.driveperf.domain.trip.TripQuality
+import com.driveperf.domain.trip.TripSegment
 import com.driveperf.domain.trip.TripSource
 import com.driveperf.domain.trip.TripStatus
 import com.driveperf.domain.tripfile.AnalysisFileStore
@@ -98,6 +104,38 @@ class TripAnalysisRepositoryTest {
         assertEquals(0, files.reads)
         assertTrue(a.data.summaryOnly)
         assertNull(a.replay)
+    }
+
+    @Test
+    fun withoutAReplayTheBandsComeFromTheTripsQualitySpans() = runTest {
+        val spans = listOf(
+            TripSegment(SegmentKind.ESTIMATED, 0.0, 2.0, SegmentReason.ESTIMATED_START),
+            TripSegment(SegmentKind.GAP, 4.0, 6.0, SegmentReason.TUNNEL),
+            TripSegment(SegmentKind.EXCLUDED, 10.0, 15.0, SegmentReason.PHONE_MOVED),
+            TripSegment(SegmentKind.PAUSED, 16.0, 18.0, SegmentReason.USER_PAUSE),
+            TripSegment(SegmentKind.INTERRUPTED, 18.0, 30.0, SegmentReason.APP_KILLED),
+        )
+        val quality = TripQuality(
+            QualityBadge.USABLE, null, Placement.MOUNTED, 50.0, 0.0, null, null, 13.0, 5.0, 20.0, spans,
+        )
+        // Motion data, but no positioned fix and no preview: the Replay builder has nothing to draw.
+        val trace = AnalysisFixtures.trace(20, fixes = emptyList())
+        val trips = FakeTrips(trip().copy(quality = quality), emptyList())
+        val repo = TripAnalysisRepository(trips, replays(null), FakeFiles(trace), FakePreviews(null))
+        val a = repo.analysis("t1")!!
+        assertNull(a.replay)
+        assertEquals(
+            listOf(
+                ReplaySpan(SegmentStyle.ESTIMATED, 0.0, 2.0),
+                ReplaySpan(SegmentStyle.NO_GPS, 4.0, 6.0),
+                ReplaySpan(SegmentStyle.EXCLUDED, 10.0, 15.0, SegmentReason.PHONE_MOVED),
+                ReplaySpan(SegmentStyle.NO_GPS, 18.0, 20.0),
+            ),
+            a.data.bands,
+        )
+        assertEquals(2.0, a.data.estimatedUntilS)
+        assertNull(a.data.gg.dotAt(12.0))
+        assertTrue(a.data.gg.moments > 0)
     }
 
     @Test

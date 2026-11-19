@@ -89,7 +89,7 @@ public object AnalysisDataBuilder {
                 AnalysisData(durationS, p.speed, p.lon, p.lat, p.jerk, elevation, spans, p.distance, false, p.gg)
             }
         } else {
-            fromPreview(durationS, distanceM, preview).let { p ->
+            fromPreview(durationS, distanceM, preview, noGps).let { p ->
                 AnalysisData(durationS, p.speed, p.lon, p.lat, null, elevation, spans, p.distance, true, p.gg)
             }
         }
@@ -124,7 +124,7 @@ public object AnalysisDataBuilder {
             Series.uniform(cloudRate, decimate(trace.lonG, block, scorable), (block - 1) / (2 * rate)),
         )
         val fixes = trace.fixes.sortedBy { it.tS }
-        val speed = speedTrack(fixes.map { it.tS }, fixes.map { it.speedMps }, noGps)
+        val speed = speedTrack(fixes.map { it.tS }, fixes.map { it.speedMps }, noGps, MAX_FIX_GAP_S)
         val positioned = fixes.filter { it.lat != null && it.lng != null }
         val distance = distanceAxis(
             positioned.map { it.tS },
@@ -143,7 +143,11 @@ public object AnalysisDataBuilder {
         )
     }
 
-    private fun fromPreview(durationS: Double, distanceM: Double?, rows: List<PreviewRow>): Parts {
+    /**
+     * The preview's rows are positioned fixes, ≤ 400 of them, so an outage need not leave a gap row: [noGps] breaks the
+     * speed line as on the trace path. Its rows are far apart on a long trip, so their spacing alone breaks nothing.
+     */
+    private fun fromPreview(durationS: Double, distanceM: Double?, rows: List<PreviewRow>, noGps: List<ReplaySpan>): Parts {
         val sorted = rows.sortedBy { it.tS }
         val times = sorted.map { it.tS }
         fun channel(pick: (PreviewRow) -> Double?): List<Double> =
@@ -155,7 +159,7 @@ public object AnalysisDataBuilder {
         )
         val real = sorted.filter { it.quality != GAP_ROW }
         return Parts(
-            track(times, channel { it.speedMps }),
+            speedTrack(times, channel { it.speedMps }, noGps, Double.POSITIVE_INFINITY),
             track(times, channel { it.lonG }),
             track(times, channel { it.latG }),
             null,
@@ -167,22 +171,25 @@ public object AnalysisDataBuilder {
     private fun track(times: List<Double>, values: List<Double>): ChannelTrack? =
         if (values.all { it.isNaN() }) null else ChannelTrack(Series.sampled(times.toDoubleArray(), values.toDoubleArray()))
 
-    /** The fixes' speed, with a `NaN` sample between two fixes too far apart or across a no-GPS span. */
-    private fun speedTrack(times: List<Double>, speeds: List<Double>, noGps: List<ReplaySpan>): ChannelTrack? {
-        if (times.isEmpty()) return null
+    /**
+     * The fixes' speed, with a `NaN` sample between two fixes more than [maxGapS] apart or across a no-GPS span; a
+     * sample inside a no-GPS span is `NaN` too, so the cursor reads no speed there.
+     */
+    private fun speedTrack(times: List<Double>, speeds: List<Double>, noGps: List<ReplaySpan>, maxGapS: Double): ChannelTrack? {
+        if (speeds.all { it.isNaN() }) return null
         val t = ArrayList<Double>(times.size + 8)
         val v = ArrayList<Double>(times.size + 8)
         for (i in times.indices) {
             if (i > 0) {
                 val a = times[i - 1]
                 val b = times[i]
-                if (b - a > MAX_FIX_GAP_S || noGps.any { it.t0S < b && it.t1S > a }) {
+                if (b - a > maxGapS || noGps.any { it.t0S < b && it.t1S > a }) {
                     t += (a + b) / 2
                     v += Double.NaN
                 }
             }
             t += times[i]
-            v += speeds[i]
+            v += if (noGps.any { times[i] > it.t0S && times[i] < it.t1S }) Double.NaN else speeds[i]
         }
         return ChannelTrack(Series.sampled(t.toDoubleArray(), v.toDoubleArray()))
     }
