@@ -2,6 +2,7 @@ package com.driveperf.platform.capture
 
 import android.app.Activity
 import android.app.Notification
+import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.ComponentName
 import android.content.Intent
@@ -58,6 +59,30 @@ class AutoTripNoticesTest {
 
         tracker.onRecordingNoticeShown(autoTrip.copy(tripId = "hidden"), visible = false)
         assertEquals(1, analytics.names.size) // notifications off: only the Task Manager shows the service
+    }
+
+    @Test
+    fun `the notice is visible only with notifications on and its channel not blocked`() {
+        CaptureNotifications(context).ensureChannel()
+        assertTrue(context.isRecordingNoticeVisible(isManual = false))
+
+        // The user blocks only "Automatic drive recording": the app's notifications stay on.
+        manager.deleteNotificationChannel(CaptureNotifications.AUTO_CHANNEL_ID)
+        manager.createNotificationChannel(
+            NotificationChannel(CaptureNotifications.AUTO_CHANNEL_ID, "Automatic drive recording", NotificationManager.IMPORTANCE_NONE),
+        )
+        assertTrue(manager.areNotificationsEnabled())
+        assertFalse(context.isRecordingNoticeVisible(isManual = false))
+        assertTrue(context.isRecordingNoticeVisible(isManual = true))
+
+        // So the tracker is told the notice is hidden and reports nothing, yet still hands over the ended trip.
+        val tracker = AutoTripNoticeTracker(analytics)
+        tracker.onRecordingNoticeShown(autoTrip, context.isRecordingNoticeVisible(autoTrip.isManual))
+        assertEquals(emptyList<String>(), analytics.names)
+        assertEquals("auto", tracker.takeEndedTrip())
+
+        shadowOf(manager).setNotificationsEnabled(false)
+        assertFalse(context.isRecordingNoticeVisible(isManual = true))
     }
 
     @Test

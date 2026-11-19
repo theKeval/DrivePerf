@@ -122,8 +122,17 @@ final class CoreTripRecorder: TripRecording, TripHistory {
     private var activityRecoveryAttemptID: String?
     private(set) var isStartingFromIntent = false
     var surfaceData: TripSurfaceData?
-    /// Set by the composition root once the core has started (DRIVE-137).
-    var trackNotice: ((AutoTripNoticeEvent) -> Void)?
+    /// Set by the composition root once the core has started (DRIVE-137). A tap that cold-launches the app arrives
+    /// before that, so events are held until it is set, then sent in order.
+    var trackNotice: ((AutoTripNoticeEvent) -> Void)? {
+        didSet {
+            guard let trackNotice else { return }
+            let held = heldNoticeEvents
+            heldNoticeEvents = []
+            held.forEach(trackNotice)
+        }
+    }
+    private var heldNoticeEvents: [AutoTripNoticeEvent] = []
     var liveActivitiesEnabled: Bool { liveSurface?.activitiesEnabled ?? false }
     private var statusObservers: [UUID: AsyncStream<RecorderStatus>.Continuation] = [:]
     private var historyObservers: [UUID: AsyncStream<[TripSummary]>.Continuation] = [:]
@@ -325,7 +334,7 @@ final class CoreTripRecorder: TripRecording, TripHistory {
     private func postRecordingNotice(tripID: String, automatic: Bool) {
         guard notifiedTripId == nil else { return }
         notifier?.postRecordingNotice(tripId: tripID, automatic: automatic) { [weak self] in
-            if automatic { self?.trackNotice?(.posted) }
+            if automatic { self?.track(.posted) }
         }
         notifiedTripId = tripID
         notifiedAutomaticTrip = automatic
@@ -333,7 +342,11 @@ final class CoreTripRecorder: TripRecording, TripHistory {
 
     /// The user opened the app from the automatic trip's notice (`auto_trip_notification_tapped`).
     func autoTripNoticeOpened() {
-        trackNotice?(.tapped)
+        track(.tapped)
+    }
+
+    private func track(_ event: AutoTripNoticeEvent) {
+        if let trackNotice { trackNotice(event) } else { heldNoticeEvents.append(event) }
     }
 
     private func endSurfaces() {

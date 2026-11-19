@@ -33,6 +33,17 @@ data object AutoTripNotificationTapped : AnalyticsEvent {
 }
 
 /**
+ * Whether the user can see the recording notice: notifications are on for the app and the notice's channel is not
+ * blocked. Either off leaves only the Task Manager entry (F-CAP-11 edge case), so the notice is not counted as posted.
+ */
+fun Context.isRecordingNoticeVisible(isManual: Boolean): Boolean {
+    val manager = getSystemService(NotificationManager::class.java)
+    if (!manager.areNotificationsEnabled()) return false
+    val channel = manager.getNotificationChannel(if (isManual) CaptureNotifications.CHANNEL_ID else CaptureNotifications.AUTO_CHANNEL_ID)
+    return channel == null || channel.importance != NotificationManager.IMPORTANCE_NONE
+}
+
+/**
  * The automatic trip's recording notice (S-LIVE-09, DRIVE-137) across the foreground service's lifetime: it reports
  * `auto_trip_notification_posted` once per confirmed automatic trip, and remembers that trip so the service can replace
  * the notice with "Drive decoded." when the trip ends (AC3). A candidate is never a trip here; manual trips have their

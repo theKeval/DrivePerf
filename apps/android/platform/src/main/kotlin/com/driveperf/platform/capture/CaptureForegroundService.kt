@@ -80,7 +80,7 @@ class CaptureForegroundService : Service() {
         val recording = recordingNotification(status)
         val notification = recording ?: notifications.buildStarting(isManualStart)
         startForeground(CaptureNotifications.NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION)
-        if (recording != null) autoNotices.onRecordingNoticeShown(status, notificationsVisible())
+        if (recording != null) autoNotices.onRecordingNoticeShown(status, isRecordingNoticeVisible(status.isManual))
         foreground = true
         // A wake the core drops at once (stale, auto detection off) never leaves idle: end after a grace period.
         idleTimeout?.cancel()
@@ -104,7 +104,7 @@ class CaptureForegroundService : Service() {
                 idleTimeout?.cancel()
                 recordingNotification(status, force = unitsChanged)?.let { notification ->
                     getSystemService(NotificationManager::class.java).notify(CaptureNotifications.NOTIFICATION_ID, notification)
-                    autoNotices.onRecordingNoticeShown(status, notificationsVisible())
+                    autoNotices.onRecordingNoticeShown(status, isRecordingNoticeVisible(status.isManual))
                 }
             } else if (active) {
                 val endedAutoTrip = autoNotices.takeEndedTrip()
@@ -121,8 +121,6 @@ class CaptureForegroundService : Service() {
         if (started == null || (!force && !rateLimit.shouldPost(status, clock.monotonicNs()))) return null
         return notifications.build(status, started, fixes.status(), nowWallMs)
     }
-
-    private fun notificationsVisible(): Boolean = getSystemService(NotificationManager::class.java).areNotificationsEnabled()
 
     private fun endIfIdle() {
         if (recorder.status.value.state == RecorderState.IDLE) endService()

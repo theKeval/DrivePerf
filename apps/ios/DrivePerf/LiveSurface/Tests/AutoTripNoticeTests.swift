@@ -79,6 +79,23 @@ final class AutoTripNoticeTests: XCTestCase {
         XCTAssertEqual(events, [.posted, .tapped], "the manual notice's tap is not counted")
     }
 
+    func testATapThatColdLaunchesTheAppIsCountedOnceAnalyticsIsAttached() async {
+        // AppDelegate forwards the tap before AppEnvironment.finishLaunch has set trackNotice.
+        let recorder = CoreTripRecorder(liveSurface: nil, notifier: notifier, autoDetectEnabled: true)
+        let router = TripSurfaceRouter()
+        let opening = Task { await router.open(.autoRecording("t1"), recorder: recorder) }
+        for _ in 0..<20 { await Task.yield() } // let the tap reach the recorder
+        XCTAssertEqual(events, [])
+
+        recorder.trackNotice = { [weak self] in self?.events.append($0) }
+        XCTAssertEqual(events, [.tapped], "the held tap is sent when analytics is attached")
+        recorder.attach(core)
+        core.send(status(.recording, manual: false))
+        await opening.value
+        await waitUntil("the notice is posted") { events.count == 2 }
+        XCTAssertEqual(events, [.tapped, .posted])
+    }
+
     func testEventNamesMatchTheTicket() {
         XCTAssertEqual(AutoTripNoticeEvent.allCases.map(\.rawValue), ["auto_trip_notification_posted", "auto_trip_notification_tapped"])
         XCTAssertEqual(NoticeAnalyticsEvent(.tapped).name, "auto_trip_notification_tapped")
