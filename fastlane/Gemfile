@@ -1,0 +1,7 @@
+# Fastlane for the release lanes (DRIVE-218, ADR-008). Kept inside fastlane/ so the repository root stays free of
+# Ruby files. Run from the repository root:
+#   BUNDLE_GEMFILE=fastlane/Gemfile bundle install
+#   BUNDLE_GEMFILE=fastlane/Gemfile bundle exec fastlane lanes
+source "https://rubygems.org"
+
+gem "fastlane", "2.242.0"
