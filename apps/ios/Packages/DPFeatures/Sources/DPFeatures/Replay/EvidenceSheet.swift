@@ -72,6 +72,8 @@ struct ReplayPinSheetView: View {
         .padding(DPSpace.s5)
         .presentationDetents([.fraction(0.42), .medium])
         .presentationCompactAdaptation(.sheet)
+        // `.contain` first, or the container identifier replaces every child's (the Jump button's included).
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("replay.pinSheet")
     }
 }
@@ -106,6 +108,7 @@ struct EvidenceSheetView: View {
             if let sheet = model.state.neededSheet { NeededSheetView(sheet: sheet, model: model) }
         }
         .task { await model.observe() }
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("evidence.sheet")
     }
 
@@ -279,15 +282,45 @@ struct EvidenceTipCard: View {
 
 /// The ±10 s trace (F-RPL-04 AC1) in Swift Charts: speed (neutral) on top, longitudinal (solid) and lateral (dashed) G
 /// below, start and end guides and the peak rule. Patterns, not colour, tell the lines apart.
+/// One point of a chart line and the unbroken run it belongs to. An absent R1 sample (NaN) ends a run and is left out,
+/// so each run is its own series and the gap stays empty instead of the whole line failing to draw.
+struct ChartRunPoint: Identifiable, Equatable {
+    let id: Int
+    let run: Int
+    let x: Double
+    let y: Double
+
+    static func runs(_ points: [(x: Double, y: Double)]) -> [ChartRunPoint] {
+        var run = 0
+        var open = false
+        var result: [ChartRunPoint] = []
+        for (index, point) in points.enumerated() {
+            guard point.x.isFinite, point.y.isFinite else {
+                if open { run += 1 }
+                open = false
+                continue
+            }
+            result.append(ChartRunPoint(id: index, run: run, x: point.x, y: point.y))
+            open = true
+        }
+        return result
+    }
+}
+
 struct EvidenceTraceChart: View {
     let trace: EvidenceTraceInfo
     let speedUnit: String
 
     var body: some View {
+        let speed = ChartRunPoint.runs(trace.speed.map { ($0.tS - trace.tPeakS, $0.value) })
+        let lon = ChartRunPoint.runs(trace.g.map { ($0.tS - trace.tPeakS, $0.lonG) })
+        let lat = ChartRunPoint.runs(trace.g.map { ($0.tS - trace.tPeakS, $0.latG) })
         VStack(alignment: .leading, spacing: DPSpace.s1_5) {
-            Chart(trace.speed, id: \.tS) { s in
-                LineMark(x: .value("Time", s.tS - trace.tPeakS), y: .value("Speed", s.value))
-                    .foregroundStyle(DPColor.Data.speed)
+            Chart {
+                ForEach(speed) { s in
+                    LineMark(x: .value("Time", s.x), y: .value("Speed", s.y), series: .value("Run", "Speed \(s.run)"))
+                        .foregroundStyle(DPColor.Data.speed)
+                }
                 RuleMark(x: .value("Peak", 0)).foregroundStyle(DPColor.Data.cursor.opacity(0.6))
             }
             .chartXScale(domain: -10.0...10.0)
@@ -295,11 +328,13 @@ struct EvidenceTraceChart: View {
             .chartYAxis { AxisMarks(position: .leading, values: .automatic(desiredCount: 2)) }
             .frame(height: 44)
             Chart {
-                ForEach(trace.g, id: \.tS) { g in
-                    LineMark(x: .value("Time", g.tS - trace.tPeakS), y: .value("G", g.lonG), series: .value("Axis", "Long"))
+                ForEach(lon) { g in
+                    LineMark(x: .value("Time", g.x), y: .value("G", g.y), series: .value("Axis", "Long \(g.run)"))
                         .foregroundStyle(ReplayDataColor.longG)
                         .lineStyle(StrokeStyle(lineWidth: 2))
-                    LineMark(x: .value("Time", g.tS - trace.tPeakS), y: .value("G", g.latG), series: .value("Axis", "Lat"))
+                }
+                ForEach(lat) { g in
+                    LineMark(x: .value("Time", g.x), y: .value("G", g.y), series: .value("Axis", "Lat \(g.run)"))
                         .foregroundStyle(ReplayDataColor.latG)
                         .lineStyle(StrokeStyle(lineWidth: 2, dash: [6, 3]))
                 }
@@ -385,6 +420,7 @@ struct NeededSheetView: View {
         }
         .padding(DPSpace.s5)
         .presentationDetents([.medium])
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("needed.sheet")
     }
 }

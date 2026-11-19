@@ -31,6 +31,7 @@ struct TipDetailView: View {
         .task { await model.observe() }
         .task { await model.observeNavigation() }
         .onChange(of: model.finished) { _, finished in if finished { onDone() } }
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("tip.detail")
     }
 
@@ -59,12 +60,13 @@ struct TipDetailView: View {
         }
         section(s.words.whyThisOne) {
             Text(s.why).font(DPFont.body).fixedSize(horizontal: false, vertical: true)
-            if !s.sparkline.isEmpty {
-                Chart(Array(s.sparkline.enumerated()), id: \.offset) { item in
-                    LineMark(x: .value("Sample", item.offset), y: .value("Long G", item.element))
+            let spark = ChartRunPoint.runs(s.sparkline.enumerated().map { (Double($0.offset), $0.element) })
+            if !spark.isEmpty {
+                Chart(spark) { item in
+                    LineMark(x: .value("Sample", item.x), y: .value("Long G", item.y), series: .value("Run", item.run))
                         .foregroundStyle(ReplayDataColor.longG)
-                    if item.offset == s.sparklinePeakIndex {
-                        PointMark(x: .value("Sample", item.offset), y: .value("Long G", item.element))
+                    if item.id == s.sparklinePeakIndex {
+                        PointMark(x: .value("Sample", item.x), y: .value("Long G", item.y))
                             .foregroundStyle(ReplayDataColor.longG)
                     }
                 }

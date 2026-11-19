@@ -21,6 +21,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class EventEvidenceTest {
     /** 60 s at 5 Hz: lonG = −k/100, latG = k/200, one fix per second at 20 − t/3 m/s. */
@@ -54,6 +55,21 @@ class EventEvidenceTest {
         assertEquals(31.0, evidence.tEndS)
         assertEquals(2.0, evidence.maxAbsG, 1e-9)
         assertEquals(20 - 20 / 3.0, evidence.maxSpeedMps, 1e-9)
+    }
+
+    @Test
+    fun anAbsentSampleStaysAGapAndDoesNotPoisonTheRanges() {
+        // AnalysisFileCodec decodes an absent sample as NaN: here the window's largest |G| and fastest fix.
+        val base = trace()
+        val lonG = base.lonG.copyOf().also { it[200] = Double.NaN }
+        val fixes = base.fixes.map { if (it.tS == 20.0) it.copy(speedMps = Double.NaN) else it }
+        val gappy = AnalysisTrace(base.rateHz, lonG, base.latG, base.vertG, base.yawDps, base.quality, fixes)
+        val evidence = assertNotNull(EvidenceWindows.cut(gappy, event(30.0)))
+        assertTrue(evidence.g.last().lonG.isNaN(), "the gap reaches the chart, which leaves it undrawn")
+        assertEquals(1.99, evidence.maxAbsG, 1e-9)
+        assertEquals(20 - 21 / 3.0, evidence.maxSpeedMps, 1e-9)
+        val allAbsent = EventEvidence("e", 0.0, 1.0, 0.0, 0.5, 1.0, listOf(EvidenceSample(0.5, Double.NaN, Double.NaN)), emptyList())
+        assertEquals(0.0, allAbsent.maxAbsG)
     }
 
     @Test

@@ -65,7 +65,8 @@ enum SyntheticReplay {
         }
         let stopAt = (d * 0.5).rounded()
         let stop = at(stopAt)
-        let maxAt = (d * 0.55).rounded()
+        // Far enough from the stop that the two 44 pt pins never overlap on a phone-width canvas.
+        let maxAt = (d * 0.65).rounded()
         let max = at(maxAt)
         let elevation = stride(from: 0.0, through: d, by: d / 40).map {
             DrivePerfShared.ElevationPoint(tS: $0, elevM: 80 + 30 * sin($0 / d * .pi * 2))

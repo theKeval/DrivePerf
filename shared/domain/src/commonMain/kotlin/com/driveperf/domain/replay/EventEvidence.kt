@@ -9,7 +9,10 @@ import kotlin.math.abs
 import kotlin.math.ceil
 import kotlin.math.floor
 
-/** One motion sample of an evidence window: longitudinal and lateral G in the vehicle frame, at [tS] trip seconds. */
+/**
+ * One motion sample of an evidence window: longitudinal and lateral G in the vehicle frame, at [tS] trip seconds. Either
+ * axis is NaN where the R1 file has no sample; charts leave a gap there.
+ */
 public data class EvidenceSample(val tS: Double, val lonG: Double, val latG: Double)
 
 /** One gated GNSS speed of an evidence window, at [tS] trip seconds. */
@@ -29,11 +32,15 @@ public data class EventEvidence(
     val g: List<EvidenceSample>,
     val speed: List<EvidenceSpeed>,
 ) {
-    /** The largest |G| on either axis in the window, for the chart's symmetric range. */
-    public val maxAbsG: Double get() = g.maxOfOrNull { maxOf(abs(it.lonG), abs(it.latG)) } ?: 0.0
+    /**
+     * The largest |G| on either axis in the window, for the chart's symmetric range. An absent sample is NaN in the R1
+     * file (`AnalysisFileCodec`), so only finite values count; charts draw absent samples as gaps.
+     */
+    public val maxAbsG: Double
+        get() = g.flatMap { listOf(it.lonG, it.latG) }.filter { it.isFinite() }.maxOfOrNull { abs(it) } ?: 0.0
 
-    /** The fastest speed in the window, for the speed lane's range. */
-    public val maxSpeedMps: Double get() = speed.maxOfOrNull { it.speedMps } ?: 0.0
+    /** The fastest finite speed in the window, for the speed lane's range. */
+    public val maxSpeedMps: Double get() = speed.map { it.speedMps }.filter { it.isFinite() }.maxOrNull() ?: 0.0
 }
 
 /** Cuts evidence windows out of a trip's R1 file (pipeline-and-scoring.md §0.3: the trace is not stored per event). */

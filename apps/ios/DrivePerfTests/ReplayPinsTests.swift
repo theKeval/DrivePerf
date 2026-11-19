@@ -115,6 +115,25 @@ final class ReplayPinsTests: XCTestCase {
         model.isNeededSheetShown = false
         XCTAssertEqual(evidence.actions.last, .dismissNeeded)
     }
+
+    /// A tap on the tick lane within 22 pt of an event tick opens that event; lower down, or further away, it seeks.
+    func testATapOnAnEventTickOpensThatEvent() {
+        let ticks = FakeOverlay().ticks
+        let size = CGSize(width: 300, height: 28)
+        // e1 peaks at 165 s of 300 s: x = 165.
+        XCTAssertEqual(ReplayScrubber.tickHit(at: CGPoint(x: 150, y: 4), size: size, ticks: ticks, durationS: 300), "e1")
+        XCTAssertNil(ReplayScrubber.tickHit(at: CGPoint(x: 140, y: 4), size: size, ticks: ticks, durationS: 300))
+        XCTAssertNil(ReplayScrubber.tickHit(at: CGPoint(x: 165, y: 20), size: size, ticks: ticks, durationS: 300))
+        XCTAssertNil(ReplayScrubber.tickHit(at: CGPoint(x: 165, y: 4), size: size, ticks: ticks, durationS: 0))
+    }
+
+    /// An absent R1 sample (NaN) ends a chart run and is left out, so the trace and sparkline draw a gap.
+    func testAnAbsentSampleSplitsTheChartLine() {
+        let runs = ChartRunPoint.runs([(0, 1), (1, .nan), (2, .nan), (3, 4), (4, 5), (5, .nan)])
+        XCTAssertEqual(runs.map(\.run), [0, 1, 1])
+        XCTAssertEqual(runs.map(\.id), [0, 3, 4], "ids stay the sample index, for the sparkline's peak")
+        XCTAssertTrue(ChartRunPoint.runs([(0, .nan)]).isEmpty)
+    }
 }
 
 /// One braking event at 165 s, one stop at 50 s; distance is 10 m per second, speed is 10 m/s.

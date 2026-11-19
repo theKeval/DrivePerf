@@ -90,13 +90,38 @@ private struct ReplayTimeLabels: View {
 }
 
 /// 4 pt track, played part in the route colour, span marks under it (estimated dashed, no GPS as a gap, excluded
-/// hatched), a 16 pt thumb that grows to 22 while dragging with the time above it. Adjustable ±30 s.
+/// hatched), a 16 pt thumb that grows to 22 while dragging with the time above it. Adjustable ±30 s. A tap on an
+/// event tick opens that event's evidence; a drag from anywhere scrubs.
 struct ReplayScrubber: View {
     let model: ReplayViewModel
     /// The event tick the drag last snapped to, for the selection haptic.
     @State private var snapped: String?
 
+    /// Half the 44 pt target of an event tick.
+    static let tickReach: CGFloat = 22
+    /// Below this much movement a touch is a tap, not a drag.
+    static let tapSlop: CGFloat = 4
+
     var body: some View {
+        scrubber.overlay {
+            if let overlay = model.overlay, !overlay.ticks.isEmpty {
+                ReplayTickTargets(model: model, ticks: overlay.ticks)
+            }
+        }
+    }
+
+    /// The event a tap at `location` opens: a tap on the tick lane (the scrubber's upper half, where event ticks sit)
+    /// within `tickReach` of a tick. Elsewhere a tap seeks, as before.
+    static func tickHit(
+        at location: CGPoint, size: CGSize, ticks: [ReplayEventPinInfo], durationS: Double
+    ) -> String? {
+        guard durationS > 0, location.y < size.height / 2 else { return nil }
+        func distance(_ tick: ReplayEventPinInfo) -> CGFloat { abs(size.width * tick.tPeakS / durationS - location.x) }
+        guard let near = ticks.min(by: { distance($0) < distance($1) }), distance(near) <= tickReach else { return nil }
+        return near.id
+    }
+
+    private var scrubber: some View {
         GeometryReader { geometry in
             let width = max(geometry.size.width, 1)
             let x = width * model.progress
@@ -127,9 +152,16 @@ struct ReplayScrubber: View {
             .gesture(
                 DragGesture(minimumDistance: 0)
                     .onChanged { value in model.scrub(to: snap(value.location.x, width: width)) }
-                    .onEnded { _ in
+                    .onEnded { value in
                         snapped = nil
                         model.endScrub()
+                        let moved = hypot(value.translation.width, value.translation.height)
+                        if moved < Self.tapSlop, let ticks = model.overlay?.ticks,
+                            let id = Self.tickHit(
+                                at: value.startLocation, size: geometry.size, ticks: ticks, durationS: model.durationS)
+                        {
+                            model.selectEvent(id)
+                        }
                     })
             .sensoryFeedback(.selection, trigger: snapped) { _, new in new != nil }
         }
@@ -172,6 +204,30 @@ struct ReplayScrubber: View {
         }
         snapped = nil
         return t
+    }
+}
+
+/// VoiceOver, Voice Control and Switch Control: each event tick is a 44 pt button that opens its evidence, read after
+/// the scrubber. Touches pass through to the scrubber, whose gesture tells a tap on a tick from a drag.
+private struct ReplayTickTargets: View {
+    let model: ReplayViewModel
+    let ticks: [ReplayEventPinInfo]
+
+    var body: some View {
+        GeometryReader { geometry in
+            ForEach(ticks) { tick in
+                Color.clear
+                    .frame(width: ReplayScrubber.tickReach * 2, height: ReplayScrubber.tickReach * 2)
+                    .position(
+                        x: geometry.size.width * tick.tPeakS / max(model.durationS, 1), y: geometry.size.height / 2 - 12)
+                    .accessibilityElement()
+                    .accessibilityLabel("\(tick.accessibilityLabel) Opens the evidence.")
+                    .accessibilityAddTraits(.isButton)
+                    .accessibilityIdentifier("replay.eventTick")
+                    .accessibilityAction { model.selectEvent(tick.id) }
+            }
+        }
+        .allowsHitTesting(false)
     }
 }
 

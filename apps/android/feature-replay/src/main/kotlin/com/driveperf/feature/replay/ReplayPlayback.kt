@@ -50,7 +50,10 @@ internal fun PlaybackBar(state: ReplayUiState.Ready, time: DoubleState, controls
             }
             val overlay = state.overlay
             val ticks = remember(overlay) {
-                overlay?.let { o -> ScrubberTicks(o.ticks.map { it.marker }, o.details.stops) } ?: ScrubberTicks.None
+                overlay?.let { o ->
+                    val labels = o.ticks.associate { it.marker.eventId to it.accessibilityLabel }
+                    ScrubberTicks(o.ticks.map { it.marker }, o.details.stops, labels)
+                } ?: ScrubberTicks.None
             }
             ReplayScrubber(time, state.replay, state.scrubbing, controls, ticks = ticks)
             TimeLabels(time, state.replay.durationS)

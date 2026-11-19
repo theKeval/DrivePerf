@@ -93,9 +93,27 @@ internal fun EvidenceChart(evidence: EventEvidence, speedPerMps: Double, summary
     }
 }
 
-/** A path through [points] in order. */
+/** A path through [points] in order, broken wherever a point is absent (NaN in the R1 file) so the gap stays empty. */
 private fun polyline(points: List<Offset>): Path = Path().apply {
-    points.forEachIndexed { i, p -> if (i == 0) moveTo(p.x, p.y) else lineTo(p.x, p.y) }
+    for (run in finiteRuns(points)) {
+        run.forEachIndexed { i, p -> if (i == 0) moveTo(p.x, p.y) else lineTo(p.x, p.y) }
+    }
+}
+
+/** [points] split at every non-finite point, which is left out; a run of one point draws nothing. */
+internal fun finiteRuns(points: List<Offset>): List<List<Offset>> {
+    val runs = mutableListOf<List<Offset>>()
+    var run = mutableListOf<Offset>()
+    for (p in points) {
+        if (p.x.isFinite() && p.y.isFinite()) {
+            run += p
+        } else if (run.isNotEmpty()) {
+            runs += run
+            run = mutableListOf()
+        }
+    }
+    if (run.isNotEmpty()) runs += run
+    return runs
 }
 
 @Composable
@@ -125,15 +143,17 @@ internal fun Sparkline(values: List<Double>, peakIndex: Int, modifier: Modifier 
     val grid = MaterialTheme.colorScheme.outlineVariant
     Spacer(
         modifier.fillMaxWidth().height(48.dp).drawWithCache {
-            val range = maxOf(values.maxOfOrNull { abs(it) } ?: 0.0, MIN_G_RANGE)
+            val range = maxOf(values.filter { it.isFinite() }.maxOfOrNull { abs(it) } ?: 0.0, MIN_G_RANGE)
             val step = size.width / (values.size - 1).coerceAtLeast(1)
             fun y(v: Double) = (size.height / 2 - v / range * size.height / 2 * 0.9).toFloat()
-            val path = Path().apply { values.forEachIndexed { i, v -> if (i == 0) moveTo(0f, y(v)) else lineTo(i * step, y(v)) } }
+            val path = polyline(values.mapIndexed { i, v -> Offset(i * step, y(v)) })
             val stroke = Stroke(2.dp.toPx(), cap = StrokeCap.Round)
             onDrawBehind {
                 drawLine(grid, Offset(0f, size.height / 2), Offset(size.width, size.height / 2), 1.dp.toPx())
                 drawPath(path, data.longG, style = stroke)
-                values.getOrNull(peakIndex)?.let { drawCircle(data.longG, 3.5.dp.toPx(), Offset(peakIndex * step, y(it))) }
+                values.getOrNull(peakIndex)?.takeIf { it.isFinite() }?.let {
+                    drawCircle(data.longG, 3.5.dp.toPx(), Offset(peakIndex * step, y(it)))
+                }
             }
         },
     )

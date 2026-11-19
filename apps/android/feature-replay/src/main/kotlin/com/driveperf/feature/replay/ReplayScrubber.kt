@@ -3,16 +3,21 @@ package com.driveperf.feature.replay
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.size
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DoubleState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -21,9 +26,9 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Fill
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -36,9 +41,12 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.ProgressBarRangeInfo
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.customActions
+import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.progressBarRangeInfo
+import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.setProgress
 import androidx.compose.ui.unit.Density
@@ -61,8 +69,11 @@ internal const val SCRUBBER_TAG = "replay_scrubber"
 private const val STEP_S = 30.0
 private const val SECONDS_PER_MINUTE = 60f
 
-/** Event ticks and stop ticks on the scrubber, at the same times as the map pins (F-RPL-03 AC3, F-RPL-02 AC3). */
-internal class ScrubberTicks(val events: List<EventMarker>, val stops: List<StopPin>) {
+/**
+ * Event ticks and stop ticks on the scrubber, at the same times as the map pins (F-RPL-03 AC3, F-RPL-02 AC3). [labels]
+ * are the event pins' TalkBack labels by event id.
+ */
+internal class ScrubberTicks(val events: List<EventMarker>, val stops: List<StopPin>, val labels: Map<String, String> = emptyMap()) {
     companion object {
         val None = ScrubberTicks(emptyList(), emptyList())
     }
@@ -70,6 +81,23 @@ internal class ScrubberTicks(val events: List<EventMarker>, val stops: List<Stop
 
 /** A drag within this distance of an event tick snaps to it (S-RPL-01). */
 private val SNAP = 8.dp
+
+/** Half the 48 dp target of an event tick. */
+private val TICK_REACH = 24.dp
+
+/** Event ticks sit this far above the track's centre. */
+private val TICK_RISE = 12.dp
+
+/**
+ * The event a tap at ([x], [y]) on a [width] × [height] scrubber opens: a tap on the tick lane (the upper half, where
+ * event ticks sit) within [reachPx] of a tick. Elsewhere a tap seeks, as before.
+ */
+@Suppress("LongParameterList") // the tap, the scrubber's size, the ticks and their reach
+internal fun tickAt(x: Float, y: Float, width: Int, height: Int, events: List<EventMarker>, duration: Double, reachPx: Float): String? {
+    if (duration <= 0 || y >= height / 2f) return null
+    fun distance(e: EventMarker) = kotlin.math.abs((e.tPeakS / duration * width).toFloat() - x)
+    return events.minByOrNull(::distance)?.takeIf { distance(it) <= reachPx }?.eventId
+}
 
 /**
  * The S-RPL-01 scrubber: 4 dp track, played part in the route colour, the quality spans marked on the track (estimated
@@ -120,13 +148,19 @@ internal fun ReplayScrubber(
         scrubTo(tS)
         scrubEnd()
     }
-    Spacer(
-        modifier
-            .fillMaxWidth()
-            .height(48.dp)
-            .testTag(SCRUBBER_TAG)
-            .scrubberSemantics(time, duration, ticks, ::seek)
-            .pointerInput(duration) { detectTapGestures { seek(toTime(it.x, size.width)) } }
+    val reachPx = with(LocalDensity.current) { TICK_REACH.toPx() }
+    Box(modifier.fillMaxWidth().height(48.dp)) {
+        Spacer(
+            Modifier
+                .fillMaxSize()
+                .testTag(SCRUBBER_TAG)
+                .scrubberSemantics(time, duration, ticks, ::seek)
+                .pointerInput(duration, ticks) {
+                    detectTapGestures {
+                        val tick = tickAt(it.x, it.y, size.width, size.height, ticks.events, duration, reachPx)
+                        if (tick != null) latest.selectEvent(tick) else seek(toTime(it.x, size.width))
+                    }
+                }
             .pointerInput(duration, ticks) {
                 detectHorizontalDragGestures(
                     onDragStart = {
@@ -135,11 +169,43 @@ internal fun ReplayScrubber(
                     },
                     onDragEnd = { latest.scrubEnd() },
                     onDragCancel = { latest.scrubEnd() },
-                ) { change, _ -> latest.scrubTo(dragTime(change.position.x, size.width)) }
-            }
-            .scrubberDrawing(time, duration, marks, colors, thumb)
-            .tickDrawing(duration, ticks, eventColors, DrivePerfTheme.dataColors.stop),
-    )
+                    ) { change, _ -> latest.scrubTo(dragTime(change.position.x, size.width)) }
+                }
+                .scrubberDrawing(time, duration, marks, colors, thumb)
+                .tickDrawing(duration, ticks, eventColors, DrivePerfTheme.dataColors.stop),
+        )
+        TickTargets(ticks, duration) { latest.selectEvent(it) }
+    }
+}
+
+internal const val EVENT_TICK_TAG = "replay_event_tick"
+
+/**
+ * TalkBack, Switch Access and Voice Access: each event tick is a 48 dp button that opens its evidence, read after the
+ * scrubber. The targets have no pointer input, so touches reach the scrubber, which tells a tap on a tick from a drag.
+ */
+@Composable
+private fun TickTargets(ticks: ScrubberTicks, duration: Double, select: (String) -> Unit) {
+    if (ticks.events.isEmpty() || duration <= 0) return
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+        for (event in ticks.events) {
+            val label = stringResource(R.string.replay_event_tick, ticks.labels[event.eventId].orEmpty())
+            Spacer(
+                Modifier
+                    .size(TICK_REACH * 2)
+                    .offset(
+                        x = maxWidth * (event.tPeakS / duration).toFloat() - TICK_REACH,
+                        y = maxHeight / 2 - TICK_RISE - TICK_REACH,
+                    )
+                    .testTag(EVENT_TICK_TAG)
+                    .semantics {
+                        role = Role.Button
+                        contentDescription = label
+                        onClick { select(event.eventId); true }
+                    },
+            )
+        }
+    }
 }
 
 /** "Replay position, 12 min of 33 min." Adjustable, with ±30 s actions. Minute steps, so playback does not re-announce. */
@@ -183,7 +249,7 @@ private fun Modifier.tickDrawing(
     stop: Color,
 ): Modifier = drawWithCache {
     val trackTop = (size.height - 4.dp.toPx()) / 2
-    val tickY = trackTop - 12.dp.toPx()
+    val tickY = trackTop - TICK_RISE.toPx()
     val r = 3.5.dp.toPx()
     val hollow = Stroke(1.5.dp.toPx())
     val stopTop = trackTop + 4.dp.toPx() + 2.dp.toPx()

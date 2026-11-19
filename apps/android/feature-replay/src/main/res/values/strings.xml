@@ -50,6 +50,8 @@
     <string name="replay_next_event">Next event</string>
     <string name="replay_previous_event">Previous event</string>
     <string name="replay_next_stop">Next stop</string>
+    <!-- An event tick on the scrubber, as a button: the pin's own label, then what it does. -->
+    <string name="replay_event_tick">%1$s Opens the evidence.</string>
     <!-- S-RPL-02 evidence (DRIVE-39); the sheet's words come from the shared EvidencePresenter. -->
     <string name="evidence_missing">This event is no longer on this drive.</string>
     <string name="evidence_axis_before">−10 s</string>
