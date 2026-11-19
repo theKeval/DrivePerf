@@ -5,27 +5,50 @@ import SwiftUI
 /// S-ANL-01 Analysis for one trip (F-RPL-05, F-RPL-06): the map card, Time/Distance and zoom, the synced timeline,
 /// the legend, the G-G card and the stat tiles; S-ANL-03 is the Channels menu, S-ANL-02 a full-screen cover. `title`
 /// is the trip's title, shown under "Analysis". `onReplay` opens S-RPL-01 for the trip; without it there is no Replay
-/// button. The view model closes its presenter when it goes away.
+/// button. The view model is made once, when the screen first appears, and closes its presenter when it goes away.
 public struct AnalysisView: View {
-    @State private var model: AnalysisViewModel
+    @State private var model: AnalysisViewModel?
+    private let make: @MainActor () -> any AnalysisPresenting
     private let title: String
     private let onReplay: ((String) -> Void)?
-    @Environment(\.dismiss) private var dismiss
-    @Environment(\.verticalSizeClass) private var verticalSize
 
     public init(presenter: any AnalysisPresenting, title: String) {
         self.init(presenter: presenter, title: title, onReplay: nil)
     }
 
     public init(presenter: any AnalysisPresenting, title: String, onReplay: ((String) -> Void)?) {
-        _model = State(initialValue: AnalysisViewModel(presenter: presenter))
+        make = { presenter }
         self.title = title
         self.onReplay = onReplay
     }
 
-    private var state: AnalysisScreenState { model.state }
+    /// Asks `presenters` for the trip's presenter only once, however often SwiftUI rebuilds this view.
+    public init(presenters: any AnalysisPresenterMaking, tripId: String, title: String, onReplay: ((String) -> Void)? = nil) {
+        make = { presenters.presenter(tripId: tripId) }
+        self.title = title
+        self.onReplay = onReplay
+    }
 
     public var body: some View {
+        if let model {
+            AnalysisWorkspace(model: model, title: title, onReplay: onReplay)
+        } else {
+            DPColor.bgGrouped.onAppear { model = AnalysisViewModel(presenter: make()) }
+        }
+    }
+}
+
+/// The screen once its view model exists.
+private struct AnalysisWorkspace: View {
+    let model: AnalysisViewModel
+    let title: String
+    let onReplay: ((String) -> Void)?
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.verticalSizeClass) private var verticalSize
+
+    private var state: AnalysisScreenState { model.state }
+
+    var body: some View {
         content
             .background(DPColor.bgGrouped)
             .navigationTitle(state.copy.title)

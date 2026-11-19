@@ -19,6 +19,9 @@ public final class AnalysisViewModel {
     public var message: String?
 
     private let presenter: any AnalysisPresenting
+    /// Set once the screen observes this model. SwiftUI may build and drop extra `AnalysisView` values (and their
+    /// models) while `@State` keeps the first; only the model that ran owns the presenter and closes it.
+    private var owns = false
 
     public init(presenter: any AnalysisPresenting) {
         self.presenter = presenter
@@ -27,11 +30,12 @@ public final class AnalysisViewModel {
     }
 
     isolated deinit {
-        presenter.close()
+        if owns { presenter.close() }
     }
 
     /// Follows the presenter's state (`.task {}`).
     public func observe() async {
+        owns = true
         for await next in presenter.states() { apply(next) }
     }
 

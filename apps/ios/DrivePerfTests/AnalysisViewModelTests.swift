@@ -64,6 +64,17 @@ final class AnalysisViewModelTests: XCTestCase {
         XCTAssertEqual(presenter.actions, [.expandGg])
     }
 
+    func testOnlyTheObservedModelClosesThePresenter() async {
+        var spare: AnalysisViewModel? = AnalysisViewModel(presenter: presenter)
+        XCTAssertNotNil(spare)
+        spare = nil
+        XCTAssertEqual(presenter.closed, 0)
+        var owner: AnalysisViewModel? = AnalysisViewModel(presenter: presenter)
+        await owner?.observe()
+        owner = nil
+        XCTAssertEqual(presenter.closed, 1)
+    }
+
     func testWithoutATimelineNothingMoves() {
         presenter.state = AnalysisScreenState(tripId: "t1", loading: true)
         let model = AnalysisViewModel(presenter: presenter)
@@ -126,5 +137,7 @@ private final class FakeAnalysisPresenter: AnalysisPresenting {
 
     func dispatch(_ action: AnalysisAction) { actions.append(action) }
 
-    func close() {}
+    var closed = 0
+
+    func close() { closed += 1 }
 }
