@@ -46,6 +46,8 @@ final class AppEnvironment {
     var replayPresenters: any ReplayPresenterMaking {
         ReplayFixture.isActive ? SyntheticReplayPresenters() : coreReplay
     }
+    /// S-ANL-01 runs the shared `AnalysisPresenter` (a stub until DRIVE-45).
+    let coreAnalysis = CoreAnalysisPresenters()
     let connectivity: any ConnectivityMonitoring = ReplayFixture.isOffline
         ? FixedConnectivity(online: false) : NetworkConnectivity()
     private(set) lazy var corePorts = CorePorts(
@@ -96,6 +98,7 @@ final class AppEnvironment {
             .withStatusRequests(surfaceRouter.statusRequests)
             .withDisplaySettings(displaySettings)
             .withReplay(replayPresenters, connectivity: connectivity)
+            .withAnalysis(coreAnalysis)
     }
 
     /// Recreate location sessions in `didFinishLaunching`, then open the core off the main actor. Location events
@@ -132,6 +135,7 @@ final class AppEnvironment {
         recorder.surfaceData?.updateLocation(canRecord: canRecordFromSystemSurface)
         drives.attach(services)
         coreReplay.attach(services)
+        coreAnalysis.attach(services)
         // The first launch after a restart re-arms the triggers and says why (F-CAP-14.3).
         recorder.onLaunch(reason: BootDetector().isFirstLaunchSinceBoot() ? .boot : .launch)
         updateTriggerAvailability()
@@ -233,6 +237,13 @@ extension AppDependencies {
         var copy = self
         copy.replayPresenters = presenters
         copy.connectivity = connectivity
+        return copy
+    }
+
+    /// S-ANL-01: Analysis's presenters.
+    fileprivate func withAnalysis(_ presenters: any AnalysisPresenterMaking) -> AppDependencies {
+        var copy = self
+        copy.analysisPresenters = presenters
         return copy
     }
 

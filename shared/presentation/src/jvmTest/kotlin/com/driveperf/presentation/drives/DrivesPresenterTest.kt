@@ -135,6 +135,18 @@ class DrivesPresenterTest {
     }
 
     @Test
+    fun `Analysis hands the trip and its title over and keeps the trip detail open`() = runTest(UnconfinedTestDispatcher()) {
+        trips.value = listOf(trip("t"))
+        val p = presenter()
+        p.dispatch(DrivesIntent.Open("t"))
+        p.dispatch(DrivesIntent.OpenAnalysis("t"))
+        assertEquals(DrivesEffect.OpenAnalysis("t", "Wednesday morning"), p.effects.first())
+        assertEquals("t", p.state.value.detail?.id)
+        p.dispatch(DrivesIntent.OpenAnalysis("gone"))
+        assertNull(withTimeoutOrNull(100) { p.effects.first() }, "an unknown trip opens nothing")
+    }
+
+    @Test
     fun `trips marked as not a drive stay reachable however few drives are left`() = runTest(UnconfinedTestDispatcher()) {
         trips.value = listOf(trip("a"), trip("b"))
         val p = presenter()

@@ -197,6 +197,9 @@ public sealed interface DrivesIntent {
     /** Replay on the trip sheet (DRIVE-200): [DrivesEffect.OpenReplay] hands the trip to S-RPL-01. */
     public data class OpenReplay(val tripId: String) : DrivesIntent
 
+    /** Analysis on the trip detail: [DrivesEffect.OpenAnalysis] hands the trip to S-ANL-01. */
+    public data class OpenAnalysis(val tripId: String) : DrivesIntent
+
     /** "Was this a bus or train?" Yes or No. */
     public data class Answer(val tripId: String, val yes: Boolean) : DrivesIntent
 
@@ -213,4 +216,7 @@ public sealed interface DrivesEffect {
      * [mapSummary] is the map's accessibility summary ("Map of your drive, 19.9 km.").
      */
     public data class OpenReplay(val tripId: String, val title: String, val mapSummary: String) : DrivesEffect
+
+    /** Open S-ANL-01 for [tripId]. [title] is the trip detail's title ("Thursday morning"), shown under "Analysis". */
+    public data class OpenAnalysis(val tripId: String, val title: String) : DrivesEffect
 }

@@ -35,4 +35,28 @@ object Routes {
     const val REPLAY = "replay/{$REPLAY_TRIP}?$REPLAY_TITLE={$REPLAY_TITLE}"
 
     fun replay(tripId: String, title: String): String = "replay/${Uri.encode(tripId)}?$REPLAY_TITLE=${Uri.encode(title)}"
+
+    const val ANALYSIS_TRIP = "tripId"
+    const val ANALYSIS_TITLE = "title"
+
+    /** S-ANL-01 Analysis (DRIVE-45): the trip ID, and the trip detail's title as the subtitle. */
+    const val ANALYSIS = "analysis/{$ANALYSIS_TRIP}?$ANALYSIS_TITLE={$ANALYSIS_TITLE}"
+
+    fun analysis(tripId: String, title: String): String =
+        "analysis/${Uri.encode(tripId)}?$ANALYSIS_TITLE=${Uri.encode(title)}"
+
+    const val SCORE_TRIP = "tripId"
+
+    /** S-TRP-01 trip detail as a push screen (DRIVE-55, coordinator decision 1). */
+    const val TRIP_DETAIL = "trip/{$SCORE_TRIP}"
+
+    fun tripDetail(tripId: String): String = "trip/${Uri.encode(tripId)}"
+
+    /** S-SCO-01 Smoothness breakdown for one trip (DRIVE-77, DRIVE-82, DRIVE-87). */
+    const val SCORE_BREAKDOWN = "score/{$SCORE_TRIP}"
+
+    fun scoreBreakdown(tripId: String): String = "score/${Uri.encode(tripId)}"
+
+    /** S-SCO-02 How scores work (DRIVE-113, DRIVE-108). */
+    const val HOW_SCORES_WORK = "how_scores_work"
 }

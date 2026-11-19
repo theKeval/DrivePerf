@@ -2,6 +2,9 @@ package com.driveperf.app
 
 import android.app.Application
 import com.driveperf.app.core.WakePath
+import com.driveperf.app.di.analysisModule
+import com.driveperf.app.di.drivesModule
+import com.driveperf.app.di.replayModule
 import com.driveperf.domain.capture.TripRecorder
 import com.driveperf.feature.onboarding.PermissionReader
 import com.driveperf.platform.capture.CaptureNotifications
@@ -19,7 +22,7 @@ class DrivePerfApplication : Application() {
         val koin = startKoin {
             androidLogger(Level.ERROR)
             androidContext(this@DrivePerfApplication)
-            modules(platformModule, appModule)
+            modules(platformModule, appModule, drivesModule, replayModule, analysisModule)
         }.koin
         koin.get<CaptureNotifications>().ensureChannel()
         // ADR-007: Sentry starts only if the user opted in to crash reports, and usage statistics are applied only once

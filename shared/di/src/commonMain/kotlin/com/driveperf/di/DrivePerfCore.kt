@@ -15,11 +15,13 @@ import com.driveperf.data.local.ProtoAnalysisFileStore
 import com.driveperf.data.local.ProtoCaptureLog
 import com.driveperf.data.local.ProtoPreviewStore
 import com.driveperf.data.local.openDatabase
+import com.driveperf.data.local.db.DrivePerfDatabase
 import com.driveperf.domain.analytics.ConsentGatedAnalytics
 import com.driveperf.domain.feedback.MarkEventNeeded
 import com.driveperf.domain.hello.GetHelloMessage
 import com.driveperf.domain.hello.HelloMessage
 import com.driveperf.domain.replay.TripReplayRepository
+import com.driveperf.foundation.Clock
 import com.driveperf.foundation.platformDescription
 import com.driveperf.pipeline.PipelineFinaliser
 import com.driveperf.pipeline.QualityAnalyticsFinaliser
@@ -57,7 +59,7 @@ public object DrivePerfCore {
         platform: PlatformBindings,
         database: DatabaseDriverFactory,
         io: CoroutineContext,
-        finaliser: ((com.driveperf.data.local.db.DrivePerfDatabase) -> TripFinaliser)? = null,
+        finaliser: ((DrivePerfDatabase) -> TripFinaliser)? = null,
     ): CoreServices = started ?: build(platform, database, io, finaliser).also { started = it }
 
     /**
@@ -72,12 +74,11 @@ public object DrivePerfCore {
     ): CoreServices = build(platform, database, io, null, capture)
 
     @OptIn(ExperimentalCoroutinesApi::class)
-    @Suppress("LongMethod") // the composition root: every service is wired here, in one place
     private fun build(
         platform: PlatformBindings,
         database: DatabaseDriverFactory,
         io: CoroutineContext,
-        finaliser: ((com.driveperf.data.local.db.DrivePerfDatabase) -> TripFinaliser)?,
+        finaliser: ((DrivePerfDatabase) -> TripFinaliser)?,
         capture: CaptureConfig = CaptureConfig(),
     ): CoreServices {
         val driver = database.create()
@@ -88,36 +89,22 @@ public object DrivePerfCore {
         val clock = platform.clock()
         val previews = ProtoPreviewStore(files, io)
         val history = LocalTripHistory(db, io)
-        val analytics = ConsentGatedAnalytics(platform.analyticsSink())
-        val recorder = TripRecorderEngine(
-            ports = CapturePorts(
-                location = platform.location(),
-                motion = platform.motion(),
-                activity = platform.activity(),
-                power = platform.power(),
-                parkedRegion = platform.parkedRegion(),
-                files = files,
-                watchdog = platform.watchdog(),
-                resumeNotice = platform.resumeNotice(),
-            ),
-            persistence = CapturePersistence(
-                store,
-                ProtoCaptureLog(files, io),
-                QualityAnalyticsFinaliser(
-                    finaliser?.invoke(db) ?: PipelineFinaliser(history, LocalRouteHistory(db, previews, io)),
-                    analytics,
-                ),
-                previews,
-                ProtoAnalysisFileStore(files, io),
-                LocalWatchdogStore(db, io),
-                LocalAutoDetectPauseStore(db, io),
-            ),
-            clock = clock,
-            zones = SystemTimeZone(),
-            scope = scope,
-            config = capture,
-            analytics = analytics,
+        val internals = CoreInternals(
+            db = db,
+            io = io,
+            files = files,
+            previews = previews,
+            history = history,
+            analysisFiles = ProtoAnalysisFileStore(files, io),
+            feedbackStore = LocalEventFeedbackStore(db, io),
+            rescorer = FeedbackRescorer(history, previews),
         )
+        val analytics = ConsentGatedAnalytics(platform.analyticsSink())
+        val tripFinaliser = QualityAnalyticsFinaliser(
+            finaliser?.invoke(db) ?: PipelineFinaliser(history, LocalRouteHistory(db, previews, io)),
+            analytics,
+        )
+        val recorder = recorder(platform, internals, store, tripFinaliser, clock, scope, capture, analytics)
         val trips = LocalTripRepository(db, files, io)
         val routes = LocalRouteRepository(db, io)
         // DRIVE-100: trips corrected to not-a-drive more than 30 days ago are deleted once per start.
@@ -127,20 +114,57 @@ public object DrivePerfCore {
             recorder = recorder,
             trips = trips,
             routes = routes,
-            replay = TripReplayRepository(trips, ProtoAnalysisFileStore(files, io), previews),
-            markEventNeeded = MarkEventNeeded(
-                trips, routes, LocalEventFeedbackStore(db, io), FeedbackRescorer(history, previews), clock,
-            ),
+            replay = TripReplayRepository(trips, internals.analysisFiles, previews),
+            markEventNeeded = MarkEventNeeded(trips, routes, internals.feedbackStore, internals.rescorer, clock),
             corrections = corrections,
             analytics = analytics,
             settings = LocalSettingsRepository(db, io, clock, analytics).also { scope.followBatterySaver(it, recorder) },
             clock = clock,
+            internals = internals,
             onClose = {
                 scope.cancel()
                 driver.close()
             },
         )
     }
+
+    /** The capture state machine on the platform's sensors and the core's stores (ADR-002 section 5). */
+    @Suppress("LongParameterList") // the recorder's ports, gathered once in build
+    private fun recorder(
+        platform: PlatformBindings,
+        internals: CoreInternals,
+        store: LocalTripStore,
+        finaliser: TripFinaliser,
+        clock: Clock,
+        scope: CoroutineScope,
+        capture: CaptureConfig,
+        analytics: ConsentGatedAnalytics,
+    ): TripRecorderEngine = TripRecorderEngine(
+        ports = CapturePorts(
+            location = platform.location(),
+            motion = platform.motion(),
+            activity = platform.activity(),
+            power = platform.power(),
+            parkedRegion = platform.parkedRegion(),
+            files = internals.files,
+            watchdog = platform.watchdog(),
+            resumeNotice = platform.resumeNotice(),
+        ),
+        persistence = CapturePersistence(
+            store,
+            ProtoCaptureLog(internals.files, internals.io),
+            finaliser,
+            internals.previews,
+            internals.analysisFiles,
+            LocalWatchdogStore(internals.db, internals.io),
+            LocalAutoDetectPauseStore(internals.db, internals.io),
+        ),
+        clock = clock,
+        zones = SystemTimeZone(),
+        scope = scope,
+        config = capture,
+        analytics = analytics,
+    )
 
     /** S-SET-03: the recorder follows the saved battery-saver choice from start-up onwards. */
     private fun CoroutineScope.followBatterySaver(
