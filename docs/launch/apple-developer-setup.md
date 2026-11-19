@@ -18,8 +18,8 @@ token ever passes through an agent, the repository or a chat.** Related: [ADR-00
 | App IDs | `com.driveperf.app`, `com.driveperf.app.widgets`, `com.driveperf.app.dev`, `com.driveperf.app.dev.widgets`, each with App Groups linked to the group |
 | Devices | Keval's iPhone 17 |
 | Certificates | Apple Development (Keval, valid to Nov 2027). No Apple Distribution certificate yet: `match` creates it (B3) |
-| Development profiles | Xcode automatic signing, `com.driveperf.app.dev` and `.dev.widgets`, valid to Nov 2027 |
-| App Store Connect app record | Not created yet (A3) |
+| Development profiles | Xcode automatic signing, `com.driveperf.app.dev` and `.dev.widgets`, valid to Nov 2027. The signed dev build is installed on Keval's iPhone |
+| App Store Connect app record | **DrivePerf**, iOS, bundle ID `com.driveperf.app`, SKU `driveperf-ios`, primary language English (U.S.), Apple ID `6836657071` (created 19 Nov 2026) |
 | Old Personal Team App IDs | `com.thekeval.driveperf.dev(.widgets)`, `com.thekeval.driveperf.hello`, `com.thekeval.spike.capture(.widgets)` moved into this team. Harmless; they can stay as the Personal Team fallback IDs or be removed |
 
 Background location and Live Activities are not portal capabilities (`UIBackgroundModes` and `NSSupportsLiveActivities`
@@ -40,11 +40,10 @@ App Store Connect → **Business** → **Complete Compliance Requirements**. As 
 expects "trader"; the address, phone and email entered are then shown on the EU App Store page. Decide which contact
 details to publish (for example support@driveperf.com) before submitting.
 
-### A3. The app record
+### A3. The app record (done)
 
-App Store Connect → **Apps** → **+** → **New App**: platform iOS, the name, primary language, bundle ID
-`com.driveperf.app` (it is in the list now), SKU, user access Full Access. The agent can do this once Keval confirms the
-name, SKU and primary language. The name must be unique on the App Store and can change until the first release.
+Created on 19 Nov 2026 with Keval's choices: name **DrivePerf**, SKU `driveperf-ios` (permanent), primary language
+English (U.S.), bundle ID `com.driveperf.app`, Full Access. The name can change until the first release.
 
 ADR-008 also puts `com.driveperf.app.dev` on an internal TestFlight group. That needs a second app record (for example
 "DrivePerf Dev") if dev builds should go to TestFlight too; decide when the release lane is built (DRIVE-67).
