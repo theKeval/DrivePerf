@@ -66,7 +66,8 @@ class AnalysisServicesTest {
         withTimeout(5_000) { core.recorder.status.first { it.state == RecorderState.RECORDING } }
         repeat(30) { i ->
             clock.advanceS(1.0)
-            bindings.location.emit(LocationSample(clock.monotonicNs(), clock.wallMs(), 2.5 + i * 1e-4, -27.5, 10.0, 4.0, 3.0, 12.0, 0.3, 0.0, 3.0))
+            val fix = LocationSample(clock.monotonicNs(), clock.wallMs(), 2.5 + i * 1e-4, -27.5, 10.0, 4.0, 3.0, 12.0, 0.3, 0.0, 3.0)
+            bindings.location.emit(fix)
         }
         withTimeout(5_000) { core.recorder.status.first { it.distanceM > 0.0 } }
         core.recorder.stop()
