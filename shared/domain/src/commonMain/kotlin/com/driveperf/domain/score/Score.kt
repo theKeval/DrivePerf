@@ -106,3 +106,31 @@ public data class Score(
     val algorithmVersion: String,
     val computedAt: Long,
 )
+
+/**
+ * pipeline-and-scoring.md §5.7 "Corrections" (F-HIS-02, F-SCO-05): after a trip's kind, an event's feedback or a
+ * deletion changes, re-derives the scores of that trip and every later one, in `(startedAt, id)` order, from the
+ * stored ledgers and without R1. Deterministic, and it never changes a score's [Score.algorithmVersion].
+ * Implemented in `:shared:pipeline`; the feedback store, the corrections and the trip deletion call it.
+ */
+public fun interface TripRecompute {
+    /** Re-derives the scores of trip [tripId] and every later trip. A trip that does not exist changes nothing. */
+    public suspend fun fromTrip(tripId: String)
+
+    public companion object {
+        /** Recomputes nothing: for scratch cores and tests that do not need it. */
+        public val NONE: TripRecompute = TripRecompute { }
+    }
+}
+
+/** What [TripRecompute] reads and writes. Implemented in `:shared:data:local`. */
+public interface ScoreHistoryStore {
+    /**
+     * Finished, live trips that started at or after [startedAt], oldest first by `(startedAt, id)`, each with its
+     * score and route match.
+     */
+    public suspend fun finishedFrom(startedAt: Long): List<com.driveperf.domain.repository.ScoredTrip>
+
+    /** Replaces these scores in one transaction. Every score write goes to the `score` table. */
+    public suspend fun saveScores(scores: List<Score>)
+}

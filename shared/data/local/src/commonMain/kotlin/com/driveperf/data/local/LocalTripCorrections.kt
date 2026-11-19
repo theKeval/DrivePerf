@@ -4,6 +4,7 @@ import app.cash.sqldelight.coroutines.asFlow
 import app.cash.sqldelight.coroutines.mapToList
 import com.driveperf.data.local.db.DrivePerfDatabase
 import com.driveperf.domain.repository.TripRepository
+import com.driveperf.domain.score.TripRecompute
 import com.driveperf.domain.trip.NotDrives
 import com.driveperf.domain.trip.Suspect
 import com.driveperf.domain.trip.SuspectAnswer
@@ -21,20 +22,23 @@ import kotlin.coroutines.CoroutineContext
 
 /**
  * [TripCorrections] on SQLDelight (DRIVE-100). [clock] stamps corrections and dates the "Not drives" purge, which
- * deletes through [trips] so files go first, as for any other deletion.
+ * deletes through [trips] so files go first, as for any other deletion. After a correction is committed, [recompute]
+ * re-derives the scores of the trip and every later one (DRIVE-131, §5.7 "Corrections"), so a trip that is no longer
+ * a drive leaves later baselines and one that is a drive again rejoins them.
  */
 public class LocalTripCorrections(
     private val db: DrivePerfDatabase,
     private val trips: TripRepository,
     private val io: CoroutineContext,
     private val clock: Clock,
+    private val recompute: TripRecompute = TripRecompute.NONE,
 ) : TripCorrections {
     private val q get() = db.tripQueries
 
     override fun observeNotDrives(): Flow<List<Trip>> =
         q.notDrives().asFlow().mapToList(io).map { rows -> rows.map { it.toDomain(spans(it.id)) } }
 
-    override suspend fun answerSuspect(tripId: String, answer: SuspectAnswer): Trip? = withContext(io) {
+    override suspend fun answerSuspect(tripId: String, answer: SuspectAnswer): Trip? = recomputed {
         db.transactionWithResult {
             val trip = finished(tripId) ?: return@transactionWithResult null
             when (answer) {
@@ -44,9 +48,13 @@ public class LocalTripCorrections(
         }
     }
 
-    override suspend fun correct(tripId: String, to: TripCorrection): Trip? = withContext(io) {
+    override suspend fun correct(tripId: String, to: TripCorrection): Trip? = recomputed {
         db.transactionWithResult { finished(tripId)?.let { write(it, to) } }
     }
+
+    /** Runs [change] on [io] and, when it changed a trip, recomputes from that trip once the change is committed. */
+    private suspend fun recomputed(change: () -> Trip?): Trip? =
+        withContext(io) { change() }?.also { recompute.fromTrip(it.id) }
 
     override suspend fun purgeExpiredNotDrives(): Int {
         val due = withContext(io) { q.expiredNotDrives(clock.wallMs() - NotDrives.RETENTION_MS).executeAsList() }

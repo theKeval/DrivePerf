@@ -38,6 +38,7 @@ public interface EventFeedbackStore {
  * "Was it needed?" (F-SCO-05, decision D4): marking a braking, acceleration or cornering event as needed drops its
  * ledger row, so the trip re-scores at once without R1 (§5.4); "Count it again" (`needed = false`) restores it. The
  * tip is re-chosen and never points at an excluded event. An "inaccurate" flag set elsewhere (F-RPL-04.4) is kept.
+ * The store then recomputes every later trip's comparison from this one (§5.7 "Corrections", [com.driveperf.domain.score.TripRecompute]).
  *
  * Returns the trip's score after the change: null when the trip has no score (passenger, unscorable, short).
  */

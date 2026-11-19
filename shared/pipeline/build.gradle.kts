@@ -32,4 +32,10 @@ tasks.named<Test>("jvmTest") {
     inputs.dir(fixtures).withPropertyName("driveFixtures").withPathSensitivity(PathSensitivity.RELATIVE)
     systemProperty("driveperf.fixtures", fixtures.asFile.absolutePath)
     systemProperty("driveperf.regenerateFixtures", providers.gradleProperty("regenerateFixtures").getOrElse("false"))
+    // DRIVE-93: the labelled set for the precision and recall harness. The committed synthetic set by default;
+    // `-PlabelledSet=<dir>` points it at the A19 field set, which stays off the repository.
+    val labelled = layout.projectDirectory.dir("src/jvmTest/resources/labelled")
+    inputs.dir(labelled).withPropertyName("labelledSet").withPathSensitivity(PathSensitivity.RELATIVE)
+    systemProperty("driveperf.labelledFixtures", labelled.asFile.absolutePath)
+    systemProperty("driveperf.labelledSet", providers.gradleProperty("labelledSet").getOrElse(labelled.asFile.absolutePath))
 }

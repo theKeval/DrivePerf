@@ -40,8 +40,7 @@ public class FeedbackRescorer(
         val ctx = ScoringContext(
             tripId = trip.id,
             scorable = true,
-            baselineEligible = Baselines.eligible(trip, 0) &&
-                (trip.quality?.gnssCoveragePct ?: 0.0) >= GNSS_ELIGIBLE_PCT,
+            baselineEligible = Baselines.ratable(trip),
             distanceM = trip.distanceM ?: 0.0,
             routeId = routeId,
             priors = priorHistory.priorsFor(trip.startedAt, context, routeId),
@@ -88,7 +87,6 @@ public class FeedbackRescorer(
 
     private companion object {
         const val SECONDS_PER_MINUTE = 60.0
-        const val GNSS_ELIGIBLE_PCT = 60.0
         const val RECENT_TIPS = 2
     }
 }
