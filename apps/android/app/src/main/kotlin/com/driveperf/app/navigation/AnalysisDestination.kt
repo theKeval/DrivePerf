@@ -1,22 +1,17 @@
 package com.driveperf.app.navigation
 
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.stringResource
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavType
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
-import com.driveperf.app.R
+import com.driveperf.feature.analysis.AnalysisRoute
+import com.driveperf.feature.analysis.AnalysisViewModel
+import org.koin.androidx.compose.koinViewModel
+import org.koin.core.parameter.parametersOf
 
 /**
- * S-ANL-01 Analysis for one trip, opened by `DrivesEffect.OpenAnalysis`. A placeholder until DRIVE-45 adds the screen;
- * nothing dispatches `DrivesIntent.OpenAnalysis` yet.
+ * S-ANL-01 Analysis for one trip (DRIVE-45, DRIVE-50), opened by `DrivesEffect.OpenAnalysis`. The title is the trip's
+ * title, shown under "Analysis"; Replay opens S-RPL-01 for the same trip.
  */
 internal fun NavGraphBuilder.analysisDestination(env: AppEnv) {
     composable(
@@ -28,11 +23,15 @@ internal fun NavGraphBuilder.analysisDestination(env: AppEnv) {
                 defaultValue = ""
             },
         ),
-    ) {
-        DetailScaffold(title = stringResource(R.string.analysis_title), onBack = { env.navController.popBackStack() }) { padding ->
-            Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
-                Text(stringResource(R.string.analysis_placeholder), style = MaterialTheme.typography.bodyLarge)
-            }
-        }
+    ) { entry ->
+        val tripId = entry.arguments?.getString(Routes.ANALYSIS_TRIP).orEmpty()
+        val title = entry.arguments?.getString(Routes.ANALYSIS_TITLE).orEmpty()
+        val viewModel: AnalysisViewModel = koinViewModel { parametersOf(tripId) }
+        AnalysisRoute(
+            viewModel = viewModel,
+            title = title,
+            onBack = { env.navController.popBackStack() },
+            onReplay = { id -> env.navController.navigate(Routes.replay(id, title)) },
+        )
     }
 }

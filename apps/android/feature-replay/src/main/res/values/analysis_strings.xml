@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- S-ANL-01/02/03 (DRIVE-45, DRIVE-50): Android-only labels. The screen copy itself comes from the shared AnalysisCopy. -->
+<resources>
+    <string name="analysis_back">Back</string>
+    <string name="analysis_channels">Channels</string>
+    <string name="analysis_replay">Replay</string>
+    <string name="analysis_zoom_in">Zoom in</string>
+    <string name="analysis_zoom_out">Zoom out</string>
+    <string name="analysis_close">Close</string>
+    <string name="analysis_view_table">View as table</string>
+    <string name="analysis_table_title">Timeline as a table</string>
+    <string name="analysis_table_header">Time · Speed · Long G · Lat G</string>
+    <string name="analysis_map_description">Map of this drive with the cursor marker. Tap to move the cursor to that point.</string>
+    <string name="analysis_pro">PRO</string>
+    <string name="analysis_gg_open">Opens the friction circle</string>
+</resources>
