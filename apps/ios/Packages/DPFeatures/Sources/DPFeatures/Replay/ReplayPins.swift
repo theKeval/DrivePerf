@@ -13,16 +13,6 @@ enum ReplayDataColor {
     static let latG = Color(dark: 0xF5A1_42FF, light: 0xB25A_00FF)
 }
 
-extension DrivingEventType {
-    var glyph: DPEventGlyph.Kind {
-        switch self {
-        case .brake: .brake
-        case .accel: .accel
-        case .corner: .corner
-        }
-    }
-}
-
 /// The pins as MapKit annotations, so they follow pans and zooms natively.
 struct ReplayPinContent: MapContent {
     let model: ReplayViewModel

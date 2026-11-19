@@ -29,7 +29,14 @@ public class LocalTripRepository(
 
     /** Driver and passenger trips; trips corrected to not-a-drive are in `TripCorrections.observeNotDrives` (F-CAP-04). */
     override fun observeTrips(): Flow<List<Trip>> =
-        q.listedTrips().asFlow().mapToList(io).map { rows -> rows.map { it.toDomain(spans(it.id)) } }
+        q.listedTrips().asFlow().mapToList(io).map { rows ->
+            // Every listed trip's spans in one query (ScoreList.sq), off the caller's thread: 1,000 trips cost two
+            // queries, not 1,001 (DRIVE-126 AC2).
+            withContext(io) {
+                val spans = db.scoreListQueries.listedSegments().executeAsList().groupBy({ it.trip_id }, { it.toDomain() })
+                rows.map { it.toDomain(spans[it.id].orEmpty()) }
+            }
+        }
 
     override suspend fun trip(id: String): Trip? = withContext(io) {
         q.tripById(id).executeAsOneOrNull()?.toDomain(spans(id))

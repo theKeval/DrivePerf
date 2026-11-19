@@ -5,6 +5,7 @@ import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -36,6 +37,7 @@ import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.customActions
+import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -51,6 +53,9 @@ import com.driveperf.presentation.drives.DrivesIntent
 import com.driveperf.presentation.drives.DrivesState
 import com.driveperf.presentation.drives.TripCopy
 import com.driveperf.presentation.drives.TripRowUi
+import com.driveperf.presentation.drives.TripSectionUi
+import com.driveperf.presentation.score.ComparisonTone
+import com.driveperf.presentation.score.ScoreBadgeUi
 
 private const val DIMMED_ALPHA = 0.6f
 
@@ -96,19 +101,15 @@ fun DrivesHomeScreen(
             if (state.seeAll) {
                 item { TextButton(onClick = onSeeAll) { Text(stringResource(R.string.drives_see_all)) } }
             }
-            item {
-                Text(
-                    text = stringResource(R.string.drives_notice_analysis),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
         }
     }
-    DrivesSheets(state, onAction)
 }
 
-/** Every recorded drive, newest first (S-HIS-01), with the "Not drives" filter (F-CAP-04 AC3). */
+/**
+ * Every recorded drive, newest first and grouped by week with sticky headers (S-HIS-01, DRIVE-126 AC1), with the
+ * "Not drives" filter (F-CAP-04 AC3). The list is lazy and keyed, so 1,000 drives compose only what is on screen.
+ */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun AllDrivesScreen(
     state: DrivesState,
@@ -153,14 +154,49 @@ fun AllDrivesScreen(
                 )
             }
         }
-        items(state.shown, key = { it.id }) { TripRow(it, state.canCorrect, onAction) }
+        if (state.filter == DrivesFilter.NOT_DRIVES) {
+            items(state.notDrives, key = { it.id }) { TripRow(it, state.canCorrect, onAction) }
+        } else {
+            state.sections.forEach { section ->
+                stickyHeader(key = "week-${section.id}") { WeekHeader(section) }
+                items(section.rows, key = { it.id }) { TripRow(it, state.canCorrect, onAction) }
+            }
+            state.sinceText?.let { since ->
+                item(key = "since") {
+                    Text(
+                        since,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                    )
+                }
+            }
+        }
     }
-    DrivesSheets(state, onAction)
+}
+
+/** A week's sticky header: "This week" and "3 drives · avg 84". */
+@Composable
+private fun WeekHeader(section: TripSectionUi) {
+    Surface(color = MaterialTheme.colorScheme.surface, modifier = Modifier.fillMaxWidth()) {
+        Row(
+            Modifier
+                .padding(vertical = 8.dp)
+                .clearAndSetSemantics {
+                    heading()
+                    contentDescription = section.accessibilityLabel
+                },
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(section.title, style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
+            Text(section.meta, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
 }
 
 /**
- * A trip card (components.md §12): tap opens the trip sheet; long-press offers "What was this?" (M3E contextual
- * actions); an open question is answered under the card.
+ * A trip card (components.md §12): tap pushes trip detail ([DrivesIntent.OpenTrip]); long-press offers "What was this?"
+ * (M3E contextual actions); an open question is answered under the card. The score badge sits at the trailing edge.
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -176,7 +212,7 @@ private fun TripRow(trip: TripRowUi, canCorrect: Boolean, onAction: (DrivesInten
                 modifier = Modifier
                     .fillMaxWidth()
                     .combinedClickable(
-                        onClick = { onAction(DrivesIntent.Open(trip.id)) },
+                        onClick = { onAction(DrivesIntent.OpenTrip(trip.id)) },
                         onLongClick = if (canCorrect) ({ menu = true }) else null,
                     )
                     .alpha(if (trip.dimmed) DIMMED_ALPHA else 1f)
@@ -187,17 +223,26 @@ private fun TripRow(trip: TripRowUi, canCorrect: Boolean, onAction: (DrivesInten
                     },
                 verticalArrangement = Arrangement.spacedBy(6.dp),
             ) {
-                Text(text = trip.title, style = MaterialTheme.typography.titleMediumEmphasized)
-                Text(
-                    "${trip.subtitle} · ${trip.stats}",
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text(text = trip.title, style = MaterialTheme.typography.titleMediumEmphasized)
+                        Text(
+                            "${trip.subtitle} · ${trip.stats}",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    trip.score?.let { ScoreBadge(it) }
+                }
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     trip.quality?.let { QualityBadgeChip(it) } ?: DpStatusChip(label = stringResource(R.string.drives_recorded))
                     if (trip.interrupted) DpStatusChip(label = stringResource(R.string.drives_interrupted), attention = true)
                     if (trip.short) DpStatusChip(label = stringResource(R.string.drives_short))
                     trip.kindLabel?.let { DpStatusChip(label = it) }
+                    trip.car?.let { DpStatusChip(label = it) }
+                }
+                trip.note?.let {
+                    Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
             CorrectionMenu(expanded = menu, onDismiss = { menu = false }) { onAction(DrivesIntent.Correct(trip.id, it)) }
@@ -275,7 +320,10 @@ private fun DrivesHomeScreenPreview() {
                 loaded = true,
                 canCorrect = true,
                 trips = listOf(
-                    TripRowUi("a", "Tuesday morning", "10 Nov · 7:42 AM", "12.4 km", "25 min", quality = QualityBadge.GOOD),
+                    TripRowUi(
+                        "a", "The Commute", "Tuesday morning · 10 Nov", "12.4 km", "25 min", quality = QualityBadge.GOOD,
+                        score = ScoreBadgeUi("85", "+2", ComparisonTone.BETTER),
+                    ),
                     TripRowUi(
                         "b", "Monday evening", "9 Nov · 5:10 PM", "9.1 km", "18 min", quality = QualityBadge.USABLE, interrupted = true,
                     ),

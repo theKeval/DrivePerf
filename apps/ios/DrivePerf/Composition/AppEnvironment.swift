@@ -4,6 +4,7 @@ import DPPlatform
 import DPSharedBridge
 import DrivePerfShared
 import Foundation
+import Sentry
 
 /// Composition root (ADR-002 §5). Builds the platform adapters once per process, starts the shared core on them
 /// (`DrivePerfCore.start`, through `corePorts`) and hands features their protocols. The only place that knows
@@ -17,7 +18,7 @@ final class AppEnvironment {
         : UserDefaultsPreferences()
     let displaySettings = CoreDisplaySettings()
     let permissions = SystemPermissions()
-    let crashReporter = ConsentGatedCrashReporter()
+    let crashReporter = ConsentGatedCrashReporter(engine: SentryCrashEngine())
     let usageAnalytics = CoreUsageAnalytics()
     let flags = BuildFlags.fromBundle()
     let clock = SystemClock()
@@ -130,6 +131,8 @@ final class AppEnvironment {
         displaySettings.attach(services)
         recorder.attach(KotlinCore(services))
         recorder.surfaceData = TripSurfaceData(trips: services.trips)
+        let analytics = services.analytics
+        recorder.trackNotice = { analytics.track(event: NoticeAnalyticsEvent($0)) }
         displaySettings.onChange = { [weak self] in self?.refreshDisplaySurfaces() }
         refreshDisplaySurfaces()
         recorder.surfaceData?.updateLocation(canRecord: canRecordFromSystemSurface)
@@ -140,6 +143,12 @@ final class AppEnvironment {
         recorder.onLaunch(reason: BootDetector().isFirstLaunchSinceBoot() ? .boot : .launch)
         updateTriggerAvailability()
         crashReporter.apply(consent: preferences.preferences.sendCrashReports)
+        // DRIVE-196: crash reports say whether a trip was being captured (in_trip, capture_mode, trip_state).
+        Task { [crashReporter, recorder] in
+            for await status in recorder.statuses() {
+                crashReporter.updateTrip(state: status.state, isManual: status.isManual)
+            }
+        }
         // Usage statistics: events wait in memory until the user has chosen (onboarding finished means S-ONB-13 was
         // answered), then are sent or dropped; a later change in Profile takes effect at once (F-ONB-08).
         usageAnalytics.attach(services.analytics)
@@ -281,5 +290,102 @@ extension AppEnvironment {
 extension NotificationAdapter {
     func postDriveDecoded(tripId: String, smoothness: Int?) {
         LocalNotifier().postDriveDecoded(tripId: tripId, smoothness: smoothness)
+    }
+
+    /// DRIVE-137: the recording notice with its own category for automatic trips, reporting when it was shown.
+    func postRecordingNotice(tripId: String, automatic: Bool, posted: @escaping @MainActor () -> Void) {
+        LocalNotifier().postRecordingNotice(tripId: tripId, automatic: automatic, onPosted: posted)
+    }
+}
+
+/// An F-CAP-11 notice event as the Kotlin `AnalyticsEvent` type the consent-gated `Analytics` port accepts.
+final class NoticeAnalyticsEvent: NSObject, DrivePerfShared.AnalyticsEvent {
+    let name: String
+    let properties: [String: String] = [:]
+
+    init(_ event: AutoTripNoticeEvent) {
+        name = event.rawValue
+    }
+}
+
+// MARK: - Crash reporting (DRIVE-196, ADR-007)
+
+/// Sentry Cocoa behind `ConsentGatedCrashReporter`: started only after crash consent, EU DSN from the build.
+///
+/// - `sendDefaultPii` off and no user ever set; no screenshots, view hierarchy, Session Replay, tracing, network
+///   breadcrumbs or failed-request capture. Crashes, app hangs, watchdog terminations and release health (crash-free
+///   sessions, F-ANA-03) are on.
+/// - Kotlin/Native crashes: `KotlinCrashHook` (Sentry Kotlin Multiplatform) reports the Kotlin exception with its
+///   Kotlin stack trace to this SDK. Sentry Cocoa is pinned to the version that SDK was built against.
+/// - `beforeSend` keeps only `CrashTags.allowed`, drops extras and removes coordinate-like text from the message and
+///   exception values; a breadcrumb that looks like a location is dropped (`CoordinateScrubber`).
+@MainActor
+final class SentryCrashEngine: CrashReportingEngine {
+    private let appBuild: String
+    private var cacheDirectory: String?
+
+    init(bundle: Bundle = .main) {
+        let version = bundle.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0"
+        let build = bundle.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "0"
+        appBuild = "\(version) (\(build))"
+    }
+
+    func start(dsn: String) {
+        var cache: String?
+        SentrySDK.start { options in
+            options.dsn = dsn
+            options.sendDefaultPii = false
+            options.tracesSampleRate = 0
+            options.enableAutoPerformanceTracing = false
+            options.enableNetworkTracking = false
+            options.enableNetworkBreadcrumbs = false
+            options.enableCaptureFailedRequests = false
+            options.attachScreenshot = false
+            options.attachViewHierarchy = false
+            options.enableAutoSessionTracking = true
+            options.enableAppHangTracking = true
+            options.enableWatchdogTerminationTracking = true
+            options.beforeSend = { SentryCrashEngine.scrub($0) }
+            options.beforeBreadcrumb = { SentryCrashEngine.keep($0) }
+            cache = options.cacheDirectoryPath
+        }
+        cacheDirectory = cache
+        let appBuild = appBuild
+        SentrySDK.configureScope { $0.setTag(value: appBuild, key: CrashTags.appBuild) }
+        KotlinCrashHook.shared.install()
+    }
+
+    func stop() {
+        SentrySDK.close()
+        // Sentry keeps queued envelopes under <cache>/io.sentry; an opt-out deletes them (ADR-007).
+        if let cacheDirectory {
+            try? FileManager.default.removeItem(atPath: (cacheDirectory as NSString).appendingPathComponent("io.sentry"))
+        }
+    }
+
+    func setTags(_ tags: [String: String]) {
+        let allowed = tags.filter { CrashTags.allowed.contains($0.key) }
+        SentrySDK.configureScope { scope in
+            for (key, value) in allowed { scope.setTag(value: value, key: key) }
+        }
+    }
+
+    nonisolated static func scrub(_ event: Sentry.Event) -> Sentry.Event? {
+        if let message = event.message {
+            let scrubbed = SentryMessage(formatted: CoordinateScrubber.scrub(message.formatted))
+            scrubbed.message = message.message.map(CoordinateScrubber.scrub)
+            scrubbed.params = message.params?.map(CoordinateScrubber.scrub)
+            event.message = scrubbed
+        }
+        event.exceptions?.forEach { exception in exception.value = exception.value.map(CoordinateScrubber.scrub) }
+        event.tags = event.tags?.filter { CrashTags.allowed.contains($0.key) }
+        event.extra = nil
+        event.breadcrumbs = event.breadcrumbs?.compactMap(keep)
+        return event
+    }
+
+    nonisolated static func keep(_ breadcrumb: Breadcrumb) -> Breadcrumb? {
+        let texts = [breadcrumb.message].compactMap { $0 } + (breadcrumb.data ?? [:]).values.map { "\($0)" }
+        return texts.contains(where: CoordinateScrubber.containsCoordinates) ? nil : breadcrumb
     }
 }

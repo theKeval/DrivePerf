@@ -2,14 +2,17 @@ import DPDesignSystem
 import DPSharedBridge
 import SwiftUI
 
-/// S-TRP-01 Trip detail, with what the shell has today: state banners (question, passenger or not a drive,
-/// interrupted, short, unscorable), the stat tiles with provenance on long-press (F-DQ-05), the data-quality row
-/// (→ S-DQ-01), "What was this?" (S-TRP-02 type picker) and Replay (→ S-RPL-01, DRIVE-200). The map hero, score
-/// and events arrive with their own stories.
+/// S-TRP-01 Trip detail, pushed from a trip card (DRIVE-55): state banners (question, passenger or not a drive,
+/// interrupted, short, unscorable), the meta row, Replay (→ S-RPL-01) and Analysis (→ S-ANL-01), the Smoothness card
+/// with its comparison and contributors (→ S-SCO-01, S-SCO-02), the stat tiles with provenance on long-press
+/// (F-DQ-05), events by type, the positive card and the tip, then data quality (→ S-DQ-01) and "What was this?".
+/// Scores are hidden on passenger and not-a-drive trips. Story, Share and Export wait for their epics; the Pro lock is
+/// deferred. The map hero arrives with its own story.
 struct TripDetailView: View {
     let trips: TripListViewModel
     let tripId: String
     @Environment(\.replayServices) private var replayServices
+    @Environment(\.analysisPresenters) private var analysisPresenters
     @Environment(CaptureViewModel.self) private var capture: CaptureViewModel?
     @State private var shownProvenance: String?
     @State private var replay: ReplayViewModel?
@@ -18,6 +21,12 @@ struct TripDetailView: View {
     @State private var showsReplay = false
     /// Replay was asked for while the in-drive lock held it (S-DRV-05); it opens when the lock lifts.
     @State private var replayHeld = false
+    @State private var analysis: (any AnalysisPresenting)?
+    @State private var analysisTitle = ""
+    @State private var showsAnalysis = false
+    @State private var analysisHeld = false
+    /// The detail was opened once; coming back from a pushed screen re-opens it only if another trip took its place.
+    @State private var hasOpened = false
 
     var body: some View {
         // A ZStack, not a Group: its lifecycle is its own, so `onAppear` fires even before the detail is open (a
@@ -36,7 +45,13 @@ struct TripDetailView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .dpScreenBackground()
         .navigationBarTitleDisplayMode(.inline)
-        .onAppear { trips.open(tripId) }
+        .onAppear {
+            // `open` records `trip_detail_opened`, so popping back from Replay or the breakdown doesn't send it again.
+            if !hasOpened || trips.detail(id: tripId) == nil {
+                hasOpened = true
+                trips.open(tripId)
+            }
+        }
         .sheet(isPresented: Binding(
             get: { trips.dataQuality(id: tripId) != nil }, set: { if !$0 { trips.closeQuality() } })
         ) {
@@ -56,12 +71,38 @@ struct TripDetailView: View {
             replay = replayServices.model(tripId: tripId, source: .tripDetail)
             showsReplay = true
         }
-        .onChange(of: capture?.heldContent) { old, new in
-            // The lock lifted and released what it held: open the Replay that was asked for.
-            guard replayHeld, old == .replay, new == nil else { return }
-            replayHeld = false
-            if capture?.isContentLocked(now: Date()) == false { openReplay() }
+        .navigationDestination(isPresented: $showsAnalysis) {
+            if let analysis { AnalysisView(presenter: analysis, title: analysisTitle) }
         }
+        .onChange(of: trips.analysisRequest) { _, request in
+            guard let request, request.tripId == tripId, let analysisPresenters else { return }
+            trips.analysisOpened()
+            analysisTitle = request.title
+            analysis = analysisPresenters.presenter(tripId: tripId)
+            showsAnalysis = true
+        }
+        .onChange(of: capture?.heldContent) { old, new in
+            // The lock lifted and released what it held: open what was asked for.
+            guard new == nil else { return }
+            if replayHeld, old == .replay {
+                replayHeld = false
+                if capture?.isContentLocked(now: Date()) == false { openReplay() }
+            }
+            if analysisHeld, old == .analysis {
+                analysisHeld = false
+                if capture?.isContentLocked(now: Date()) == false { trips.requestAnalysis(tripId) }
+            }
+        }
+    }
+
+    /// D1: during a driver trip (or the calm minute after it) Analysis waits behind S-DRV-05 too.
+    private func requestAnalysis() {
+        if let capture, capture.isContentLocked(now: Date()) {
+            analysisHeld = true
+            capture.requestContent(.analysis)
+            return
+        }
+        trips.requestAnalysis(tripId)
     }
 
     /// AC6: during a driver trip (or the calm minute after it) Replay waits behind S-DRV-05.
@@ -95,6 +136,40 @@ struct TripDetailView: View {
         .accessibilityIdentifier("tripDetail.replay")
     }
 
+    private func analysisButton(enabled: Bool) -> some View {
+        Button(action: requestAnalysis) {
+            Label {
+                Text("Analysis").font(DPFont.button)
+            } icon: {
+                Image(systemName: "waveform.path.ecg")
+            }
+            .frame(maxWidth: .infinity, minHeight: DPLayout.touchMin)
+        }
+        .buttonStyle(.glass)
+        .disabled(!enabled)
+        .accessibilityHint(enabled ? "Speed and G over the drive" : "Detailed data removed for this drive")
+        .accessibilityIdentifier("tripDetail.analysis")
+    }
+
+    /// S-TRP-01 action row: Replay (primary) · Analysis. Two rows at accessibility sizes.
+    @ViewBuilder
+    private func actions(_ detail: TripDetail) -> some View {
+        let hasReplay = replayServices != nil
+        let hasAnalysis = analysisPresenters != nil
+        if hasReplay || hasAnalysis {
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: DPSpace.s2) {
+                    if hasReplay { replayButton }
+                    if hasAnalysis { analysisButton(enabled: detail.canAnalyse) }
+                }
+                VStack(spacing: DPSpace.s2) {
+                    if hasReplay { replayButton }
+                    if hasAnalysis { analysisButton(enabled: detail.canAnalyse) }
+                }
+            }
+        }
+    }
+
     private func content(_ detail: TripDetail) -> some View {
         ScrollView {
             VStack(alignment: .leading, spacing: DPLayout.sectionGap) {
@@ -103,10 +178,20 @@ struct TripDetailView: View {
                         ForEach(Array(detail.banners.enumerated()), id: \.offset) { _, banner in bannerView(banner) }
                     }
                 }
-                if replayServices != nil { replayButton }
+                if let meta = detail.meta { TripMetaRow(meta: meta) }
+                actions(detail)
+                if !detail.scoresHidden, let score = detail.score {
+                    TripScoreCard(score: score, trips: trips, tripId: tripId)
+                }
                 tiles(detail.tiles)
                 Text("Touch and hold a number to see how it was measured.")
                     .font(DPFont.caption).foregroundStyle(DPColor.text3)
+                if !detail.scoresHidden {
+                    if let events = detail.events { TripEventsSection(events: events) }
+                    if detail.cleanest != nil || detail.tip != nil {
+                        TripHighlights(cleanest: detail.cleanest, tip: detail.tip)
+                    }
+                }
                 VStack(spacing: 0) {
                     if let badge = detail.quality {
                         Button { trips.openQuality(tripId) } label: {

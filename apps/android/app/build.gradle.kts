@@ -10,6 +10,29 @@ val sentryDsn: Provider<String> = providers.gradleProperty("driveperf.sentryDsn"
     .orElse(providers.environmentVariable("DRIVEPERF_SENTRY_DSN"))
     .orElse("")
 
+// Sentry R8 mapping ID (DRIVE-196, ADR-007): release-android.yml generates a UUID, this build writes it into the release
+// variants' `sentry-debug-meta.properties` asset (sentry-android reads it to match stack traces with the mapping), and
+// the lane uploads mapping.txt under the same UUID with sentry-cli. Without the variable nothing is added. No Sentry
+// Gradle plugin: applied here it loads the Kotlin Gradle plugin a second time.
+val sentryProguardUuid: String? = providers.environmentVariable("DRIVEPERF_SENTRY_PROGUARD_UUID").orNull
+    ?.takeIf { it.isNotBlank() }
+    ?.also { require(Regex("[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}").matches(it)) { "DRIVEPERF_SENTRY_PROGUARD_UUID is not a UUID" } }
+
+/** Writes `sentry-debug-meta.properties` with the R8 mapping's UUID. */
+abstract class SentryDebugMetaTask : DefaultTask() {
+    @get:Input
+    abstract val proguardUuid: Property<String>
+
+    @get:OutputDirectory
+    abstract val outputDirectory: DirectoryProperty
+
+    @TaskAction
+    fun write() {
+        outputDirectory.get().file("sentry-debug-meta.properties").asFile
+            .writeText("io.sentry.ProguardUuids=${proguardUuid.get()}\n")
+    }
+}
+
 // Google Maps (ADR-005, DRIVE-200): the restricted API key and the optional Night Drive Map ID come from local.properties
 // or the environment, never the repository (DRIVE-42 creates the key). Without a key Replay draws on the plain canvas.
 val localProperties = Properties().apply {
@@ -153,6 +176,16 @@ dependencies {
     androidTestImplementation(libs.compose.ui.test.junit4)
     androidTestImplementation(libs.androidx.test.ext.junit)
     androidTestImplementation(libs.androidx.test.runner)
+}
+
+androidComponents {
+    onVariants(selector().withBuildType("release")) { variant ->
+        val uuid = sentryProguardUuid ?: return@onVariants
+        val debugMeta = tasks.register<SentryDebugMetaTask>("sentryDebugMeta${variant.name.replaceFirstChar(Char::uppercase)}") {
+            proguardUuid.set(uuid)
+        }
+        variant.sources.assets?.addGeneratedSourceDirectory(debugMeta, SentryDebugMetaTask::outputDirectory)
+    }
 }
 
 // android.yml runs `:apps:android:app:detekt` and `:apps:android:app:testDevDebugUnitTest` only. Hooking the library

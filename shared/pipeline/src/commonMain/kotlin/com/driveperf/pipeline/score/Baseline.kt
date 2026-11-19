@@ -46,6 +46,7 @@ public object Baselines {
     private const val NEEDED = 3
     private const val BAND = 6.0
     private const val HALF = 0.5
+    private const val GNSS_RATABLE_PCT = 60.0
 
     /** §5.7 eligibility: a scored driver trip with Good or Usable data and no unanswered or confirmed suspicion. */
     public fun eligible(trip: Trip, smoothness: Int?): Boolean {
@@ -54,6 +55,13 @@ public object Baselines {
         return trip.kind == TripKind.DRIVER && smoothness != null && suspectOk &&
             (badge == QualityBadge.GOOD || badge == QualityBadge.USABLE)
     }
+
+    /**
+     * §5.9: the trip may get an efficiency rating, which takes the baseline's eligibility, whatever its score, plus
+     * GNSS coverage of at least 60 %.
+     */
+    public fun ratable(trip: Trip): Boolean =
+        eligible(trip, 0) && (trip.quality?.gnssCoveragePct ?: 0.0) >= GNSS_RATABLE_PCT
 
     /**
      * @param priors eligible trips that started before this one, any order.

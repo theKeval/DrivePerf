@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		D13300000000000000000003 /* DPDesignSystem in Frameworks */ = {isa = PBXBuildFile; productRef = D13300000000000000000004 /* DPDesignSystem */; };
+		D19600000000000000000001 /* Sentry in Frameworks */ = {isa = PBXBuildFile; productRef = D19600000000000000000002 /* Sentry */; };
 		FEB70EF8BA0C217C495F4BCC /* DPFeatures in Frameworks */ = {isa = PBXBuildFile; productRef = EC8B5A20E069754FAEC2A2D5 /* DPFeatures */; };
 		E60FCF481FDE03861756D195 /* DPPlatform in Frameworks */ = {isa = PBXBuildFile; productRef = 2384D057D281CC940F7D4E1E /* DPPlatform */; };
 		7EC52976499B5B81A0D425A8 /* DPFeatures in Frameworks */ = {isa = PBXBuildFile; productRef = 410609BA9023FE19A593C6B5 /* DPFeatures */; };
@@ -68,6 +69,8 @@
 		D13300000000000000000001 /* LiveSurface tests excluded from app */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
+				LiveSurface/Tests/AutoTripNoticeTests.swift,
+				LiveSurface/Tests/CrashReportingTests.swift,
 				LiveSurface/Tests/TripSurfaceTests.swift,
 			);
 			target = 778130C49534A4D32801D13D /* DrivePerf */;
@@ -120,6 +123,7 @@
 				FEB70EF8BA0C217C495F4BCC /* DPFeatures in Frameworks */,
 				E60FCF481FDE03861756D195 /* DPPlatform in Frameworks */,
 				7E85C121565F0546BC490205 /* DPSharedBridge in Frameworks */,
+				D19600000000000000000001 /* Sentry in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -204,6 +208,7 @@
 				EC8B5A20E069754FAEC2A2D5 /* DPFeatures */,
 				2384D057D281CC940F7D4E1E /* DPPlatform */,
 				EE821C4170D02D96DA041C18 /* DPSharedBridge */,
+				D19600000000000000000002 /* Sentry */,
 			);
 			productName = DrivePerf;
 			productReference = 7BCCADA3021C07D12E775CB5 /* DrivePerf.app */;
@@ -321,6 +326,7 @@
 				5A808F7C62E4B24828FC32B3 /* XCLocalSwiftPackageReference "Packages/DPFeatures" */,
 				9D45327FEBD5309F46CE4E18 /* XCLocalSwiftPackageReference "Packages/DPPlatform" */,
 				7015D458296ACD554F6808F0 /* XCLocalSwiftPackageReference "Packages/DPSharedBridge" */,
+				D19600000000000000000003 /* XCRemoteSwiftPackageReference "sentry-cocoa" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 86024CAD1E83101D97359D73 /* Products */;
@@ -737,6 +743,17 @@
 		};
 /* End XCLocalSwiftPackageReference section */
 
+/* Begin XCRemoteSwiftPackageReference section */
+		D19600000000000000000003 /* XCRemoteSwiftPackageReference "sentry-cocoa" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/getsentry/sentry-cocoa.git";
+			requirement = {
+				kind = exactVersion;
+				version = 9.30.2;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
 /* Begin XCSwiftPackageProductDependency section */
 		D13300000000000000000004 /* DPDesignSystem */ = {
 			isa = XCSwiftPackageProductDependency;
@@ -769,6 +786,11 @@
 		EE821C4170D02D96DA041C18 /* DPSharedBridge */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = DPSharedBridge;
+		};
+		D19600000000000000000002 /* Sentry */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = D19600000000000000000003 /* XCRemoteSwiftPackageReference "sentry-cocoa" */;
+			productName = Sentry;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

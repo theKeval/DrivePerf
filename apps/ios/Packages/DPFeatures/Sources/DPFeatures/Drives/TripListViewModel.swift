@@ -2,9 +2,10 @@ import DPSharedBridge
 import Foundation
 import Observation
 
-/// S-HOME-01 "Latest drives", S-HIS-01 "All drives", S-TRP-01 trip detail and S-DQ-01 data quality: a thin wrapper
-/// over the shared Drives presenter (DRIVE-217, ADR-002 §4). The state is the presenter's; this only forwards intents
-/// and turns the presenter's Replay hand-off into `replayRequest` for the trip detail.
+/// S-HOME-01 "Latest drives", S-HIS-01 "All drives", S-TRP-01 trip detail, S-SCO-01 Smoothness breakdown, S-SCO-02
+/// How scores work and S-DQ-01 data quality: a thin wrapper over the shared Drives presenter (DRIVE-217, ADR-002 §4).
+/// The state is the presenter's; this only forwards intents and turns the presenter's Replay and Analysis hand-offs
+/// into `replayRequest` and `analysisRequest` for the trip detail.
 @MainActor
 @Observable
 public final class TripListViewModel {
@@ -17,8 +18,16 @@ public final class TripListViewModel {
         public var mapSummary: String
     }
 
+    /// What the presenter asked to open in Analysis; the trip detail opens it and calls `analysisOpened()`.
+    public struct AnalysisRequest: Equatable, Sendable {
+        public var tripId: String
+        /// The trip's title, shown under "Analysis".
+        public var title: String
+    }
+
     public private(set) var state: DrivesScreenState
     public private(set) var replayRequest: ReplayRequest?
+    public private(set) var analysisRequest: AnalysisRequest?
     private let presenter: any DrivesPresenting
 
     public init(presenter: any DrivesPresenting) {
@@ -43,6 +52,8 @@ public final class TripListViewModel {
             switch navigation {
             case .openReplay(let tripId, let title, let mapSummary):
                 replayRequest = ReplayRequest(tripId: tripId, title: title, mapSummary: mapSummary)
+            case .openAnalysis(let tripId, let title):
+                analysisRequest = AnalysisRequest(tripId: tripId, title: title)
             }
         }
     }
@@ -90,6 +101,24 @@ public final class TripListViewModel {
 
     /// The trip detail opened the Replay in `replayRequest`.
     public func replayOpened() { replayRequest = nil }
+
+    /// Analysis on the trip detail: the presenter answers with `analysisRequest`.
+    public func requestAnalysis(_ id: String) { send(.openAnalysis(tripId: id)) }
+
+    /// The trip detail opened the Analysis in `analysisRequest`.
+    public func analysisOpened() { analysisRequest = nil }
+
+    /// S-SCO-01 is showing [id] (`score_viewed {surface: breakdown}`).
+    public func showBreakdown(_ id: String) { send(.showBreakdown(tripId: id)) }
+
+    /// S-SCO-02 opened from [source] (`scores_explainer_viewed`).
+    public func explainerOpened(from source: ExplainerSource) { send(.openHowScoresWork(source: source)) }
+
+    /// A contributor's events were opened on S-SCO-01 (`contributor_tapped`).
+    public func contributorTapped(_ id: ScoreContributorID) { send(.tapContributor(id)) }
+
+    /// S-SCO-02's content.
+    public var explainer: HowScoresWork? { state.explainer }
 
     /// "Was this a bus or train?" Yes / No.
     public func answer(tripId: String, yes: Bool) { send(.answer(tripId: tripId, yes: yes)) }

@@ -24,6 +24,7 @@ import com.driveperf.data.local.db.DrivePerfDatabase
 import com.driveperf.domain.capture.PreviewStore
 import com.driveperf.domain.feedback.EventFeedbackStore
 import com.driveperf.domain.feedback.TripRescorer
+import com.driveperf.domain.score.TripRecompute
 import com.driveperf.domain.repository.TripHistory
 import com.driveperf.domain.tripfile.AnalysisFileStore
 import kotlinx.coroutines.flow.Flow
@@ -83,6 +84,8 @@ internal class CoreInternals(
     val analysisFiles: AnalysisFileStore,
     val feedbackStore: EventFeedbackStore,
     val rescorer: TripRescorer,
+    /** DRIVE-131: re-derives the scores of a trip and every later one (§5.7 "Corrections"). */
+    val recompute: TripRecompute,
 )
 
 /**
@@ -120,6 +123,7 @@ public class CoreServices internal constructor(
     internal val analysisFiles: AnalysisFileStore get() = internals.analysisFiles
     internal val feedbackStore: EventFeedbackStore get() = internals.feedbackStore
     internal val rescorer: TripRescorer get() = internals.rescorer
+    internal val recompute: TripRecompute get() = internals.recompute
 
     /** The user's unit system, or the region's default until they choose one. */
     internal fun units(region: String): Flow<UnitSystem> = settings.state.map { it.effectiveUnits(region) }

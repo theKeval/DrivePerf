@@ -7,6 +7,8 @@ import UserNotifications
 
 enum TripNotificationRoute: Equatable {
     case recording(String)
+    /// The automatic trip's "Recording your drive" (F-CAP-11): opens like `.recording` and is counted.
+    case autoRecording(String)
     case decoded(String)
     /// "Auto-detect may be paused" (F-CAP-14, S-LIVE-10): opens the capture status sheet.
     case watchdog
@@ -22,6 +24,8 @@ enum TripNotificationRoute: Equatable {
         case LocalNotifier.recordingCategory, "":
             // Recording notices delivered before categories were added have the same identifier and thread.
             self = .recording(tripID)
+        case LocalNotifier.autoRecordingCategory:
+            self = .autoRecording(tripID)
         case LocalNotifier.decodedCategory:
             self = .decoded(tripID)
         default:
@@ -42,7 +46,10 @@ final class TripSurfaceRouter {
 
     func open(_ route: TripNotificationRoute, recorder: CoreTripRecorder) async {
         switch route {
-        case .recording(let tripID):
+        case .recording(let tripID), .autoRecording(let tripID):
+            // Counted as soon as it is tapped, whether or not the trip is still recording by the time the app is up.
+            if case .autoRecording = route { recorder.autoTripNoticeOpened() }
+            // The in-drive screen (S-DRV-01) covers the shell while the trip records; never content (F-CAP-11 AC2).
             guard await TripIntentHandler.waitForActiveTrip(recorder), recorder.status.tripId == tripID else { return }
         case .decoded:
             // The shell opens on Drives. Its existing capture gate takes precedence during another drive.

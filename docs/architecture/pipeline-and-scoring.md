@@ -699,6 +699,24 @@ delta    = Smoothness − baseline
 
 **Corrections (F-HIS-02).** Changing a trip's kind or an event's feedback recomputes, from stored ledgers, the baselines, deltas, bands and records of that trip and later ones, in `(startedAt, id)` order, within 2 s.
 
+As built (DRIVE-131, DRIVE-97; `HistoryRecompute` behind the domain port `TripRecompute`):
+
+- **Triggers.** The feedback store after a new score ("Was it needed?", "Count it again", "Not accurate?"), the corrections after a committed kind change or suspect answer, and the trip deletion. Each runs from its trip once its own transaction has committed.
+- **Deletion.** The trip's files go first. Then, in one transaction, it leaves its route, where a record it held passes to the best remaining eligible run (§7.4), and its rows are deleted. The recompute starts at the first finished trip at or after the deleted one.
+- **Per trip**, walking that trip and every later one:
+
+| Trip | What happens |
+|---|---|
+| `kind ≠ DRIVER` with a Smoothness | Withheld (§5.8): Smoothness, baseline, delta, basis, calibrating, bands, efficiency rating, tip and record state are cleared. The ledger, sub-scores and efficiency measures stay, so the trip can be a drive again |
+| `DRIVER`, no Smoothness, a ledger, not Unscorable | Re-scored from the ledger and its feedback (§5.4), tip included (§6.2). Under 120 s of exposure it stays as it is |
+| `DRIVER` with a Smoothness | Compared again: baseline, delta, basis, calibrating, contributor bands and the efficiency rating (§5.9) against its priors as they are now. Its Smoothness, sub-scores, events and tip stay |
+| No score, or no context | Left alone |
+
+- **Only changed scores are written**, in one transaction to the `score` table. An unchanged history writes nothing, which is what makes the walk deterministic and safe to repeat.
+- **Versions.** No recompute changes a score's `algorithmVersion`, and neither does the §5.4 feedback re-score. A trip keeps its version until a deliberate re-run from R1 (§0.6, F-SCO-04 AC3).
+- **Budget.** Later trips are read with one query per table, earlier ones a page at a time and once per walk. 2,000 trips recompute in about 0.4 s on the JVM (`HistoryRecomputeTest`).
+- **Not yet.** A later trip's tip and record state are not re-chosen: the tip depends on R1 for its excess-jerk window, and records are maintained by §7.4–7.5. A recompute interrupted by the app being killed leaves later comparisons stale until the next one; the next trigger repairs them.
+
 ### 5.8 Unscorable
 
 | Case | Result |
@@ -734,7 +752,7 @@ rating = BETTER if I ≤ −0.15; WORSE if I ≥ +0.15; else USUAL; null while c
 | Complete gentle stop ≥ rolling stop | Stop relief | G-06 |
 | Speed never raises the score | Allow-list, context order | G-07 |
 | Unusual pace sets no record | Pace band, §7.5 | G-11 |
-| Every guardrail passes before a version ships | CI | §8 |
+| Every guardrail passes before a version ships | CI: the "Scoring release gate" step of `shared.yml` runs G-06, G-07, G-11, the tip audit and both golden suites. The §8.3 table (`Goldens.TABLE_VERSION`) and the fixture goldens record the scoring version, so bumping `Versions.SCORING` without regenerating them fails (DRIVE-108) | §8 |
 
 ---
 
@@ -786,6 +804,8 @@ tipId within the category:
 | Cornering | Braking event within 3 s before → `corner_brake_before`. Peak in the first half → `corner_smooth_entry`. Otherwise `corner_unwind_exit` |
 | Consistency | `HIGHWAY` → `consist_hold_steady`. Otherwise `consist_longer_look` |
 | Anticipation | `stopStartCount ≥ 4` → `anticip_coast_red`. `CITY` → `anticip_leave_gap`. Otherwise `anticip_read_ahead` |
+
+**Audit (DRIVE-102).** `TipAudit` checks a stored tip: none on a trip that is not a drive, is Unscorable or has no Smoothness; its event, if any, is one of the trip's, is not "needed" or "not accurate", and is not LOW confidence; and its `tipId` is in the library under its category. Tests run it over everything the finaliser, the feedback re-score and the recompute write.
 
 The result is stored as `tip {tipId, category, eventId?, placeKey?}`. `placeKey` comes from the anchor event's position, or from the nearest gated fix to the middle of the anchor span, so every tip is tied to a place. Feedback re-runs selection, so a "needed" event can never remain the tip's anchor (F-SCO-05 AC2).
 
@@ -1029,6 +1049,14 @@ Run the §4–§5 stage on the same drives decimated to 25 Hz and at 50 Hz (usin
 | Battery %/h, screen off | Q11 | Spike 1, A19 |
 | 25 Hz vs 50 Hz | Median score difference ≤ 1, event concordance ≥ 95 % | P-21 |
 | Transit flagged | Q7 ≥ 50 % | A19 |
+
+**Precision and recall harness (DRIVE-93 AC2).** `EventHarness` matches detected events one-to-one with labelled ones of the same type whose peak is within ±1.0 s, nearest first, and checks the targets above per type over the whole set. A labelled trip is a §8.2 fixture `<id>.csv` with `<id>.labels.csv` beside it (`type,t_peak_s`, trip time). Both files start with `# privacy-trimmed` (ADR-008), A19 files included. `LabelledSetTest` runs the committed synthetic set (`shared/pipeline/src/jvmTest/resources/labelled`: three hard pull-aways, turns and stops among gentle driving, labelled by construction). The A19 set stays off the repository and runs with `./gradlew :shared:pipeline:jvmTest --tests '*LabelledSetTest' -PlabelledSet=<dir>`.
+
+**Analytics.** At trip end, `ScoreAnalyticsFinaliser` sends three events, with the buckets of `research/analytics-crash-privacy.md` §2. Re-scores and recomputes never pass through it.
+
+- `trip_finalised {mode, trigger, quality, duration_bucket, distance_bucket, score_bucket}`: once for every finalised trip. `score_bucket` comes from `scoreBucket(smoothness)` (`lt_50` … `90_100`) and is left out without a score. `quality` maps the Limited badge to `poor`.
+- `events_detected {type, count_bucket}`: once per type for every scored drive.
+- `baseline_established {trips}`: on the first drive compared with a baseline, with the scored drives it took (`lt_4`, `4`, `5_6`, `7_10`, `11_20`, `gt_20`).
 
 **Deliberate extreme manoeuvres happen only in controlled environments.** Ordinary-road testing must never ask a driver to create a dangerous event.
 

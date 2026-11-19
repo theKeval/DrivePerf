@@ -1,5 +1,6 @@
 package com.driveperf.pipeline.score
 
+import com.driveperf.domain.score.Band
 import com.driveperf.domain.score.Contributor
 import com.driveperf.domain.score.ContributorId
 import com.driveperf.domain.score.Efficiency
@@ -65,7 +66,8 @@ internal class TripScorer(private val cfg: ScoringConfig = ScoringConfig()) {
 
     /**
      * §5.4 instant recompute: drops the ledger rows of events marked needed or inaccurate and re-scores, without R1.
-     * Noise floors and the badge stay as computed at finalisation.
+     * Noise floors and the badge stay as computed at finalisation, and so does [Score.algorithmVersion]: a re-score is
+     * not a new algorithm run (F-SCO-04 AC3).
      */
     @Suppress("LongParameterList")
     fun rescore(
@@ -85,7 +87,7 @@ internal class TripScorer(private val cfg: ScoringConfig = ScoringConfig()) {
         val costs = activeEvents.associate { e -> e.id to eventCost(e, cfg) }
         val cv = score.efficiency?.speedConsistencyCv
         return calculator.score(total, wobble, context)
-            ?.let { assemble(ctx, context, it, ledger, activeEvents, costs, inputs, cv) }
+            ?.let { assemble(ctx, context, it, ledger, activeEvents, costs, inputs, cv).copy(algorithmVersion = score.algorithmVersion) }
             ?: insufficientExposure(score, ctx)
     }
 
@@ -133,7 +135,7 @@ internal class TripScorer(private val cfg: ScoringConfig = ScoringConfig()) {
                 subScore = sub,
                 value = values[id],
                 band = band,
-                reasonKey = band?.let { "${id.name.lowercase()}.${it.name.lowercase()}" },
+                reasonKey = reasonKey(id, band),
                 eventIds = eventsFor(id, activeEvents, costs),
             )
         }
@@ -205,6 +207,9 @@ internal class TripScorer(private val cfg: ScoringConfig = ScoringConfig()) {
         const val STOP_START_S = 3.0
     }
 }
+
+/** The §5.7 contributor reason key for [band], null while calibrating. */
+internal fun reasonKey(id: ContributorId, band: Band?): String? = band?.let { "${id.name.lowercase()}.${it.name.lowercase()}" }
 
 /** §5.3 event cost of a stored event, recomputed from its type, peak and confidence. */
 internal fun eventCost(e: DrivingEvent, cfg: ScoringConfig): Double {

@@ -64,7 +64,7 @@ class DrivesViewModelTest {
     }
 
     @Test
-    fun `Replay closes the trip sheet, then hands the trip to S-RPL-01 (DRIVE-200)`() = runTest {
+    fun `Replay hands the trip to S-RPL-01 and trip detail stays under it (DRIVE-200, DRIVE-55)`() = runTest {
         trips.value = listOf(trip("t", at(2026, 11, 10, 17, 42)))
         val model = vm()
         model.onAction(DrivesIntent.Open("t"))
@@ -72,6 +72,17 @@ class DrivesViewModelTest {
         model.effects.test {
             model.onAction(DrivesIntent.OpenReplay("t"))
             assertEquals(DrivesEffect.OpenReplay("t", "Tuesday evening", "Map of your drive, 19.9 km."), awaitItem())
+        }
+        assertEquals("t", model.state.value.detail?.id)
+    }
+
+    @Test
+    fun `a trip card asks for the trip detail push screen`() = runTest {
+        trips.value = listOf(trip("t", at(2026, 11, 10, 17, 42)))
+        val model = vm()
+        model.effects.test {
+            model.onAction(DrivesIntent.OpenTrip("t"))
+            assertEquals(DrivesEffect.OpenTrip("t"), awaitItem())
         }
         assertNull(model.state.value.detail)
     }

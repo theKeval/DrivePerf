@@ -28,7 +28,7 @@ with `firebase deploy --only firestore:indexes --project <dev|prod>` (on Keval's
 | Piece | Waiting for | Switch |
 |---|---|---|
 | Cloud Run deploy in `backend.yml` | Blaze upgrade, Artifact Registry, Workload Identity Federation (Phase 6, DRIVE-76) | repository variable `CLOUD_RUN_DEPLOY_ENABLED=true` plus `GCP_WIF_PROVIDER`, `GCP_DEPLOY_SA`, `GCP_PROJECT_ID`, `GCP_REGION` in the `dev` and `prod` environments. The steps are a sketch, untested until DRIVE-76 proves WIF |
-| `release-android.yml` | Keval's upload keystore, Play service account and first manual Play upload ([runbook](../launch/release-runbook.md) Part C). The Sentry R8 mapping upload joins with crash reporting (DRIVE-196) | repository variable `RELEASE_ANDROID_ENABLED=true` |
+| `release-android.yml` | Keval's upload keystore, Play service account and first manual Play upload ([runbook](../launch/release-runbook.md) Part C). Sentry ([runbook](../launch/release-runbook.md) Part F) is optional: without it the mapping upload is skipped with a warning | repository variable `RELEASE_ANDROID_ENABLED=true` |
 | `release-ios.yml` | Keval's App Store Connect API key, `match` repository and distribution certificate ([apple-developer-setup.md](../launch/apple-developer-setup.md) B1 to B4, [runbook](../launch/release-runbook.md) Part A). The dSYM upload is skipped with a warning until `SENTRY_AUTH_TOKEN` exists | repository variable `RELEASE_IOS_ENABLED=true` |
 | Maestro | the first flows in `.maestro/` | add the emulator and simulator jobs next to the flow check in `nightly.yml` |
 
@@ -51,9 +51,13 @@ has every secret and variable, the steps Keval takes to create them, how to cut 
 - **One deviation from ADR-008:** the Play upload uses a service-account JSON key, because `supply` cannot use Workload
   Identity Federation. The key has no Google Cloud role, only "Release apps to testing tracks" on this app, and lives
   only in `prod` (runbook C3).
-- **Symbols:** iOS dSYMs go to Sentry with a pinned `sentry-cli` and are kept as a run artifact for 90 days; the Android
-  R8 mapping goes to Play with each upload (for Android vitals) and is kept as an artifact. Sentry's own R8 mapping
-  upload arrives with crash reporting (DRIVE-196).
+- **Symbols:** iOS dSYMs go to Sentry with a pinned `sentry-cli` and are kept as a run artifact for 90 days. The
+  Android R8 mapping goes to Play with each upload (for Android vitals), to Sentry with `sentry-cli proguard upload`
+  under a UUID the workflow generates and the build writes into `sentry-debug-meta.properties` (DRIVE-196; no Sentry
+  Gradle plugin, which applied in the app module would load the Kotlin Gradle plugin a second time), and is kept as an
+  artifact. Both Sentry uploads are skipped with a warning until `SENTRY_AUTH_TOKEN` exists.
+- **Crash reporting DSNs (DRIVE-196):** the repository variables `SENTRY_DSN_IOS` and `SENTRY_DSN_ANDROID` go into the
+  release builds. Empty means the build has no DSN and crash reporting stays off, whatever the user chose.
 
 Nothing in `.github/workflows/` stores a secret. The release jobs read theirs from the `prod` environment at run time,
 and the pull-request job of each release workflow reads none.

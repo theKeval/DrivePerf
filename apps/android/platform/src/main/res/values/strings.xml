@@ -15,6 +15,11 @@
     <string name="capture_notification_chip">%1$d min</string>
     <string name="capture_notification_chip_hours">%1$d h</string>
     <string name="capture_notification_stop">Stop</string>
+    <string name="decoded_channel_name">Finished drives</string>
+    <string name="decoded_channel_description">One quiet notice after an automatic drive is finalised. It never shows a map or a place.</string>
+    <string name="decoded_notification_title">Drive decoded.</string>
+    <string name="decoded_notification_score">Smoothness %1$d</string>
+    <string name="decoded_notification_no_score">Open DrivePerf to see your drive.</string>
     <string name="auto_detect_channel_name">Auto-detect</string>
     <string name="auto_detect_channel_description">Tells you when automatic trips come back on after a pause.</string>
     <string name="auto_detect_resumed_title">Auto-detect is back on</string>

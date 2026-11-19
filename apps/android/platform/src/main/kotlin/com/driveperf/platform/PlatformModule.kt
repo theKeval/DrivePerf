@@ -12,7 +12,10 @@ import com.driveperf.domain.capture.PowerState
 import com.driveperf.domain.tripfile.TripFileStore
 import com.driveperf.foundation.Clock
 import com.driveperf.platform.activity.ActivityRecognitionSource
+import com.driveperf.platform.capture.AutoTripNoticeTaps
+import com.driveperf.platform.capture.AutoTripNoticeTracker
 import com.driveperf.platform.capture.CaptureFailureBus
+import com.driveperf.platform.capture.DriveDecodedNotice
 import com.driveperf.platform.capture.CaptureNotifications
 import com.driveperf.platform.capture.FileTripStore
 import com.driveperf.platform.location.FixWatch
@@ -46,6 +49,11 @@ val platformModule = module {
         val users = androidContext().getSystemService(UserManager::class.java)
         FileTripStore(File(androidContext().filesDir, "trips"), isUnlocked = users::isUserUnlocked)
     }
+    // DRIVE-137: the automatic trip's notice analytics and its "Drive decoded." replacement. Analytics and the trip
+    // repository come from the shared core in the app's module.
+    single { AutoTripNoticeTracker(get()) }
+    single { AutoTripNoticeTaps(get()) }
+    single { DriveDecodedNotice(androidContext(), get()) }
     single {
         CaptureNotifications(androidContext()) {
             get<SettingsRepository>().state.value.effectiveUnits(Locale.getDefault().country)

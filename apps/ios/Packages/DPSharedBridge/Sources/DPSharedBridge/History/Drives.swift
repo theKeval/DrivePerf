@@ -4,12 +4,12 @@ import Foundation
 // DRIVE-217, ADR-002 §4). Everything is already formatted by the core; the app target maps the Kotlin values into
 // these (`CoreDrivesPresenter`). Features never see Kotlin.
 
-/// One trip card (components.md §12, reduced to what the app has: no route label, score or car yet).
+/// One trip card (components.md §12).
 public struct TripRow: Identifiable, Equatable, Sendable {
     public var id: String
-    /// "Thursday morning"
+    /// The route label ("The Commute") when the trip has one, else "Thursday morning".
     public var title: String
-    /// "5 Nov · 8:14 am"
+    /// "Thursday morning · 5 Nov" under a route label, else "5 Nov · 8:14 am".
     public var subtitle: String
     /// "37.9 km"
     public var distance: String
@@ -30,11 +30,16 @@ public struct TripRow: Identifiable, Equatable, Sendable {
     public var isDimmed: Bool
     /// "Passenger" / "Bus or train" chip in place of the stats emphasis.
     public var kindLabel: String?
+    /// The score badge; nil when the score is hidden or before analysis.
+    public var score: ScoreBadge?
+    /// The car chip, only when the user has more than one car.
+    public var car: String?
 
     public init(
         id: String, title: String, subtitle: String, distance: String, duration: String, note: String? = nil,
         accessibilityLabel: String = "", quality: QualityBadge? = nil, qualityWord: String? = nil,
-        isInterrupted: Bool = false, question: TripQuestion? = nil, isDimmed: Bool = false, kindLabel: String? = nil
+        isInterrupted: Bool = false, question: TripQuestion? = nil, isDimmed: Bool = false, kindLabel: String? = nil,
+        score: ScoreBadge? = nil, car: String? = nil
     ) {
         self.id = id
         self.title = title
@@ -49,6 +54,8 @@ public struct TripRow: Identifiable, Equatable, Sendable {
         self.question = question
         self.isDimmed = isDimmed
         self.kindLabel = kindLabel
+        self.score = score
+        self.car = car
     }
 }
 
@@ -57,15 +64,18 @@ public struct TripSection: Identifiable, Equatable, Sendable {
     public var id: String
     /// "This week", "Last week", "19–25 Oct"
     public var title: String
-    /// "3 drives"
+    /// "3 drives · avg 84"
     public var meta: String
     public var rows: [TripRow]
+    /// "This week, 3 drives, average 84"
+    public var accessibilityLabel: String
 
-    public init(id: String, title: String, meta: String, rows: [TripRow]) {
+    public init(id: String, title: String, meta: String, rows: [TripRow], accessibilityLabel: String? = nil) {
         self.id = id
         self.title = title
         self.meta = meta
         self.rows = rows
+        self.accessibilityLabel = accessibilityLabel ?? "\(title), \(meta)"
     }
 }
 
@@ -145,10 +155,24 @@ public struct TripDetail: Equatable, Sendable {
     public var qualityWord: String?
     /// The current answer to "What was this?", for the picker's checkmark.
     public var correction: TripCorrection
+    public var meta: TripMeta?
+    /// Passenger or not a drive: no score, contributors, events or tip; a banner says why (F-RPL-07 AC4).
+    public var scoresHidden: Bool
+    /// The Smoothness card; nil while hidden or before the score has been read.
+    public var score: ScoreSummary?
+    public var breakdown: ScoreBreakdown?
+    public var events: TripEvents?
+    /// "9.5 km with no abrupt inputs."
+    public var cleanest: String?
+    public var tip: ScoreTip?
+    /// False once the detailed data was removed to save space.
+    public var canAnalyse: Bool
 
     public init(
         id: String, title: String, subtitle: String, banners: [TripBanner] = [], tiles: [ProvenancedValue] = [],
-        quality: QualityBadge? = nil, qualityWord: String? = nil, correction: TripCorrection = .driver
+        quality: QualityBadge? = nil, qualityWord: String? = nil, correction: TripCorrection = .driver,
+        meta: TripMeta? = nil, scoresHidden: Bool = false, score: ScoreSummary? = nil, breakdown: ScoreBreakdown? = nil,
+        events: TripEvents? = nil, cleanest: String? = nil, tip: ScoreTip? = nil, canAnalyse: Bool = true
     ) {
         self.id = id
         self.title = title
@@ -158,6 +182,14 @@ public struct TripDetail: Equatable, Sendable {
         self.quality = quality
         self.qualityWord = qualityWord
         self.correction = correction
+        self.meta = meta
+        self.scoresHidden = scoresHidden
+        self.score = score
+        self.breakdown = breakdown
+        self.events = events
+        self.cleanest = cleanest
+        self.tip = tip
+        self.canAnalyse = canAnalyse
     }
 }
 
@@ -251,11 +283,13 @@ public struct DrivesScreenState: Equatable, Sendable {
     public var sinceText: String?
     /// "What was this?" choices, in order.
     public var corrections: [CorrectionChoice]
+    /// S-SCO-02 How scores work.
+    public var explainer: HowScoresWork?
 
     public init(
         hasLoaded: Bool = false, trips: [TripRow] = [], latest: [TripRow]? = nil, notDrives: [TripRow] = [], sections: [TripSection] = [],
         canCorrect: Bool = false, detail: TripDetail? = nil, quality: DataQualityDetail? = nil, countText: String = "0 drives",
-        sinceText: String? = nil, corrections: [CorrectionChoice] = []
+        sinceText: String? = nil, corrections: [CorrectionChoice] = [], explainer: HowScoresWork? = nil
     ) {
         self.hasLoaded = hasLoaded
         self.trips = trips
@@ -268,6 +302,7 @@ public struct DrivesScreenState: Equatable, Sendable {
         self.countText = countText
         self.sinceText = sinceText
         self.corrections = corrections
+        self.explainer = explainer
     }
 }
 
@@ -278,6 +313,14 @@ public enum DrivesAction: Equatable, Sendable {
     case openQuality(tripId: String)
     case closeQuality
     case openReplay(tripId: String)
+    /// Analysis on trip detail: the presenter answers with `DrivesNavigation.openAnalysis`.
+    case openAnalysis(tripId: String)
+    /// S-SCO-01 is showing [tripId]: records `score_viewed {surface: breakdown}`.
+    case showBreakdown(tripId: String)
+    /// S-SCO-02 opened: records `scores_explainer_viewed {source}`. iOS pushes it with a navigation link.
+    case openHowScoresWork(source: ExplainerSource)
+    /// A contributor row was opened on S-SCO-01: records `contributor_tapped`.
+    case tapContributor(ScoreContributorID)
     case answer(tripId: String, yes: Bool)
     case correct(tripId: String, to: TripCorrection)
 }
@@ -286,6 +329,8 @@ public enum DrivesAction: Equatable, Sendable {
 public enum DrivesNavigation: Equatable, Sendable {
     /// Open S-RPL-01: `title` is shown under "Replay", `mapSummary` is the map's accessibility summary.
     case openReplay(tripId: String, title: String, mapSummary: String)
+    /// Open S-ANL-01: `title` is shown under "Analysis".
+    case openAnalysis(tripId: String, title: String)
 }
 
 /// The shared Drives presenter as features see it (DRIVE-217).
