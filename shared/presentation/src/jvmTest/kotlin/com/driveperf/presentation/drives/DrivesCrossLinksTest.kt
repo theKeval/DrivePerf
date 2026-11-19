@@ -68,7 +68,7 @@ class DrivesCrossLinksTest {
 
     private fun TestScope.presenter(maps: TripMapSource? = this@DrivesCrossLinksTest.maps) = DrivesPresenter(
         trips, null, MutableStateFlow(UnitSystem.METRIC), JavaTimeFormatter(), FixedClock(toronto(2026, 11, 10, 18)),
-        backgroundScope, reader, analytics, maps,
+        backgroundScope, reader, analytics, maps = maps,
     )
 
     private val brake = DrivingEvent("e1", "t", EventType.BRAKE, 120.0, 119.0, 121.4, 1.4, -0.42, null, 43.0, -79.0, 14.0, 0.0,
@@ -241,7 +241,7 @@ class DrivesCrossLinksTest {
     @Test
     fun `onMain with a map source owns its scope`() = runTest(UnconfinedTestDispatcher()) {
         val p = DrivesPresenter.onMain(trips, null, MutableStateFlow(UnitSystem.METRIC), JavaTimeFormatter(),
-            FixedClock(0L), reader, analytics, maps)
+            FixedClock(0L), reader, analytics, maps = maps)
         trips.value = listOf(trip())
         p.dispatch(DrivesIntent.Open("t"))
         assertNotNull(p.state.value.detail?.map)

@@ -53,8 +53,10 @@ public class TripAnalysisRepository(
         val preview = previews.read(tripId).orEmpty()
         val duration = maxOf(trip.durationS ?: 0.0, replay?.durationS ?: 0.0, trace?.let { it.size.toDouble() / it.rateHz } ?: 0.0)
         val data = AnalysisDataBuilder.build(duration, trip.distanceM, trace, preview, replay?.spans ?: qualitySpans(trip, duration))
-        val events = trips.events(tripId)
-        val markers = EventMarkers.build(events, trips.feedback(tripId), trip.quality?.spans.orEmpty())
+        // Events reported "Not accurate?" leave the ticks, the map, the G-G and its peaks, as they leave Replay's pins.
+        val feedback = trips.feedback(tripId)
+        val events = trips.events(tripId).filter { feedback[it.id]?.inaccurate == null }
+        val markers = EventMarkers.build(events, feedback, trip.quality?.spans.orEmpty())
         return TripAnalysis(trip, replay, data, markers, events, trips.score(tripId))
     }
 
