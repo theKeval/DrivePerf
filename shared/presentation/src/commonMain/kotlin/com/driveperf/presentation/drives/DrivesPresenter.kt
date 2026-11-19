@@ -23,6 +23,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -41,7 +42,9 @@ import kotlinx.coroutines.launch
  * @param units the user's unit system, from the shared settings.
  * @param clock its wall time decides "This week" and "Last week".
  * @param scores the trips' scores; null where they are not wired (previews), and then no score shows.
- * @param analytics `trip_detail_opened`, `score_viewed`, `scores_explainer_viewed` and `contributor_tapped`.
+ * @param analytics `trip_detail_opened`, `score_viewed`, `scores_explainer_viewed`, `contributor_tapped` and
+ *   `tip_evidence_opened`.
+ * @param maps the open trip's map hero (DRIVE-55); null where it is not wired, and then the hero hides.
  */
 @Suppress("LongParameterList", "TooManyFunctions") // the screens' inputs, injected so the state machine stays testable
 public class DrivesPresenter(
@@ -53,6 +56,7 @@ public class DrivesPresenter(
     scope: CoroutineScope,
     private val scores: ScoreReader? = null,
     private val analytics: Analytics? = null,
+    private val maps: TripMapSource? = null,
 ) : BasePresenter<DrivesState, DrivesIntent, DrivesEffect>(DrivesState(canCorrect = corrections != null), scope) {
     /** Which screen the open trip's score is viewed on (`score_viewed {surface}`). */
     private enum class Surface(val key: String) { TRIP_DETAIL("trip_detail"), BREAKDOWN("breakdown") }
@@ -73,6 +77,8 @@ public class DrivesPresenter(
         val pendingOpened: Boolean = false,
         /** `score_viewed` waits for the open trip's score. */
         val pendingView: Surface? = null,
+        /** The open trip's map hero, by trip ID; null until loaded. */
+        val detailMap: Pair<String, TripMapUi?>? = null,
     )
 
     private val inputs = MutableStateFlow(Inputs())
@@ -90,6 +96,21 @@ public class DrivesPresenter(
         }
         this.scope.launch { units.collect { system -> change { it.copy(units = system) } } }
         scores?.let(::observeScores)
+        maps?.let(::observeMap)
+    }
+
+    /**
+     * Loads the open trip's map hero, and again when its feedback changes: an event reported "Not accurate?" leaves
+     * the pins (DRIVE-55, DRIVE-39).
+     */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    private fun observeMap(source: TripMapSource) {
+        scope.launch {
+            inputs.map { i -> i.detailId?.let { id -> id to i.detailScore?.takeIf { it.tripId == id }?.feedback.orEmpty() } }
+                .distinctUntilChanged()
+                .mapLatest { key -> key?.let { (id, _) -> id to source.map(id) } }
+                .collect { loaded -> change { it.copy(detailMap = loaded) } }
+        }
     }
 
     @OptIn(ExperimentalCoroutinesApi::class)
@@ -123,6 +144,7 @@ public class DrivesPresenter(
                 scope.launch { port.answerSuspect(intent.tripId, if (intent.yes) SuspectAnswer.YES else SuspectAnswer.NO) }
             }
             is DrivesIntent.Correct -> corrections?.let { port -> scope.launch { port.correct(intent.tripId, intent.to) } }
+            is DrivesIntent.OpenEvidence, is DrivesIntent.OpenTip, is DrivesIntent.OpenTipEvidence -> crossLink(intent)
         }
     }
 
@@ -137,6 +159,28 @@ public class DrivesPresenter(
                 emit(DrivesEffect.OpenHowScoresWork)
             }
             is DrivesIntent.TapContributor -> track("contributor_tapped", "contributor" to intent.contributor.name.lowercase())
+            else -> Unit
+        }
+    }
+
+    /**
+     * The links from trip detail and the breakdown to the evidence sheet and the tip (DRIVE-87 AC2, DRIVE-55, DRIVE-102).
+     * An event reported "Not accurate?" is left out everywhere, so it has no evidence to open.
+     */
+    private fun crossLink(intent: DrivesIntent) {
+        val detail = state.value.detail
+        when (intent) {
+            is DrivesIntent.OpenEvidence -> {
+                val row = detail?.takeIf { it.id == intent.tripId }?.events?.rows?.firstOrNull { it.id == intent.eventId }
+                if (row?.excluded != true) emit(DrivesEffect.OpenEvidence(intent.tripId, intent.eventId))
+            }
+            is DrivesIntent.OpenTip -> emit(DrivesEffect.OpenTip(intent.tripId))
+            is DrivesIntent.OpenTipEvidence -> {
+                val tip = detail?.takeIf { it.id == intent.tripId }?.tip ?: return
+                val eventId = tip.eventId ?: return
+                track("tip_evidence_opened", "tip_id" to tip.tipId)
+                emit(DrivesEffect.OpenEvidence(intent.tripId, eventId))
+            }
             else -> Unit
         }
     }
@@ -210,6 +254,7 @@ public class DrivesPresenter(
     private fun detail(trip: Trip, i: Inputs, rows: TripRows, trips: List<Trip>, byId: Map<String, Trip>): TripDetailUi {
         val scoreDetail = i.detailScore?.takeIf { it.tripId == trip.id }
         val base = TripSheet(i.units, format).detail(trip, rows.title(trip), rows.subtitle(trip), scoreDetail?.car ?: rows.line(trip)?.car)
+            .copy(map = map(trip, i))
         if (scoreDetail == null || !trip.scoresShown) return base
         val score = TripScore(i.units, format) { id -> byId[id]?.startedAt }
         // The user's first scored drive ever reads "Your baseline" rather than "Calibrating · 1 of 3" (§5.7).
@@ -220,6 +265,17 @@ public class DrivesPresenter(
             events = score.events(trip, scoreDetail),
             cleanest = score.cleanest(trip, scoreDetail),
             tip = score.tip(scoreDetail),
+        )
+    }
+
+    /** The open trip's map hero with its label; its event pins hide with the scores (F-RPL-07 AC4). */
+    private fun map(trip: Trip, i: Inputs): TripMapUi? {
+        val map = i.detailMap?.takeIf { it.first == trip.id }?.second ?: return null
+        val pins = if (trip.scoresShown) map.pins else emptyList()
+        return map.copy(
+            pins = pins,
+            estimatedStart = (trip.estimatedDistanceM ?: 0.0) > 0,
+            accessibilityLabel = tripMapLabel(distanceText(trip.distance, i.units), pins.size, map.stops.size),
         )
     }
 
@@ -254,6 +310,23 @@ public class DrivesPresenter(
         ): DrivesPresenter {
             val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
             return DrivesPresenter(trips, corrections, units, format, clock, scope, scores, analytics).also { it.ownedScope = scope }
+        }
+
+        /** [onMain] with the open trip's map hero too (`CoreServices.drivesPresenter`, DRIVE-55). */
+        @Suppress("LongParameterList") // the screens' inputs
+        public fun onMain(
+            trips: Flow<List<Trip>>,
+            corrections: TripCorrections?,
+            units: Flow<UnitSystem>,
+            format: DrivesFormatter,
+            clock: Clock,
+            scores: ScoreReader?,
+            analytics: Analytics?,
+            maps: TripMapSource?,
+        ): DrivesPresenter {
+            val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+            return DrivesPresenter(trips, corrections, units, format, clock, scope, scores, analytics, maps)
+                .also { it.ownedScope = scope }
         }
     }
 }

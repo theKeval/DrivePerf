@@ -162,7 +162,7 @@ private fun GgBody(gg: GgView, timeline: AnalysisTimeline?, cursor: DoubleState,
                     ListItem(
                         modifier = Modifier.heightIn(min = 56.dp),
                         supportingContent = { Text(row.detail) },
-                        trailingContent = { TextButton(onClick = { controls.showEvent(row.eventId) }) { Text(row.value) } },
+                        trailingContent = { TextButton(onClick = { controls.openEvidence(row.eventId) }) { Text(row.value) } },
                     ) { Text(row.title) }
                 }
             }

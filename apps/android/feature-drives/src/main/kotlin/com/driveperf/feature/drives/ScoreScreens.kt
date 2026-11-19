@@ -3,6 +3,7 @@ package com.driveperf.feature.drives
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
@@ -76,7 +77,9 @@ fun ScoreBreakdownScreen(
         Hero(score, breakdown)
         if (score.isScored) {
             if (breakdown.options.isNotEmpty()) ComparedWith(breakdown)
-            WhatMovedIt(score.contributors, breakdown.contributorsFooter) { onAction(DrivesIntent.TapContributor(it)) }
+            WhatMovedIt(score.contributors, breakdown.contributorsFooter, { onAction(DrivesIntent.TapContributor(it)) }) {
+                onAction(DrivesIntent.OpenEvidence(tripId, it))
+            }
             Runs(breakdown)
         } else {
             breakdown.notScoredFooter?.let { Text(it, style = MaterialTheme.typography.bodySmall,
@@ -142,35 +145,21 @@ private fun ComparedWith(breakdown: BreakdownUi) {
     }
 }
 
-/** "What moved it": the four contributors; one with events expands to its event rows. */
+/**
+ * "What moved it": the four contributors; one with events expands to its event rows, and each row opens its evidence
+ * ([onEvent], DRIVE-87 AC2).
+ */
 @Composable
-private fun WhatMovedIt(contributors: List<ContributorUi>, footer: String, onTap: (ContributorId) -> Unit) {
+private fun WhatMovedIt(contributors: List<ContributorUi>, footer: String, onTap: (ContributorId) -> Unit, onEvent: (String) -> Unit) {
     var open by rememberSaveable { mutableStateOf(contributors.firstOrNull { it.events.isNotEmpty() }?.id?.name) }
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         SectionTitle(stringResource(R.string.score_what_moved_it))
         Surface(shape = MaterialTheme.shapes.large, color = cardColor, modifier = Modifier.fillMaxWidth()) {
-            Column(Modifier.padding(horizontal = 16.dp)) {
-                contributors.forEachIndexed { index, contributor ->
-                    if (index > 0) HorizontalDivider()
-                    val hasEvents = contributor.events.isNotEmpty()
-                    val isOpen = hasEvents && open == contributor.id.name
-                    ContributorRow(
-                        contributor,
-                        Modifier.then(
-                            if (hasEvents) {
-                                Modifier.clickable {
-                                    open = if (isOpen) null else contributor.id.name
-                                    if (!isOpen) onTap(contributor.id)
-                                }
-                            } else {
-                                Modifier
-                            },
-                        ),
-                        trailing = if (hasEvents) ({ Text(if (isOpen) "⌃" else "⌄",
-                            style = MaterialTheme.typography.titleMedium) }) else null,
-                    )
-                    if (isOpen) contributor.events.forEach { EventRow(it, Modifier.padding(start = 8.dp)) }
-                }
+            Box(Modifier.padding(horizontal = 16.dp)) {
+                ContributorList(contributors, open, onToggle = { id, opening ->
+                    open = if (opening) id.name else null
+                    if (opening) onTap(id)
+                }, onEvent = onEvent)
             }
         }
         Text(footer, style = MaterialTheme.typography.bodySmall, color = DrivePerfTheme.extendedColors.text2)

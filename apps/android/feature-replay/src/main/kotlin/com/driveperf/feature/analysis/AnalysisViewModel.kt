@@ -56,6 +56,9 @@ interface AnalysisControls {
 
     fun openReplay()
 
+    /** An event tick or a G-G peak row: S-RPL-02 for [eventId] (DRIVE-39 AC1). Dragging across a tick only scrubs. */
+    fun openEvidence(eventId: String) = Unit
+
     companion object {
         /** Controls that do nothing, for previews. */
         val None: AnalysisControls = object : AnalysisControls {
@@ -140,6 +143,11 @@ class AnalysisViewModel(presenterFactory: (CoroutineScope) -> AnalysisPresenter)
     override fun showEvent(eventId: String) = send(AnalysisIntent.ShowEvent(eventId))
 
     override fun openReplay() = send(AnalysisIntent.OpenReplay)
+
+    override fun openEvidence(eventId: String) = send(AnalysisIntent.OpenEvidence(eventId))
+
+    /** Feedback changed in the evidence sheet: read the analysis again, so an event reported "Not accurate?" leaves. */
+    fun reload() = send(AnalysisIntent.Reload)
 
     fun back() = send(AnalysisIntent.Back)
 

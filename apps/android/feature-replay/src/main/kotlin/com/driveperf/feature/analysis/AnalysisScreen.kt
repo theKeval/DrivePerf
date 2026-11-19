@@ -79,20 +79,28 @@ internal const val ANALYSIS_TAG = "analysis_screen"
 
 /**
  * S-ANL-01 Analysis, bound to its view model. [title] is the trip's title (part of day · label), shown under
- * "Analysis". [onReplay] opens S-RPL-01 for the trip.
+ * "Analysis". [onReplay] opens S-RPL-01 for the trip; [onEvidence] opens S-RPL-02 for an event of it (DRIVE-39 AC1).
  */
 @Composable
-fun AnalysisRoute(viewModel: AnalysisViewModel, title: String, onBack: () -> Unit, onReplay: (String) -> Unit) {
+fun AnalysisRoute(
+    viewModel: AnalysisViewModel,
+    title: String,
+    onBack: () -> Unit,
+    onReplay: (String) -> Unit,
+    onEvidence: (String) -> Unit = {},
+) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
     val back by rememberUpdatedState(onBack)
     val replay by rememberUpdatedState(onReplay)
+    val evidence by rememberUpdatedState(onEvidence)
     LaunchedEffect(viewModel) {
         viewModel.effects.collect { effect ->
             when (effect) {
                 AnalysisEffect.Close -> back()
                 is AnalysisEffect.OpenReplay -> replay(effect.tripId)
                 is AnalysisEffect.Message -> snackbar.showSnackbar(effect.text)
+                is AnalysisEffect.OpenEvidence -> evidence(effect.eventId)
             }
         }
     }
