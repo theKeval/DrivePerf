@@ -34,7 +34,8 @@ abstract class SentryDebugMetaTask : DefaultTask() {
 }
 
 // Google Maps (ADR-005, DRIVE-200): the restricted API key and the optional Night Drive Map ID come from local.properties
-// or the environment, never the repository (DRIVE-42 creates the key). Without a key Replay draws on the plain canvas.
+// or the environment, never the repository (DRIVE-216 created the key: release-runbook.md Part G). Without a key Replay
+// draws on the plain canvas.
 val localProperties = Properties().apply {
     rootProject.file("local.properties").takeIf { it.isFile }?.inputStream()?.use { load(it) }
 }
