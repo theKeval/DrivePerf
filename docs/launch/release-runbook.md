@@ -163,20 +163,31 @@ Until these steps are done the apps carry no DSN, so crash reporting does nothin
 
 ### F1. The Sentry organisation, EU region (ADR-007)
 
-1. Sign up at sentry.io and create the organisation. **Choose the EU data region (Frankfurt) at sign-up**: it can't be
-   changed later. The free Developer plan is enough for the beta.
-2. Organisation **Settings → Security & Privacy**: turn on **Prevent storing of IP addresses**, keep **Data Scrubber**
-   and **Use Default Scrubbers** on, and add an advanced data-scrubbing rule: *Replace* with `[location removed]`,
-   matching the regex `-?\d{1,3}\.\d{4,}\s*[,;/ ]\s*-?\d{1,3}\.\d{4,}` on all values (the same pattern the apps use).
-3. Create two projects: `driveperf-ios` (platform Apple iOS) and `driveperf-android` (Android). Skip the SDK setup
-   screens; the apps are already wired.
-4. In each project: **Settings → Client Keys (DSN)** → the default key → **Rate limiting**: for example 500 events per
-   hour, so a crash loop can't use up the month's quota. **Settings → Spike Protection** stays on.
+1. Sign up at sentry.io/signup. In the form, **Organization** becomes the organisation slug (`DrivePerf` →
+   `driveperf`), and **Data Storage Location** must be **European Union (EU)**, which is Frankfurt: it can't be changed
+   later. Sentry emails a verification link that opens `https://<slug>.sentry.io/onboarding/welcome/`. Check the region
+   under **Settings → General Settings → Data Storage Region**. A new organisation starts on a 14-day trial and drops
+   to the free Developer plan on its own; no card is needed, and the Developer plan is enough for the beta.
+2. Organisation **Settings → Security & Privacy**, under **Data Scrubbing**, turn on all three (at organisation level
+   they start off): **Require Data Scrubber**, **Require Using Default Scrubbers** and **Prevent Storing of IP
+   Addresses**. Optionally also turn on **Enhanced Privacy** (keeps PII and source code out of notifications).
+3. Same page, **Advanced Data Scrubbing → Add Rule**: Dataset *Errors, Transactions, Attachments*; Method **Replace**,
+   Placeholder `[location removed]`; Data Type **Regex matches**, Regex
+   `-?\d{1,3}\.\d{4,}\s*[,;/ ]\s*-?\d{1,3}\.\d{4,}` (the same pattern the apps use); Source `**` (every field).
+   Sentry then notes that deep wildcards also apply to log and metric attributes: expected. **Save Rule**; the list
+   then reads *[Replace] [the regex] with [[location removed]] from [\*\*]*.
+4. Create two projects from **Projects → Create Project → Set up manually**: `driveperf-ios` (platform **iOS**) and
+   `driveperf-android` (**Android**), on the default team. Skip the SDK setup screens and the "let your agent set up
+   Sentry" prompt: the apps are already wired.
+5. In each project: **Settings → Client Keys (DSN)** → **Configure** on the **Default** key → **Rate Limits**: Count
+   `500`, Time Window **1 hour**, **Save**, so a crash loop can't use up the month's quota. Spike protection is on by
+   default for each project; check it under organisation **Settings → Spike Protection**.
 
 ### F2. The DSNs (they turn crash reporting on in the builds)
 
 A DSN is not secret (every app binary contains it), but it is never committed. Copy each project's DSN from
-**Settings → Client Keys (DSN)**:
+**Settings → Client Keys (DSN)** (an EU DSN contains `ingest.de.sentry.io`) straight into the command, not into a file
+or chat:
 
 ```bash
 gh variable set SENTRY_DSN_IOS --repo theKeval/DrivePerf --body "<iOS DSN>"
@@ -186,14 +197,19 @@ gh variable set SENTRY_DSN_IOS --repo theKeval/DrivePerf --body "<iOS DSN>"
 gh variable set SENTRY_DSN_ANDROID --repo theKeval/DrivePerf --body "<Android DSN>"
 ```
 
+`gh variable list --repo theKeval/DrivePerf` shows the start of each value: the part before `@` is the project's key,
+so you can check the two are not swapped.
+
 The release lanes put them into the builds (`DP_SENTRY_DSN` on iOS, `DRIVEPERF_SENTRY_DSN` on Android). For a
 local device build, put `DP_SENTRY_DSN = <iOS DSN>` in the gitignored `apps/ios/Config/Local.xcconfig`, or run Gradle with
 `DRIVEPERF_SENTRY_DSN=<Android DSN>`. Leaving either empty turns crash reporting off for that build.
 
 ### F3. Symbol uploads (dSYMs and the R8 mapping)
 
-Sentry → Settings → **Developer Settings → Organization Tokens** → create `DrivePerf CI` (it carries the `org:ci` scope
-that symbol uploads need), then:
+Organisation **Settings → Organization Tokens** (`https://<slug>.sentry.io/settings/auth-tokens/`) → **Create New
+Token** → name `DrivePerf CI` → **Create Token**. Organisation tokens always carry the `org:ci` scope that symbol uploads
+need, and they also encode the EU region, so the lanes need no Sentry URL. Sentry shows the token once: copy it, run
+the first command below (it asks for the value without echoing it), and close the dialog only after `gh` confirms.
 
 ```bash
 gh secret set SENTRY_AUTH_TOKEN --env prod --repo theKeval/DrivePerf
@@ -217,11 +233,17 @@ under a UUID it also writes into the bundle.
 
 ### F4. Check it before the beta (ADR-007 confirmation)
 
-1. Install the first build that has the DSN, allow crash reports in onboarding (S-ONB-13) or Profile (S-PRV-07).
-2. Trigger a test crash on a test build and reopen the app, so the report is sent on the next launch. In Sentry: the
-   iOS crash, including one from shared Kotlin code, shows symbolicated frames and the tags `in_trip`, `capture_mode`,
-   `trip_state` and `app_build`, and nothing else; the Android crash shows de-obfuscated frames.
-3. Turn crash reports off in Profile: nothing more arrives.
+1. Cut a release (Part E). The run's annotations no longer warn that the Sentry upload was skipped, and the files show
+   up in Sentry: `driveperf-ios` → **Settings → Debug Files** lists the `DrivePerf` and `DrivePerfWidgets` dSYMs, and `driveperf-android` →
+   **Settings → ProGuard** lists the mapping under the run's UUID.
+2. Install that build, allow crash reports in onboarding (S-ONB-13) or Profile (S-PRV-07).
+3. Crash it and reopen the app, so the report is sent on the next launch. The release builds have no crash button or
+   debug hook, so this needs a build that can crash on purpose (a follow-up to DRIVE-196; until then this step waits
+   for the device checks in DRIVE-211). In Sentry: the iOS crash, including one from shared Kotlin code, shows
+   symbolicated frames; the Android crash shows de-obfuscated frames. Of the custom tags, only `in_trip`,
+   `capture_mode`, `trip_state` and `app_build` appear. Sentry's own tags (device, OS, release, level and so on)
+   are expected; no coordinates, user or IP address.
+4. Turn crash reports off in Profile: nothing more arrives.
 
 ## Halting a rollout on crash-free sessions (F-ANA-03 AC3)
 
