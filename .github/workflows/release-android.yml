@@ -6,8 +6,9 @@ name: release-android
 # environment, which needs Keval's approval for every run. Every secret lives in that environment; the runbook lists
 # them and how Keval creates them: docs/launch/release-runbook.md. Without PLAY_SERVICE_ACCOUNT_JSON the run stops
 # after the signed bundle (for the first, manual Play upload). With SENTRY_AUTH_TOKEN the R8 mapping also goes to
-# Sentry under a UUID the bundle carries, and SENTRY_DSN_ANDROID turns crash reporting on in the build (DRIVE-196). Nothing here creates tags. A pull request that touches
-# the lanes only loads them (no secrets, no environment).
+# Sentry under a UUID the bundle carries, and SENTRY_DSN_ANDROID turns crash reporting on in the build (DRIVE-196). With
+# MAPS_API_KEY, Replay draws Google map tiles; without it, the plain canvas (DRIVE-216). Nothing here creates tags. A pull
+# request that touches the lanes only loads them (no secrets, no environment).
 
 on:
   push:
@@ -96,6 +97,7 @@ jobs:
           DRIVEPERF_UPLOAD_STORE_PASSWORD: ${{ secrets.ANDROID_UPLOAD_STORE_PASSWORD }}
           DRIVEPERF_UPLOAD_KEY_ALIAS: ${{ secrets.ANDROID_UPLOAD_KEY_ALIAS }}
           DRIVEPERF_UPLOAD_KEY_PASSWORD: ${{ secrets.ANDROID_UPLOAD_KEY_PASSWORD }}
+          MAPS_API_KEY: ${{ secrets.MAPS_API_KEY }}
         run: ./gradlew --console=plain :apps:android:app:bundleProdRelease
 
       - name: Check the bundle is signed with the upload key
