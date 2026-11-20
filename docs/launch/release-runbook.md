@@ -245,6 +245,91 @@ under a UUID it also writes into the bundle.
    are expected; no coordinates, user or IP address.
 4. Turn crash reports off in Profile: nothing more arrives.
 
+## Part G. Google Maps key for Android Replay (Keval, DRIVE-216)
+
+Android Replay (DRIVE-200, [ADR-005](../architecture/adr/ADR-005-maps.md)) draws Google map tiles under the route when
+the build has `MAPS_API_KEY`. Without the key, offline, or when tiles fail, it draws the route on the plain canvas.
+Gradle reads `MAPS_API_KEY` and `MAPS_MAP_ID` from `local.properties` or the environment, puts the key in the manifest
+placeholder and sets `BuildConfig.HAS_MAPS_KEY` (`apps/android/app/build.gradle.kts`). iOS uses MapKit and needs no
+key. Set up on 20 Nov 2026.
+
+### G1. Project, billing and API
+
+- **Project:** `driveperf-prod` (DrivePerf). One key serves the dev and prod builds, because Gradle reads a single
+  `MAPS_API_KEY` for both flavours.
+- **Billing:** Maps SDK for Android needs a billing account on the project even though its map loads are free.
+  Linking it also put the prod Firebase project on **Blaze**: Firebase's free quotas still apply, and usage above them
+  is billed. A budget, `driveperf-prod monthly` (US$10, email alerts at 10 %, 50 % and 100 %), warns about any spend.
+  A budget alert does not cap spend.
+- **API:** only **Maps SDK for Android** (`maps-android-backend.googleapis.com`) is enabled for maps.
+- **Cost:** Google's pricing lists the "Maps SDK" SKU (native Android and iOS map loads) as free and unlimited.
+  Street View (not used) and map loads that use a **Map ID** are billed (G3).
+
+### G2. The API key
+
+Google Cloud console → *APIs & Services → Credentials* → **DrivePerf Android Maps (DRIVE-216)**:
+
+- **Application restrictions: Android apps.** Both packages, `com.driveperf.app` and `com.driveperf.app.dev`, each with
+  these SHA-1 certificate fingerprints:
+
+  | Signing certificate | Signs | Where to read its SHA-1 |
+  |---|---|---|
+  | Keval's local debug keystore (`~/.android/debug.keystore`) | `devDebug` and `prodDebug` builds from this Mac | `./gradlew :apps:android:app:signingReport` |
+  | Play **app signing key**, classical | what testers and users install from Play | Play Console → *Test and release → App integrity → App signing* |
+  | Play **app signing key**, post-quantum (beta) | the same, if Play ever serves it | same page |
+  | **Upload key** (C1) | the bundle CI uploads, if installed directly | same page |
+
+  A SHA-1 certificate fingerprint is not secret: it identifies a public certificate.
+- **API restrictions:** Maps SDK for Android only.
+
+The key was created with `gcloud services api-keys create` (`--api-target=service=maps-android-backend.googleapis.com`
+and one `--allowed-application=sha1_fingerprint=…,package_name=…` per pair). A new signing certificate (another Mac's
+debug keystore, an upload-key reset) needs its SHA-1 added for both packages: in the console, open the key → **Android
+apps → Add**. `gcloud services api-keys update --allowed-application` replaces the whole list, so pass every pair.
+
+**Never commit or paste the key.** These commands move it without printing it (`CLOUDSDK_CORE_DISABLE_FILE_LOGGING=1`
+keeps it out of gcloud's own logs):
+
+```bash
+export CLOUDSDK_CORE_DISABLE_FILE_LOGGING=1
+MAPS_KEY_UID=$(gcloud services api-keys list --project driveperf-prod --filter='displayName:DRIVE-216' --format='value(uid)')
+
+# Local builds: append to the gitignored local.properties at the repository root (each checkout or worktree has its own).
+k=$(gcloud services api-keys get-key-string "$MAPS_KEY_UID" --project driveperf-prod --format='value(keyString)') \
+  && printf 'MAPS_API_KEY=%s\n' "$k" >> local.properties; unset k
+
+# Release builds (Play internal testing): the `prod` environment secret read by release-android.yml.
+gcloud services api-keys get-key-string "$MAPS_KEY_UID" --project driveperf-prod --format='value(keyString)' \
+  | tr -d '\n' | env -u GITHUB_TOKEN gh secret set MAPS_API_KEY --env prod --repo theKeval/DrivePerf
+```
+
+On 20 Nov 2026 Keval asked the agent to run the `local.properties` step on this Mac; the key was piped, never shown.
+Keval sets the GitHub secret. Check it by name only: `env -u GITHUB_TOKEN gh secret list --env prod --repo theKeval/DrivePerf`.
+
+**Rotating:** create a new key with the same restrictions, replace it in `local.properties` and the `prod` secret,
+cut a release, then delete the old key.
+
+### G3. Night Drive Map ID: not used
+
+ADR-005 planned a cloud-styled Map ID for the Night Drive dark style with POIs off. Google's Map Management page says a
+Map ID on the Android or iOS Maps SDK makes each map load billable under the **Dynamic Maps** SKU: 10,000 free loads a
+month, then US$7 per 1,000. Without a Map ID the loads stay free and unlimited. Keval chose **no Map ID** (20 Nov 2026,
+[decisions.md](../product/decisions.md)). Replay uses the SDK's own dark or light scheme, so POIs stay visible and
+`MAPS_MAP_ID` stays unset.
+
+A map style named **Night Drive** is saved under *Google Maps Platform → Map Styles* (land `#0E131A`, water `#0A1A24`,
+roads `#1F2733`, labels `#7A8392`, POIs and transit stations hidden). A style costs nothing on its own. To use it
+later: *Map Management → Create map ID* (type **Android**), associate the Night Drive style, then set `MAPS_MAP_ID` in
+`local.properties` and as a `prod` variable (it is not secret), and pass it to the release build next to `MAPS_API_KEY`.
+
+### G4. Check it
+
+1. `./gradlew :apps:android:app:installDevDebug` with the phone connected.
+2. Open a drive → **Replay**. Map tiles appear under the route.
+3. The plain canvas instead of tiles means either the build has no key (`BuildConfig.HAS_MAPS_KEY` false: check
+   `local.properties`) or Google refused it. In the second case, `adb logcat | grep -i "Authorization failure"` names
+   the package and SHA-1 it saw: add that pair to the key (G2). Changes to a key can take a few minutes to apply.
+
 ## Halting a rollout on crash-free sessions (F-ANA-03 AC3)
 
 The rule: halt a staged rollout (Play) or pause a phased release (App Store) if a release's crash-free sessions drop
@@ -324,3 +409,4 @@ applies from the first production release (wave 2 onwards).
 | `SENTRY_ORG` | variable (optional) | repository | dSYM and R8 mapping upload | F3 |
 | `SENTRY_PROJECT_IOS` | variable (optional) | repository | dSYM upload | F3 |
 | `SENTRY_PROJECT_ANDROID` | variable (optional) | repository | R8 mapping upload | F3 |
+| `MAPS_API_KEY` | secret (optional) | env `prod` | Google map tiles in Android Replay; without it Replay uses the plain canvas | G2 |
