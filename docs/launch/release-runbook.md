@@ -17,10 +17,21 @@ these steps.
 
 - **Triggers:** a tag `v1.2.3`, or a manual run with a version input. Both jobs also need the repository variable
   `RELEASE_IOS_ENABLED` / `RELEASE_ANDROID_ENABLED` set to `true`; otherwise the run is skipped.
-- **Approval:** both jobs run in the GitHub environment `prod`, which waits for Keval's approval on every run.
+- **Approval:** both jobs run in the GitHub environment `prod`, which waits for Keval's approval on every run. Its
+  deployment policy allows the branch `main` and the tag pattern `v*`; without the tag rule a tag push is refused before
+  it reaches the approval. To add it once:
+
+  ```bash
+  gh api -X POST repos/theKeval/DrivePerf/environments/prod/deployment-branch-policies -f name='v*' -f type=tag
+  ```
+
+- **`gh` and a session token:** if your shell exports a `GITHUB_TOKEN` that cannot write secrets or variables, `gh`
+  fails with HTTP 403. Prefix the `gh` commands in this runbook with `env -u GITHUB_TOKEN` to use your own login.
 - **Versions:** the marketing version comes from the tag (`v0.2.0` → `0.2.0`) or the input. The build number (iOS
   `CFBundleVersion`) and version code (Android) are the workflow's run number, so each lane counts up on its own.
-  Re-running a failed run reuses its number: fine if the upload had not happened yet; otherwise start a new run.
+  Pull-request runs of the same workflow count too, so numbers skip (the first beta builds were 0.1.0 (3) on both
+  platforms). Re-running a failed run reuses its number: fine if the upload had not happened yet; otherwise start a
+  new run.
 - **Pull requests** that touch `fastlane/**` or a release workflow run one job, "Load the Fastlane lanes", which
   installs the bundle and lists the lanes. It has no secrets and no environment.
 
@@ -74,14 +85,17 @@ gh secret set ANDROID_UPLOAD_KEY_PASSWORD --env prod --repo theKeval/DrivePerf
 gh secret set ANDROID_UPLOAD_KEY_ALIAS --env prod --repo theKeval/DrivePerf --body upload
 ```
 
-The two password commands prompt for the value. Then delete the local `.jks`.
+The two password commands prompt for the value. Check that the saved password opens the keystore
+(`keytool -list -keystore driveperf-upload.jks` shows one `upload` `PrivateKeyEntry`), back the `.jks` up (a password
+manager that holds attachments, or an encrypted disk image), then delete the local copy.
 
 ### C2. The Play app and the internal testing track
 
 1. Play Console → **Create app** (if it is not there yet): name DrivePerf, app, free, then accept the declarations.
    The package name is fixed by the first upload: it must be `com.driveperf.app`.
 2. **Testing → Internal testing → Testers:** create an email list (for example `DrivePerf team`) with the Google
-   accounts of the testers, and save. Copy the **opt-in link**: each tester opens it once to join.
+   accounts of the testers, and save. Copy the **opt-in link**: each tester opens it once to join. Its copy button
+   stays disabled until the first release (C4); the link is already shown on hover.
 3. Play App Signing is on by default for new apps. Leave it on: Google holds the app signing key, the upload key from C1
    only proves the upload is yours.
 
@@ -96,7 +110,8 @@ The two password commands prompt for the value. Then delete the local `.jks`.
 3. Play Console → **Users and permissions → Invite new users** → the service account's email → **App permissions** →
    DrivePerf → tick **Release apps to testing tracks** and **View app information (read only)** → invite. No
    account-level permissions. The grant can take a while to take effect.
-4. Add the key, then delete the file (keep a copy in the password manager):
+4. **After C4**, add the key, then delete the file (keep a copy in the password manager). Steps 1 to 3 can happen
+   before C4; set the secret only once the first release is out, or the C4 run tries the API upload and fails:
 
    ```bash
    gh secret set PLAY_SERVICE_ACCOUNT_JSON --env prod --repo theKeval/DrivePerf < play-release.json
@@ -114,9 +129,16 @@ Google's API accepts uploads only for an app that already has a bundle. So the f
 1. Leave `PLAY_SERVICE_ACCOUNT_JSON` unset for now (or do C3 later), set `RELEASE_ANDROID_ENABLED=true` (Part D), and
    run the workflow (Part E). It builds and signs the bundle, warns "Play upload skipped" and keeps the AAB as the
    artifact `android-prod-release-<version>-<run>`.
-2. Download the artifact, unzip it, and in Play Console → **Testing → Internal testing → Create new release** upload
-   `app-prod-release.aab`. Play registers the upload key from it. Add release notes, **Save**, **Review release**,
-   **Start rollout to Internal testing**.
+2. Download the artifact (or use the run page → **Artifacts**):
+
+   ```bash
+   gh run download <run id> --repo theKeval/DrivePerf --name android-prod-release-<version>-<run> --dir ~/Downloads/driveperf-first-aab
+   ```
+
+   It holds `bundle/prodRelease/app-prod-release.aab` and `mapping/prodRelease/mapping.txt`. In Play Console →
+   **Testing → Internal testing → Create new release**, keep **Use Google-generated key** if asked about app signing,
+   and upload `app-prod-release.aab`. Play registers the upload key from it. Add release notes, **Next**, then **Save
+   and publish** / **Start rollout to Internal testing**. A warning about the missing deobfuscation file is fine.
 3. From then on the lane uploads. If a lane upload fails with "Only releases with status draft may be created on
    draft app", set the repository variable `PLAY_RELEASE_STATUS=draft` (each upload then waits for you to roll it out
    in the Play Console) and remove it once the app's first release is out.
@@ -235,8 +257,9 @@ applies from the first production release (wave 2 onwards).
    ```
 
 2. GitHub → **Actions** → the run → **Review deployments** → `prod` → **Approve and deploy**.
-3. iOS: the run ends at the upload (about 30 to 45 minutes). Apple processes the build for 10 to 30 minutes more, then
-   it appears in TestFlight for the internal group. Android: the build is on the internal track as soon as the run
+3. iOS: the run ends at the upload (about 30 to 45 minutes; the first run took 10). Apple processes the build for 10 to
+   30 minutes more, then it appears in TestFlight for the internal group. Its status then reads **Ready to Submit**:
+   that refers to Beta App Review for external groups only, and internal testers can already install it. Android: the build is on the internal track as soon as the run
    ends; testers who joined through the opt-in link update from the Play Store.
 4. **Done when** the build installs from TestFlight on Keval's iPhone and from the Play Store (internal testing) on
    Keval's Android phone.
