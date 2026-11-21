@@ -1003,9 +1003,10 @@
         { t: 'Lock DrivePerf in Recents', p: 'Open Recents, then pull DrivePerf down until the lock shows', cta: null },
       ] },
     otherOEM: { brand: 'OnePlus', detected: 'OnePlus · OxygenOS', title: 'Keep DrivePerf running on your OnePlus',
-      lead: 'Some phones pause apps in the background to save battery. When that happens, drives don’t start on their own. Two settings fix it.',
+      lead: 'Some phones pause apps in the background to save battery. When that happens, drives don’t start on their own. Three settings fix it.',
       steps: [
         { t: 'Allow background activity', p: 'Settings › Apps › DrivePerf › Battery usage', cta: 'Open app battery', toast: 'Opens App info › Battery usage' },
+        { t: 'Allow auto launch, so drives still start after an app update', p: 'Settings › Apps › DrivePerf › Battery usage › Allow auto launch', cta: 'Open app battery', toast: 'Opens App info › Battery usage' },
         { t: 'Turn off battery optimisation for DrivePerf', p: 'Settings › Battery › Battery optimisation', cta: 'Open battery optimisation', toast: 'Opens Battery optimisation' },
       ] },
   };

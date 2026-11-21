@@ -54,13 +54,27 @@ class OemGuidesTest {
     }
 
     @Test
-    fun `Samsung has two steps, Xiaomi three with a last step that has no button, OnePlus two`() {
+    fun `Samsung has two steps, Xiaomi three with a last step that has no button, OnePlus three`() {
         assertEquals(2, OemGuides.forDevice("samsung")!!.steps.size)
         val xiaomi = OemGuides.forDevice("xiaomi")!!.steps
         assertEquals(3, xiaomi.size)
         assertNull(xiaomi.last().button)
         assertTrue(xiaomi.last().links.isEmpty())
-        assertEquals(2, OemGuides.forDevice("oneplus")!!.steps.size)
+        assertEquals(3, OemGuides.forDevice("oneplus")!!.steps.size)
+    }
+
+    @Test
+    fun `the OnePlus guide asks for auto launch on the app's battery page, between background activity and battery optimisation`() {
+        // DRIVE-221: OxygenOS blocks MY_PACKAGE_REPLACED without auto launch, so automatic trips stay off after an update.
+        val steps = OemGuides.forDevice("OnePlus")!!.steps
+        assertEquals(
+            listOf(R.string.onb_oem_oneplus_step1, R.string.onb_oem_oneplus_step2, R.string.onb_oem_oneplus_step3),
+            steps.map(GuideStep::title),
+        )
+        assertEquals(R.string.onb_oem_oneplus_step2_path, steps[1].path)
+        assertEquals(R.string.onb_oem_open_app_battery, steps[1].button)
+        assertEquals(listOf<GuideLink>(GuideLink.AppDetails), steps[1].links)
+        assertEquals(listOf<GuideLink>(GuideLink.BatteryOptimisationSettings), steps[2].links)
     }
 
     @Test
