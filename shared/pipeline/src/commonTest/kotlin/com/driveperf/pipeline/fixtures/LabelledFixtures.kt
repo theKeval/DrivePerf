@@ -16,6 +16,15 @@ internal object LabelledFixtures {
     /** About 7 min of city driving: three hard pull-aways, three hard turns and three hard stops, plus gentle driving. */
     val city: Labelled by lazy {
         val c = SyntheticCapture(Mount.rotated(Mount.PORTRAIT_UPRIGHT, 15.0, 10.0), startLat = 4.5, startLng = -29.5, seed = 44)
+        val labels = cityDrive(c)
+        Labelled(DriveFixtures.Fixture("syn-labelled-city-01", "Labelled: three hard pull-aways, turns and stops", c.streams()), labels)
+    }
+
+    /**
+     * [city]'s manoeuvres driven on [c], from its current time. Returns the hard ones' labels on [c]'s time base. The A19
+     * tool's tests drive it on two phones at once.
+     */
+    fun cityDrive(c: SyntheticCapture): List<LabelledEvent> {
         val labels = mutableListOf<LabelledEvent>()
         fun hard(type: EventType, manoeuvre: () -> Unit) {
             val t0 = c.seconds
@@ -47,7 +56,7 @@ internal object LabelledFixtures {
             c.cruise(10.0)
             c.stop(1.6, 1.5, 15.0)
         }
-        Labelled(DriveFixtures.Fixture("syn-labelled-city-01", "Labelled: three hard pull-aways, turns and stops", c.streams()), labels)
+        return labels
     }
 
     val all: List<Labelled> get() = listOf(city)
