@@ -248,7 +248,7 @@ internal class TripMachine(private val cfg: CaptureConfig = CaptureConfig()) {
     private fun onWake(s: MachineState, e: MachineEvent.Wake): Transition {
         val manual = e.wake.kind == WakeKind.MANUAL
         val t = when {
-            s.phase == FINISHING -> Transition(s.copy(pendingWake = e))
+            s.phase == FINISHING -> Transition(if (s.replacesPendingWake(e, isStale(e))) s.copy(pendingWake = e) else s)
             manual && s.phase == CANDIDATE -> promoteToManual(s, e)
             s.phase != IDLE || s.dbLocked -> Transition(s)
             manual -> startCapture(s, e, manual = true)
@@ -497,16 +497,9 @@ internal class TripMachine(private val cfg: CaptureConfig = CaptureConfig()) {
         )
     }
 
-    private fun stopSeconds(trip: ActiveTrip): Double = if (trip.manual) cfg.manualStopS else cfg.autoStopS
+    private fun stopSeconds(trip: ActiveTrip): Double = cfg.stopSeconds(trip)
 
-    /** When the stop timer is due: [stoppingBeganAtNs] plus the stop time, while paused. */
-    private fun MachineState.stopDueNs(): Long? {
-        val began = stoppingBeganAtNs
-        val t = trip
-        return if (phase == PAUSED && began != null && t != null) began + secondsNs(stopSeconds(t)) else null
-    }
-
-    private fun MachineState.isStopOverdue(nowNs: Long): Boolean = stopDueNs()?.let { nowNs >= it } ?: false
+    private fun MachineState.isStopOverdue(nowNs: Long): Boolean = isStopOverdue(nowNs, cfg)
 
     private fun resumeCheck(s: MachineState, fix: LocationSample, nowNs: Long): Transition {
         val fresh = nowNs - fix.tMonoNs in 0L..secondsNs(cfg.resumeFixAgeS)
@@ -728,17 +721,9 @@ internal class TripMachine(private val cfg: CaptureConfig = CaptureConfig()) {
         if (s.phase != FINISHING) return Transition(s)
         val parking = e.parking ?: s.parking
         val ended = listOf(MachineEffect.StopGnss) + armAt(parking)
-        val next = s.pendingWake?.let { onWake(idle(s, parking), deferredWake(it, e.nowNs, parking)) }
+        val next = s.pendingWake?.let { onWake(idle(s, parking), it.deferredTo(e.nowNs, parking)) }
             ?: Transition(idle(s, parking), checkIn(s))
         return Transition(next.state, ended + next.effects)
-    }
-
-    /** [wake] as handled at [nowNs]: a new trip starts then, bounded by the parking just recorded. */
-    private fun deferredWake(wake: MachineEvent.Wake, nowNs: Long, parking: Parking?): MachineEvent.Wake {
-        val waitedNs = maxOf(0L, nowNs - wake.nowNs)
-        val wallMs = wake.nowWallMs + waitedNs / Units.NANOS_PER_MILLI
-        val header = wake.newTrip.copy(startMonoNs = nowNs, startWallMs = wallMs, parking = parking)
-        return wake.copy(nowNs = nowNs, nowWallMs = wallMs, newTrip = header)
     }
 
     // ---- helpers ----

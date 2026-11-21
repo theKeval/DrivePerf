@@ -200,6 +200,28 @@ class OverdueStopTest {
     }
 
     @Test
+    fun aLateStaleWakeDoesNotDisplaceTheWakeThatEndedTheTrip() {
+        val finishing = wake(parked(), afterParkS, WakeKind.ACTIVITY_VEHICLE, id = "trip-2").state
+        val staleAtS = afterParkS - 400
+        val stale = m.reduce(
+            finishing,
+            MachineEvent.Wake(
+                ns(afterParkS + 1), wallAt(afterParkS + 1), WakeEvent(WakeKind.PARKED_EXIT, ns(staleAtS), wallAt(staleAtS)),
+                header(afterParkS + 1, WakeKind.PARKED_EXIT, id = "trip-3"),
+            ),
+        )
+        assertEquals("trip-2", stale.state.pendingWake?.newTrip?.tripId)
+
+        val manual = wake(stale.state, afterParkS + 2, WakeKind.MANUAL, id = "trip-4").state
+        assertEquals("trip-4", manual.pendingWake?.newTrip?.tripId, "the user's Start replaces an automatic wake")
+        val auto = wake(manual, afterParkS + 3, WakeKind.ACTIVITY_VEHICLE, id = "trip-5").state
+        assertEquals("trip-4", auto.pendingWake?.newTrip?.tripId, "and is never replaced")
+        val next = m.reduce(auto, MachineEvent.Finalised(ns(afterParkS + 4), parking))
+        assertEquals(RecorderState.RECORDING, next.state.phase)
+        assertEquals("trip-4", next.state.trip?.id)
+    }
+
+    @Test
     fun aWakeWhileAnyTripIsFinishingStartsTheNextTripOnceItIsCommitted() {
         val moving = drive(wake(idle, 0.0, WakeKind.MANUAL).state, 1, 30, 10.0).state
         val finishing = m.reduce(moving, MachineEvent.UserStop(ns(40.0))).state
