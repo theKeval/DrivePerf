@@ -3,7 +3,9 @@ package com.driveperf.pipeline.fixtures
 import com.driveperf.domain.capture.CaptureHeader
 import com.driveperf.domain.capture.CapturedTrip
 import com.driveperf.domain.capture.WakeKind
+import com.driveperf.domain.trip.EventType
 import com.driveperf.pipeline.score.EventHarness
+import com.driveperf.pipeline.score.TypeCounts
 import com.driveperf.testing.FixtureCsv
 import com.driveperf.testing.SyntheticCapture
 import kotlinx.coroutines.test.runTest
@@ -47,8 +49,10 @@ class LabelledSetTest {
     @Test
     fun theLabelledSetMeetsThePrecisionAndRecallTargets() = runTest {
         val harness = PipelineHarness()
+        val external = set.canonicalFile != committed.canonicalFile
         val labelled = set.listFiles { f -> f.name.endsWith(".labels.csv") }.orEmpty().sortedBy { it.name }
         assertTrue(labelled.isNotEmpty(), "no <id>.labels.csv in $set")
+        var km = 0.0
         val perTrip = labelled.map { labelsFile ->
             val id = labelsFile.name.removeSuffix(".labels.csv")
             listOf(labelsFile, File(set, "$id.csv")).forEach { f ->
@@ -56,15 +60,46 @@ class LabelledSetTest {
             }
             val parsed = FixtureCsv.parse(File(set, "$id.csv").readText())
             val trip = checkNotNull(harness.run(captureOf(id, parsed)).trip) { "$id finalised to no trip" }
-            EventHarness.evaluate(EventHarness.of(trip.events), EventHarness.parseLabels(labelsFile.readText()))
+            val text = labelsFile.readText()
+            val counts = EventHarness.evaluate(
+                EventHarness.of(trip.events), EventHarness.parseLabels(text), coverage = EventHarness.parseCoverage(text),
+            )
+            val tripKm = (trip.trip.distanceM ?: 0.0) / M_PER_KM
+            km += tripKm
+            println("DRIVE-93 trip $id ${"%.1f".format(tripKm)} km $counts")
+            counts
         }
         val counts = EventHarness.total(perTrip)
-        println("DRIVE-93 labelled set ${set.name}: ${labelled.size} trips, $counts")
-        assertEquals(emptyList(), EventHarness.failures(counts), counts.toString())
+        println("DRIVE-93 labelled set ${set.name}: ${labelled.size} trips, ${"%.1f".format(km)} km, $counts")
+        counts.forEach { (type, c) -> println("DRIVE-93 ${report(type, c, km)}") }
+        // The committed set is labelled by construction and judged in full; a field set needs enough confirmed labels.
+        val minLabels = if (external) EventHarness.MIN_LABELS else 0
+        if (external) {
+            EventHarness.insufficient(counts).forEach { println("DRIVE-93 $it: insufficient data (< $minLabels confirmed labels)") }
+        }
+        assertEquals(emptyList(), EventHarness.failures(counts, minLabels), counts.toString())
     }
 
-    private fun captureOf(id: String, p: FixtureCsv.Parsed) = CapturedTrip(
-        CaptureHeader(id, SyntheticCapture.START_MONO_NS, SyntheticCapture.WALL0, -300, "Etc/GMT+5", WakeKind.MANUAL, null, 50, null),
-        p.fixes, p.motion, p.activity, emptyList(), emptyList(),
-    )
+    private fun report(type: EventType, c: TypeCounts, km: Double): String {
+        fun rate(k: Int, n: Int): String = EventHarness.wilson95(k, n)?.let { ci ->
+            "%.0f %% [%.0f–%.0f]".format(PCT * k / n, PCT * ci.start, PCT * ci.endInclusive)
+        } ?: "unavailable"
+        fun per100(x: Int): String = if (km <= 0.0) "unavailable" else "%.1f".format(x * HUNDRED_KM / km)
+        return "$type TP=${c.truePositives} FP=${c.falsePositives} FN=${c.falseNegatives} " +
+            "precision ${rate(c.truePositives, c.truePositives + c.falsePositives)} " +
+            "recall ${rate(c.truePositives, c.truePositives + c.falseNegatives)} " +
+            "per 100 km TP ${per100(c.truePositives)} FP ${per100(c.falsePositives)} FN ${per100(c.falseNegatives)}"
+    }
+
+    internal companion object {
+        private const val M_PER_KM = 1000.0
+        private const val HUNDRED_KM = 100.0
+        private const val PCT = 100.0
+
+        /** How a labelled fixture is replayed: a manual capture of its streams. The A19 tool uses it for the time base. */
+        fun captureOf(id: String, p: FixtureCsv.Parsed) = CapturedTrip(
+            CaptureHeader(id, SyntheticCapture.START_MONO_NS, SyntheticCapture.WALL0, -300, "Etc/GMT+5", WakeKind.MANUAL, null, 50, null),
+            p.fixes, p.motion, p.activity, emptyList(), emptyList(),
+        )
+    }
 }
