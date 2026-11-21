@@ -1,6 +1,8 @@
 package com.driveperf.pipeline.fixtures
 
 import com.driveperf.domain.trip.EventType
+import com.driveperf.domain.capture.LocationSample
+import com.driveperf.pipeline.score.Coverage
 import com.driveperf.pipeline.score.EventHarness
 import com.driveperf.pipeline.score.LabelledEvent
 import com.driveperf.pipeline.score.TypeCounts
@@ -118,6 +120,49 @@ class A19LabellerTest {
         val course = kept.zip(out).firstNotNullOf { (a, b) -> if (a.courseDeg != null) a.courseDeg!! to b.courseDeg!! else null }
         assertEquals(((course.first - Math.toDegrees(2.0)) % 360 + 360) % 360, course.second, 0.06)
     }
+
+    @Test
+    fun anImuGapInsideAKeptStretchIsNotCovered() {
+        val r = drive.reference
+        val before = A19Reference.frame(r.motion, r.fixes, r::tS)
+        val run = A19Reference.runs(before.ok).maxBy { it.count() }
+        val gapAt = before.tS((run.first + run.last) / 2)
+        val gapped = r.withoutMotion { t -> abs(t - gapAt) <= 0.5 }
+        val after = A19Reference.frame(gapped.motion, gapped.fixes, gapped::tS)
+        val hole = after.unstable.single { gapAt in it }
+        // The 1 s gap plus a guard second each side, give or take a grid step.
+        assertEquals(3.0, hole.endInclusive - hole.start, 0.2, after.unstable.toString())
+        assertTrue(before.unstable.none { gapAt in it })
+    }
+
+    @Test
+    fun aPairWithNoCoverageLeftIsSkippedNotWrittenAsFullyCovered() {
+        // A 0.4 s IMU gap every 25 s: the reference still solves, but no covered run reaches 30 s.
+        val gappy = drive.reference.withoutMotion { t -> t % 25.0 < 0.4 }
+        val f = A19Reference.frame(gappy.motion, gappy.fixes, gappy::tS)
+        assertTrue(f.usable, "the frame still solves: GNSS rho ${f.gnssRho}")
+        val pairing = A19Labeller.pair(listOf(drive.candidate), listOf(gappy)).single()
+        val e = A19Labeller.entry(pairing, "rec-a19-01", trimM = 100.0) { id, csv -> base(id, csv) }
+        assertEquals(null, e.labelsCsv, e.summary)
+        assertTrue("no reference coverage" in e.summary, e.summary)
+    }
+
+    @Test
+    fun ratesAreNormalisedByTheCoveredDistanceOnly() {
+        // 10 m/s due north for 60 s, one fix a second; 20 s of it covered, starting 5 s after the trip's start.
+        val fixes = (0..60).map { s ->
+            LocationSample(
+                SyntheticCapture.START_MONO_NS + s * 1_000_000_000L, SyntheticCapture.WALL0 + s * 1000L,
+                2.5 + s * 10.0 / 111_195.0, -27.5, null, 5.0, null, 10.0, null, 0.0, null,
+            )
+        }
+        val coverage = Coverage(listOf(10.0..30.0))
+        assertEquals(200.0, LabelledSetTest.coveredM(fixes, coverage, baseS = 5.0), 1.0)
+        assertEquals(600.0, LabelledSetTest.coveredM(fixes, Coverage(), baseS = 5.0), 1.0)
+    }
+
+    private fun A19Labeller.Recording.withoutMotion(drop: (Double) -> Boolean) =
+        A19Labeller.Recording(id, platform, startWallMs, fixes, motion.filterNot { drop(tS(it.tMonoNs)) }, activity)
 
     private fun base(id: String, csv: String): Double {
         val trip = checkNotNull(runBlocking { PipelineHarness().run(LabelledSetTest.captureOf(id, FixtureCsv.parse(csv))) }.trip)

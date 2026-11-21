@@ -2,8 +2,10 @@ package com.driveperf.pipeline.fixtures
 
 import com.driveperf.domain.capture.CaptureHeader
 import com.driveperf.domain.capture.CapturedTrip
+import com.driveperf.domain.capture.LocationSample
 import com.driveperf.domain.capture.WakeKind
 import com.driveperf.domain.trip.EventType
+import com.driveperf.pipeline.score.Coverage
 import com.driveperf.pipeline.score.EventHarness
 import com.driveperf.pipeline.score.TypeCounts
 import com.driveperf.testing.FixtureCsv
@@ -53,6 +55,7 @@ class LabelledSetTest {
         val labelled = set.listFiles { f -> f.name.endsWith(".labels.csv") }.orEmpty().sortedBy { it.name }
         assertTrue(labelled.isNotEmpty(), "no <id>.labels.csv in $set")
         var km = 0.0
+        var totalKm = 0.0
         val perTrip = labelled.map { labelsFile ->
             val id = labelsFile.name.removeSuffix(".labels.csv")
             listOf(labelsFile, File(set, "$id.csv")).forEach { f ->
@@ -61,16 +64,20 @@ class LabelledSetTest {
             val parsed = FixtureCsv.parse(File(set, "$id.csv").readText())
             val trip = checkNotNull(harness.run(captureOf(id, parsed)).trip) { "$id finalised to no trip" }
             val text = labelsFile.readText()
-            val counts = EventHarness.evaluate(
-                EventHarness.of(trip.events), EventHarness.parseLabels(text), coverage = EventHarness.parseCoverage(text),
-            )
+            val coverage = EventHarness.parseCoverage(text)
+            val counts = EventHarness.evaluate(EventHarness.of(trip.events), EventHarness.parseLabels(text), coverage = coverage)
             val tripKm = (trip.trip.distanceM ?: 0.0) / M_PER_KM
-            km += tripKm
-            println("DRIVE-93 trip $id ${"%.1f".format(tripKm)} km $counts")
+            // Rates are per covered km: the counts leave out everything outside the coverage, so the distance must too.
+            val base = (trip.trip.startedAt - SyntheticCapture.WALL0) / MS_PER_S
+            val coveredKm = if (coverage.spans.isEmpty()) tripKm else coveredM(parsed.fixes, coverage, base) / M_PER_KM
+            km += coveredKm
+            totalKm += tripKm
+            println("DRIVE-93 trip $id ${"%.1f".format(tripKm)} km, ${"%.1f".format(coveredKm)} km covered $counts")
             counts
         }
         val counts = EventHarness.total(perTrip)
-        println("DRIVE-93 labelled set ${set.name}: ${labelled.size} trips, ${"%.1f".format(km)} km, $counts")
+        val kms = "${"%.1f".format(totalKm)} km, ${"%.1f".format(km)} km covered"
+        println("DRIVE-93 labelled set ${set.name}: ${labelled.size} trips, $kms, $counts")
         counts.forEach { (type, c) -> println("DRIVE-93 ${report(type, c, km)}") }
         // The committed set is labelled by construction and judged in full; a field set needs enough confirmed labels.
         val minLabels = if (external) EventHarness.MIN_LABELS else 0
@@ -93,8 +100,15 @@ class LabelledSetTest {
 
     internal companion object {
         private const val M_PER_KM = 1000.0
+        private const val MS_PER_S = 1000.0
+        private const val NS_PER_S = 1e9
         private const val HUNDRED_KM = 100.0
         private const val PCT = 100.0
+
+        /** Track metres between consecutive fixes that both fall inside [coverage], in trip seconds (fixture t − [baseS]). */
+        fun coveredM(fixes: List<LocationSample>, coverage: Coverage, baseS: Double): Double = fixes.zipWithNext()
+            .filter { (a, b) -> listOf(a, b).all { (it.tMonoNs - SyntheticCapture.START_MONO_NS) / NS_PER_S - baseS in coverage } }
+            .sumOf { (a, b) -> A19Labeller.haversineM(a, b) }
 
         /** How a labelled fixture is replayed: a manual capture of its streams. The A19 tool uses it for the time base. */
         fun captureOf(id: String, p: FixtureCsv.Parsed) = CapturedTrip(

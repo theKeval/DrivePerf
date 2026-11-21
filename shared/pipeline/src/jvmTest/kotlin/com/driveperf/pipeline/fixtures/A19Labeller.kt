@@ -183,6 +183,10 @@ internal object A19Labeller {
         val covered = A19Reference.subtract(listOf(refSpan), frame.unstable)
             .map { max(0.0, toTrip(it.start))..min(tripEnd, toTrip(it.endInclusive)) }
             .filter { it.endInclusive - it.start >= MIN_SPAN_S }
+        // No coverage is not "all covered" (an empty Coverage means the whole trip): with nothing to judge, skip the pair.
+        if (covered.isEmpty()) {
+            return Entry(outId, null, null, "$head SKIP no reference coverage ≥ ${MIN_SPAN_S.roundToInt()} s in the trimmed window")
+        }
         val coverage = Coverage(covered)
         val refLabels = A19Reference.labels(frame).filter { l -> covered.any { s -> toTrip(l.tS) in s } }
         val labels = refLabels.map { LabelledEvent(it.type, toTrip(it.tS), it.uncertain) }
@@ -273,7 +277,7 @@ internal object A19Labeller {
 
     private fun trackM(fixes: List<LocationSample>): Double = fixes.zipWithNext().sumOf { (a, b) -> haversineM(a, b) }
 
-    private fun haversineM(a: LocationSample, b: LocationSample): Double {
+    fun haversineM(a: LocationSample, b: LocationSample): Double {
         val dLat = Math.toRadians(b.lat - a.lat)
         val dLng = Math.toRadians(b.lng - a.lng)
         val h = sin(dLat / 2) * sin(dLat / 2) + cos(Math.toRadians(a.lat)) * cos(Math.toRadians(b.lat)) * sin(dLng / 2) * sin(dLng / 2)

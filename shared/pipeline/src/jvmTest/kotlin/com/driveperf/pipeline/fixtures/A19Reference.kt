@@ -31,6 +31,7 @@ internal object A19Reference {
     private const val STABLE_STEP_DEG = 10.0
     private const val MIN_STRETCH_S = 120.0
     private const val SEGMENT_EDGE_S = 10.0
+    private const val GAP_GUARD_S = 1.0
     private const val MIN_OK_SHARE = 0.8
     private const val QUIET_G = 0.03
     private const val QUIET_DPS = 3.0
@@ -109,9 +110,10 @@ internal object A19Reference {
             if (rho >= MIN_GNSS_RHO) kept += seg to rho
         }
         val rho = if (kept.isEmpty()) bestRho else kept.sumOf { (s, r) -> r * s.count() } / kept.sumOf { (s, _) -> s.count() }
-        // Stretch edges are not ok (the centred mean and the filter run out of data there), so they are not covered.
-        val edge = (SEGMENT_EDGE_S * FS).toInt()
-        val covered = kept.map { (s, _) -> out.tS(s.first + edge)..out.tS(s.last - edge) }
+        // Covered is every run of valid frame samples: stretch edges are not ok (the centred mean and the filter run out
+        // of data there), and neither is an IMU gap over 200 ms, which the filter also smears by up to a guard second.
+        val covered = runs(out.ok).map { r -> (out.tS(r.first) + GAP_GUARD_S)..(out.tS(r.last) - GAP_GUARD_S) }
+            .filter { it.endInclusive > it.start }
         val unstable = merge(listOf(t0..out.tS(n - 1)).let { all -> subtract(all, covered) })
         return Frame(t0, out.lon, out.lat, out.vert, out.yaw, out.speed, out.ok, rho, unstable)
     }
@@ -407,6 +409,18 @@ internal object A19Reference {
     }
 
     // ---- Small maths ---------------------------------------------------------------------------------------------
+
+    /** Index runs where [ok] holds. */
+    fun runs(ok: BooleanArray): List<IntRange> {
+        val out = mutableListOf<IntRange>()
+        var start = -1
+        for (k in 0..ok.size) {
+            val on = k < ok.size && ok[k]
+            if (on && start < 0) start = k
+            if (!on && start >= 0) { out += start until k; start = -1 }
+        }
+        return out
+    }
 
     fun merge(spans: List<ClosedFloatingPointRange<Double>>): List<ClosedFloatingPointRange<Double>> {
         val out = mutableListOf<ClosedFloatingPointRange<Double>>()
