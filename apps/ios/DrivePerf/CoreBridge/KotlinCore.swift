@@ -91,6 +91,9 @@ final class CorePlatformBindings: NSObject, DrivePerfShared.PlatformBindings, @u
     func analyticsSink() -> any DrivePerfShared.AnalyticsSink { analytics }
     func watchdog() -> any DrivePerfShared.AutoDetectWatchdog { watchdogPort }
     func resumeNotice() -> any DrivePerfShared.AutoDetectResumeNotice { resumeNoticePort }
+    /// No device wake for the stop timer (DRIVE-223): the location session keeps a paused trip's app running, and the
+    /// core ends an overdue trip at its next input.
+    func stopAlarm() -> any DrivePerfShared.CaptureDeadlineAlarm { NoOpCaptureDeadlineAlarm.shared }
 }
 
 /// `AutoDetectWatchdog`.
