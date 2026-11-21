@@ -23,8 +23,10 @@ final class AppEnvironment {
     let flags = BuildFlags.fromBundle()
     let clock = SystemClock()
     let files = FileTripStore()
-    let triggers = WakeTriggerMonitor()
-    let location = CoreLocationSource()
+    /// DRIVE-222: what Core Location said about the location sessions, for field runs (`Capture/location-diagnostics.jsonl`).
+    static let locationLog = LocationDiagnosticsLog()
+    let triggers = WakeTriggerMonitor(log: AppEnvironment.locationLog)
+    let location = CoreLocationSource(log: AppEnvironment.locationLog)
     let motion = CoreMotionSource()
     let activity = CoreMotionActivitySource()
     let power = SystemPowerState()
@@ -55,7 +57,10 @@ final class AppEnvironment {
         clock: clock, location: location, motion: motion, activity: activity, power: power, parkedRegion: triggers,
         tripFiles: files)
     private(set) lazy var selfTest = SelfTestRunner(environment: self)
-    private let sessions = LocationServiceSessions()
+    private let sessions = LocationServiceSessions(log: AppEnvironment.locationLog)
+    /// DRIVE-222: after a restart iOS starts background location only once the app has been opened.
+    private let openedSinceBoot = OpenedSinceBoot()
+    private let rearmNotice = NotificationRearmNotice()
     private let authorization = CLLocationManager()
     private var launched = false
     private var launchTask: Task<Void, Never>?
@@ -106,6 +111,8 @@ final class AppEnvironment {
     /// received meanwhile wait in the recorder until recovery has been queued (ADR-002 §5, EC-RBT).
     func launch() {
         guard !launched, !Self.isCaptureOff else { return }
+        Self.locationLog.record(
+            "launch", ["app": AppRunState.current.rawValue, "openedSinceBoot": openedSinceBoot.state().rawValue])
         recorder.beginLaunch()
         refreshCapture()
         // Recreate location sessions even before the first unlock; the database must still wait (EC-RBT).
@@ -187,13 +194,13 @@ final class AppEnvironment {
         let always = status == .authorizedAlways
         let auto = preferences.preferences.autoTripsEnabled
         if canRecord {
-            sessions.hold(always: auto && always)
+            sessions.hold(always: auto && always, runState: AppRunState.current)
         } else {
             sessions.release()
         }
         if auto && always && files.isUnlockedSinceBoot() {
             if !triggersArmed {
-                triggers.startTriggers { [weak self] wake in self?.recorder.onWake(wake) }
+                triggers.startTriggers { [weak self] wake in self?.handleWake(wake) }
                 triggersArmed = true
             }
             motion.recordAccelerometerHistory()
@@ -210,9 +217,33 @@ final class AppEnvironment {
     /// The scene became active: re-read permissions and re-arm, then tell the core, which counts it as a check-in and
     /// moves the watchdog notice 24 h ahead (F-CAP-14.1, F-CAP-14.4).
     func foregrounded() {
+        // DRIVE-222: first, so `refreshCapture` sees the app in use and replaces a session made in the background.
+        if openedSinceBoot.state() != .opened {
+            Self.locationLog.record("first_foreground_since_boot")
+        }
+        openedSinceBoot.recordForeground()
+        rearmNotice.clear()
         refreshCapture()
+        location.renewInForeground()
         guard launched else { return }
         recorder.onForeground()
+    }
+
+    /// DRIVE-222: a wake in the background before the app was opened since the phone restarted cannot record (iOS
+    /// suspends the app ~10 s into the candidate), so the first one per boot posts "Auto-detect may be paused". The
+    /// wake still goes to the core: if iOS lets the location through after all, the trip records.
+    private func handleWake(_ wake: DPSharedBridge.WakeEvent) {
+        let runState = AppRunState.current
+        let opened = openedSinceBoot.state()
+        Self.locationLog.record(
+            "wake", ["kind": wake.kind.rawValue, "app": runState.rawValue, "openedSinceBoot": opened.rawValue])
+        if OpenedSinceBoot.shouldAsk(runState: runState, health: recorder.status.autoDetectHealth),
+            openedSinceBoot.claimNotice()
+        {
+            rearmNotice.post()
+            Self.locationLog.record("rearm_notice_posted")
+        }
+        recorder.onWake(wake)
     }
 
     /// Tells the core whether the OS triggers can run, from what the user can fix in Settings (Always location, Motion

@@ -156,4 +156,12 @@ final class TripNotificationRouteTests: XCTestCase {
                 actionID: UNNotificationDismissActionIdentifier, requestID: NotificationWatchdog.identifier,
                 category: NotificationWatchdog.category, tripID: ""))
     }
+
+    /// DRIVE-222: the post-restart notice opens the same sheet but is its own route (not counted as the watchdog).
+    func testRearmNoticeOpensTheStatusSheetAsItsOwnRoute() {
+        let notice = TripNotificationRoute(
+            actionID: UNNotificationDefaultActionIdentifier, requestID: NotificationRearmNotice.identifier,
+            category: NotificationWatchdog.category, tripID: "")
+        XCTAssertEqual(notice, .rearmAfterBoot)
+    }
 }

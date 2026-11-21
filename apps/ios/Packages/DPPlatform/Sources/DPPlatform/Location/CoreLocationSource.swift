@@ -9,12 +9,17 @@ import Foundation
 ///
 /// Callable from any thread (the Kotlin core calls ports from its own); Core Location runs on the main thread.
 /// Fixes are delivered one per batch at ~1 Hz. Dropping fixes cached from before a wake is the core's job.
+///
+/// DRIVE-222: a `CLBackgroundActivitySession` started in the background cannot keep the app running (Apple Developer
+/// Forums 767460: "A new CLBackgroundActivitySession can only be started from Foreground"). Every start, stop, session
+/// diagnostic and the first fix go to the diagnostics log, and `renewInForeground()` replaces a session started in
+/// the background once the user opens the app during a capture.
 public final class CoreLocationSource: LocationSourceBridge, @unchecked Sendable {
     private let engine: Engine
 
     @MainActor
-    public init(clock: SystemClock = SystemClock()) {
-        engine = Engine(clock: clock)
+    public init(clock: SystemClock = SystemClock(), log: LocationDiagnosticsLog? = nil) {
+        engine = Engine(clock: clock, log: log)
     }
 
     /// Turn off only for an A19 experiment on `liveUpdates` alone.
@@ -34,18 +39,31 @@ public final class CoreLocationSource: LocationSourceBridge, @unchecked Sendable
         onMain { engine.stop() }
     }
 
+    /// The app came to the foreground: a capture whose background session was started in the background gets a new
+    /// one, started now while the app is in use, so it keeps running after the user leaves the app again.
+    @MainActor
+    public func renewInForeground() {
+        engine.renewInForeground()
+    }
+
     @MainActor
     private final class Engine: NSObject, CLLocationManagerDelegate {
         var legacyKeepAlive = true
         private let clock: SystemClock
+        private let log: LocationDiagnosticsLog?
         private let manager = CLLocationManager()
         private var backgroundSession: CLBackgroundActivitySession?
+        private var sessionStartedInUse = false
+        private var sessionTask: Task<Void, Never>?
         private var liveTask: Task<Void, Never>?
         private var lastAccepted: Date?
         private var sink: (@Sendable ([LocationSample]) -> Void)?
+        private var startedAt: Date?
+        private var fixCount = 0
 
-        init(clock: SystemClock) {
+        init(clock: SystemClock, log: LocationDiagnosticsLog?) {
             self.clock = clock
+            self.log = log
             super.init()
             manager.delegate = self
             manager.activityType = .automotiveNavigation
@@ -58,15 +76,27 @@ public final class CoreLocationSource: LocationSourceBridge, @unchecked Sendable
         func start(sink: @escaping @Sendable ([LocationSample]) -> Void) {
             self.sink = sink
             guard liveTask == nil else { return }
-            backgroundSession = CLBackgroundActivitySession()
+            let runState = AppRunState.current
+            startedAt = Date()
+            fixCount = 0
+            log?.record("location_start", ["app": runState.rawValue, "keepAlive": legacyKeepAlive ? "on" : "off"])
+            beginBackgroundSession(runState: runState)
+            let log = log
             liveTask = Task { [weak self] in
+                var lastFlags: String?
                 do {
                     for try await update in CLLocationUpdate.liveUpdates(.automotiveNavigation) {
                         guard let self, !Task.isCancelled else { return }
+                        let flags = LocationDiagnosticKey.key(update)
+                        if flags != lastFlags {
+                            lastFlags = flags
+                            log?.record("live_update", ["flags": flags, "app": AppRunState.current.rawValue])
+                        }
                         if let location = update.location { self.ingest(location) }
                     }
                 } catch {
                     // The stream ended (authorization lost); the app reports permissions separately.
+                    log?.record("live_update", ["flags": "streamError"])
                 }
             }
             if legacyKeepAlive {
@@ -76,14 +106,64 @@ public final class CoreLocationSource: LocationSourceBridge, @unchecked Sendable
         }
 
         func stop() {
+            if startedAt != nil {
+                log?.record(
+                    "location_stop", ["fixes": String(fixCount), "app": AppRunState.current.rawValue])
+            }
+            startedAt = nil
             liveTask?.cancel()
             liveTask = nil
             manager.stopUpdatingLocation()
             manager.allowsBackgroundLocationUpdates = false
-            backgroundSession?.invalidate()
-            backgroundSession = nil
+            endBackgroundSession()
             lastAccepted = nil
             sink = nil
+        }
+
+        func renewInForeground() {
+            let runState = AppRunState.current
+            guard liveTask != nil, !sessionStartedInUse, runState.isInUse else { return }
+            log?.record("location_session_renewed", ["app": runState.rawValue])
+            let previous = backgroundSession
+            sessionTask?.cancel()
+            beginBackgroundSession(runState: runState)
+            previous?.invalidate()
+            if legacyKeepAlive {
+                manager.allowsBackgroundLocationUpdates = true
+                manager.startUpdatingLocation()
+            }
+        }
+
+        /// A new session; the caller invalidates any previous one after this, so there is no gap.
+        private func beginBackgroundSession(runState: AppRunState) {
+            let session = CLBackgroundActivitySession()
+            backgroundSession = session
+            sessionStartedInUse = runState.isInUse
+            let log = log
+            let started = runState.rawValue
+            sessionTask = Task {
+                var last: String?
+                do {
+                    for try await diagnostic in session.diagnostics {
+                        let key = LocationDiagnosticKey.key(diagnostic)
+                        guard key != last else { continue }
+                        last = key
+                        log?.record(
+                            "background_session_diagnostic",
+                            ["diagnostic": key, "startedIn": started, "app": AppRunState.current.rawValue])
+                    }
+                } catch {
+                    log?.record("background_session_diagnostic", ["diagnostic": "streamError", "startedIn": started])
+                }
+            }
+        }
+
+        private func endBackgroundSession() {
+            sessionTask?.cancel()
+            sessionTask = nil
+            backgroundSession?.invalidate()
+            backgroundSession = nil
+            sessionStartedInUse = false
         }
 
         func ingest(_ location: CLLocation) {
@@ -91,6 +171,12 @@ public final class CoreLocationSource: LocationSourceBridge, @unchecked Sendable
                 let sample = LocationMapping.sample(from: location, lastAccepted: lastAccepted, clock: clock)
             else { return }
             lastAccepted = location.timestamp
+            fixCount += 1
+            if fixCount == 1, let startedAt {
+                log?.record(
+                    "location_first_fix",
+                    ["afterS": String(Int(Date().timeIntervalSince(startedAt))), "app": AppRunState.current.rawValue])
+            }
             sink([sample])
         }
 
