@@ -155,3 +155,28 @@ public object NoOpAutoDetectResumeNotice : AutoDetectResumeNotice {
 
     override fun cancel(): Unit = Unit
 }
+
+/**
+ * A device wake for the trip's stop timer (pipeline-and-scoring.md §1.6, DRIVE-223). The core's own timers count on a
+ * clock that stops while the CPU sleeps, so a parked phone could keep a trip open until the next drive. This wake fires
+ * in deep sleep and Doze, so the trip ends near its stop time. Android supplies an allow-while-idle `AlarmManager`
+ * alarm; iOS keeps the default, which schedules nothing (its location session keeps the app running while paused).
+ * The core ends an overdue trip at its next input either way.
+ */
+public interface CaptureDeadlineAlarm {
+    /**
+     * Calls [onDue] once, at or after [atMonoNs] on the `Clock.monotonicNs` base, which counts while the phone sleeps.
+     * Replaces any pending wake. [onDue] may run on any thread.
+     */
+    public fun schedule(atMonoNs: Long, onDue: () -> Unit)
+
+    /** Removes the pending wake, if any. Safe to call when none is pending. */
+    public fun cancel()
+}
+
+/** A deadline wake that schedules nothing: tests and platforms whose timers keep running. */
+public object NoOpCaptureDeadlineAlarm : CaptureDeadlineAlarm {
+    override fun schedule(atMonoNs: Long, onDue: () -> Unit): Unit = Unit
+
+    override fun cancel(): Unit = Unit
+}

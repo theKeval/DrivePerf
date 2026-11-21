@@ -185,6 +185,8 @@ Times are monotonic. All values come from `PipelineConfig`, and **P-nn** refers 
 | `PAUSED` | motion sample | IMU at 10 Hz and `|userAccel| ≥ 0.03 g` | same | IMU back to 50 Hz immediately, so the pull-away is captured at full rate |
 | `PAUSED` | fix | Resume condition (§1.6) | `RECORDING` | IMU 50 Hz, `Mark RESUMED`, cancel `StopTimer` and `ImuIdleTimer` |
 | `PAUSED` | `StopTimer` | | `FINISHING` | `endedAt = stoppingBeganAt` (F-CAP-03 AC1) |
+| `PAUSED` | any event | `now ≥ stoppingBeganAt + stop timer` (overdue, DRIVE-223) | `FINISHING`, then the event | Ends the trip exactly as `StopTimer` would, before the event is handled. A user's passenger choice applies instead, with the same `endedAt` |
+| `FINISHING` | wake | | same | Kept; handled at `PROCESSED`, so the drive that woke the app starts a trip of its own (DRIVE-223) |
 | `RECORDING`, `PAUSED` | user Stop | Confirmed on S-DRV-02 | `FINISHING` | `endedAt = now` |
 | `RECORDING`, `PAUSED` | Passenger, keep | | `FINISHING` | `kind = PASSENGER`, no score, content lock lifted |
 | `RECORDING`, `PAUSED` | Passenger, don't save | | `IDLE` | Stop, delete all samples within 1 min |
@@ -220,6 +222,7 @@ Confirm is evaluated first, then reject, then the 180 s timeout. Motion alone ca
 | No GNSS (EC-TUN, underground parking) | IMU stillness (§2.4) for the same duration decides |
 | Resume | A fix no more than 5 s old with horizontal accuracy ≤ 30 m and speed ≥ 3.0 m/s (10.8 km/h). Walking, running or cycling at ≥ MEDIUM blocks resume. When no fix has arrived for ≥ 30 s, sustained non-still IMU windows for ≥ 3 s plus AUTOMOTIVE ≥ MEDIUM may also resume (EC-TUN); unknown stillness never qualifies. Any fresh fix, even inaccurate or stationary, blocks this fallback. IMU motion can raise its sampling rate while the stop timer keeps running. |
 | Stop timer, auto | 240 s from the start of the final stop (P-06, tuning range 120–480 s). The reducer uses that same start time for `ended_at`. Target Q10 |
+| Overdue stop (DRIVE-223) | Platform timers can stall while the CPU sleeps, but event times use a clock that counts in sleep. Any event in `PAUSED` at or after the stop deadline ends the trip first, and a resume (GNSS or EC-TUN) is never allowed past it. Android also backs the deadline with an allow-while-idle `ELAPSED_REALTIME_WAKEUP` alarm (no exact-alarm permission), so the trip ends near the stop rather than at the next input |
 | Stop timer, manual, no Stop tapped | 900 s (P-08). The Story says so (F-CAP-01 AC4) |
 | Auto trip < 500 m or < 120 s | `DISCARDED` (F-CAP-17) |
 | Manual trip < 500 m or < 120 s | Kept, "Short trip", no score |

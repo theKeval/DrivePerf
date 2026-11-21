@@ -69,6 +69,17 @@ class AutoTripNoticeTracker(private val analytics: Analytics) {
     /** The confirmed automatic trip that just ended, once; null after a manual trip or a rejected candidate. */
     @Synchronized
     fun takeEndedTrip(): String? = confirmedTripId.also { confirmedTripId = null }
+
+    /**
+     * The confirmed automatic trip that ended when [currentTripId] started straight after it, with no idle status in
+     * between (a wake that arrived while it was finishing, DRIVE-223); null while it is still the current trip.
+     */
+    @Synchronized
+    fun takeEndedTripBefore(currentTripId: String?): String? {
+        val ended = confirmedTripId?.takeIf { it != currentTripId }
+        if (ended != null) confirmedTripId = null
+        return ended
+    }
 }
 
 /**

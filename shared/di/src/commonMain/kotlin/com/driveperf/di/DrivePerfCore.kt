@@ -181,6 +181,7 @@ public object DrivePerfCore {
             files = internals.files,
             watchdog = platform.watchdog(),
             resumeNotice = platform.resumeNotice(),
+            stopAlarm = platform.stopAlarm(),
         ),
         persistence = CapturePersistence(
             store,

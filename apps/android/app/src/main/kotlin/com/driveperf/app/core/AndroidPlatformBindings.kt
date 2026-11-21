@@ -6,6 +6,7 @@ import com.driveperf.di.PlatformBindings
 import com.driveperf.domain.analytics.AnalyticsSink
 import com.driveperf.domain.capture.ActivitySource
 import com.driveperf.domain.capture.AutoDetectResumeNotice
+import com.driveperf.domain.capture.CaptureDeadlineAlarm
 import com.driveperf.domain.capture.LocationSource
 import com.driveperf.domain.capture.MotionSource
 import com.driveperf.domain.capture.ParkedRegionMonitor
@@ -15,7 +16,7 @@ import com.driveperf.foundation.Clock
 import com.driveperf.foundation.newId
 
 /** The `:apps:android:platform` adapters as the core's ports (ADR-002 section 5). */
-@Suppress("LongParameterList") // one value per port
+@Suppress("LongParameterList", "TooManyFunctions") // one value and one function per port
 class AndroidPlatformBindings(
     private val clock: Clock,
     private val location: LocationSource,
@@ -27,6 +28,7 @@ class AndroidPlatformBindings(
     private val deviceId: String,
     private val analytics: AnalyticsSink,
     private val resumeNotice: AutoDetectResumeNotice,
+    private val stopAlarm: CaptureDeadlineAlarm,
 ) : PlatformBindings {
     override fun clock(): Clock = clock
 
@@ -47,6 +49,8 @@ class AndroidPlatformBindings(
     override fun analyticsSink(): AnalyticsSink = analytics
 
     override fun resumeNotice(): AutoDetectResumeNotice = resumeNotice
+
+    override fun stopAlarm(): CaptureDeadlineAlarm = stopAlarm
 }
 
 /**

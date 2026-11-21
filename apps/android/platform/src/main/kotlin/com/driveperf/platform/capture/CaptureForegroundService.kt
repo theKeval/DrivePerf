@@ -102,6 +102,8 @@ class CaptureForegroundService : Service() {
             if (status.state != RecorderState.IDLE) {
                 active = true
                 idleTimeout?.cancel()
+                // The next drive can start as the last trip commits, with no idle status between them (DRIVE-223).
+                autoNotices.takeEndedTripBefore(status.tripId)?.let { ended -> appScope.launch { decodedNotice.post(ended) } }
                 recordingNotification(status, force = unitsChanged)?.let { notification ->
                     getSystemService(NotificationManager::class.java).notify(CaptureNotifications.NOTIFICATION_ID, notification)
                     autoNotices.onRecordingNoticeShown(status, isRecordingNoticeVisible(status.isManual))

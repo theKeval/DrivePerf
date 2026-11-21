@@ -86,6 +86,16 @@ class AutoTripNoticesTest {
     }
 
     @Test
+    fun `a trip followed at once by the next one is handed over when the next one appears`() {
+        val tracker = AutoTripNoticeTracker(analytics)
+        tracker.onRecordingNoticeShown(autoTrip, visible = true)
+        assertNull(tracker.takeEndedTripBefore("auto"))
+        assertEquals("auto", tracker.takeEndedTripBefore("next"))
+        assertNull(tracker.takeEndedTripBefore("next"))
+        assertNull(tracker.takeEndedTrip())
+    }
+
+    @Test
     fun `the ended trip is handed over once, and never for a manual trip or a candidate`() {
         val tracker = AutoTripNoticeTracker(analytics)
         assertNull(tracker.takeEndedTrip())

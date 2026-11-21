@@ -5,6 +5,8 @@ import com.driveperf.domain.analytics.AnalyticsSink
 import com.driveperf.domain.capture.ActivitySource
 import com.driveperf.domain.capture.AutoDetectResumeNotice
 import com.driveperf.domain.capture.AutoDetectWatchdog
+import com.driveperf.domain.capture.CaptureDeadlineAlarm
+import com.driveperf.domain.capture.NoOpCaptureDeadlineAlarm
 import com.driveperf.domain.capture.NoOpAutoDetectResumeNotice
 import com.driveperf.domain.capture.NoOpAutoDetectWatchdog
 import com.driveperf.domain.feedback.MarkEventNeeded
@@ -71,6 +73,12 @@ public interface PlatformBindings {
      * `UNUserNotificationCenter` adapter, Android an `AlarmManager` one. The default schedules nothing.
      */
     public fun resumeNotice(): AutoDetectResumeNotice = NoOpAutoDetectResumeNotice
+
+    /**
+     * The device wake behind the trip's stop timer (DRIVE-223). Android supplies an allow-while-idle `AlarmManager`
+     * alarm; iOS keeps the default, which schedules nothing.
+     */
+    public fun stopAlarm(): CaptureDeadlineAlarm = NoOpCaptureDeadlineAlarm
 }
 
 /** The core's own wiring that the per-feature factories need. Built only by [DrivePerfCore]. */

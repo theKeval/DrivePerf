@@ -262,7 +262,7 @@ class TripMachineTest {
     fun freshFixesAndLingeringAutomotiveNeverResumeFromImuMotion() {
         var state = drive(autoRecording(), 31, 65, 0.0, startNorth = 200.0).state
         state = m.reduce(state, MachineEvent.Activity(ns(66.0), listOf(activity(66.0, ActivityType.AUTOMOTIVE)))).state
-        for (i in 66..270) {
+        for (i in 66..269) { // a batch at 271 s is past the stop deadline and ends the trip (DRIVE-223)
             state = state.fixes(fix(i.toDouble(), 0.0, 200.0)).state
             val t = m.reduce(state, MachineEvent.Motion(ns(i + 1.0), motionRun(i.toDouble(), 1.0, noisy = true)))
             assertEquals(RecorderState.PAUSED, t.state.phase)
