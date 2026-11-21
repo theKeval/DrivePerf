@@ -61,6 +61,7 @@ final class AppEnvironment {
     /// DRIVE-222: after a restart iOS starts background location only once the app has been opened.
     private let openedSinceBoot = OpenedSinceBoot()
     private let rearmNotice = NotificationRearmNotice()
+    private var askedForTripId: String?
     private let authorization = CLLocationManager()
     private var launched = false
     private var launchTask: Task<Void, Never>?
@@ -156,6 +157,10 @@ final class AppEnvironment {
                 crashReporter.updateTrip(state: status.state, isManual: status.isManual)
             }
         }
+        // DRIVE-222: decided on the core's own status, after it has restored a saved pause (Codex P2 on #96).
+        Task { [weak self, recorder] in
+            for await status in recorder.statuses() { self?.askToOpenIfNeeded(status) }
+        }
         // Usage statistics: events wait in memory until the user has chosen (onboarding finished means S-ONB-13 was
         // answered), then are sent or dropped; a later change in Profile takes effect at once (F-ONB-08).
         usageAnalytics.attach(services.analytics)
@@ -229,21 +234,28 @@ final class AppEnvironment {
         recorder.onForeground()
     }
 
-    /// DRIVE-222: a wake in the background before the app was opened since the phone restarted cannot record (iOS
-    /// suspends the app ~10 s into the candidate), so the first one per boot posts "Auto-detect may be paused". The
-    /// wake still goes to the core: if iOS lets the location through after all, the trip records.
+    /// DRIVE-222: logs the wake, then hands it to the core.
     private func handleWake(_ wake: DPSharedBridge.WakeEvent) {
-        let runState = AppRunState.current
-        let opened = openedSinceBoot.state()
         Self.locationLog.record(
-            "wake", ["kind": wake.kind.rawValue, "app": runState.rawValue, "openedSinceBoot": opened.rawValue])
-        if OpenedSinceBoot.shouldAsk(runState: runState, health: recorder.status.autoDetectHealth),
-            openedSinceBoot.claimNotice()
-        {
-            rearmNotice.post()
-            Self.locationLog.record("rearm_notice_posted")
-        }
+            "wake",
+            ["kind": wake.kind.rawValue, "app": AppRunState.current.rawValue,
+             "openedSinceBoot": openedSinceBoot.state().rawValue])
         recorder.onWake(wake)
+    }
+
+    /// DRIVE-222: an automatic candidate started in the background before the app was opened since the phone restarted
+    /// cannot record (iOS suspends the app ~10 s in), so the first one per boot posts "Auto-detect may be paused".
+    /// Waiting for the core's candidate, not the wake, means a pause restored from storage (or Automatic trips off)
+    /// never asks: a wake can arrive before the core has started, while the status still shows the default `.on`. The
+    /// candidate goes on: if iOS lets the location through after all, the trip records.
+    private func askToOpenIfNeeded(_ status: DPSharedBridge.RecorderStatus) {
+        guard OpenedSinceBoot.shouldAsk(runState: AppRunState.current, status: status),
+            status.tripId != askedForTripId
+        else { return }
+        askedForTripId = status.tripId
+        guard openedSinceBoot.claimNotice() else { return }
+        rearmNotice.post()
+        Self.locationLog.record("rearm_notice_posted")
     }
 
     /// Tells the core whether the OS triggers can run, from what the user can fix in Settings (Always location, Motion

@@ -40,10 +40,12 @@ public struct OpenedSinceBoot {
         return BootDetector.isNewBoot(previous: foreground, current: bootTime) ? .notOpened : .opened
     }
 
-    /// Only a wake in the background can be refused: in the foreground the app is in use. A user pause or Automatic
-    /// trips off means no trip was expected anyway.
-    public static func shouldAsk(runState: AppRunState, health: AutoDetectHealth) -> Bool {
-        !runState.isInUse && (health == .on || health == .needsAttention)
+    /// Asks only for an automatic candidate the core started (so the wake passed its guards: Automatic trips on, no
+    /// pause, both restored from storage) while the app is in the background; in the foreground the app is in use.
+    /// The status before the core starts shows `.on` by default, so health alone would not do (Codex P2 on #96).
+    public static func shouldAsk(runState: AppRunState, status: RecorderStatus) -> Bool {
+        !runState.isInUse && status.state == .candidate && !status.isManual
+            && (status.autoDetectHealth == .on || status.autoDetectHealth == .needsAttention)
     }
 
     /// True once per boot, on the first call while the app has not been opened since the phone started. An unknown

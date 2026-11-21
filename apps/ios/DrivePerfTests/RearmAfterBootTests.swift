@@ -62,13 +62,43 @@ final class OpenedSinceBootTests: XCTestCase {
         XCTAssertEqual(opened.state(bootTime: restart), .opened)
     }
 
-    func testOnlyABackgroundWakeWithAutoDetectOnAsks() {
-        XCTAssertTrue(OpenedSinceBoot.shouldAsk(runState: .background, health: .on))
-        XCTAssertTrue(OpenedSinceBoot.shouldAsk(runState: .background, health: .needsAttention))
-        XCTAssertFalse(OpenedSinceBoot.shouldAsk(runState: .active, health: .on), "in use: location can start")
-        XCTAssertFalse(OpenedSinceBoot.shouldAsk(runState: .inactive, health: .on), "a user launch is in use")
-        XCTAssertFalse(OpenedSinceBoot.shouldAsk(runState: .background, health: .paused))
-        XCTAssertFalse(OpenedSinceBoot.shouldAsk(runState: .background, health: .off))
+    private func status(
+        _ state: RecorderState, health: AutoDetectHealth = .on, manual: Bool = false
+    ) -> RecorderStatus {
+        RecorderStatus(
+            state: state, tripId: state == .idle ? nil : "t1", isManual: manual, elapsedS: 0, distanceM: 0,
+            autoDetectEnabled: health != .off, autoDetectHealth: health)
+    }
+
+    func testOnlyAnAutomaticCandidateInTheBackgroundAsks() {
+        XCTAssertTrue(OpenedSinceBoot.shouldAsk(runState: .background, status: status(.candidate)))
+        XCTAssertTrue(
+            OpenedSinceBoot.shouldAsk(runState: .background, status: status(.candidate, health: .needsAttention)))
+        XCTAssertFalse(
+            OpenedSinceBoot.shouldAsk(runState: .active, status: status(.candidate)), "in use: location can start")
+        XCTAssertFalse(
+            OpenedSinceBoot.shouldAsk(runState: .inactive, status: status(.candidate)), "a user launch is in use")
+        XCTAssertFalse(
+            OpenedSinceBoot.shouldAsk(runState: .background, status: status(.recording, manual: true)),
+            "a manual start is not auto-detect")
+    }
+
+    /// Codex P2 on #96: paused, then a restart, then a wake before the core has started. The recorder's status is the
+    /// default `.idle` / `.on` then; the restored pause keeps the core idle, so nothing asks and the once-per-boot
+    /// notice is not used up.
+    func testAPausedUserIsNotAskedAfterARestartEvenBeforeTheCoreStarts() {
+        let opened = OpenedSinceBoot(defaults: defaults)
+        opened.recordForeground(bootTime: boot)
+        let restart = boot.addingTimeInterval(86_400)
+        let beforeCore = RecorderStatus.idle
+        XCTAssertEqual(beforeCore.autoDetectHealth, .on, "the default the wake sees before the core attaches")
+        XCTAssertFalse(OpenedSinceBoot.shouldAsk(runState: .background, status: beforeCore))
+        let restoredPause = status(.idle, health: .paused)
+        XCTAssertFalse(OpenedSinceBoot.shouldAsk(runState: .background, status: restoredPause))
+        XCTAssertFalse(
+            OpenedSinceBoot.shouldAsk(runState: .background, status: status(.candidate, health: .paused)))
+        XCTAssertFalse(OpenedSinceBoot.shouldAsk(runState: .background, status: status(.idle, health: .off)))
+        XCTAssertTrue(opened.claimNotice(bootTime: restart), "the slot for this boot is still free")
     }
 
     func testTheNoticeReusesTheWatchdogCopyUnderItsOwnIdentifier() {
