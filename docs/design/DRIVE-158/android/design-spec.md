@@ -167,7 +167,7 @@ Every state also renders in light/dark (`theme=light`), XL text (`text=xl`) and 
 |---|---|
 | Samsung | Keep DrivePerf awake on your Samsung. Samsung can put apps to sleep to save battery. When it does, drives don’t start on their own. Two settings fix it. Steps: Add DrivePerf to “Never sleeping apps” (Settings › Battery › Background usage limits) · Set app battery to “Unrestricted” (Settings › Apps › DrivePerf › Battery) |
 | Xiaomi | Keep DrivePerf awake on your Xiaomi. Xiaomi phones stop background apps to save battery. When that happens, drives don’t start on their own. Three settings fix it. Steps: Turn on Autostart (Settings › Apps › Manage apps › DrivePerf) · Set Battery saver to “No restrictions” (Settings › Apps › Manage apps › DrivePerf › Battery saver) · Lock DrivePerf in Recents (Open Recents, then pull DrivePerf down until the lock shows) |
-| OnePlus | Keep DrivePerf running on your OnePlus. Some phones pause apps in the background to save battery. When that happens, drives don’t start on their own. Two settings fix it. Steps: Allow background activity (Settings › Apps › DrivePerf › Battery usage) · Turn off battery optimisation for DrivePerf (Settings › Battery › Battery optimisation) |
+| OnePlus | Keep DrivePerf running on your OnePlus. Some phones pause apps in the background to save battery. When that happens, drives don’t start on their own. Three settings fix it. Steps: Allow background activity (Settings › Apps › DrivePerf › Battery usage) · Allow auto launch, so drives still start after an app update (Settings › Apps › DrivePerf › Battery usage › Allow auto launch; DRIVE-221) · Turn off battery optimisation for DrivePerf (Settings › Battery › Battery optimisation) |
 
 ### Free / Pro
 

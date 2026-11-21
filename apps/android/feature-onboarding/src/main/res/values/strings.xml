@@ -202,11 +202,13 @@
     <string name="onb_oem_xiaomi_step3_path">Open Recents, then pull DrivePerf down until the lock shows</string>
 
     <string name="onb_oem_oneplus_title">Keep DrivePerf running on your OnePlus</string>
-    <string name="onb_oem_oneplus_lead">Some phones pause apps in the background to save battery. When that happens, drives don’t start on their own. Two settings fix it.</string>
+    <string name="onb_oem_oneplus_lead">Some phones pause apps in the background to save battery. When that happens, drives don’t start on their own. Three settings fix it.</string>
     <string name="onb_oem_oneplus_step1">Allow background activity</string>
     <string name="onb_oem_oneplus_step1_path">Settings › Apps › DrivePerf › Battery usage</string>
-    <string name="onb_oem_oneplus_step2">Turn off battery optimisation for DrivePerf</string>
-    <string name="onb_oem_oneplus_step2_path">Settings › Battery › Battery optimisation</string>
+    <string name="onb_oem_oneplus_step2">Allow auto launch, so drives still start after an app update</string>
+    <string name="onb_oem_oneplus_step2_path">Settings › Apps › DrivePerf › Battery usage › Allow auto launch</string>
+    <string name="onb_oem_oneplus_step3">Turn off battery optimisation for DrivePerf</string>
+    <string name="onb_oem_oneplus_step3_path">Settings › Battery › Battery optimisation</string>
 
     <string name="onb_oem_oppo_title">Keep DrivePerf running on your Oppo</string>
     <string name="onb_oem_vivo_title">Keep DrivePerf running on your Vivo</string>

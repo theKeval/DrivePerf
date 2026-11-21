@@ -117,8 +117,14 @@ object OemGuides {
                     R.string.onb_oem_oneplus_step1, R.string.onb_oem_oneplus_step1_path, R.string.onb_oem_open_app_battery,
                     listOf(GuideLink.AppDetails),
                 ),
+                // OxygenOS 12+ refuses to start an app that is not allowed to auto launch, even for MY_PACKAGE_REPLACED,
+                // so without this switch automatic trips stay off after every app update until DrivePerf is opened (DRIVE-221).
                 GuideStep(
-                    R.string.onb_oem_oneplus_step2, R.string.onb_oem_oneplus_step2_path, R.string.onb_oem_open_battery_optimisation,
+                    R.string.onb_oem_oneplus_step2, R.string.onb_oem_oneplus_step2_path, R.string.onb_oem_open_app_battery,
+                    listOf(GuideLink.AppDetails),
+                ),
+                GuideStep(
+                    R.string.onb_oem_oneplus_step3, R.string.onb_oem_oneplus_step3_path, R.string.onb_oem_open_battery_optimisation,
                     listOf(GuideLink.BatteryOptimisationSettings),
                 ),
             ),

@@ -32,6 +32,10 @@ these steps.
   Pull-request runs of the same workflow count too, so numbers skip (the first beta builds were 0.1.0 (3) on both
   platforms). Re-running a failed run reuses its number: fine if the upload had not happened yet; otherwise start a
   new run.
+- **Build numbers on test phones:** a TestFlight build must have a higher build number than any Xcode-built
+  `com.driveperf.app` already on a tester's iPhone. If the numbers match, TestFlight shows **Open** and leaves the
+  local build in place (seen on Keval's iPhone with 0.1.0 (4), DRIVE-218). Delete the local build first, or ship a
+  higher number.
 - **Pull requests** that touch `fastlane/**` or a release workflow run one job, "Load the Fastlane lanes", which
   installs the bundle and lists the lanes. It has no secrets and no environment.
 
