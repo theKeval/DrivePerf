@@ -142,6 +142,8 @@ internal data class MachineState(
     val cruise: Cruise? = null,
     /** The user paused automatic detection (F-CAP-15); null when not paused. */
     val pause: AutoDetectPause? = null,
+    /** A wake that arrived while the last trip was finishing, handled once it is finalised (DRIVE-223). */
+    val pendingWake: MachineEvent.Wake? = null,
     /** The thermal state last written as a THERMAL mark in this trip, for the data-quality notes. */
     val markedThermal: ThermalState? = null,
     /** A LOW_BATTERY mark was written in this trip. */

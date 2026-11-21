@@ -8,6 +8,7 @@ import com.driveperf.domain.capture.ActivitySink
 import com.driveperf.domain.capture.ActivitySource
 import com.driveperf.domain.capture.AutoDetectResumeNotice
 import com.driveperf.domain.capture.AutoDetectWatchdog
+import com.driveperf.domain.capture.CaptureDeadlineAlarm
 import com.driveperf.domain.capture.GeoPoint
 import com.driveperf.domain.capture.LocationSample
 import com.driveperf.domain.capture.LocationSink
@@ -220,5 +221,37 @@ public class FakeAutoDetectResumeNotice : AutoDetectResumeNotice {
     override fun cancel() {
         scheduledAt = null
         cancels++
+    }
+}
+
+/** Records the stop-timer device wake the core schedules (DRIVE-223); [fire] delivers it as the platform would. */
+public class FakeCaptureDeadlineAlarm : CaptureDeadlineAlarm {
+    private var onDue: (() -> Unit)? = null
+
+    /** The pending deadline on the monotonic clock, or null when none is pending. */
+    public var scheduledAtMonoNs: Long? = null
+        private set
+
+    /** Number of [cancel] calls. */
+    public var cancels: Int = 0
+        private set
+
+    override fun schedule(atMonoNs: Long, onDue: () -> Unit) {
+        scheduledAtMonoNs = atMonoNs
+        this.onDue = onDue
+    }
+
+    override fun cancel() {
+        scheduledAtMonoNs = null
+        onDue = null
+        cancels++
+    }
+
+    /** Fires the pending wake, once. */
+    public fun fire() {
+        val due = onDue ?: return
+        scheduledAtMonoNs = null
+        onDue = null
+        due()
     }
 }

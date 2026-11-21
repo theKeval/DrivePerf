@@ -8,6 +8,7 @@ import com.driveperf.domain.capture.AutoDetectPauseLength
 import com.driveperf.domain.capture.AutoDetectPauseStore
 import com.driveperf.domain.capture.AutoDetectResumeNotice
 import com.driveperf.domain.capture.AutoDetectWatchdog
+import com.driveperf.domain.capture.CaptureDeadlineAlarm
 import com.driveperf.domain.capture.CaptureBatch
 import com.driveperf.domain.capture.CaptureHeader
 import com.driveperf.domain.capture.CaptureLog
@@ -17,6 +18,7 @@ import com.driveperf.domain.capture.FinalisedTrip
 import com.driveperf.domain.capture.LocationSample
 import com.driveperf.domain.capture.LocationSource
 import com.driveperf.domain.capture.MotionSource
+import com.driveperf.domain.capture.NoOpCaptureDeadlineAlarm
 import com.driveperf.domain.capture.NoOpAutoDetectResumeNotice
 import com.driveperf.domain.capture.NoOpAutoDetectWatchdog
 import com.driveperf.domain.capture.ParkedRegionMonitor
@@ -59,8 +61,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 
 /**
- * The device ports the recorder drives. [watchdog] schedules the F-CAP-14 notification and [resumeNotice] the F-CAP-15
- * "back on" notification; the defaults do nothing.
+ * The device ports the recorder drives. [watchdog] schedules the F-CAP-14 notification, [resumeNotice] the F-CAP-15
+ * "back on" notification and [stopAlarm] the device wake behind the stop timer (DRIVE-223); the defaults do nothing.
  */
 public data class CapturePorts(
     val location: LocationSource,
@@ -71,6 +73,7 @@ public data class CapturePorts(
     val files: TripFileStore,
     val watchdog: AutoDetectWatchdog = NoOpAutoDetectWatchdog,
     val resumeNotice: AutoDetectResumeNotice = NoOpAutoDetectResumeNotice,
+    val stopAlarm: CaptureDeadlineAlarm = NoOpCaptureDeadlineAlarm,
 )
 
 /**
@@ -117,6 +120,9 @@ public class TripRecorderEngine(
     private val inputs = Channel<Input>(Channel.UNLIMITED)
     private val mutableStatus = MutableStateFlow(RecorderStatus.IDLE)
     private val timers = mutableMapOf<TimerId, Job>()
+
+    /** A [CapturePorts.stopAlarm] wake is pending. Touched only on the engine coroutine. */
+    private var stopAlarmSet = false
 
     /** Recorded-accelerometer queries still running, by trip. Touched only on the engine coroutine. */
     private val backfills = mutableMapOf<String, CompletableDeferred<List<RecordedAccelSample>>>()
@@ -305,7 +311,7 @@ public class TripRecorderEngine(
             is MachineEffect.ArmParkedRegion -> ports.parkedRegion.arm(effect.center, effect.radiusM)
             is MachineEffect.QueryActivityHistory -> queryHistory(effect)
             is MachineEffect.Schedule -> schedule(effect)
-            is MachineEffect.Cancel -> timers.remove(effect.id)?.cancel()
+            is MachineEffect.Cancel -> cancelTimer(effect.id)
             is MachineEffect.ConfirmTrip -> confirmTrip(effect)
             is MachineEffect.RunBackfill -> runBackfill(effect)
             is MachineEffect.Append -> append(effect)
@@ -434,11 +440,28 @@ public class TripRecorderEngine(
         if (!ok) send { t -> MachineEvent.AppendFailed(t, effect.tripId, hadMotion = effect.batch.motion.isNotEmpty()) }
     }
 
+    /**
+     * Timers run as coroutine delays, which count on a clock that stops in deep sleep. The stop timer is also backed by
+     * the platform's device wake, so a parked trip ends near its stop time (DRIVE-223); whichever fires first ends it,
+     * and the reducer ignores the other.
+     */
     private fun schedule(effect: MachineEffect.Schedule) {
         timers.remove(effect.id)?.cancel()
         timers[effect.id] = scope.launch {
             delay(effect.delayNs / Units.NANOS_PER_MILLI)
             send { now -> MachineEvent.Timer(now, effect.id) }
+        }
+        if (effect.id == TimerId.STOP) {
+            stopAlarmSet = true
+            ports.stopAlarm.schedule(clock.monotonicNs() + effect.delayNs) { send { now -> MachineEvent.Timer(now, TimerId.STOP) } }
+        }
+    }
+
+    private fun cancelTimer(id: TimerId) {
+        timers.remove(id)?.cancel()
+        if (id == TimerId.STOP && stopAlarmSet) {
+            stopAlarmSet = false
+            ports.stopAlarm.cancel()
         }
     }
 

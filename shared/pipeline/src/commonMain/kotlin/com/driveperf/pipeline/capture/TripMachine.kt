@@ -40,7 +40,19 @@ import com.driveperf.pipeline.geo.Geo
 internal class TripMachine(private val cfg: CaptureConfig = CaptureConfig()) {
     private val cruiseRule = CruiseRule(cfg)
 
-    fun reduce(s: MachineState, e: MachineEvent): Transition = when (e) {
+    /**
+     * A stop timer that should have fired already ends the trip before [e] is handled (DRIVE-223): the platform timer
+     * runs on a clock that stalls in deep sleep, but `nowNs` does not, so a trip parked for hours never absorbs the next
+     * drive. A user's passenger choice is honoured instead, with the same end time ([onPassenger]).
+     */
+    fun reduce(s: MachineState, e: MachineEvent): Transition {
+        if (e is MachineEvent.Passenger || !s.isStopOverdue(e.nowNs)) return dispatch(s, e)
+        val stopped = finish(s, s.stoppingBeganAtNs ?: e.nowNs, EndReason.STOP_TIMER)
+        val next = dispatch(stopped.state, e)
+        return Transition(next.state, stopped.effects + next.effects)
+    }
+
+    private fun dispatch(s: MachineState, e: MachineEvent): Transition = when (e) {
         is MachineEvent.Fixes -> onFixes(s, e)
         is MachineEvent.Motion -> onMotion(s, e)
         is MachineEvent.Activity -> onActivity(s, e.samples, e.nowNs)
@@ -228,10 +240,15 @@ internal class TripMachine(private val cfg: CaptureConfig = CaptureConfig()) {
 
     // ---- wakes (§1.3, §1.4) ----
 
-    /** Every wake, even one that starts nothing, is a check-in: the app was woken (F-CAP-14 AC1). */
+    /**
+     * Every wake, even one that starts nothing, is a check-in: the app was woken (F-CAP-14 AC1). A wake while the last
+     * trip is finishing is kept and handled once it is finalised ([onFinalised]): it is usually the next drive, which
+     * woke the app that ended the last one (DRIVE-223).
+     */
     private fun onWake(s: MachineState, e: MachineEvent.Wake): Transition {
         val manual = e.wake.kind == WakeKind.MANUAL
         val t = when {
+            s.phase == FINISHING -> Transition(s.copy(pendingWake = e))
             manual && s.phase == CANDIDATE -> promoteToManual(s, e)
             s.phase != IDLE || s.dbLocked -> Transition(s)
             manual -> startCapture(s, e, manual = true)
@@ -482,6 +499,15 @@ internal class TripMachine(private val cfg: CaptureConfig = CaptureConfig()) {
 
     private fun stopSeconds(trip: ActiveTrip): Double = if (trip.manual) cfg.manualStopS else cfg.autoStopS
 
+    /** When the stop timer is due: [stoppingBeganAtNs] plus the stop time, while paused. */
+    private fun MachineState.stopDueNs(): Long? {
+        val began = stoppingBeganAtNs
+        val t = trip
+        return if (phase == PAUSED && began != null && t != null) began + secondsNs(stopSeconds(t)) else null
+    }
+
+    private fun MachineState.isStopOverdue(nowNs: Long): Boolean = stopDueNs()?.let { nowNs >= it } ?: false
+
     private fun resumeCheck(s: MachineState, fix: LocationSample, nowNs: Long): Transition {
         val fresh = nowNs - fix.tMonoNs in 0L..secondsNs(cfg.resumeFixAgeS)
         val accurate = fix.hAccM?.let { it in 0.0..cfg.resumeFixHAccM } == true
@@ -489,8 +515,10 @@ internal class TripMachine(private val cfg: CaptureConfig = CaptureConfig()) {
         return if (fresh && accurate && driving) resume(s, nowNs) else Transition(s)
     }
 
+    /** Never past the stop deadline: a trip whose stop timer is overdue ended at its stop (DRIVE-223). */
     private fun resume(s: MachineState, nowNs: Long): Transition {
-        val trip = s.trip ?: return Transition(s)
+        val trip = s.trip
+        if (trip == null || s.isStopOverdue(nowNs)) return finish(s, s.stoppingBeganAtNs ?: nowNs, EndReason.STOP_TIMER)
         val (hz, reason) = targetRate(s.copy(cruise = null))
         val rate = if (s.imuHz != hz && !s.imuStoppedForSpace) rateEffects(trip, hz, reason, nowNs) else emptyList()
         val next = s.copy(
@@ -664,7 +692,10 @@ internal class TripMachine(private val cfg: CaptureConfig = CaptureConfig()) {
         val trip = s.trip
         return when {
             !s.isLive() || trip == null -> Transition(s)
-            e.keep -> finish(s.copy(trip = trip.copy(kind = TripKind.PASSENGER)), e.nowNs, EndReason.PASSENGER)
+            e.keep -> {
+                val endNs = if (s.isStopOverdue(e.nowNs)) s.stoppingBeganAtNs ?: e.nowNs else e.nowNs
+                finish(s.copy(trip = trip.copy(kind = TripKind.PASSENGER)), endNs, EndReason.PASSENGER)
+            }
             else -> {
                 val here = s.lastFix?.let { GeoPoint(it.lat, it.lng) }
                 val arm = here?.let { listOf(MachineEffect.ArmParkedRegion(it, cfg.parkedRadiusM)) }.orEmpty()
@@ -689,10 +720,25 @@ internal class TripMachine(private val cfg: CaptureConfig = CaptureConfig()) {
         return Transition(s.copy(phase = FINISHING), track + fx)
     }
 
+    /**
+     * Back to idle, re-armed at the trip's end point. A wake kept while finishing is handled now, as if it arrived at
+     * [MachineEvent.Finalised]: its trip starts here, after the parking just recorded (DRIVE-223).
+     */
     private fun onFinalised(s: MachineState, e: MachineEvent.Finalised): Transition {
         if (s.phase != FINISHING) return Transition(s)
         val parking = e.parking ?: s.parking
-        return Transition(idle(s, parking), listOf(MachineEffect.StopGnss) + armAt(parking) + checkIn(s))
+        val ended = listOf(MachineEffect.StopGnss) + armAt(parking)
+        val next = s.pendingWake?.let { onWake(idle(s, parking), deferredWake(it, e.nowNs, parking)) }
+            ?: Transition(idle(s, parking), checkIn(s))
+        return Transition(next.state, ended + next.effects)
+    }
+
+    /** [wake] as handled at [nowNs]: a new trip starts then, bounded by the parking just recorded. */
+    private fun deferredWake(wake: MachineEvent.Wake, nowNs: Long, parking: Parking?): MachineEvent.Wake {
+        val waitedNs = maxOf(0L, nowNs - wake.nowNs)
+        val wallMs = wake.nowWallMs + waitedNs / Units.NANOS_PER_MILLI
+        val header = wake.newTrip.copy(startMonoNs = nowNs, startWallMs = wallMs, parking = parking)
+        return wake.copy(nowNs = nowNs, nowWallMs = wallMs, newTrip = header)
     }
 
     // ---- helpers ----
