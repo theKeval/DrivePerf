@@ -12,11 +12,18 @@ enum TripNotificationRoute: Equatable {
     case decoded(String)
     /// "Auto-detect may be paused" (F-CAP-14, S-LIVE-10): opens the capture status sheet.
     case watchdog
+    /// DRIVE-222: the same notice after a restart, before the app was opened: opens the status sheet, not counted as
+    /// `watchdog_opened` (the watchdog itself did not fire).
+    case rearmAfterBoot
 
     init?(actionID: String, requestID: String, category: String, tripID: String) {
         guard actionID == UNNotificationDefaultActionIdentifier else { return nil }
         if requestID == NotificationWatchdog.identifier {
             self = .watchdog
+            return
+        }
+        if requestID == NotificationRearmNotice.identifier {
+            self = .rearmAfterBoot
             return
         }
         guard !tripID.isEmpty, requestID == LocalNotifier.identifier(for: tripID) else { return nil }
@@ -58,6 +65,10 @@ final class TripSurfaceRouter {
             // The app was opened, so the scene's foreground check-in re-arms auto-detect; the sheet shows what, if
             // anything, to fix.
             recorder.onWatchdogOpened()
+            statusRequests.request()
+            return
+        case .rearmAfterBoot:
+            // Opening the app is the fix: the scene's foreground re-arms location; the sheet shows the state.
             statusRequests.request()
             return
         }

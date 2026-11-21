@@ -24,6 +24,7 @@ public final class WakeTriggerMonitor: NSObject, ParkedRegionMonitorBridge {
 
     private let clock: SystemClock
     private let spotStore: ParkedSpotStore
+    private let log: LocationDiagnosticsLog?
     private let filter = WakeFilter()
     private let slcManager = CLLocationManager()
     private let visitManager = CLLocationManager()
@@ -33,9 +34,13 @@ public final class WakeTriggerMonitor: NSObject, ParkedRegionMonitorBridge {
     private var regionUpdateTask: Task<Void, Never>?
     private var onWake: (@MainActor (WakeEvent) -> Void)?
 
-    public init(clock: SystemClock = SystemClock(), spotStore: ParkedSpotStore = ParkedSpotStore()) {
+    public init(
+        clock: SystemClock = SystemClock(), spotStore: ParkedSpotStore = ParkedSpotStore(),
+        log: LocationDiagnosticsLog? = nil
+    ) {
         self.clock = clock
         self.spotStore = spotStore
+        self.log = log
         processStartWallMs = clock.wallMs()
         super.init()
         slcManager.delegate = self
@@ -136,11 +141,12 @@ public final class WakeTriggerMonitor: NSObject, ParkedRegionMonitorBridge {
         let eventWallMs = date.wallMs
         let now = clock.wallMs()
         let foreground = UIApplication.shared.applicationState == .active
-        guard
-            filter.accepts(
-                source: source, eventWallMs: eventWallMs, nowWallMs: now, processStartWallMs: processStartWallMs,
-                appInForeground: foreground)
-        else { return }
+        let accepted = filter.accepts(
+            source: source, eventWallMs: eventWallMs, nowWallMs: now, processStartWallMs: processStartWallMs,
+            appInForeground: foreground)
+        // DRIVE-222: which trigger fired and whether it became a wake (no coordinates).
+        log?.record("trigger", ["source": source.key, "accepted": accepted ? "yes" : "no"])
+        guard accepted else { return }
         onWake?(WakeEvent(kind: kind, tMonoNs: clock.monotonicNs(atWall: date), wallMs: eventWallMs))
     }
 
@@ -158,14 +164,26 @@ extension WakeTriggerMonitor: @preconcurrency CLLocationManagerDelegate {
     }
 
     public func locationManager(_ manager: CLLocationManager, didVisit visit: CLVisit) {
-        guard visit.departureDate == .distantFuture else { return }
+        let arrival = visit.departureDate == .distantFuture
+        log?.record("trigger", ["source": "visit", "visit": arrival ? "arrival" : "departure"])
+        guard arrival else { return }
         handleVisitArrival(lat: visit.coordinate.latitude, lng: visit.coordinate.longitude)
     }
 }
 
 /// Drops wakes that would open a false trip candidate (spike change 8). Pure and unit-tested.
 public struct WakeFilter: Sendable {
-    public enum Source: Sendable { case region, significantChange }
+    public enum Source: Sendable {
+        case region, significantChange
+
+        /// The diagnostics-log key.
+        var key: String {
+            switch self {
+            case .region: "region"
+            case .significantChange: "significantChange"
+            }
+        }
+    }
 
     /// Every cold launch delivered a cached significant-change fix 504–52,106 s old in the spike.
     public var maxLocationAgeMs: Int64 = 300_000
