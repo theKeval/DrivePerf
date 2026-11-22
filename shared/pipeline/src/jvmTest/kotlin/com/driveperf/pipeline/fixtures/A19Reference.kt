@@ -301,10 +301,12 @@ internal object A19Reference {
     }
 
     /**
-     * Forward direction in the (e1, e2) plane and its best-lag correlation with GNSS `dv/dt`. GNSS sees only the
-     * longitudinal part, `a = w1·h1 + w2·h2` with `w` the forward unit vector, so `w` is the two-channel least-squares
-     * solution `(HᵀH)⁻¹Hᵀa`, normalised; `Hᵀa` alone leans towards lateral motion that correlates with speed changes.
-     * A stretch whose horizontal channels are (nearly) collinear cannot fix the axis and scores 0.
+     * Forward direction in the (e1, e2) plane and its correlation with GNSS `dv/dt`. GNSS sees only the longitudinal
+     * part, `a = w1·h1 + w2·h2` with `w` the forward unit vector, so `w` is the two-channel least-squares solution
+     * `(HᵀH)⁻¹Hᵀa`, normalised (`Hᵀa` alone leans towards lateral motion that correlates with speed changes). GNSS
+     * speed may lag the IMU by up to [GNSS_LAG_S], and rows paired across a lag fit a rotated axis, so the lag and the
+     * axis are searched together: each lag gets its own fit, and the best-scoring pair wins. A stretch whose horizontal
+     * channels are (nearly) collinear at every lag cannot fix the axis and scores 0.
      */
     fun forward(
         h1: DoubleArray,
@@ -312,20 +314,22 @@ internal object A19Reference {
         dvdt: List<Pair<Double, Double>>,
         t0: Double,
     ): Pair<Pair<Double, Double>, Double> {
-        val rows = dvdt.mapNotNull { (t, a) -> windowMean(h1, t, t0)?.let { m1 -> windowMean(h2, t, t0)?.let { Triple(m1, it, a) } } }
-        val (w1, w2) = leastSquares(rows)
-        val norm = sqrt(w1 * w1 + w2 * w2)
-        if (norm == 0.0) return (1.0 to 0.0) to 0.0
-        val u = w1 / norm to w2 / norm
-        val lon = DoubleArray(h1.size) { h1[it] * u.first + h2[it] * u.second }
-        var best = -1.0
+        var best: Pair<Pair<Double, Double>, Double> = (1.0 to 0.0) to 0.0
         var lag = -GNSS_LAG_S
         while (lag <= GNSS_LAG_S + 1e-9) {
-            val pairs = dvdt.mapNotNull { (t, a) -> windowMean(lon, t - lag, t0)?.let { it to a } }
-            best = max(best, pearson(pairs))
+            val rows = dvdt.mapNotNull { (t, a) ->
+                windowMean(h1, t - lag, t0)?.let { m1 -> windowMean(h2, t - lag, t0)?.let { Triple(m1, it, a) } }
+            }
+            val (w1, w2) = leastSquares(rows)
+            val norm = sqrt(w1 * w1 + w2 * w2)
+            if (norm > 0.0) {
+                val u = w1 / norm to w2 / norm
+                val rho = pearson(rows.map { (m1, m2, a) -> (m1 * u.first + m2 * u.second) to a })
+                if (rho > best.second) best = u to rho
+            }
             lag += STEP_S
         }
-        return u to best
+        return best
     }
 
     /** `(HᵀH)⁻¹Hᵀa` for rows `(h1, h2, a)`; (0, 0) when the two channels are (nearly) collinear. */

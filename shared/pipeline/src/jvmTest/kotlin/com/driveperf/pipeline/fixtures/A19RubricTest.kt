@@ -38,6 +38,25 @@ class A19RubricTest {
     }
 
     @Test
+    fun theForwardAxisIsFittedAtTheGnssLagNotAcrossIt() {
+        // GNSS dv/dt 1 s late, and lateral motion that follows the longitudinal by 1 s (brake, then turn): fitted across
+        // the lag, the lateral channel explains the late GNSS best and the axis swings far round. (A single sinusoid
+        // cannot tell lag from rotation: every lag fits it perfectly, so the drive here is broadband.)
+        val fs = A19Reference.FS
+        val n = (600 * fs).toInt()
+        fun lon(t: Double) = 0.2 * sin(0.3 * t) + 0.1 * sin(0.71 * t) + 0.05 * sin(1.37 * t)
+        val theta = 0.4
+        val lat = DoubleArray(n) { 0.8 * lon(it / fs - 1.0) + 0.03 * sin(2.1 * it / fs) }
+        val h1 = DoubleArray(n) { lon(it / fs) * cos(theta) + lat[it] * sin(theta) }
+        val h2 = DoubleArray(n) { lon(it / fs) * sin(theta) - lat[it] * cos(theta) }
+        val dvdt = (3 until 597).map { s -> s.toDouble() to (0 until fs.toInt()).map { lon(s - 1.0 - 0.5 + it / fs) }.average() }
+        val (u, rho) = A19Reference.forward(h1, h2, dvdt, 0.0)
+        val errDeg = Math.toDegrees(abs(atan2(u.second, u.first) - theta))
+        assertTrue(errDeg < 3.0, "forward axis off by $errDeg°")
+        assertTrue(rho > 0.99, "rho $rho")
+    }
+
+    @Test
     fun twoBrakesTheAppKeepsApartAreTwoLabels() {
         // 0.40 g for 1 s, 0.19 g for 1.2 s (between the loose and exact exit), then 0.38 g for 1 s, at 15 m/s.
         val fs = A19Reference.FS
