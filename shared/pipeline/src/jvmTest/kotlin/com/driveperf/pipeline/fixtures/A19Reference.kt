@@ -40,6 +40,9 @@ internal object A19Reference {
     private const val GNSS_LAG_S = 1.5
     private const val MIN_GNSS_RHO = 0.6
 
+    /** Horizontal channels whose correlation exceeds √(1 − this) are too collinear to fix the forward axis. */
+    private const val DEGENERATE_SHARE = 1e-3
+
     /** A12 §4.1 entry and exit thresholds in g, minimum duration in s. */
     data class Rule(val type: EventType, val enter: Double, val exit: Double, val minDurS: Double)
 
@@ -56,7 +59,6 @@ internal object A19Reference {
     private const val YAW_MARGIN_DPS = 1.0
     private const val IMPACT_G = 0.40
     private const val IMPACT_PAD = 15
-    private const val SAME_EVENT_S = 0.5
     private const val GNSS_DV_SHARE = 0.5
 
     /** The reference in its vehicle frame on a 25 Hz grid starting at [t0S] (reference trip seconds). */
@@ -298,62 +300,83 @@ internal object A19Reference {
         }
     }
 
-    /** Forward direction in the (e1, e2) plane by least squares against GNSS `dv/dt`, and its best-lag correlation. */
-    private fun forward(
+    /**
+     * Forward direction in the (e1, e2) plane and its best-lag correlation with GNSS `dv/dt`. GNSS sees only the
+     * longitudinal part, `a = w1·h1 + w2·h2` with `w` the forward unit vector, so `w` is the two-channel least-squares
+     * solution `(HᵀH)⁻¹Hᵀa`, normalised; `Hᵀa` alone leans towards lateral motion that correlates with speed changes.
+     * A stretch whose horizontal channels are (nearly) collinear cannot fix the axis and scores 0.
+     */
+    fun forward(
         h1: DoubleArray,
         h2: DoubleArray,
         dvdt: List<Pair<Double, Double>>,
         t0: Double,
     ): Pair<Pair<Double, Double>, Double> {
-        fun mean(x: DoubleArray, tS: Double): Double? {
-            val a = ((tS - 0.5 - t0) * FS).roundToInt()
-            val b = ((tS + 0.5 - t0) * FS).roundToInt()
-            if (a < 0 || b > x.size) return null
-            var sum = 0.0
-            for (k in a until b) sum += x[k]
-            return sum / (b - a)
-        }
-        var s1 = 0.0
-        var s2 = 0.0
-        for ((t, a) in dvdt) {
-            val m1 = mean(h1, t)
-            val m2 = mean(h2, t)
-            if (m1 != null && m2 != null) { s1 += m1 * a; s2 += m2 * a }
-        }
-        val norm = sqrt(s1 * s1 + s2 * s2)
+        val rows = dvdt.mapNotNull { (t, a) -> windowMean(h1, t, t0)?.let { m1 -> windowMean(h2, t, t0)?.let { Triple(m1, it, a) } } }
+        val (w1, w2) = leastSquares(rows)
+        val norm = sqrt(w1 * w1 + w2 * w2)
         if (norm == 0.0) return (1.0 to 0.0) to 0.0
-        val u = s1 / norm to s2 / norm
+        val u = w1 / norm to w2 / norm
         val lon = DoubleArray(h1.size) { h1[it] * u.first + h2[it] * u.second }
         var best = -1.0
         var lag = -GNSS_LAG_S
         while (lag <= GNSS_LAG_S + 1e-9) {
-            val pairs = dvdt.mapNotNull { (t, a) -> mean(lon, t - lag)?.let { it to a } }
+            val pairs = dvdt.mapNotNull { (t, a) -> windowMean(lon, t - lag, t0)?.let { it to a } }
             best = max(best, pearson(pairs))
             lag += STEP_S
         }
         return u to best
     }
 
+    /** `(HᵀH)⁻¹Hᵀa` for rows `(h1, h2, a)`; (0, 0) when the two channels are (nearly) collinear. */
+    private fun leastSquares(rows: List<Triple<Double, Double, Double>>): Pair<Double, Double> {
+        val s11 = rows.sumOf { it.first * it.first }
+        val s12 = rows.sumOf { it.first * it.second }
+        val s22 = rows.sumOf { it.second * it.second }
+        val s1 = rows.sumOf { it.first * it.third }
+        val s2 = rows.sumOf { it.second * it.third }
+        val det = s11 * s22 - s12 * s12
+        val solvable = s11 > 0.0 && s22 > 0.0 && det > DEGENERATE_SHARE * s11 * s22
+        return if (solvable) (s22 * s1 - s12 * s2) / det to (s11 * s2 - s12 * s1) / det else 0.0 to 0.0
+    }
+
+    /** Mean of [x] (a grid starting at [t0]) over the second centred on [tS], or null if it runs off the grid. */
+    private fun windowMean(x: DoubleArray, tS: Double, t0: Double): Double? {
+        val a = ((tS - 0.5 - t0) * FS).roundToInt()
+        val b = ((tS + 0.5 - t0) * FS).roundToInt()
+        if (a < 0 || b > x.size) return null
+        var sum = 0.0
+        for (k in a until b) sum += x[k]
+        return sum / (b - a)
+    }
+
     // ---- Rubric --------------------------------------------------------------------------------------------------
 
     private data class Hit(val start: Int, val end: Int, val peak: Int, val p: Double)
 
-    /** Every reference label: the loose pass finds candidates, the exact §4.1 pass with margins decides certainty. */
+    /**
+     * Every reference label. Each exact §4.1 event (thresholds as the app applies them) that is within the gate margins
+     * is a label of its own, certain unless [doubt] finds a check too close to call: two events the app keeps apart stay
+     * two labels. The loose pass (thresholds 10 % lower) only adds `uncertain` labels where no such exact event lies.
+     */
     fun labels(f: Frame): List<Label> = RULES.flatMap { rule ->
         val signs = if (rule.type == EventType.CORNER) listOf(1, -1) else listOf(if (rule.type == EventType.BRAKE) -1 else 1)
         signs.flatMap { sign ->
             val x = if (rule.type == EventType.CORNER) f.lat else f.lon
             val c = DoubleArray(f.n) { sign * x[it] }
-            val loose = detect(c, f.ok, rule.enter * (1 - NEAR), rule.exit * (1 - NEAR)).filter { h ->
-                h.durS() >= rule.minDurS - DUR_MARGIN_S && gateSpeed(f, rule, h) >= SPEED_GATE_MPS - SPEED_MARGIN_MPS &&
-                    (rule.type != EventType.CORNER || sign * f.yaw[h.peak] >= YAW_GATE_DPS - YAW_MARGIN_DPS)
-            }
+            fun gated(h: Hit) = h.durS() >= rule.minDurS - DUR_MARGIN_S && gateSpeed(f, rule, h) >= SPEED_GATE_MPS - SPEED_MARGIN_MPS &&
+                (rule.type != EventType.CORNER || sign * f.yaw[h.peak] >= YAW_GATE_DPS - YAW_MARGIN_DPS)
             val exact = detect(c, f.ok, rule.enter, rule.exit)
-            loose.map { h ->
-                val match = exact.filter { e -> abs(e.peak - h.peak) * STEP_S <= SAME_EVENT_S }
-                val why = if (match.isEmpty()) "below" else match.map { doubt(f, rule, it, sign) }.minByOrNull { it?.length ?: 0 }
-                Label(rule.type, f.tS(h.peak), h.p, why != null, why)
-            }
+            val kept = exact.filter(::gated)
+            val fromExact = kept.map { e -> doubt(f, rule, e, sign).let { why -> Label(rule.type, f.tS(e.peak), e.p, why != null, why) } }
+            val fromLoose = detect(c, f.ok, rule.enter * (1 - NEAR), rule.exit * (1 - NEAR)).filter(::gated)
+                .filter { h -> kept.none { e -> e.start <= h.end && h.start <= e.end } }
+                .map { h ->
+                    // Inside: an exact event the gates or margins set aside; none: the peak stays below the threshold.
+                    val inside = exact.filter { e -> e.start <= h.end && h.start <= e.end }.maxByOrNull { it.p }
+                    Label(rule.type, f.tS(h.peak), h.p, true, inside?.let { doubt(f, rule, it, sign) } ?: "below")
+                }
+            fromExact + fromLoose
         }
     }.sortedBy { it.tS }
 
