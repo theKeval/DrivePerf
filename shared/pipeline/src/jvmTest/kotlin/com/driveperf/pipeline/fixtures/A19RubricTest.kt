@@ -29,7 +29,7 @@ class A19RubricTest {
         val h2 = DoubleArray(n) { lon[it] * sin(theta) - lat[it] * cos(theta) }
         val perS = A19Reference.FS.toInt()
         val dvdt = (2 until 598).map { s ->
-            s.toDouble() to (0 until perS).map { lon[((s - 0.5) * A19Reference.FS).toInt() + it] }.average()
+            A19Reference.GnssDiff(s - 0.5, s + 0.5, (0 until perS).map { lon[((s - 0.5) * A19Reference.FS).toInt() + it] }.average())
         }
         val (u, rho) = A19Reference.forward(h1, h2, dvdt, 0.0)
         val errDeg = Math.toDegrees(abs(atan2(u.second, u.first) - theta))
@@ -49,10 +49,31 @@ class A19RubricTest {
         val lat = DoubleArray(n) { 0.8 * lon(it / fs - 1.0) + 0.03 * sin(2.1 * it / fs) }
         val h1 = DoubleArray(n) { lon(it / fs) * cos(theta) + lat[it] * sin(theta) }
         val h2 = DoubleArray(n) { lon(it / fs) * sin(theta) - lat[it] * cos(theta) }
-        val dvdt = (3 until 597).map { s -> s.toDouble() to (0 until fs.toInt()).map { lon(s - 1.0 - 0.5 + it / fs) }.average() }
+        val dvdt = (3 until 597).map { s ->
+            A19Reference.GnssDiff(s - 0.5, s + 0.5, (0 until fs.toInt()).map { lon(s - 1.5 + it / fs) }.average())
+        }
         val (u, rho) = A19Reference.forward(h1, h2, dvdt, 0.0)
         val errDeg = Math.toDegrees(abs(atan2(u.second, u.first) - theta))
         assertTrue(errDeg < 3.0, "forward axis off by $errDeg°")
+        assertTrue(rho > 0.99, "rho $rho")
+    }
+
+    @Test
+    fun theImuIsAveragedOverTheGnssDifferenceInterval() {
+        // Codex's case: 1 Hz fixes, so each central difference spans 2 s. Averaged over 1 s instead, the 1.37 rad/s
+        // component is attenuated differently on the two sides and the fit leans ~7° towards the lateral channel.
+        val fs = A19Reference.FS
+        val n = (600 * fs).toInt()
+        fun lon(t: Double) = 0.2 * sin(0.3 * t) + 0.2 * sin(1.37 * t)
+        val h1 = DoubleArray(n) { lon(it / fs) }
+        val h2 = DoubleArray(n) { 0.2 * sin(0.3 * it / fs) - 0.2 * sin(1.37 * it / fs) }
+        // A central difference is the mean acceleration over its 2 s interval.
+        val dvdt = (3 until 597).map { s ->
+            A19Reference.GnssDiff(s - 1.0, s + 1.0, (0 until 2 * fs.toInt()).map { h1[((s - 1.0) * fs).toInt() + it] }.average())
+        }
+        val (u, rho) = A19Reference.forward(h1, h2, dvdt, 0.0)
+        val errDeg = Math.toDegrees(abs(atan2(u.second, u.first)))
+        assertTrue(errDeg < 1.0, "forward axis off by $errDeg°")
         assertTrue(rho > 0.99, "rho $rho")
     }
 

@@ -32,6 +32,12 @@ internal object A19Reference {
     private const val MIN_STRETCH_S = 120.0
     private const val SEGMENT_EDGE_S = 10.0
     private const val GAP_GUARD_S = 1.0
+    private const val MOUNT_TURN_DEG = 30.0
+    private const val COURSE_MIN_MPS = 3.0
+    private const val COURSE_STEADY_DPS = 5.0
+    private const val OFFSET_SPAN_S = 120.0
+    private const val FULL_TURN_DEG = 360.0
+    private const val HALF_TURN_DEG = 180.0
     private const val MIN_OK_SHARE = 0.8
     private const val QUIET_G = 0.03
     private const val QUIET_DPS = 3.0
@@ -81,6 +87,11 @@ internal object A19Reference {
         val usable: Boolean get() = ok.any { it }
     }
 
+    /** GNSS longitudinal acceleration in g: the speed change over [fromS, toS] (reference seconds) divided by its length. */
+    data class GnssDiff(val fromS: Double, val toS: Double, val g: Double) {
+        val tS: Double get() = (fromS + toS) / 2
+    }
+
     /** One reference label in reference trip seconds; [why] names the first check an uncertain label failed. */
     data class Label(val type: EventType, val tS: Double, val peakG: Double, val uncertain: Boolean, val why: String? = null)
 
@@ -88,7 +99,8 @@ internal object A19Reference {
 
     /**
      * The reference's vehicle frame. The phone is meant to stay put, but it may slide or be moved: the drive is cut into
-     * steady stretches (10 s windows whose gravity direction stays within 10° of the stretch's), each ≥ 120 s stretch is
+     * steady stretches (10 s windows whose gravity direction stays within 10° of the stretch's and in which the phone did
+     * not turn flat in its mount, [MountCheck]), each ≥ 120 s stretch is
      * solved on its own, and only stretches whose forward axis correlates ≥ 0.6 with GNSS `dv/dt` are kept (`ok`).
      */
     fun frame(motion: List<MotionSample>, fixes: List<LocationSample>, tOf: (Long) -> Double): Frame {
@@ -106,7 +118,8 @@ internal object A19Reference {
         val quiet = quietMask(dvdt, gyro, out)
         val kept = mutableListOf<Pair<IntRange, Double>>()
         var bestRho = 0.0
-        for (seg in steadyStretches(sensorUp, okRaw)) {
+        val mount = MountCheck(gyro, sensorUp, fixes, tOf, out)
+        for (seg in steadyStretches(sensorUp, okRaw, mount::turned)) {
             val rho = solveStretch(seg, force, gyro, okRaw, quiet, dvdt, out)
             bestRho = max(bestRho, rho)
             if (rho >= MIN_GNSS_RHO) kept += seg to rho
@@ -121,7 +134,7 @@ internal object A19Reference {
     }
 
     /** Index ranges where the phone held still: 10 s windows within 10° of the stretch's first, ≥ 120 s long. */
-    private fun steadyStretches(up: List<DoubleArray>, ok: BooleanArray): List<IntRange> {
+    private fun steadyStretches(up: List<DoubleArray>, ok: BooleanArray, turned: (Int, Int) -> Boolean): List<IntRange> {
         val w = (STABLE_WINDOW_S * FS).toInt()
         val sub = FS.toInt()
         fun dir(a: Int, b: Int) = unit(DoubleArray(3) { c -> (a until b).sumOf { up[c][it] } })
@@ -136,7 +149,7 @@ internal object A19Reference {
         while (a + w <= ok.size) {
             val d = dir(a, a + w)
             // A window is steady when it has data and none of its 1 s means leaves its own direction by more than 10°.
-            val steady = (a until a + w).count { ok[it] } >= w * MIN_OK_SHARE &&
+            val steady = (a until a + w).count { ok[it] } >= w * MIN_OK_SHARE && !turned(a, a + w) &&
                 (a until a + w step sub).all { s -> angleDeg(dir(s, min(s + sub, a + w)), d) <= STABLE_STEP_DEG }
             when {
                 !steady -> close(a)
@@ -149,6 +162,50 @@ internal object A19Reference {
         return stretches
     }
 
+    /**
+     * Whether the phone turned about the vertical in its mount. A phone turned flat keeps its gravity direction, so the
+     * gravity test alone would join both orientations into one stretch and solve a diagonal forward axis. The phone's
+     * heading (integrated yaw) minus the car's (GNSS course) is the mount offset; it holds while the phone stays put. A
+     * window is turned when the offset moves by more than [MOUNT_TURN_DEG] between the nearest steady moving fixes either
+     * side of it (≥ 3 m/s, course changing ≤ 5°/s, at most 120 s apart), so a turn during a stop shows too. Without such
+     * fixes the window passes.
+     */
+    private class MountCheck(
+        gyro: List<DoubleArray>,
+        up: List<DoubleArray>,
+        fixes: List<LocationSample>,
+        tOf: (Long) -> Double,
+        private val out: Frame,
+    ) {
+        private val heading = DoubleArray(out.n)
+        private val steady: List<Pair<Double, Double>>
+
+        init {
+            for (k in 1 until out.n) heading[k] = heading[k - 1] + (0..2).sumOf { c -> gyro[c][k] * up[c][k] } * STEP_S
+            val moving = fixes.filter { (it.speedMps ?: 0.0) >= COURSE_MIN_MPS && it.courseDeg != null }
+                .map { tOf(it.tMonoNs) to it.courseDeg!! }.sortedBy { it.first }
+            // Mount offset at each steady fix: the car's counter-clockwise heading is minus its course.
+            steady = moving.indices.filter { i ->
+                val p = moving.getOrNull(i - 1)
+                val q = moving.getOrNull(i + 1)
+                p != null && q != null && q.first > p.first && abs(wrap(q.second - p.second)) / (q.first - p.first) <= COURSE_STEADY_DPS
+            }.mapNotNull { i ->
+                val (t, course) = moving[i]
+                val k = ((t - out.t0S) * FS).roundToInt()
+                if (k in 0 until out.n) t to heading[k] + course else null
+            }
+        }
+
+        fun turned(a: Int, b: Int): Boolean {
+            val before = steady.lastOrNull { it.first <= out.tS(a) }
+            val after = steady.firstOrNull { it.first >= out.tS(b) }
+            return before != null && after != null && after.first - before.first <= OFFSET_SPAN_S &&
+                abs(wrap(after.second - before.second)) > MOUNT_TURN_DEG
+        }
+
+        private fun wrap(deg: Double): Double = ((deg % FULL_TURN_DEG) + FULL_TURN_DEG + HALF_TURN_DEG) % FULL_TURN_DEG - HALF_TURN_DEG
+    }
+
     /** Solves one steady stretch into [out]; returns its forward-axis correlation with GNSS (written only if ≥ 0.6). */
     @Suppress("LongParameterList") // the stretch's input channels
     private fun solveStretch(
@@ -157,7 +214,7 @@ internal object A19Reference {
         gyro: List<DoubleArray>,
         okRaw: BooleanArray,
         quiet: BooleanArray,
-        dvdt: List<Pair<Double, Double>>,
+        dvdt: List<GnssDiff>,
         out: Frame,
     ): Double {
         val m = seg.count()
@@ -170,7 +227,7 @@ internal object A19Reference {
         val e1 = unit(cross(up, if (abs(up[0]) < 0.9) doubleArrayOf(1.0, 0.0, 0.0) else doubleArrayOf(0.0, 1.0, 0.0)))
         val e2 = cross(up, e1)
         val t0 = out.tS(seg.first)
-        val inSeg = dvdt.filter { (t, _) -> t >= t0 + 1 && t <= out.tS(seg.last) - 1 }
+        val inSeg = dvdt.filter { it.fromS >= t0 && it.toS <= out.tS(seg.last) }
         val (u, rho) = forward(DoubleArray(m) { dot(kin[it], e1) }, DoubleArray(m) { dot(kin[it], e2) }, inSeg, t0)
         if (rho < MIN_GNSS_RHO) return rho
         val fwd = DoubleArray(3) { u.first * e1[it] + u.second * e2[it] }
@@ -266,11 +323,11 @@ internal object A19Reference {
     }
 
     /** Samples where GNSS sees under 0.03 g of speed change and the phone turns under 3 °/s. */
-    private fun quietMask(dvdt: List<Pair<Double, Double>>, gyro: List<DoubleArray>, out: Frame): BooleanArray {
+    private fun quietMask(dvdt: List<GnssDiff>, gyro: List<DoubleArray>, out: Frame): BooleanArray {
         val a = DoubleArray(out.n) { Double.NaN }
-        for ((t, g) in dvdt) {
-            val k = ((t - out.t0S) * FS).roundToInt()
-            for (j in max(0, k - FS.toInt() / 2) until min(out.n, k + FS.toInt() / 2 + 1)) a[j] = g
+        for (d in dvdt) {
+            val k = ((d.tS - out.t0S) * FS).roundToInt()
+            for (j in max(0, k - FS.toInt() / 2) until min(out.n, k + FS.toInt() / 2 + 1)) a[j] = d.g
         }
         return BooleanArray(out.n) { k ->
             val turn = sqrt(gyro[0][k] * gyro[0][k] + gyro[1][k] * gyro[1][k] + gyro[2][k] * gyro[2][k])
@@ -291,12 +348,16 @@ internal object A19Reference {
         }
     }
 
-    /** GNSS longitudinal acceleration in g at fix times: central differences over fixes ≤ 2.5 s apart. */
-    private fun gnssAccel(fixes: List<LocationSample>, tOf: (Long) -> Double): List<Pair<Double, Double>> {
+    /**
+     * GNSS longitudinal acceleration in g: central differences over fixes ≤ 2.5 s apart. Each keeps its interval, since
+     * a central difference is exactly the mean acceleration over it, and the IMU must be averaged over the same span.
+     */
+    private fun gnssAccel(fixes: List<LocationSample>, tOf: (Long) -> Double): List<GnssDiff> {
         val s = fixes.filter { it.speedMps != null }.map { tOf(it.tMonoNs) to it.speedMps!! }.sortedBy { it.first }
         return (1 until s.size - 1).mapNotNull { i ->
             val dt = s[i + 1].first - s[i - 1].first
-            if (dt <= 0 || dt > GNSS_PAIR_MAX_S) null else s[i].first to (s[i + 1].second - s[i - 1].second) / dt / Units.G
+            val g = (s[i + 1].second - s[i - 1].second) / dt / Units.G
+            if (dt <= 0 || dt > GNSS_PAIR_MAX_S) null else GnssDiff(s[i - 1].first, s[i + 1].first, g)
         }
     }
 
@@ -311,14 +372,16 @@ internal object A19Reference {
     fun forward(
         h1: DoubleArray,
         h2: DoubleArray,
-        dvdt: List<Pair<Double, Double>>,
+        dvdt: List<GnssDiff>,
         t0: Double,
     ): Pair<Pair<Double, Double>, Double> {
         var best: Pair<Pair<Double, Double>, Double> = (1.0 to 0.0) to 0.0
         var lag = -GNSS_LAG_S
         while (lag <= GNSS_LAG_S + 1e-9) {
-            val rows = dvdt.mapNotNull { (t, a) ->
-                windowMean(h1, t - lag, t0)?.let { m1 -> windowMean(h2, t - lag, t0)?.let { Triple(m1, it, a) } }
+            val rows = dvdt.mapNotNull { d ->
+                val m1 = windowMean(h1, d.fromS - lag, d.toS - lag, t0)
+                val m2 = windowMean(h2, d.fromS - lag, d.toS - lag, t0)
+                if (m1 == null || m2 == null) null else Triple(m1, m2, d.g)
             }
             val (w1, w2) = leastSquares(rows)
             val norm = sqrt(w1 * w1 + w2 * w2)
@@ -344,10 +407,10 @@ internal object A19Reference {
         return if (solvable) (s22 * s1 - s12 * s2) / det to (s11 * s2 - s12 * s1) / det else 0.0 to 0.0
     }
 
-    /** Mean of [x] (a grid starting at [t0]) over the second centred on [tS], or null if it runs off the grid. */
-    private fun windowMean(x: DoubleArray, tS: Double, t0: Double): Double? {
-        val a = ((tS - 0.5 - t0) * FS).roundToInt()
-        val b = ((tS + 0.5 - t0) * FS).roundToInt()
+    /** Mean of [x] (a grid starting at [t0]) over [fromS, toS), or null if that runs off the grid. */
+    private fun windowMean(x: DoubleArray, fromS: Double, toS: Double, t0: Double): Double? {
+        val a = ((fromS - t0) * FS).roundToInt()
+        val b = max(a + 1, ((toS - t0) * FS).roundToInt())
         if (a < 0 || b > x.size) return null
         var sum = 0.0
         for (k in a until b) sum += x[k]

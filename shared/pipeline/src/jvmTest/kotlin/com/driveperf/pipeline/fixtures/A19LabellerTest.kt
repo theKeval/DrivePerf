@@ -2,6 +2,8 @@ package com.driveperf.pipeline.fixtures
 
 import com.driveperf.domain.trip.EventType
 import com.driveperf.domain.capture.LocationSample
+import com.driveperf.domain.capture.MotionSample
+import com.driveperf.domain.capture.Vec3
 import com.driveperf.pipeline.score.Coverage
 import com.driveperf.pipeline.score.EventHarness
 import com.driveperf.pipeline.score.LabelledEvent
@@ -11,6 +13,8 @@ import com.driveperf.testing.SyntheticCapture
 import com.driveperf.testing.SyntheticCapture.Mount
 import kotlinx.coroutines.runBlocking
 import kotlin.math.abs
+import kotlin.math.cos
+import kotlin.math.sin
 import kotlin.math.sqrt
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -136,6 +140,36 @@ class A19LabellerTest {
     }
 
     @Test
+    fun aPhoneTurnedFlatInItsMountSplitsTheStretch() {
+        // Over 2 s mid-drive the reference turns 60° about its own vertical: gravity stays put, so only the yaw against
+        // the GNSS course shows it. One stretch across both orientations would solve a diagonal forward axis.
+        val r = drive.reference
+        val before = A19Reference.frame(r.motion, r.fixes, r::tS)
+        val run = A19Reference.runs(before.ok).maxBy { it.count() }
+        val turnAt = before.tS((run.first + run.last) / 2)
+        val motion = r.motion.map { m -> m.turnedFlat(r.tS(m.tMonoNs) - turnAt) }
+        val turned = A19Labeller.Recording(r.id, r.platform, r.startWallMs, r.fixes, motion, r.activity)
+        val f = A19Reference.frame(turned.motion, turned.fixes, turned::tS)
+        assertTrue(f.unstable.any { turnAt + 1.0 in it }, "the turn is not covered: ${f.unstable}")
+        val lon = drive.refStreams.lonTruthG
+        val truth = A19Reference.a3(DoubleArray(f.n) { k -> (lon.getOrElse(2 * k) { 0.0 } + lon.getOrElse(2 * k + 1) { 0.0 }) / 2 })
+        val okK = (0 until f.n).filter { f.ok[it] }
+        val rms = sqrt(okK.sumOf { (f.lon[it] - truth[it]).let { d -> d * d } } / okK.size)
+        assertTrue(rms < 0.04, "vehicle-frame RMS error $rms g over the covered samples")
+    }
+
+    /** This sample with the phone turned flat by 60° over 2 s from [sinceTurnS] = 0: vectors rotate by −φ about z. */
+    private fun MotionSample.turnedFlat(sinceTurnS: Double): MotionSample {
+        val phi = Math.toRadians(TURN_DEG * (sinceTurnS / TURN_S).coerceIn(0.0, 1.0))
+        val c = cos(phi)
+        val s = sin(phi)
+        fun rot(v: Vec3) = Vec3(v.x * c + v.y * s, -v.x * s + v.y * c, v.z)
+        val spin = if (sinceTurnS in 0.0..TURN_S) TURN_DEG / TURN_S else 0.0
+        val gyro = rot(rotRateDps)
+        return copy(userAccelG = rot(userAccelG), gravityUp = rot(gravityUp), rotRateDps = gyro.copy(z = gyro.z + spin))
+    }
+
+    @Test
     fun aPairWithNoCoverageLeftIsSkippedNotWrittenAsFullyCovered() {
         // A 0.4 s IMU gap every 25 s: the reference still solves, but no covered run reaches 30 s.
         val gappy = drive.reference.withoutMotion { t -> t % 25.0 < 0.4 }
@@ -173,5 +207,7 @@ class A19LabellerTest {
         const val PRE_ROLL_S = 7.0
         const val CLOCK_ERROR_MS = 300L
         const val WALL = 1_800_000_000_000L
+        const val TURN_DEG = 60.0
+        const val TURN_S = 2.0
     }
 }
